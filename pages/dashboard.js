@@ -13,8 +13,6 @@ export default function Dashboard() {
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
     const [profitLossHistory, setProfitLossHistory] = useState([]);
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
     const summaryData = [
         { name: "Invested", value: totalInvested },
         { name: "Profit/Loss", value: totalProfitLoss }
@@ -37,7 +35,7 @@ export default function Dashboard() {
     // Lấy danh mục đầu tư từ API backend
     const fetchPortfolio = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/portfolio`);
+            const response = await fetch("https://crypto-manager-backend.onrender.com/api/portfolio");
             const data = await response.json();
             setPortfolio(data.portfolio);
             setTotalInvested(data.totalInvested);
@@ -51,7 +49,7 @@ export default function Dashboard() {
     // Lấy danh sách giao dịch từ API backend
     const fetchTransactions = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/transactions`);
+            const response = await fetch("https://crypto-manager-backend.onrender.com/api/transactions");
             const data = await response.json();
             setTransactions(data);
         } catch (error) {
@@ -74,7 +72,7 @@ export default function Dashboard() {
         };
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/transactions`, {
+            const response = await fetch("https://crypto-manager-backend.onrender.com/api/transactions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(newTransaction),
@@ -102,7 +100,7 @@ export default function Dashboard() {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/transactions/${id}`, {
+            const response = await fetch(`https://crypto-manager-backend.onrender.com/api/transactions/${id}`, {
                 method: "DELETE",
             });
 
