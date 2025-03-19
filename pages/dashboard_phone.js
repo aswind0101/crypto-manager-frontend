@@ -151,7 +151,7 @@ export default function Dashboard() {
         <div className="min-h-screen bg-gray-100">
             <Navbar />
             <div className="p-6">
-                <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+                <div className="bg-white p-6 rounded-lg shadow-md mb-6 text-gray-700">
                     <h2 className="text-xl font-semibold mb-4">Porfilio Summary</h2>
                     {/* Tổng quan danh mục đầu tư */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
