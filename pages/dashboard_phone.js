@@ -206,11 +206,8 @@ export default function Dashboard() {
                                         {getCoinIcon(coin.coin_symbol)}
                                         <h2 className="text-lg font-bold text-gray-700">{coin.coin_symbol}</h2>
                                     </div>
-                                    <p className="text-gray-500 text-sm">Current Price </p>
-                                    <p className="text-xl font-semibold">{coin.current_price.toLocaleString()}</p>
-
-                                    <p className="text-gray-500 text-sm">Average Price </p>
-                                    <p className="text-xl font-semibold">{coin.total_quantity > 0
+                                    <p className="text-gray-500 text-sm">Current Price - Average Price</p>-
+                                    <p className="text-xl font-semibold">{coin.current_price.toLocaleString()} - {coin.total_quantity > 0
                                         ? `$${((coin.total_invested - coin.total_sold) / coin.total_quantity).toFixed(2)}`
                                         : "N/A"}</p>
 
