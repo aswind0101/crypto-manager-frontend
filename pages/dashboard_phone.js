@@ -150,81 +150,79 @@ export default function Dashboard() {
     return (
         <div className="min-h-screen bg-gray-100">
             <Navbar />
-            <div className="p-6">
-                <div className="bg-white p-6 rounded-lg shadow-md mb-6 text-gray-700">
-                    <h2 className="text-xl font-semibold mb-4">Porfilio Summary</h2>
-                    {/* Tổng quan danh mục đầu tư */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Card Tổng Đầu Tư */}
-                        <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
-                            <span className="text-2xl font-bold text-gray-700 flex items-center">
-                                <span className="mr-2">💰</span> Total Invested
+            <div className="bg-white p-6 rounded-lg shadow-md mb-6 text-gray-700">
+                <h2 className="text-xl font-semibold mb-4">Porfilio Summary</h2>
+                {/* Tổng quan danh mục đầu tư */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Card Tổng Đầu Tư */}
+                    <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
+                        <span className="text-2xl font-bold text-gray-700 flex items-center">
+                            <span className="mr-2">💰</span> Total Invested
                             </span>
-                            <p className="text-3xl font-bold text-blue-600 mt-2">
-                                ${totalInvested.toLocaleString()}
-                            </p>
-                            <ResponsiveContainer width="100%" height={80}>
-                                <BarChart data={[{ name: "Invested", value: totalInvested }]}>
-                                    <XAxis dataKey="name" hide />
-                                    <YAxis hide domain={[0, totalInvested * 1.2]} />
-                                    <Bar dataKey="value" fill="#4A90E2" barSize={50} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-
-                        {/* Card Tổng Lợi Nhuận */}
-                        <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
-                            <span className="text-2xl font-bold text-gray-700 flex items-center">
-                                <span className="mr-2">📉</span> Total Profit/Loss
-                            </span>
-                            <p className={`text-3xl font-bold mt-2 ${totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                ${totalProfitLoss.toLocaleString()}
-                            </p>
-                            <ResponsiveContainer width="100%" height={80}>
-                                <LineChart data={[
-                                    { time: "Start", value: totalProfitLoss * 0.9 },
-                                    { time: "Mid", value: totalProfitLoss },
-                                    { time: "Now", value: totalProfitLoss * 1.1 }
-                                ]}>
-                                    <XAxis dataKey="time" hide />
-                                    <YAxis hide />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="value"
-                                        stroke={totalProfitLoss >= 0 ? "#27AE60" : "#E74C3C"} // Xanh nếu lợi nhuận dương, đỏ nếu âm
-                                        strokeWidth={6}
-                                        dot={{ r: 2 }}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                        {/* GRID HIỂN THỊ CÁC COIN */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {portfolio.map((coin, index) => (
-                                <div key={index} className="bg-white p-4 rounded-lg shadow-lg flex flex-col items-center border border-gray-300">
-                                    <div className="flex items-center gap-2">
-                                        {getCoinIcon(coin.coin_symbol)}
-                                        <h2 className="text-lg font-bold text-gray-700">{coin.coin_symbol}</h2>
-                                    </div>
-                                    <p className="text-gray-500 text-sm">Current Price - Average Price</p>
-                                    <p className="text-xl font-semibold">${coin.current_price.toLocaleString()} - {coin.total_quantity > 0
-                                        ? `$${((coin.total_invested - coin.total_sold) / coin.total_quantity).toFixed(2)}`
-                                        : "N/A"}</p>
-                                    <p className="text-gray-500 text-sm">Total Quantity</p>
-                                    <p className="text-xl font-semibold">{coin.total_quantity.toLocaleString()}</p>
-
-                                    <p className="text-gray-500 text-sm mt-2">Current Value</p>
-                                    <p className="text-xl font-semibold text-blue-600">${coin.current_value.toLocaleString()}</p>
-
-                                    <p className="text-gray-500 text-sm mt-2">Profit/Loss</p>
-                                    <p className={`text-xl font-semibold ${coin.profit_loss >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                        ${coin.profit_loss.toLocaleString()}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-
+                        <p className="text-3xl font-bold text-blue-600 mt-2">
+                            ${totalInvested.toLocaleString()}
+                        </p>
+                        <ResponsiveContainer width="100%" height={80}>
+                            <BarChart data={[{ name: "Invested", value: totalInvested }]}>
+                                <XAxis dataKey="name" hide />
+                                <YAxis hide domain={[0, totalInvested * 1.2]} />
+                                <Bar dataKey="value" fill="#4A90E2" barSize={50} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
+
+                    {/* Card Tổng Lợi Nhuận */}
+                    <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
+                        <span className="text-2xl font-bold text-gray-700 flex items-center">
+                            <span className="mr-2">📉</span> Total Profit/Loss
+                            </span>
+                        <p className={`text-3xl font-bold mt-2 ${totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            ${totalProfitLoss.toLocaleString()}
+                        </p>
+                        <ResponsiveContainer width="100%" height={80}>
+                            <LineChart data={[
+                                { time: "Start", value: totalProfitLoss * 0.9 },
+                                { time: "Mid", value: totalProfitLoss },
+                                { time: "Now", value: totalProfitLoss * 1.1 }
+                            ]}>
+                                <XAxis dataKey="time" hide />
+                                <YAxis hide />
+                                <Line
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke={totalProfitLoss >= 0 ? "#27AE60" : "#E74C3C"} // Xanh nếu lợi nhuận dương, đỏ nếu âm
+                                    strokeWidth={6}
+                                    dot={{ r: 2 }}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                    {/* GRID HIỂN THỊ CÁC COIN */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        {portfolio.map((coin, index) => (
+                            <div key={index} className="bg-white p-4 rounded-lg shadow-lg flex flex-col items-center border border-gray-300">
+                                <div className="flex items-center gap-2">
+                                    {getCoinIcon(coin.coin_symbol)}
+                                    <h2 className="text-lg font-bold text-gray-700">{coin.coin_symbol}</h2>
+                                </div>
+                                <p className="text-gray-500 text-sm">Current Price - Average Price</p>
+                                <p className="text-xl font-semibold">${coin.current_price.toLocaleString()} - {coin.total_quantity > 0
+                                    ? `$${((coin.total_invested - coin.total_sold) / coin.total_quantity).toFixed(2)}`
+                                    : "N/A"}</p>
+                                <p className="text-gray-500 text-sm">Total Quantity</p>
+                                <p className="text-xl font-semibold">{coin.total_quantity.toLocaleString()}</p>
+
+                                <p className="text-gray-500 text-sm mt-2">Current Value</p>
+                                <p className="text-xl font-semibold text-blue-600">${coin.current_value.toLocaleString()}</p>
+
+                                <p className="text-gray-500 text-sm mt-2">Profit/Loss</p>
+                                <p className={`text-xl font-semibold ${coin.profit_loss >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                    ${coin.profit_loss.toLocaleString()}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+
                 </div>
             </div>
         </div>
