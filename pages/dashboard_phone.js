@@ -206,6 +206,9 @@ export default function Dashboard() {
                                         {getCoinIcon(coin.coin_symbol)}
                                         <h2 className="text-lg font-bold text-gray-700">{coin.coin_symbol}</h2>
                                     </div>
+                                    <p className="text-gray-500 text-sm">Current Price </p>
+                                    <p className="text-xl font-semibold">{coin.current_price.toLocaleString()}</p>
+
                                     <p className="text-gray-500 text-sm">Total Quantity</p>
                                     <p className="text-xl font-semibold">{coin.total_quantity.toLocaleString()}</p>
 
