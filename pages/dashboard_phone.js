@@ -162,11 +162,11 @@ export default function Dashboard() {
                         <p className="text-3xl font-bold text-blue-600 mt-2">
                             ${totalInvested.toLocaleString()}
                         </p>
-                        <ResponsiveContainer width="100%" height={80}>
+                        <ResponsiveContainer width="100%" height={60}>
                             <BarChart data={[{ name: "Invested", value: totalInvested }]}>
                                 <XAxis dataKey="name" hide />
-                                <YAxis hide domain={[0, totalInvested * 1.2]} />
-                                <Bar dataKey="value" fill="#4A90E2" barSize={50} />
+                                <YAxis hide domain={[0, Math.max(totalInvested * 1.2, 100)]} />
+                                <Bar dataKey="value" fill="#4A90E2" barSize={20} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
