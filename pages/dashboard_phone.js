@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import React from "react";
 import Navbar from "../components/Navbar";
 import {
-    PieChart, Pie, Cell, Legend, BarChart, Bar, XAxis, YAxis, Tooltip,
-    ResponsiveContainer, LabelList, CartesianGrid, LineChart, Line
+    ResponsiveContainer, RadialBarChart, RadialBar, PieChart, Pie, Cell 
 } from "recharts";
 import { FaBitcoin, FaEthereum, FaCoins } from "react-icons/fa";
 
@@ -13,12 +12,20 @@ export default function Dashboard() {
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
     const [profitLossHistory, setProfitLossHistory] = useState([]);
+    const [totalCurrentValue, setTotalCurrentValue] = useState(0);
+    const totalProfitPositive = totalProfitLoss >= 0; // Kiểm tra tổng danh mục có lời hay lỗ
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
     const summaryData = [
         { name: "Invested", value: totalInvested },
         { name: "Profit/Loss", value: totalProfitLoss }
+    ];
+
+    // Dữ liệu hiển thị biểu đồ tròn
+    const data = [
+        { name: "Current", value: totalCurrentValue, color: "#32CD32" }, // Xanh lá
+        { name: "Remaining", value: totalInvested - totalCurrentValue, color: "#FF0000" } // Đỏ nếu bị lỗ
     ];
 
     // State quản lý giao dịch
@@ -35,7 +42,7 @@ export default function Dashboard() {
         return () => clearInterval(interval); // Xóa interval khi unmount
     }, []);
     //Tính tổng giá trị hiện tại
-    const [totalCurrentValue, setTotalCurrentValue] = useState(0);
+    
 
 
     // Lấy danh mục đầu tư từ API backend
@@ -129,15 +136,11 @@ export default function Dashboard() {
         name: p.coin_symbol,
         value: parseFloat(p.total_invested),
     }));*/
-    const totalInvestment = portfolio.reduce((sum, coin) => sum + coin.total_invested, 0);
-
-    const colors = ["#4CAF50", "#FF9800", "#2196F3", "#9C27B0", "#E91E63", "#FFC107"];
-    const profitLossColor = totalProfitLoss >= 0 ? "#4CAF50" : "#E91E63";
-
-    const pieData = portfolio.map((coin) => ({
+   
+    const portfolioData = portfolio.map(coin => ({
         name: coin.coin_symbol,
-        percentageValue: ((coin.total_invested / totalInvestment) * 100).toFixed(2),
-        percentage: `${((coin.total_invested / totalInvestment) * 100).toFixed(2)}%`,
+        value: coin.current_value,
+        fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000" // Xanh nếu lời, đỏ nếu lỗ
     }));
 
     const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#A28CFF"];
@@ -157,60 +160,45 @@ export default function Dashboard() {
         <div className="min-h-screen bg-gray-100">
             <Navbar />
             <div className="bg-white p-6 rounded-lg shadow-md mb-6 text-gray-700">
-                <h2 className="text-xl font-semibold mb-4">Porfolio Summary</h2>
+                <h2 className="text-xl text-center font-semibold mb-4 ">Porfolio Summary</h2>
                 {/* Tổng quan danh mục đầu tư */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Card Tổng Đầu Tư */}
-                    <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
-                        <span className="text-2xl font-bold text-gray-700 flex items-center">
-                            <span className="mr-2">💰</span> Total Invested
-                        </span>
-                        <p className="text-3xl font-bold text-blue-600 mt-2">
-                            ${totalInvested.toLocaleString()}
-                        </p>
-                        <ResponsiveContainer width="100%" height={60}>
-                            <BarChart data={[{ name: "Invested", value: totalInvested }]}>
-                                <XAxis dataKey="name" hide />
-                                <YAxis hide domain={[0, Math.max(totalInvested * 1.2, 100)]} />
-                                <Bar dataKey="value" fill="#4A90E2" barSize={20} />
-                            </BarChart>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    {/* Biểu đồ hiển thị Total Profit/Loss */}
+                    <div className="relative w-full h-80 flex justify-center items-center mb-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RadialBarChart
+                                innerRadius="70%"
+                                outerRadius="100%"
+                                data={portfolio.map(coin => ({
+                                    name: coin.coin_symbol,
+                                    value: coin.current_value,
+                                    fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
+                                }))}
+                                startAngle={180}
+                                endAngle={0}
+                            >
+                                <RadialBar minAngle={15} background clockWise dataKey="value" />
+                            </RadialBarChart>
                         </ResponsiveContainer>
+                        <div className="absolute text-center">
+                            <p className={`text-xl font-bold ${totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
+                            </p>
+                            <p className="text-xs text-gray-500">Total Profit/Loss</p>
+                            {/* Tổng đầu tư và tổng giá trị hiện tại */}
+                            <div className="flex justify-between w-full mt-4 px-6 text-center">
+                                <div className="flex flex-col items-center">
+                                    <span className="text-lg font-bold text-gray-700">💰 Invested</span>
+                                    <p className="text-lg font-bold text-blue-600">${totalInvested.toLocaleString()}</p>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <span className="text-lg font-bold text-gray-700">📊 Current Value</span>
+                                    <p className="text-lg font-bold text-green-600">${totalCurrentValue.toLocaleString()}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    {/* Card Tổng Giá Trị Hiện Tại */}
-                    <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
-                        <span className="text-2xl font-bold text-gray-700 flex items-center">
-                            <span className="mr-2">📊</span> Total Current Value
-                        </span>
-                        <p className="text-3xl font-bold text-green-600 mt-2">
-                            ${totalCurrentValue.toLocaleString()}
-                        </p>
-                    </div>
-                    {/* Card Tổng Lợi Nhuận */}
-                    <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
-                        <span className="text-2xl font-bold text-gray-700 flex items-center">
-                            <span className="mr-2">📉</span> Total Profit/Loss
-                        </span>
-                        <p className={`text-3xl font-bold mt-2 ${totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            ${totalProfitLoss.toLocaleString()}
-                        </p>
-                        <ResponsiveContainer width="100%" height={80}>
-                            <LineChart data={[
-                                { time: "Start", value: totalProfitLoss * 0.9 },
-                                { time: "Mid", value: totalProfitLoss },
-                                { time: "Now", value: totalProfitLoss * 1.1 }
-                            ]}>
-                                <XAxis dataKey="time" hide />
-                                <YAxis hide />
-                                <Line
-                                    type="monotone"
-                                    dataKey="value"
-                                    stroke={totalProfitLoss >= 0 ? "#27AE60" : "#E74C3C"} // Xanh nếu lợi nhuận dương, đỏ nếu âm
-                                    strokeWidth={6}
-                                    dot={{ r: 2 }}
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
+
                     {/* GRID HIỂN THỊ CÁC COIN */}
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         {portfolio.map((coin, index) => (
@@ -239,6 +227,7 @@ export default function Dashboard() {
 
                 </div>
             </div>
+
         </div>
     );
 }
