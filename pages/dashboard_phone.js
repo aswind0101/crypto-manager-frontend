@@ -34,6 +34,9 @@ export default function Dashboard() {
         const interval = setInterval(fetchPortfolio, 60000); // Cập nhật mỗi 10 giây
         return () => clearInterval(interval); // Xóa interval khi unmount
     }, []);
+    //Tính tổng giá trị hiện tại
+    const [totalCurrentValue, setTotalCurrentValue] = useState(0);
+
 
     // Lấy danh mục đầu tư từ API backend
     const fetchPortfolio = async () => {
@@ -44,6 +47,9 @@ export default function Dashboard() {
             setTotalInvested(data.totalInvested);
             setTotalProfitLoss(data.totalProfitLoss);
             setProfitLossHistory(data.profitLossHistory || []);
+            // Tính tổng giá trị hiện tại
+            const totalValue = data.portfolio.reduce((sum, coin) => sum + coin.current_value, 0);
+            setTotalCurrentValue(totalValue);
         } catch (error) {
             console.error("Error fetching portfolio:", error);
         }
@@ -151,14 +157,14 @@ export default function Dashboard() {
         <div className="min-h-screen bg-gray-100">
             <Navbar />
             <div className="bg-white p-6 rounded-lg shadow-md mb-6 text-gray-700">
-                <h2 className="text-xl font-semibold mb-4">Porfilio Summary</h2>
+                <h2 className="text-xl font-semibold mb-4">Porfolio Summary</h2>
                 {/* Tổng quan danh mục đầu tư */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Card Tổng Đầu Tư */}
                     <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
                         <span className="text-2xl font-bold text-gray-700 flex items-center">
                             <span className="mr-2">💰</span> Total Invested
-                            </span>
+                        </span>
                         <p className="text-3xl font-bold text-blue-600 mt-2">
                             ${totalInvested.toLocaleString()}
                         </p>
@@ -170,12 +176,20 @@ export default function Dashboard() {
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
-
+                    {/* Card Tổng Giá Trị Hiện Tại */}
+                    <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
+                        <span className="text-2xl font-bold text-gray-700 flex items-center">
+                            <span className="mr-2">📊</span> Total Current Value
+                        </span>
+                        <p className="text-3xl font-bold text-green-600 mt-2">
+                            ${totalCurrentValue.toLocaleString()}
+                        </p>
+                    </div>
                     {/* Card Tổng Lợi Nhuận */}
                     <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
                         <span className="text-2xl font-bold text-gray-700 flex items-center">
                             <span className="mr-2">📉</span> Total Profit/Loss
-                            </span>
+                        </span>
                         <p className={`text-3xl font-bold mt-2 ${totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
                             ${totalProfitLoss.toLocaleString()}
                         </p>
