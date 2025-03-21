@@ -188,12 +188,12 @@ export default function Dashboard() {
                             {/* Tổng đầu tư và tổng giá trị hiện tại */}
                             <div className="flex justify-between w-full mt-4 px-6 text-center">
                                 <div className="flex flex-col items-center">
-                                    <span className="text-lg font-bold text-gray-700">💰 Invested</span>
-                                    <p className="text-lg font-bold text-blue-600">${totalInvested.toLocaleString()}</p>
+                                    <span className="text-sm font-bold text-gray-700">💰 Invested</span>
+                                    <p className="text-sm font-bold text-blue-600">${totalInvested.toLocaleString()}</p>
                                 </div>
                                 <div className="flex flex-col items-center">
-                                    <span className="text-lg font-bold text-gray-700">📊 Current Value</span>
-                                    <p className="text-lg font-bold text-green-600">${totalCurrentValue.toLocaleString()}</p>
+                                    <span className="text-sm font-bold text-gray-700">📊 Current Value</span>
+                                    <p className="text-sm font-bold text-green-600">${totalCurrentValue.toLocaleString()}</p>
                                 </div>
                             </div>
                         </div>
