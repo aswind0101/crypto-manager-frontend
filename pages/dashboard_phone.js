@@ -181,7 +181,7 @@ export default function Dashboard() {
                             </RadialBarChart>
                         </ResponsiveContainer>
                         <div className="absolute text-center">
-                            <p className={`text-xl font-bold ${totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
                                 {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
                             </p>
                             <p className="text-xs text-gray-500">Total Profit/Loss</p>
