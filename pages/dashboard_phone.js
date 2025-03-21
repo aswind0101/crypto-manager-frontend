@@ -221,7 +221,7 @@ export default function Dashboard() {
                                 </div>
                                 <p className="text-gray-500 text-sm">Current Price - Average Price</p>
                                 <p className="text-xl font-semibold">${coin.current_price.toLocaleString()} - {coin.total_quantity > 0
-                                    ? `$${((coin.total_invested - coin.total_sold) / coin.total_quantity).toFixed(2)}`
+                                    ? `$${((coin.total_invested - coin.total_sold) / coin.total_quantity).toFixed(3)}`
                                     : "N/A"}</p>
                                 <p className="text-gray-500 text-sm">Total Quantity</p>
                                 <p className="text-xl font-semibold">{coin.total_quantity.toLocaleString()}</p>
