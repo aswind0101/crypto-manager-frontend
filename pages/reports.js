@@ -191,11 +191,11 @@ export default function Dashboard() {
                     <div className="absolute bottom-12 left-0 right-0 flex justify-between px-6 text-sm text-gray-300">
                         <div className="flex flex-col items-center">
                             <span className="font-bold text-gray-400">💰 Invested</span>
-                            <p className="font-bold text-blue-400 text-xl">${totalInvested.toLocaleString()}</p>
+                            <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
                         </div>
                         <div className="flex flex-col items-center">
                             <span className="font-bold text-gray-400">📊 Current Value</span>
-                            <p className="font-bold text-green-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
+                            <p className="font-bold text-blue-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
@@ -219,11 +219,11 @@ export default function Dashboard() {
 
                         {/* Tổng số lượng */}
                         <p className="text-gray-400 text-sm">Total Quantity</p>
-                        <p className="text-xl font-semibold text-blue-400">{coin.total_quantity.toLocaleString()}</p>
+                        <p className="text-xl font-semibold white">{coin.total_quantity.toLocaleString()}</p>
 
                         {/* Giá trị hiện tại */}
                         <p className="text-gray-400 text-sm mt-2">Current Value</p>
-                        <p className="text-xl font-semibold text-green-400">${coin.current_value.toLocaleString()}</p>
+                        <p className="text-xl font-semibold text-blue-400">${coin.current_value.toLocaleString()}</p>
 
                         {/* Profit/Loss */}
                         <p className="text-gray-400 text-sm mt-2">Profit/Loss</p>
