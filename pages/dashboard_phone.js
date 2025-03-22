@@ -5,6 +5,8 @@ import {
     ResponsiveContainer, RadialBarChart, RadialBar, PieChart, Pie, Cell 
 } from "recharts";
 import { FaBitcoin, FaEthereum, FaCoins } from "react-icons/fa";
+import { useCoinIcons } from "../components/useCoinIcons"; 
+
 
 export default function Dashboard() {
     // State quản lý danh mục đầu tư
@@ -144,16 +146,19 @@ export default function Dashboard() {
     }));
 
     const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#A28CFF"];
+    const coinIcons = useCoinIcons();
     //Get coin icoins
     const getCoinIcon = (symbol) => {
-        switch (symbol.toUpperCase()) {
-            case "BTC":
-                return <FaBitcoin className="text-yellow-500 text-3xl" />;
-            case "ETH":
-                return <FaEthereum className="text-blue-500 text-3xl" />;
-            default:
-                return <FaCoins className="text-gray-500 text-3xl" />;
-        }
+        const url = coinIcons[symbol.toUpperCase()];
+        return url ? (
+            <img
+                src={url}
+                alt={symbol}
+                className="w-8 h-8 object-contain rounded-full"
+            />
+        ) : (
+                <FaCoins className="text-gray-500 text-2xl" />
+            );
     };
 
     return (
@@ -198,7 +203,6 @@ export default function Dashboard() {
                             </div>
                         </div>
                     </div>
-
                     {/* GRID HIỂN THỊ CÁC COIN */}
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         {portfolio.map((coin, index) => (
@@ -224,10 +228,8 @@ export default function Dashboard() {
                             </div>
                         ))}
                     </div>
-
                 </div>
             </div>
-
         </div>
     );
 }
