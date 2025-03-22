@@ -157,56 +157,61 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="p-4 max-w-5xl mx-auto">
+        <div className="p-0 max-w-5xl mx-auto">
+            <Navbar />
             {/* Thẻ trên - Báo cáo tổng quan */}
-            <div className="relative w-full h-80 flex justify-center items-center mb-0">
-                <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart
-                        innerRadius="70%"
-                        outerRadius="100%"
-                        data={portfolio.map(coin => ({
-                            name: coin.coin_symbol,
-                            value: coin.current_value,
-                            fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
-                        }))}
-                        startAngle={180}
-                        endAngle={0}
-                    >
-                        <RadialBar minAngle={15} background clockWise dataKey="value" />
-                    </RadialBarChart>
-                </ResponsiveContainer>
-                <div className="absolute text-center">
-                    <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
-                    </p>
-                    <p className="text-xs text-gray-500">Total Profit/Loss</p>
-                    {/* Tổng đầu tư và tổng giá trị hiện tại */}
-                    <div className="flex justify-between w-full mt-4 px-6 text-center">
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
+                <div className="relative h-75 rounded-xl shadow-lg bg-black overflow-hidden">
+                    {/* Biểu đồ full size */}
+                    <ResponsiveContainer width="100%" height="100%">
+                        <RadialBarChart
+                            innerRadius="70%"
+                            outerRadius="100%"
+                            data={portfolio.map(coin => ({
+                                name: coin.coin_symbol,
+                                value: coin.current_value,
+                                fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
+                            }))}
+                            startAngle={180}
+                            endAngle={0}
+                        >
+                            <RadialBar minAngle={15} background clockWise dataKey="value" />
+                        </RadialBarChart>
+                    </ResponsiveContainer>
+
+                    {/* Phần text nằm chính giữa biểu đồ vòng */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                        <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
+                            {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
+                        </p>
+                        <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
+                    </div>
+
+                    {/* Tổng đầu tư & Giá trị hiện tại - đặt sát đáy */}
+                    <div className="absolute bottom-12 left-0 right-0 flex justify-between px-6 text-sm text-gray-300">
                         <div className="flex flex-col items-center">
-                            <span className="text-sm font-bold text-gray-700">💰 Invested</span>
-                            <p className="text-sm font-bold text-blue-600">${totalInvested.toLocaleString()}</p>
+                            <span className="font-bold text-gray-400">💰 Invested</span>
+                            <p className="font-bold text-blue-400 text-xl">${totalInvested.toLocaleString()}</p>
                         </div>
                         <div className="flex flex-col items-center">
-                            <span className="text-sm font-bold text-gray-700">📊 Current Value</span>
-                            <p className="text-sm font-bold text-green-600">${totalCurrentValue.toLocaleString()}</p>
+                            <span className="font-bold text-gray-400">📊 Current Value</span>
+                            <p className="font-bold text-green-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Thẻ dưới - Danh mục coins */}
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-black p-6 rounded-xl shadow-lg">
+                {/* Thẻ dưới - Danh mục coins */}
                 {portfolio.map((coin, index) => (
-                    <div key={index} className="bg-gray-900 p-4 rounded-lg shadow-lg flex flex-col items-center border border-gray-700">
+                    <div key={index} className="bg-gray-900 p-6 rounded-lg shadow-lg flex flex-col items-center">
                         {/* Tên Coin + Icon */}
                         <div className="flex items-center gap-2">
                             {getCoinIcon(coin.coin_symbol)}
-                            <h2 className="text-lg font-bold text-white">{coin.coin_symbol.toUpperCase()}</h2>
+                            <h2 className="text-lg text-yellow-300 font-bold">{coin.coin_symbol.toUpperCase()}</h2>
                         </div>
 
                         {/* Giá hiện tại - Giá trung bình */}
                         <p className="text-gray-400 text-sm">Current Price - Average Price</p>
-                        <p className="text-xl text-white font-semibold">
+                        <p className="text-xl text-yellow-300 font-semibold">
                             ${coin.current_price.toLocaleString()} - {coin.total_quantity > 0
                                 ? `$${((coin.total_invested - coin.total_sold) / coin.total_quantity).toLocaleString()}`
                                 : "N/A"}

@@ -2,10 +2,17 @@ import Link from "next/link";
 
 export default function Navbar() {
   return (
-    <nav className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg py-4 px-6 flex justify-between items-center transition duration-300 hover:opacity-90">
-      <h1 className="text-white text-2xl font-bold tracking-wide">Crypto Manager</h1>
-      <div className="space-x-6">
-      </div>
-    </nav>
+      <nav className="bg-yellow-300 shadow-md px-6 py-3 flex justify-between items-center rounded-b-lg">
+          {/* Logo / Brand */}
+          <div className="flex items-center gap-2 text-black font-extrabold text-xl">
+              <span>💰</span>
+              <span>Crypto Manager</span>
+          </div>
+
+          {/* Menu items */}
+          <div className="flex items-center gap-4 text-black font-semibold text-sm">
+              <a href="/settings" className="hover:underline">Settings</a>
+          </div>
+      </nav>
   );
 }
