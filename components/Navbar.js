@@ -6,7 +6,7 @@ export default function Navbar() {
             {/* Logo */}
             <div className="flex items-center gap-2 text-black font-extrabold text-xl">
                 <span>💰</span>
-                <span>Crypto Manager</span>
+                <span>CMA</span>
             </div>
 
             {/* Menu */}
