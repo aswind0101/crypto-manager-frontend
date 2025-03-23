@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
+import Link from "next/link";
 
 export default function Transactions() {
     const [transactions, setTransactions] = useState([]);
@@ -60,7 +61,15 @@ export default function Transactions() {
     return (
         <div className="w-full p-4 bg-black min-h-screen">
             <Navbar />
-            <h1 className="text-2xl font-bold text-yellow-400 my-6">📜 Transaction History</h1>
+            <div className="flex justify-between items-center my-6">
+                <h1 className="text-2xl font-bold text-yellow-400">📜 Transaction History</h1>
+                <Link
+                    href="/add-transaction"
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition"
+                >
+                    ➕ Add Transaction
+  </Link>
+            </div>
 
             {/* Bộ lọc */}
             <div className="flex flex-col md:flex-row gap-4 mb-4">
