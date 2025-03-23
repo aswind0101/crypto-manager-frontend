@@ -56,6 +56,13 @@ export default function Navbar() {
                 <span>CMA</span>
             </div>
 
+            {/* User Info */}
+            {user && (
+                <div className="hidden md:flex items-center text-black font-semibold text-sm mr-4">
+                    Hello, <span className="ml-1 font-bold">{user.name}</span>
+                </div>
+            )}
+
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-4 font-semibold text-sm">
                 <Link href="/home" className="text-black hover:text-white transition flex items-center gap-1">
@@ -91,17 +98,30 @@ export default function Navbar() {
                         animate={{ opacity: 0.95, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute top-16 left-0 w-full bg-[#fef3c7] text-black py-4 px-6 flex flex-col gap-4 font-semibold text-sm rounded-b-xl shadow-lg z-50"
+                        className="absolute top-16 left-0 w-full bg-[#fefce8] text-black py-4 px-6 flex flex-col gap-4 font-semibold text-sm rounded-b-xl shadow-xl z-50"
                     >
-                        <Link href="/home" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
+                        {user && (
+                            <div className="text-gray-700 text-base font-medium mb-2">
+                                👋 Hello, <span className="font-bold">{user.name}</span>
+                            </div>
+                        )}
+                        <Link
+                            href="/home"
+                            onClick={() => setMenuOpen(false)}
+                            className="flex items-center gap-2 hover:text-yellow-600"
+                        >
                             <FiHome /> Home
-                        </Link>
-                        <Link href="/transactions" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
+            </Link>
+                        <Link
+                            href="/transactions"
+                            onClick={() => setMenuOpen(false)}
+                            className="flex items-center gap-2 hover:text-yellow-600"
+                        >
                             <FiList /> Transactions
-                        </Link>
+            </Link>
                         {user && (
                             <button
-                                className="text-left flex items-center gap-2"
+                                className="text-left flex items-center gap-2 hover:text-red-500"
                                 onClick={() => {
                                     handleLogout();
                                     setMenuOpen(false);
@@ -113,6 +133,7 @@ export default function Navbar() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
         </nav>
     );
 }
