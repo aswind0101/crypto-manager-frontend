@@ -4,6 +4,7 @@ import { auth } from "../firebase";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
+import { FiHome, FiList, FiLogOut } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Navbar() {
@@ -57,18 +58,18 @@ export default function Navbar() {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-4 font-semibold text-sm">
-                <Link href="/transactions" className="text-black hover:text-white transition">
-                    Transactions
+                <Link href="/home" className="text-black hover:text-white transition flex items-center gap-1">
+                    <FiHome /> Home
                 </Link>
-                <Link href="/home" className="text-black hover:text-white transition">
-                    Home
+                <Link href="/transactions" className="text-black hover:text-white transition flex items-center gap-1">
+                    <FiList /> Transactions
                 </Link>
                 {user && (
                     <button
                         onClick={handleLogout}
-                        className="text-black hover:text-white transition"
+                        className="text-black hover:text-white transition flex items-center gap-1"
                     >
-                        Logout
+                        <FiLogOut /> Logout
                     </button>
                 )}
             </div>
@@ -87,25 +88,26 @@ export default function Navbar() {
                     <motion.div
                         ref={menuRef}
                         initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        animate={{ opacity: 0.95, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute top-16 left-0 w-full bg-yellow-300 text-black py-4 px-6 flex flex-col gap-4 font-semibold text-sm rounded-b-xl shadow-lg z-50"
+                        className="absolute top-16 left-0 w-full bg-[#fef3c7] text-black py-4 px-6 flex flex-col gap-4 font-semibold text-sm rounded-b-xl shadow-lg z-50"
                     >
-                        <Link href="/transactions" onClick={() => setMenuOpen(false)}>
-                            Transactions
+                        <Link href="/home" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
+                            <FiHome /> Home
                         </Link>
-                        <Link href="/home" onClick={() => setMenuOpen(false)}>
-                            Home
+                        <Link href="/transactions" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
+                            <FiList /> Transactions
                         </Link>
                         {user && (
                             <button
+                                className="text-left flex items-center gap-2"
                                 onClick={() => {
                                     handleLogout();
                                     setMenuOpen(false);
                                 }}
                             >
-                                Logout
+                                <FiLogOut /> Logout
                             </button>
                         )}
                     </motion.div>
