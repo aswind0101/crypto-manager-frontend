@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import React from "react";
 import Navbar from "../components/Navbar";
 import {
-    ResponsiveContainer, RadialBarChart, RadialBar
+    ResponsiveContainer,
+    RadialBarChart,
+    RadialBar
 } from "recharts";
 import { FaCoins } from "react-icons/fa";
 import { useCoinIcons } from "../components/useCoinIcons";
@@ -37,9 +39,20 @@ export default function Dashboard() {
             const response = await fetch("https://crypto-manager-backend.onrender.com/api/portfolio");
             const data = await response.json();
             setPortfolio(data.portfolio);
-            setTotalInvested(data.totalInvested);
+
+            // ✅ Tính tổng Net Invested
+            const netTotalInvested = data.portfolio.reduce(
+                (sum, coin) => sum + (coin.total_invested - coin.total_sold),
+                0
+            );
+            setTotalInvested(netTotalInvested);
+
             setTotalProfitLoss(data.totalProfitLoss);
-            const totalValue = data.portfolio.reduce((sum, coin) => sum + coin.current_value, 0);
+
+            const totalValue = data.portfolio.reduce(
+                (sum, coin) => sum + coin.current_value,
+                0
+            );
             setTotalCurrentValue(totalValue);
         } catch (error) {
             console.error("Error fetching portfolio:", error);
@@ -121,13 +134,12 @@ export default function Dashboard() {
                     </select>
                 </div>
 
-                {/* Portfolio List */}
+                {/* Portfolio Cards */}
                 {filteredPortfolio.map((coin, index) => {
-                    const avgPrice = coin.total_quantity > 0
-                        ? ((coin.total_invested - coin.total_sold) / coin.total_quantity)
-                        : 0;
-                    const profitLossPercentage = coin.total_invested > 0
-                        ? ((coin.profit_loss / coin.total_invested) * 100).toFixed(1)
+                    const netInvested = coin.total_invested - coin.total_sold;
+                    const avgPrice = coin.total_quantity > 0 ? (netInvested / coin.total_quantity) : 0;
+                    const profitLossPercentage = netInvested > 0
+                        ? ((coin.profit_loss / netInvested) * 100).toFixed(1)
                         : 0;
                     const priceChangePercent = avgPrice > 0
                         ? (((coin.current_price - avgPrice) / avgPrice) * 100).toFixed(2)
@@ -148,11 +160,16 @@ export default function Dashboard() {
                                 ${coin.current_price.toLocaleString()} <span className="text-white">-</span> ${avgPrice.toFixed(3)}
                                 <span className={`ml-2 text-sm font-semibold ${priceChangePercent >= 0 ? "text-green-400" : "text-red-400"}`}>
                                     ({priceChangePercent}% {priceChangePercent >= 0 ? "▲" : "▼"})
-                                </span>
+                </span>
                             </p>
 
                             <p className="text-gray-400 text-sm mt-2">Total Quantity</p>
                             <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
+
+                            <p className="text-gray-400 text-sm mt-2">Net Invested</p>
+                            <p className="text-lg font-mono text-purple-400">
+                                ${netInvested.toLocaleString()}
+                            </p>
 
                             <p className="text-gray-400 text-sm mt-2">Current Value</p>
                             <p className="text-lg font-mono text-blue-400">${coin.current_value.toLocaleString()}</p>
