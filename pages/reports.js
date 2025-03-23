@@ -2,51 +2,37 @@ import { useState, useEffect } from "react";
 import React from "react";
 import Navbar from "../components/Navbar";
 import {
-    ResponsiveContainer, RadialBarChart, RadialBar, PieChart, Pie, Cell
+    ResponsiveContainer, RadialBarChart, RadialBar
 } from "recharts";
-import { FaBitcoin, FaEthereum, FaCoins } from "react-icons/fa";
+import { FaCoins } from "react-icons/fa";
 import { useCoinIcons } from "../components/useCoinIcons";
 
 export default function Dashboard() {
-    // State quản lý danh mục đầu tư
     const [portfolio, setPortfolio] = useState([]);
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
-    const [profitLossHistory, setProfitLossHistory] = useState([]);
     const [totalCurrentValue, setTotalCurrentValue] = useState(0);
-    const totalProfitPositive = totalProfitLoss >= 0; // Kiểm tra tổng danh mục có lời hay lỗ
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filterByProfit, setFilterByProfit] = useState("all");
 
-    const summaryData = [
-        { name: "Invested", value: totalInvested },
-        { name: "Profit/Loss", value: totalProfitLoss }
-    ];
+    const coinIcons = useCoinIcons();
 
-    // Dữ liệu hiển thị biểu đồ tròn
-    const data = [
-        { name: "Current", value: totalCurrentValue, color: "#32CD32" }, // Xanh lá
-        { name: "Remaining", value: totalInvested - totalCurrentValue, color: "#FF0000" } // Đỏ nếu bị lỗ
-    ];
-
-    // State quản lý giao dịch
-    const [transactions, setTransactions] = useState([]);
-    const [coin, setCoin] = useState("");
-    const [quantity, setQuantity] = useState("");
-    const [price, setPrice] = useState("");
-    const [type, setType] = useState("buy");
+    const getCoinIcon = (symbol) => {
+        const url = coinIcons[symbol.toUpperCase()];
+        return url ? (
+            <img src={url} alt={symbol} className="w-8 h-8 object-contain rounded-full" />
+        ) : (
+                <FaCoins className="text-gray-500 text-2xl" />
+            );
+    };
 
     useEffect(() => {
         fetchPortfolio();
-        fetchTransactions();
-        const interval = setInterval(fetchPortfolio, 60000); // Cập nhật mỗi 10 giây
-        return () => clearInterval(interval); // Xóa interval khi unmount
+        const interval = setInterval(fetchPortfolio, 60000);
+        return () => clearInterval(interval);
     }, []);
-    //Tính tổng giá trị hiện tại
 
-
-
-    // Lấy danh mục đầu tư từ API backend
     const fetchPortfolio = async () => {
         try {
             const response = await fetch("https://crypto-manager-backend.onrender.com/api/portfolio");
@@ -54,8 +40,6 @@ export default function Dashboard() {
             setPortfolio(data.portfolio);
             setTotalInvested(data.totalInvested);
             setTotalProfitLoss(data.totalProfitLoss);
-            setProfitLossHistory(data.profitLossHistory || []);
-            // Tính tổng giá trị hiện tại
             const totalValue = data.portfolio.reduce((sum, coin) => sum + coin.current_value, 0);
             setTotalCurrentValue(totalValue);
         } catch (error) {
@@ -63,111 +47,26 @@ export default function Dashboard() {
         }
     };
 
-    // Lấy danh sách giao dịch từ API backend
-    const fetchTransactions = async () => {
-        try {
-            const response = await fetch("https://crypto-manager-backend.onrender.com/api/transactions");
-            const data = await response.json();
-            setTransactions(data);
-        } catch (error) {
-            console.error("Error fetching transactions:", error);
-        }
-    };
+    const filteredPortfolio = portfolio.filter((coin) => {
+        const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Thêm giao dịch mới
-    const handleSubmit = async () => {
-        if (!coin || !quantity || !price) {
-            alert("Please fill in all fields.");
-            return;
-        }
+        const matchesProfit =
+            filterByProfit === "all" ||
+            (filterByProfit === "profit" && coin.profit_loss >= 0) ||
+            (filterByProfit === "loss" && coin.profit_loss < 0);
 
-        const newTransaction = {
-            coin_symbol: coin.toUpperCase(),
-            quantity: parseFloat(quantity),
-            price: parseFloat(price),
-            transaction_type: type,
-        };
-
-        try {
-            const response = await fetch("https://crypto-manager-backend.onrender.com/api/transactions", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newTransaction),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setTransactions([data, ...transactions]);
-                fetchPortfolio();
-                setCoin("");
-                setQuantity("");
-                setPrice("");
-            } else {
-                console.error("Failed to add transaction.");
-            }
-        } catch (error) {
-            console.error("Error adding transaction:", error);
-        }
-    };
-
-    // Xóa giao dịch
-    const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this transaction?")) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`https://crypto-manager-backend.onrender.com/api/transactions/${id}`, {
-                method: "DELETE",
-            });
-
-            if (response.ok) {
-                setTransactions(transactions.filter((tx) => tx.id !== id));
-                fetchPortfolio();
-            } else {
-                console.error("Failed to delete transaction.");
-            }
-        } catch (error) {
-            console.error("Error deleting transaction:", error);
-        }
-    };
-
-    // Dữ liệu biểu đồ danh mục đầu tư
-    /*const pieData = portfolio.map((p) => ({
-        name: p.coin_symbol,
-        value: parseFloat(p.total_invested),
-    }));*/
-
-    const portfolioData = portfolio.map(coin => ({
-        name: coin.coin_symbol,
-        value: coin.current_value,
-        fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000" // Xanh nếu lời, đỏ nếu lỗ
-    }));
-
-    const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#A28CFF"];
-    //Get coin icoins
-    const coinIcons = useCoinIcons();
-
-    const getCoinIcon = (symbol) => {
-        const url = coinIcons[symbol.toUpperCase()];
-        return url ? (
-            <img
-                src={url}
-                alt={symbol}
-                className="w-8 h-8 object-contain rounded-full"
-            />
-        ) : (
-                <FaCoins className="text-gray-500 text-2xl" />
-            );
-    };
+        return matchesSearch && matchesProfit;
+    });
 
     return (
         <div className="p-0 max-w-5xl mx-auto">
             <Navbar />
-            {/* Thẻ trên - Báo cáo tổng quan */}
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
-                <div className="relative h-75 rounded-xl shadow-lg bg-black overflow-hidden">
-                    {/* Biểu đồ full size */}
+
+            <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
+
+                {/* Radial Chart Section */}
+                <div className="relative h-80 rounded-xl shadow-lg bg-black overflow-hidden">
                     <ResponsiveContainer width="100%" height="100%">
                         <RadialBarChart
                             innerRadius="70%"
@@ -184,7 +83,6 @@ export default function Dashboard() {
                         </RadialBarChart>
                     </ResponsiveContainer>
 
-                    {/* Phần text nằm chính giữa biểu đồ vòng */}
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
                         <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
                             {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
@@ -192,8 +90,7 @@ export default function Dashboard() {
                         <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
                     </div>
 
-                    {/* Tổng đầu tư & Giá trị hiện tại - đặt sát đáy */}
-                    <div className="absolute bottom-12 left-0 right-0 flex justify-between px-6 text-sm text-gray-300">
+                    <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
                         <div className="flex flex-col items-center">
                             <span className="font-bold text-gray-400">💰 Invested</span>
                             <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
@@ -205,38 +102,70 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Thẻ dưới - Danh mục coins */}
-                {portfolio.map((coin, index) => (
-                    <div key={index} className="bg-gray-900 p-6 rounded-lg shadow-lg flex flex-col items-center">
-                        {/* Tên Coin + Icon */}
-                        <div className="flex items-center gap-2">
-                            {getCoinIcon(coin.coin_symbol)}
-                            <h2 className="text-lg text-yellow-300 font-bold">{coin.coin_symbol.toUpperCase()}</h2>
+                {/* Filter Section */}
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white mt-4">
+                    <input
+                        type="text"
+                        placeholder="🔍 Search by coin name or symbol..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="p-2 rounded-lg w-full md:w-1/2 bg-gray-800 text-white outline-none"
+                    />
+
+                    <select
+                        value={filterByProfit}
+                        onChange={(e) => setFilterByProfit(e.target.value)}
+                        className="p-2 rounded-lg bg-gray-800 text-white w-full md:w-1/4 outline-none"
+                    >
+                        <option value="all">All</option>
+                        <option value="profit">🟢 Profit</option>
+                        <option value="loss">🔴 Loss</option>
+                    </select>
+                </div>
+
+                {/* Portfolio Coin Cards */}
+                {filteredPortfolio.map((coin, index) => {
+                    const avgPrice = coin.total_quantity > 0
+                        ? ((coin.total_invested - coin.total_sold) / coin.total_quantity)
+                        : 0;
+                    const profitLossPercentage = coin.total_invested > 0
+                        ? ((coin.profit_loss / coin.total_invested) * 100).toFixed(1)
+                        : 0;
+                    const priceChangePercent = avgPrice > 0
+                        ? (((coin.current_price - avgPrice) / avgPrice) * 100).toFixed(2)
+                        : 0;
+
+                    return (
+                        <div key={index} className="bg-[#0e1628] hover:scale-105 hover:shadow-2xl transition-all duration-300 p-6 rounded-xl shadow-md flex flex-col items-center text-white w-full">
+                            <div className="flex items-center gap-3 mb-2">
+                                {getCoinIcon(coin.coin_symbol)}
+                                <div className="text-left">
+                                    <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
+                                    <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
+                                </div>
+                            </div>
+
+                            <p className="text-gray-400 text-sm mt-2">Current Price - Avg. Buy Price</p>
+                            <p className="text-lg font-mono text-yellow-300">
+                                ${coin.current_price.toLocaleString()} <span className="text-white">-</span> ${avgPrice.toFixed(3)}
+                                <span className={`ml-2 text-sm font-semibold ${priceChangePercent >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                    ({priceChangePercent}% {priceChangePercent >= 0 ? "▲" : "▼"})
+                                </span>
+                            </p>
+
+                            <p className="text-gray-400 text-sm mt-2">Total Quantity</p>
+                            <p className="text-lg font-mono white">{coin.total_quantity.toLocaleString()}</p>
+
+                            <p className="text-gray-400 text-sm mt-2">Current Value</p>
+                            <p className="text-lg font-mono text-blue-400">${coin.current_value.toLocaleString()}</p>
+
+                            <p className="text-gray-400 text-sm mt-2">Profit / Loss</p>
+                            <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                ${coin.profit_loss.toLocaleString()} <span className="text-xs">({profitLossPercentage}%)</span>
+                            </p>
                         </div>
-
-                        {/* Giá hiện tại - Giá trung bình */}
-                        <p className="text-gray-400 text-sm">Current Price - Average Price</p>
-                        <p className="text-xl text-yellow-300 font-semibold">
-                            ${coin.current_price.toLocaleString()} - {coin.total_quantity > 0
-                                ? `$${((coin.total_invested - coin.total_sold) / coin.total_quantity).toLocaleString()}`
-                                : "N/A"}
-                        </p>
-
-                        {/* Tổng số lượng */}
-                        <p className="text-gray-400 text-sm">Total Quantity</p>
-                        <p className="text-xl font-semibold white">{coin.total_quantity.toLocaleString()}</p>
-
-                        {/* Giá trị hiện tại */}
-                        <p className="text-gray-400 text-sm mt-2">Current Value</p>
-                        <p className="text-xl font-semibold text-blue-400">${coin.current_value.toLocaleString()}</p>
-
-                        {/* Profit/Loss */}
-                        <p className="text-gray-400 text-sm mt-2">Profit/Loss</p>
-                        <p className={`text-xl font-semibold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                            ${coin.profit_loss.toLocaleString()}
-                        </p>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );
