@@ -1,4 +1,4 @@
-﻿// components/useCoinIcons.js
+// components/useCoinIcons.js
 import { useEffect, useState } from "react";
 import axios from "axios";
 

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import React from "react";
 import Navbar from "../components/Navbar";
 import {
@@ -24,8 +24,8 @@ export default function Dashboard() {
         return url ? (
             <img src={url} alt={symbol} className="w-8 h-8 object-contain rounded-full" />
         ) : (
-                <FaCoins className="text-gray-500 text-2xl" />
-            );
+            <FaCoins className="text-gray-500 text-2xl" />
+        );
     };
 
     useEffect(() => {
@@ -132,7 +132,6 @@ export default function Dashboard() {
 
                 {filteredPortfolio.map((coin, index) => {
                     const netInvested = coin.total_invested - coin.total_sold;
-                    
                     const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
                         ? (netInvested / coin.total_quantity)
                         : 0;
