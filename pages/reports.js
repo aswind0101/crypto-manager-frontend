@@ -12,7 +12,6 @@ export default function Dashboard() {
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
     const [totalCurrentValue, setTotalCurrentValue] = useState(0);
-
     const [searchTerm, setSearchTerm] = useState("");
     const [filterByProfit, setFilterByProfit] = useState("all");
 
@@ -62,10 +61,9 @@ export default function Dashboard() {
     return (
         <div className="p-0 max-w-5xl mx-auto">
             <Navbar />
-
             <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
 
-                {/* Radial Chart Section */}
+                {/* Radial Chart */}
                 <div className="relative h-80 rounded-xl shadow-lg bg-black overflow-hidden">
                     <ResponsiveContainer width="100%" height="100%">
                         <RadialBarChart
@@ -102,7 +100,7 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Filter Section */}
+                {/* Filters */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white mt-4">
                     <input
                         type="text"
@@ -123,7 +121,7 @@ export default function Dashboard() {
                     </select>
                 </div>
 
-                {/* Portfolio Coin Cards */}
+                {/* Portfolio List */}
                 {filteredPortfolio.map((coin, index) => {
                     const avgPrice = coin.total_quantity > 0
                         ? ((coin.total_invested - coin.total_sold) / coin.total_quantity)
@@ -154,10 +152,10 @@ export default function Dashboard() {
                             </p>
 
                             <p className="text-gray-400 text-sm mt-2">Total Quantity</p>
-                            <p className="text-lg font-mono white">{coin.total_quantity.toLocaleString()}</p>
+                            <p className="text-lg font-mono text-blue-400">{coin.total_quantity.toLocaleString()}</p>
 
                             <p className="text-gray-400 text-sm mt-2">Current Value</p>
-                            <p className="text-lg font-mono text-blue-400">${coin.current_value.toLocaleString()}</p>
+                            <p className="text-lg font-mono text-green-400">${coin.current_value.toLocaleString()}</p>
 
                             <p className="text-gray-400 text-sm mt-2">Profit / Loss</p>
                             <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
