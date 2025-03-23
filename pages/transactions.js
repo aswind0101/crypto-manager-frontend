@@ -144,7 +144,7 @@ export default function Transactions() {
                                                     onClick={() => deleteTransaction(tx.id)}
                                                     disabled={deletingId === tx.id}
                                                 >
-                                                    {deletingId === tx.id ? "Deleting..." : "🗑️ Delete"}
+                                                    {deletingId === tx.id ? "Deleting..." : "Delete"}
                                                 </button>
                                             </td>
                                         </tr>
