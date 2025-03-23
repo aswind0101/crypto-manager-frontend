@@ -6,6 +6,9 @@ export default function Transactions() {
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState(null);
 
+    const [selectedCoin, setSelectedCoin] = useState("All");
+    const [selectedType, setSelectedType] = useState("All");
+
     useEffect(() => {
         fetchTransactions();
     }, []);
@@ -44,14 +47,51 @@ export default function Transactions() {
         }
     };
 
+    // 📌 Lọc dữ liệu
+    const filteredTransactions = transactions.filter((tx) => {
+        const matchesCoin = selectedCoin === "All" || tx.coin_symbol.toUpperCase() === selectedCoin;
+        const matchesType = selectedType === "All" || tx.transaction_type.toLowerCase() === selectedType.toLowerCase();
+        return matchesCoin && matchesType;
+    });
+
+    // 📌 Tạo danh sách coin duy nhất từ dữ liệu
+    const coinOptions = [...new Set(transactions.map((tx) => tx.coin_symbol.toUpperCase()))];
+
     return (
-        <div className="max-w-6xl mx-auto p-4 bg-black min-h-screen">
+        <div className="w-full p-4 bg-black min-h-screen">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 my-6">📜 Transaction History</h1>
 
+            {/* Bộ lọc */}
+            <div className="flex flex-col md:flex-row gap-4 mb-4">
+                <select
+                    value={selectedCoin}
+                    onChange={(e) => setSelectedCoin(e.target.value)}
+                    className="bg-[#1f2937] text-white px-4 py-2 rounded-md w-full md:w-1/3"
+                >
+                    <option value="All">All Coins</option>
+                    {coinOptions.map((coin) => (
+                        <option key={coin} value={coin}>
+                            {coin}
+                        </option>
+                    ))}
+                </select>
+
+                <select
+                    value={selectedType}
+                    onChange={(e) => setSelectedType(e.target.value)}
+                    className="bg-[#1f2937] text-white px-4 py-2 rounded-md w-full md:w-1/3"
+                >
+                    <option value="All">All Types</option>
+                    <option value="buy">Buy</option>
+                    <option value="sell">Sell</option>
+                </select>
+            </div>
+
+            {/* Bảng giao dịch */}
             {loading ? (
                 <p className="text-white">Loading transactions...</p>
-            ) : transactions.length === 0 ? (
+            ) : filteredTransactions.length === 0 ? (
                 <p className="text-gray-400">No transactions found.</p>
             ) : (
                         <div className="overflow-x-auto bg-[#0e1628] rounded-xl shadow-lg">
@@ -69,7 +109,7 @@ export default function Transactions() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {transactions.map((tx, index) => (
+                                    {filteredTransactions.map((tx, index) => (
                                         <tr
                                             key={tx.id}
                                             className="border-t border-gray-700 hover:bg-[#162330] transition"

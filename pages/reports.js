@@ -152,10 +152,10 @@ export default function Dashboard() {
                             </p>
 
                             <p className="text-gray-400 text-sm mt-2">Total Quantity</p>
-                            <p className="text-lg font-mono text-blue-400">{coin.total_quantity.toLocaleString()}</p>
+                            <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
 
                             <p className="text-gray-400 text-sm mt-2">Current Value</p>
-                            <p className="text-lg font-mono text-green-400">${coin.current_value.toLocaleString()}</p>
+                            <p className="text-lg font-mono text-blue-400">${coin.current_value.toLocaleString()}</p>
 
                             <p className="text-gray-400 text-sm mt-2">Profit / Loss</p>
                             <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
