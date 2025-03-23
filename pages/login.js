@@ -18,7 +18,7 @@ export default function Login() {
                 email: user.email,
                 photo: user.photoURL
             }));
-            router.push("/reports");
+            router.push("/home");
         } catch (error) {
             console.error("Login failed:", error);
         }
@@ -33,7 +33,7 @@ export default function Login() {
                     email: user.email,
                     photo: user.photoURL
                 }));
-                router.push("/reports");
+                router.push("/home");
             }
         });
         return () => unsubscribe();
