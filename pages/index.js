@@ -1,20 +1,55 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import { useEffect } from "react";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/router";
+import { app } from "../firebase";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+export default function Login() {
+    const router = useRouter();
+    const auth = getAuth(app);
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+    const handleLogin = async () => {
+        const provider = new GoogleAuthProvider();
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            localStorage.setItem("user", JSON.stringify({
+                uid: user.uid,
+                name: user.displayName,
+                email: user.email,
+                photo: user.photoURL
+            }));
+            router.push("/home");
+        } catch (error) {
+            console.error("Login failed:", error);
+        }
+    };
 
-export default function Home() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <h1 className="text-4xl font-bold text-blue-600">Tailwind CSS 4.0 Đã Hoạt Động!</h1>
-    </div>
-  );
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                localStorage.setItem("user", JSON.stringify({
+                    uid: user.uid,
+                    name: user.displayName,
+                    email: user.email,
+                    photo: user.photoURL
+                }));
+                router.push("/home");
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    return (
+        <div className="flex items-center justify-center h-screen bg-black text-white">
+            <div className="bg-[#0e1628] p-8 rounded-lg shadow-lg text-center w-full max-w-md">
+                <h1 className="text-3xl font-bold mb-6 text-yellow-400">Crypto Manager</h1>
+                <button
+                    onClick={handleLogin}
+                    className="bg-yellow-400 text-black font-bold py-2 px-6 rounded hover:bg-yellow-500 transition"
+                >
+                    Sign in with Google
+                </button>
+            </div>
+        </div>
+    );
 }
