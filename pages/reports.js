@@ -40,9 +40,8 @@ export default function Dashboard() {
             const data = await response.json();
             setPortfolio(data.portfolio);
 
-            // ✅ Tính tổng Net Invested
             const netTotalInvested = data.portfolio.reduce(
-                (sum, coin) => sum + (coin.total_invested - coin.total_sold),
+                (sum, coin) => sum + coin.total_invested,
                 0
             );
             setTotalInvested(netTotalInvested);
@@ -75,8 +74,6 @@ export default function Dashboard() {
         <div className="p-0 max-w-5xl mx-auto">
             <Navbar />
             <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
-
-                {/* Radial Chart */}
                 <div className="relative h-80 rounded-xl shadow-lg bg-black overflow-hidden">
                     <ResponsiveContainer width="100%" height="100%">
                         <RadialBarChart
@@ -113,7 +110,6 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Filters */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white mt-4">
                     <input
                         type="text"
@@ -134,16 +130,27 @@ export default function Dashboard() {
                     </select>
                 </div>
 
-                {/* Portfolio Cards */}
                 {filteredPortfolio.map((coin, index) => {
                     const netInvested = coin.total_invested - coin.total_sold;
                     const avgPrice = coin.total_quantity > 0 ? (netInvested / coin.total_quantity) : 0;
-                    const profitLossPercentage = netInvested > 0
-                        ? ((coin.profit_loss / netInvested) * 100).toFixed(1)
-                        : 0;
-                    const priceChangePercent = avgPrice > 0
-                        ? (((coin.current_price - avgPrice) / avgPrice) * 100).toFixed(2)
-                        : 0;
+                    const originalInvested = coin.total_invested;
+
+                    let profitLossPercentage = "–";
+                    if (originalInvested > 0) {
+                        profitLossPercentage = ((coin.profit_loss / originalInvested) * 100).toFixed(1) + "%";
+                    } else if (netInvested > 0) {
+                        profitLossPercentage = ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%";
+                    } else if (coin.profit_loss > 0) {
+                        profitLossPercentage = "∞%";
+                    } else {
+                        profitLossPercentage = "0%";
+                    }
+
+                    const priceChangeText = avgPrice > 0 ? (
+                        <span className={`ml-2 text-sm font-semibold ${(((coin.current_price - avgPrice) / avgPrice) * 100) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                            ({(((coin.current_price - avgPrice) / avgPrice) * 100).toFixed(2)}% {((coin.current_price - avgPrice) >= 0 ? "▲" : "▼")})
+                        </span>
+                    ) : null;
 
                     return (
                         <div key={index} className="bg-[#0e1628] hover:scale-105 hover:shadow-2xl transition-all duration-300 p-6 rounded-xl shadow-md flex flex-col items-center text-white w-full">
@@ -157,17 +164,20 @@ export default function Dashboard() {
 
                             <p className="text-gray-400 text-sm mt-2">Current Price - Avg. Buy Price</p>
                             <p className="text-lg font-mono text-yellow-300">
-                                ${coin.current_price.toLocaleString()} <span className="text-white">-</span> ${avgPrice.toFixed(3)}
-                                <span className={`ml-2 text-sm font-semibold ${priceChangePercent >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                    ({priceChangePercent}% {priceChangePercent >= 0 ? "▲" : "▼"})
-                </span>
+                                ${coin.current_price.toLocaleString()} <span className="text-white">-</span> {avgPrice > 0 ? `$${avgPrice.toFixed(3)}` : "–"}
+                                {priceChangeText}
                             </p>
 
                             <p className="text-gray-400 text-sm mt-2">Total Quantity</p>
                             <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
 
+                            <p className="text-gray-400 text-sm mt-2">Total Invested</p>
+                            <p className="text-lg font-mono text-orange-400">
+                                ${coin.total_invested.toLocaleString()}
+                            </p>
+
                             <p className="text-gray-400 text-sm mt-2">Net Invested</p>
-                            <p className="text-lg font-mono text-purple-400">
+                            <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>
                                 ${netInvested.toLocaleString()}
                             </p>
 
@@ -176,7 +186,7 @@ export default function Dashboard() {
 
                             <p className="text-gray-400 text-sm mt-2">Profit / Loss</p>
                             <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                ${coin.profit_loss.toLocaleString()} <span className="text-xs">({profitLossPercentage}%)</span>
+                                ${coin.profit_loss.toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
                             </p>
                         </div>
                     );
