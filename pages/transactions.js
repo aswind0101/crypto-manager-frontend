@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Link from "next/link";
-
-export default function Transactions() {
+import withAuthProtection from "../hoc/withAuthProtection";
+function Transactions() {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState(null);
@@ -165,3 +165,4 @@ export default function Transactions() {
         </div>
     );
 }
+export default withAuthProtection(Transactions);

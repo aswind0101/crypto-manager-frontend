@@ -1,7 +1,8 @@
 import { useState } from "react";
 import Navbar from "../components/Navbar";
+import withAuthProtection from "../hoc/withAuthProtection";
 
-export default function AddTransaction() {
+function AddTransaction() {
     const [coinSymbol, setCoinSymbol] = useState("");
     const [quantity, setQuantity] = useState("");
     const [price, setPrice] = useState("");
@@ -109,3 +110,4 @@ export default function AddTransaction() {
         </div>
     );
 }
+export default withAuthProtection(AddTransaction);

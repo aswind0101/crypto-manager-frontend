@@ -10,7 +10,9 @@ import { FaCoins } from "react-icons/fa";
 import { useCoinIcons } from "../components/useCoinIcons";
 import { useRouter } from "next/router";
 
-export default function Dashboard() {
+import withAuthProtection from "../hoc/withAuthProtection";
+
+function Dashboard() {
     const [portfolio, setPortfolio] = useState([]);
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
@@ -205,3 +207,4 @@ export default function Dashboard() {
         </div>
     );
 }
+export default withAuthProtection(Dashboard);
