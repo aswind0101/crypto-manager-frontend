@@ -1,9 +1,8 @@
-// components/useCoinIcons.js
 import { useEffect, useState } from "react";
 import axios from "axios";
 
 export function useCoinIcons() {
-    const [coinMap, setCoinMap] = useState({});
+    const [icons, setIcons] = useState({});
 
     useEffect(() => {
         async function fetchIcons() {
@@ -15,14 +14,16 @@ export function useCoinIcons() {
                 res.data.forEach((coin) => {
                     map[coin.symbol.toUpperCase()] = coin.image;
                 });
-                setCoinMap(map);
+                setIcons(map);
             } catch (error) {
-                console.error("Failed to load coin icons", error);
+                console.error("⚠️ Failed to fetch coin icons:", error.message);
+                // fallback: empty map
+                setIcons({});
             }
         }
 
         fetchIcons();
     }, []);
 
-    return coinMap;
+    return icons;
 }

@@ -1,5 +1,5 @@
-// updated: Hiển thị trạng thái chờ khi lần đầu không lấy được giá, chỉ cập nhật khi lấy được giá
-import { useState, useEffect } from "react";
+// updated: Hiển thị trạng thái chờ khi lần đầu không lấy được giá, chỉ cập nhật khi lấy được giá + Fix lỗi setInterval lặp khi chuyển trang + Hiển thị bộ lọc ngay cả khi dùng dữ liệu cache
+import { useState, useEffect, useRef } from "react";
 import React from "react";
 import Navbar from "../components/Navbar";
 import {
@@ -24,6 +24,7 @@ function Dashboard() {
     const [lastUpdated, setLastUpdated] = useState(null);
     const [priceFetchFailed, setPriceFetchFailed] = useState(false);
     const [firstLoaded, setFirstLoaded] = useState(false);
+    const intervalRef = useRef(null);
     const router = useRouter();
 
     const coinIcons = useCoinIcons();
@@ -38,6 +39,27 @@ function Dashboard() {
     };
 
     useEffect(() => {
+        const cached = localStorage.getItem("cachedPortfolio");
+        const cachedTime = localStorage.getItem("lastUpdated");
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            setPortfolio(parsed);
+            setFirstLoaded(true);
+            setLoading(false);
+
+            const totalValue = parsed.reduce((sum, coin) => sum + coin.current_value, 0);
+            const netTotalInvested = parsed.reduce((sum, coin) => sum + coin.total_invested, 0);
+            const totalProfit = parsed.reduce((sum, coin) => sum + coin.profit_loss, 0);
+
+            setTotalInvested(netTotalInvested);
+            setTotalCurrentValue(totalValue);
+            setTotalProfitLoss(totalProfit);
+
+            if (cachedTime) {
+                setLastUpdated(new Date(cachedTime).toLocaleTimeString());
+            }
+        }
+
         const storedUser = localStorage.getItem("user");
         if (!storedUser) {
             router.push("/login");
@@ -45,8 +67,17 @@ function Dashboard() {
         }
         const user = JSON.parse(storedUser);
         fetchPortfolioWithRetry(user.uid);
-        const interval = setInterval(() => fetchPortfolioWithRetry(user.uid), 60000);
-        return () => clearInterval(interval);
+
+        if (!intervalRef.current) {
+            intervalRef.current = setInterval(() => fetchPortfolioWithRetry(user.uid), 60000);
+        }
+
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+        };
     }, []);
 
     const fetchPortfolioWithRetry = async (userId, retryCount = 0) => {
@@ -57,11 +88,14 @@ function Dashboard() {
 
             const totalValue = data.portfolio.reduce((sum, coin) => sum + coin.current_value, 0);
             const netTotalInvested = data.portfolio.reduce((sum, coin) => sum + coin.total_invested, 0);
+            const totalProfit = data.portfolio.reduce((sum, coin) => sum + coin.profit_loss, 0);
 
             if (totalValue > 0) {
+                localStorage.setItem("cachedPortfolio", JSON.stringify(data.portfolio));
+                localStorage.setItem("lastUpdated", new Date().toISOString());
                 setPortfolio(data.portfolio);
                 setTotalInvested(netTotalInvested);
-                setTotalProfitLoss(data.totalProfitLoss);
+                setTotalProfitLoss(totalProfit);
                 setTotalCurrentValue(totalValue);
                 setLastUpdated(new Date().toLocaleString("en-US", {
                     hour: "2-digit",
@@ -74,7 +108,7 @@ function Dashboard() {
                 if (!firstLoaded) {
                     setPriceFetchFailed(true);
                 } else {
-                    console.warn("Skipped update, giá vẫn giữ nguyên do không lấy được giá mới");
+                    console.warn("Skipped update, giữ nguyên dữ liệu cũ.");
                 }
             }
         } catch (error) {
@@ -107,8 +141,11 @@ function Dashboard() {
             <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
                 <div className="relative h-80 rounded-xl shadow-lg bg-black overflow-hidden">
                     {!firstLoaded && priceFetchFailed ? (
-                        <div className="flex items-center justify-center h-full">
-                            <p className="text-yellow-400 text-sm animate-pulse">
+                        <div className="flex flex-col items-center justify-center h-full space-y-4">
+                            <div className="w-56 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div className="h-full bg-yellow-400 animate-pulse w-full"></div>
+                            </div>
+                            <p className="text-yellow-400 text-sm text-center animate-pulse">
                                 ⚠️ Unable to fetch the latest prices. Please wait while we try again...
                             </p>
                         </div>
@@ -156,7 +193,9 @@ function Dashboard() {
                             </>
                         )}
                 </div>
-                {firstLoaded && !priceFetchFailed && (
+
+                {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
+                {portfolio.length > 0 && (
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white mt-4">
                         <input
                             type="text"
@@ -177,6 +216,8 @@ function Dashboard() {
                         </select>
                     </div>
                 )}
+
+                {/* phần còn lại giữ nguyên */}
                 {filteredPortfolio.map((coin, index) => {
                     const netInvested = coin.total_invested - coin.total_sold;
                     const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
@@ -240,7 +281,6 @@ function Dashboard() {
                         </div>
                     );
                 })}
-
             </div>
         </div>
     );
