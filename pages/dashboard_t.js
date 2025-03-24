@@ -1,5 +1,5 @@
-// updated: Hiển thị trạng thái chờ khi lần đầu không lấy được giá, chỉ cập nhật khi lấy được giá
-import { useState, useEffect } from "react";
+// updated: Hiển thị trạng thái chờ khi lần đầu không lấy được giá, chỉ cập nhật khi lấy được giá + Fix lỗi setInterval lặp khi chuyển trang
+import { useState, useEffect, useRef } from "react";
 import React from "react";
 import Navbar from "../components/Navbar";
 import {
@@ -24,6 +24,7 @@ function Dashboard() {
     const [lastUpdated, setLastUpdated] = useState(null);
     const [priceFetchFailed, setPriceFetchFailed] = useState(false);
     const [firstLoaded, setFirstLoaded] = useState(false);
+    const intervalRef = useRef(null);
     const router = useRouter();
 
     const coinIcons = useCoinIcons();
@@ -58,6 +59,7 @@ function Dashboard() {
                 setLastUpdated(new Date(cachedTime).toLocaleTimeString());
             }
         }
+
         const storedUser = localStorage.getItem("user");
         if (!storedUser) {
             router.push("/login");
@@ -65,8 +67,17 @@ function Dashboard() {
         }
         const user = JSON.parse(storedUser);
         fetchPortfolioWithRetry(user.uid);
-        const interval = setInterval(() => fetchPortfolioWithRetry(user.uid), 60000);
-        return () => clearInterval(interval);
+
+        if (!intervalRef.current) {
+            intervalRef.current = setInterval(() => fetchPortfolioWithRetry(user.uid), 60000);
+        }
+
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+        };
     }, []);
 
     const fetchPortfolioWithRetry = async (userId, retryCount = 0) => {
@@ -97,7 +108,7 @@ function Dashboard() {
                 if (!firstLoaded) {
                     setPriceFetchFailed(true);
                 } else {
-                    console.warn("Skipped update, giá vẫn giữ nguyên do không lấy được giá mới");
+                    console.warn("Skipped update, giữ nguyên dữ liệu cũ.");
                 }
             }
         } catch (error) {
