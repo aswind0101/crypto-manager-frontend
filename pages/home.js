@@ -10,7 +10,6 @@ import {
 import { FaCoins } from "react-icons/fa";
 import { useCoinIcons } from "../components/useCoinIcons";
 import { useRouter } from "next/router";
-
 import withAuthProtection from "../hoc/withAuthProtection";
 
 function Dashboard() {
@@ -24,8 +23,16 @@ function Dashboard() {
     const [lastUpdated, setLastUpdated] = useState(null);
     const [priceFetchFailed, setPriceFetchFailed] = useState(false);
     const [firstLoaded, setFirstLoaded] = useState(false);
-    // Đảm bảo trạng thái "chúng ta từng có dữ liệu trước đó"
     const [hasCache, setHasCache] = useState(false);
+    const [selectedCoin, setSelectedCoin] = useState(null);
+    const [tradeType, setTradeType] = useState("buy");
+    const [quantity, setQuantity] = useState("");
+    const [price, setPrice] = useState("");
+    const [showModal, setShowModal] = useState(false);  
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formError, setFormError] = useState("");
+
 
     const intervalRef = useRef(null);
     const router = useRouter();
@@ -127,6 +134,47 @@ function Dashboard() {
         }
     };
 
+    const handleOpenTradeModal = (coin, type) => {
+        setSelectedCoin(coin);
+        setTradeType(type);
+        setQuantity("");
+        setPrice(coin.current_price || "");
+        setShowModal(true);
+        setFormError("");
+    };
+
+
+    const handleConfirmTrade = async () => {
+        if (!quantity || parseFloat(quantity) <= 0) {
+            setFormError("Please enter a valid quantity > 0.");
+            return;
+        }
+        setIsSubmitting(true);
+        const user = JSON.parse(localStorage.getItem("user"));
+        if (!user) return;
+
+        try {
+            await fetch("https://crypto-manager-backend.onrender.com/api/transactions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    coin_symbol: selectedCoin.coin_symbol,
+                    quantity: parseFloat(quantity),
+                    price: parseFloat(price),
+                    transaction_type: tradeType,
+                    user_id: user.uid
+                })
+            });
+            setShowModal(false);
+            fetchPortfolioWithRetry(user.uid);
+        } catch (error) {
+            setFormError("An error occurred. Please try again later.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+
     const filteredPortfolio = portfolio.filter((coin) => {
         const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
@@ -143,6 +191,45 @@ function Dashboard() {
         <div className="p-0 max-w-5xl mx-auto">
             <Navbar />
             <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
+                {/* Modal */}
+                {showModal && selectedCoin && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-gray-900 p-6 rounded-lg w-96 shadow-xl">
+                            <h2 className="text-xl font-bold mb-4 text-white">
+                                {tradeType === "buy" ? "Buy" : "Sell"} {selectedCoin.coin_symbol.toUpperCase()}
+                            </h2>
+                            <input
+                                type="number"
+                                value={quantity}
+                                onChange={(e) => setQuantity(e.target.value)}
+                                placeholder="Quantity"
+                                className="w-full mb-2 p-2 rounded bg-gray-800 text-white"
+                            />
+                            <input
+                                type="number"
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
+                                placeholder="Price"
+                                className="w-full mb-2 p-2 rounded bg-gray-800 text-white"
+                            />
+                            {formError && <p className="text-red-400 text-sm mb-2">{formError}</p>}
+                            <div className="flex justify-between">
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white"
+                                    disabled={isSubmitting}
+                                >Cancel</button>
+                                <button
+                                    onClick={handleConfirmTrade}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white"
+                                    disabled={isSubmitting}
+                                >{isSubmitting ? "Processing..." : "Confirm"}</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
                 <div className="relative h-80 rounded-xl shadow-lg bg-black overflow-hidden">
                     {!hasCache && priceFetchFailed ? (
                         <div className="flex flex-col items-center justify-center h-full space-y-4">
@@ -282,6 +369,17 @@ function Dashboard() {
                             <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                 ${coin.profit_loss.toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
                             </p>
+                            <div className="mt-4 flex gap-4">
+                                <button
+                                    onClick={() => handleOpenTradeModal(coin, "buy")}
+                                    className="bg-green-600 hover:bg-green-700 px-4 py-1 rounded text-white text-sm"
+                                >Buy</button>
+                                <button
+                                    onClick={() => handleOpenTradeModal(coin, "sell")}
+                                    className="bg-red-600 hover:bg-red-700 px-4 py-1 rounded text-white text-sm"
+                                >Sell</button>
+                            </div>
+
                         </div>
                     );
                 })}
