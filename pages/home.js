@@ -24,6 +24,9 @@ function Dashboard() {
     const [lastUpdated, setLastUpdated] = useState(null);
     const [priceFetchFailed, setPriceFetchFailed] = useState(false);
     const [firstLoaded, setFirstLoaded] = useState(false);
+    // Đảm bảo trạng thái "chúng ta từng có dữ liệu trước đó"
+    const [hasCache, setHasCache] = useState(false);
+
     const intervalRef = useRef(null);
     const router = useRouter();
 
@@ -42,6 +45,7 @@ function Dashboard() {
         const cached = localStorage.getItem("cachedPortfolio");
         const cachedTime = localStorage.getItem("lastUpdated");
         if (cached) {
+            setHasCache(true);
             const parsed = JSON.parse(cached);
             setPortfolio(parsed);
             setFirstLoaded(true);
@@ -140,7 +144,7 @@ function Dashboard() {
             <Navbar />
             <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
                 <div className="relative h-80 rounded-xl shadow-lg bg-black overflow-hidden">
-                    {!firstLoaded && priceFetchFailed ? (
+                    {!hasCache && priceFetchFailed ? (
                         <div className="flex flex-col items-center justify-center h-full space-y-4">
                             <div className="w-56 h-2 bg-gray-700 rounded-full overflow-hidden">
                                 <div className="h-full bg-yellow-400 animate-pulse w-full"></div>
