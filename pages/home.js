@@ -40,7 +40,7 @@ function Dashboard() {
         }
         const user = JSON.parse(storedUser);
         fetchPortfolio(user.uid);
-        const interval = setInterval(() => fetchPortfolio(user.uid), 60000);
+        const interval = setInterval(() => fetchPortfolio(user.uid), 120000);
         return () => clearInterval(interval);
     }, []);
 
