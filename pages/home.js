@@ -28,7 +28,7 @@ function Dashboard() {
     const [tradeType, setTradeType] = useState("buy");
     const [quantity, setQuantity] = useState("");
     const [price, setPrice] = useState("");
-    const [showModal, setShowModal] = useState(false);  
+    const [showModal, setShowModal] = useState(false);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState("");
@@ -47,6 +47,21 @@ function Dashboard() {
                 <FaCoins className="text-gray-500 text-2xl" />
             );
     };
+    // Thay đổi độ đậm nhạt của biểu đồ
+    const getDynamicColor = (coin) => {
+        if (!coin.total_invested || coin.total_invested <= 0) return "#999";
+        const percentChange = (coin.profit_loss / coin.total_invested) * 100;
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+        if (percentChange >= 0) {
+            const lightness = clamp(60 - percentChange, 25, 60);
+            return `hsl(120, 100%, ${lightness}%)`; // green hue
+        } else {
+            const lightness = clamp(60 + percentChange, 25, 60);
+            return `hsl(0, 100%, ${lightness}%)`; // red hue
+        }
+    };
+
 
     useEffect(() => {
         const cached = localStorage.getItem("cachedPortfolio");
@@ -249,7 +264,7 @@ function Dashboard() {
                                         data={portfolio.map(coin => ({
                                             name: coin.coin_symbol,
                                             value: coin.current_value,
-                                            fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
+                                            fill: getDynamicColor(coin) //Thay đổi màu
                                         }))}
                                         startAngle={180}
                                         endAngle={0}
