@@ -340,7 +340,8 @@ function Dashboard() {
                 </div>
                 {/* Market Overview */}
                 <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow">
-                    <div className="flex items-center justify-between cursor-pointer" className="flex items-center justify-between cursor-pointer transition-colors duration-200" onClick={() => setShowMarketOverview(!showMarketOverview)}>
+                    <div className="flex items-center justify-between cursor-pointer transition-colors duration-200"
+ onClick={() => setShowMarketOverview(!showMarketOverview)}>
         <h2 className="text-lg font-bold">🌐 Market Overview</h2>
                 <span className="text-sm text-blue-400 hover:underline flex items-center gap-1">
                     <span className={`transform transition-transform duration-300 ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
