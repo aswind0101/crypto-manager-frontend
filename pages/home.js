@@ -13,6 +13,14 @@ import { useRouter } from "next/router";
 import withAuthProtection from "../hoc/withAuthProtection";
 
 function Dashboard() {
+    const formatNumber = (num) => {
+        if (!num || isNaN(num)) return '–';
+        if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+        if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+        if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+        if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+        return Number(num).toLocaleString();
+    };
     const [portfolio, setPortfolio] = useState([]);
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
@@ -28,7 +36,12 @@ function Dashboard() {
     const [tradeType, setTradeType] = useState("buy");
     const [quantity, setQuantity] = useState("");
     const [price, setPrice] = useState("");
-    const [showModal, setShowModal] = useState(false);
+    const [showModal, setShowModal] = useState(false);  
+
+    const [globalMarketCap, setGlobalMarketCap] = useState(null);
+    const [topCoins, setTopCoins] = useState([]);
+    const [showMarketOverview, setShowMarketOverview] = useState(true);
+
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState("");
@@ -47,21 +60,6 @@ function Dashboard() {
                 <FaCoins className="text-gray-500 text-2xl" />
             );
     };
-    // Thay đổi độ đậm nhạt của biểu đồ
-    const getDynamicColor = (coin) => {
-        if (!coin.total_invested || coin.total_invested <= 0) return "#999";
-        const percentChange = (coin.profit_loss / coin.total_invested) * 100;
-        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-        if (percentChange >= 0) {
-            const lightness = clamp(60 - percentChange, 25, 60);
-            return `hsl(120, 100%, ${lightness}%)`; // green hue
-        } else {
-            const lightness = clamp(60 + percentChange, 25, 60);
-            return `hsl(0, 100%, ${lightness}%)`; // red hue
-        }
-    };
-
 
     useEffect(() => {
         const cached = localStorage.getItem("cachedPortfolio");
@@ -93,10 +91,15 @@ function Dashboard() {
         }
         const user = JSON.parse(storedUser);
         fetchPortfolioWithRetry(user.uid);
-
+        fetchMarketData();
+        
         if (!intervalRef.current) {
-            intervalRef.current = setInterval(() => fetchPortfolioWithRetry(user.uid), 60000);
+            intervalRef.current = setInterval(() => {
+                fetchPortfolioWithRetry(user.uid);
+                fetchGlobalMarketCap(); // ✅ thêm dòng này để tự động cập nhật
+            }, 60000);
         }
+
 
         return () => {
             if (intervalRef.current) {
@@ -105,6 +108,41 @@ function Dashboard() {
             }
         };
     }, []);
+
+    const fetchMarketData = async () => {
+        const cachedCap = localStorage.getItem("cachedMarketCap");
+        const cachedTop = localStorage.getItem("cachedTopCoins");
+        if (cachedCap && cachedTop) {
+            setGlobalMarketCap(Number(cachedCap));
+            setTopCoins(JSON.parse(cachedTop));
+        }
+
+        try {
+            const [globalRes, topRes] = await Promise.all([
+                fetch("https://api.coingecko.com/api/v3/global"),
+                fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=3&page=1")
+            ]);
+
+            // ✅ Kiểm tra nếu fetch thành công
+            if (!globalRes.ok || !topRes.ok) {
+                throw new Error("CoinGecko API failed");
+            }
+
+            const globalData = await globalRes.json();
+            const topData = await topRes.json();
+
+            setGlobalMarketCap(globalData.data.total_market_cap.usd);
+            setTopCoins(topData);
+
+            // ✅ Lưu cache
+            localStorage.setItem("cachedMarketCap", globalData.data.total_market_cap.usd);
+            localStorage.setItem("cachedTopCoins", JSON.stringify(topData));
+        } catch (error) {
+            console.error("⚠️ Failed to fetch market data:", error.message || error);
+        }
+    };
+
+
 
     const fetchPortfolioWithRetry = async (userId, retryCount = 0) => {
         try {
@@ -205,6 +243,7 @@ function Dashboard() {
     return (
         <div className="p-0 max-w-5xl mx-auto">
             <Navbar />
+            
             <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
                 {/* Modal */}
                 {showModal && selectedCoin && (
@@ -264,7 +303,7 @@ function Dashboard() {
                                         data={portfolio.map(coin => ({
                                             name: coin.coin_symbol,
                                             value: coin.current_value,
-                                            fill: getDynamicColor(coin) //Thay đổi màu
+                                            fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
                                         }))}
                                         startAngle={180}
                                         endAngle={0}
@@ -299,7 +338,36 @@ function Dashboard() {
                             </>
                         )}
                 </div>
-
+                {/* Market Overview */}
+                <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow">
+                    <div className="flex items-center justify-between cursor-pointer" className="flex items-center justify-between cursor-pointer transition-colors duration-200" onClick={() => setShowMarketOverview(!showMarketOverview)}>
+        <h2 className="text-lg font-bold">🌐 Market Overview</h2>
+                <span className="text-sm text-blue-400 hover:underline flex items-center gap-1">
+                    <span className={`transform transition-transform duration-300 ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
+                </span>
+        </div>
+                    
+                    {showMarketOverview && (
+                        <>
+                            <p className="text-sm text-gray-300 mb-4">
+                                <span className="text-sm text-gray-400">Total Market Cap: </span>
+                                <span className="text-sm text-gray-400">${formatNumber(globalMarketCap)}</span>
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {topCoins.map((coin) => (
+                                    <div key={coin.id} className="bg-gray-800 rounded p-3">
+                                        <div className="flex items-center gap-2">
+                                            <img src={coin.image} alt={coin.name} className="w-6 h-6" />
+                                            <span className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</span>
+                                        </div>
+                                        <p className="text-sm mt-1">💵 ${formatNumber(coin.current_price)}</p>
+                                        <p className="text-sm text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white mt-4">
