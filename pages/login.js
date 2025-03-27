@@ -1,11 +1,13 @@
 import { useEffect } from "react";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithPopup,setPersistence,
+    browserLocalPersistence, GoogleAuthProvider, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/router";
 import { app } from "../firebase";
 
 export default function Login() {
     const router = useRouter();
     const auth = getAuth(app);
+    setPersistence(auth, browserLocalPersistence);//Thêm auth.setPersistence() để bảo đảm phiên đăng nhập lưu lâu hơn
 
     const handleLogin = async () => {
         const provider = new GoogleAuthProvider();
