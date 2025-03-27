@@ -44,6 +44,9 @@ function Dashboard() {
     const [topCoins, setTopCoins] = useState([]);
     const [showMarketOverview, setShowMarketOverview] = useState(true);
 
+    const [refreshing, setRefreshing] = useState(false);
+
+
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState("");
@@ -59,42 +62,42 @@ function Dashboard() {
         return url ? (
             <img src={url} alt={symbol} className="w-8 h-8 object-contain rounded-full" />
         ) : (
-            <FaCoins className="text-gray-500 text-2xl" />
-        );
+                <FaCoins className="text-gray-500 text-2xl" />
+            );
     };
     const fetchMarketData = async (useCache = true) => {
         if (useCache) {
-          const cachedCap = localStorage.getItem("cachedMarketCap");
-          const cachedTop = localStorage.getItem("cachedTopCoins");
-          if (cachedCap && cachedTop) {
-            setGlobalMarketCap(Number(cachedCap));
-            setTopCoins(JSON.parse(cachedTop));
-          }
+            const cachedCap = localStorage.getItem("cachedMarketCap");
+            const cachedTop = localStorage.getItem("cachedTopCoins");
+            if (cachedCap && cachedTop) {
+                setGlobalMarketCap(Number(cachedCap));
+                setTopCoins(JSON.parse(cachedTop));
+            }
         }
-      
+
         try {
-          const [globalRes, topRes] = await Promise.all([
-            fetch("https://api.coingecko.com/api/v3/global"),
-            fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=3&page=1")
-          ]);
-      
-          if (!globalRes.ok || !topRes.ok) {
-            throw new Error("CoinGecko API failed");
-          }
-      
-          const globalData = await globalRes.json();
-          const topData = await topRes.json();
-      
-          setGlobalMarketCap(globalData.data.total_market_cap.usd);
-          setTopCoins(topData);
-      
-          localStorage.setItem("cachedMarketCap", globalData.data.total_market_cap.usd);
-          localStorage.setItem("cachedTopCoins", JSON.stringify(topData));
+            const [globalRes, topRes] = await Promise.all([
+                fetch("https://api.coingecko.com/api/v3/global"),
+                fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=3&page=1")
+            ]);
+
+            if (!globalRes.ok || !topRes.ok) {
+                throw new Error("CoinGecko API failed");
+            }
+
+            const globalData = await globalRes.json();
+            const topData = await topRes.json();
+
+            setGlobalMarketCap(globalData.data.total_market_cap.usd);
+            setTopCoins(topData);
+
+            localStorage.setItem("cachedMarketCap", globalData.data.total_market_cap.usd);
+            localStorage.setItem("cachedTopCoins", JSON.stringify(topData));
         } catch (error) {
-          console.error("⚠️ Failed to fetch market data:", error.message || error);
+            console.error("⚠️ Failed to fetch market data:", error.message || error);
         }
-      };
-      
+    };
+
 
     useEffect(() => {
         const cached = localStorage.getItem("cachedPortfolio");
@@ -144,8 +147,10 @@ function Dashboard() {
         };
     }, []);
 
-   
 
+
+
+    const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
     const fetchPortfolioWithRetry = async (userId, retryCount = 0) => {
         try {
@@ -165,6 +170,9 @@ function Dashboard() {
                     Authorization: `Bearer ${idToken}`,
                 },
             });
+
+            if (!response.ok) throw new Error("Failed to fetch portfolio");
+
             const data = await response.json();
 
             const totalValue = data.portfolio.reduce((sum, coin) => sum + coin.current_value, 0);
@@ -172,37 +180,47 @@ function Dashboard() {
             const totalProfit = data.portfolio.reduce((sum, coin) => sum + coin.profit_loss, 0);
 
             if (totalValue > 0) {
+                // ✅ Cập nhật cache
                 localStorage.setItem("cachedPortfolio", JSON.stringify(data.portfolio));
                 localStorage.setItem("lastUpdated", new Date().toISOString());
+
+                // ✅ Cập nhật state
                 setPortfolio(data.portfolio);
                 setTotalInvested(netTotalInvested);
                 setTotalProfitLoss(totalProfit);
                 setTotalCurrentValue(totalValue);
+
+                // ✅ Cập nhật định dạng thời gian như bản gốc của Hiền
                 setLastUpdated(new Date().toLocaleString("en-US", {
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit"
                 }));
+
                 setPriceFetchFailed(false);
                 setFirstLoaded(true);
             } else {
                 if (!firstLoaded) {
                     setPriceFetchFailed(true);
                 } else {
-                    console.warn("Skipped update, giữ nguyên dữ liệu cũ.");
+                    console.warn("⚠️ Skipped update, giữ nguyên dữ liệu cũ.");
                 }
             }
         } catch (error) {
-            console.error("Error fetching portfolio:", error);
+            console.error(`❌ Retry ${retryCount + 1} failed:`, error.message || error);
+
             if (retryCount < 2) {
-                setTimeout(() => {
-                    fetchPortfolioWithRetry(userId, retryCount + 1);
-                }, 5000);
+                const waitTime = 3000 * (retryCount + 1); // 3s, 6s
+                await delay(waitTime);
+                return fetchPortfolioWithRetry(userId, retryCount + 1);
+            } else {
+                setPriceFetchFailed(true);
             }
         } finally {
             if (firstLoaded) setLoading(false);
         }
     };
+
 
     const handleOpenTradeModal = (coin, type) => {
         setSelectedCoin(coin);
@@ -317,48 +335,71 @@ function Dashboard() {
                             </p>
                         </div>
                     ) : (
-                        <>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <RadialBarChart
-                                    innerRadius="70%"
-                                    outerRadius="100%"
-                                    data={portfolio.map(coin => ({
-                                        name: coin.coin_symbol,
-                                        value: coin.current_value,
-                                        fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
-                                    }))}
-                                    startAngle={180}
-                                    endAngle={0}
-                                >
-                                    <RadialBar minAngle={15} background clockWise dataKey="value" />
-                                </RadialBarChart>
-                            </ResponsiveContainer>
+                            <>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <RadialBarChart
+                                        innerRadius="70%"
+                                        outerRadius="100%"
+                                        data={portfolio.map(coin => ({
+                                            name: coin.coin_symbol,
+                                            value: coin.current_value,
+                                            fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
+                                        }))}
+                                        startAngle={180}
+                                        endAngle={0}
+                                    >
+                                        <RadialBar minAngle={15} background clockWise dataKey="value" />
+                                    </RadialBarChart>
+                                </ResponsiveContainer>
 
-                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
-                                </p>
-                                <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
-                            </div>
+                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                                    <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                        {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
+                                    </p>
+                                    <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
+                                </div>
 
-                            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
-                                <div className="flex flex-col items-center">
-                                    <span className="font-bold text-gray-400">💰 Invested</span>
-                                    <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
+                                <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
+                                    <div className="flex flex-col items-center">
+                                        <span className="font-bold text-gray-400">💰 Invested</span>
+                                        <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <span className="font-bold text-gray-400">📊 Current Value</span>
+                                        <p className="font-bold text-blue-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col items-center">
-                                    <span className="font-bold text-gray-400">📊 Current Value</span>
-                                    <p className="font-bold text-blue-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
-                                </div>
-                            </div>
 
-                            {lastUpdated && (
-                                <div className="absolute bottom-2 w-full text-center text-xs text-gray-400">
-                                    🕒 Last price update: {lastUpdated}
-                                </div>
-                            )}
-                        </>
-                    )}
+                                {lastUpdated && (
+                                    <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
+                                        <span>🕒 Last price update: {lastUpdated}</span>
+                                        <button
+                                            onClick={async () => {
+                                                const storedUser = localStorage.getItem("user");
+                                                if (storedUser) {
+                                                    const user = JSON.parse(storedUser);
+                                                    setRefreshing(true); // bắt đầu xoay
+                                                    await fetchPortfolioWithRetry(user.uid);
+                                                    setRefreshing(false); // ngừng xoay
+                                                }
+                                            }}
+                                            className="min-w-[80px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-yellow-300 rounded-full border border-yellow-400 text-xs font-semibold transition active:scale-95 z-10 flex items-center gap-1"
+                                        >
+                                            <span
+                                                className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
+                                                    }`}
+                                            >
+                                                🔄
+  </span>
+                                            {refreshing ? "Refreshing..." : "Refresh"}
+                                        </button>
+
+                                    </div>
+                                )}
+
+
+                            </>
+                        )}
                 </div>
                 {/* Market Overview */}
                 <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow">

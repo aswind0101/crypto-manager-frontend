@@ -149,8 +149,8 @@ function Transactions() {
                                             </td>
                                             <td
                                                 className={`px-4 py-2 font-medium ${tx.transaction_type === "buy"
-                                                        ? "text-green-400"
-                                                        : "text-red-400"
+                                                    ? "text-green-400"
+                                                    : "text-red-400"
                                                     }`}
                                             >
                                                 {tx.transaction_type.toUpperCase()}
