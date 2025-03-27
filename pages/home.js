@@ -62,8 +62,8 @@ function Dashboard() {
         return url ? (
             <img src={url} alt={symbol} className="w-8 h-8 object-contain rounded-full" />
         ) : (
-                <FaCoins className="text-gray-500 text-2xl" />
-            );
+            <FaCoins className="text-gray-500 text-2xl" />
+        );
     };
     const fetchMarketData = async (useCache = true) => {
         if (useCache) {
@@ -335,71 +335,71 @@ function Dashboard() {
                             </p>
                         </div>
                     ) : (
-                            <>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <RadialBarChart
-                                        innerRadius="70%"
-                                        outerRadius="100%"
-                                        data={portfolio.map(coin => ({
-                                            name: coin.coin_symbol,
-                                            value: coin.current_value,
-                                            fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
-                                        }))}
-                                        startAngle={180}
-                                        endAngle={0}
+                        <>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <RadialBarChart
+                                    innerRadius="70%"
+                                    outerRadius="100%"
+                                    data={portfolio.map(coin => ({
+                                        name: coin.coin_symbol,
+                                        value: coin.current_value,
+                                        fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
+                                    }))}
+                                    startAngle={180}
+                                    endAngle={0}
+                                >
+                                    <RadialBar minAngle={15} background clockWise dataKey="value" />
+                                </RadialBarChart>
+                            </ResponsiveContainer>
+
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                                <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
+                                </p>
+                                <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
+                            </div>
+
+                            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
+                                <div className="flex flex-col items-center">
+                                    <span className="font-bold text-gray-400">💰 Invested</span>
+                                    <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <span className="font-bold text-gray-400">📊 Current Value</span>
+                                    <p className="font-bold text-blue-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
+                                </div>
+                            </div>
+
+                            {lastUpdated && (
+                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
+                                    <span>🕒 Last price update: {lastUpdated}</span>
+                                    <button
+                                        onClick={async () => {
+                                            const storedUser = localStorage.getItem("user");
+                                            if (storedUser) {
+                                                const user = JSON.parse(storedUser);
+                                                setRefreshing(true); // bắt đầu xoay
+                                                await fetchPortfolioWithRetry(user.uid);
+                                                setRefreshing(false); // ngừng xoay
+                                            }
+                                        }}
+                                        className="min-w-[80px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-yellow-300 rounded-full border border-yellow-400 text-xs font-semibold transition active:scale-95 z-10 flex items-center gap-1"
                                     >
-                                        <RadialBar minAngle={15} background clockWise dataKey="value" />
-                                    </RadialBarChart>
-                                </ResponsiveContainer>
-
-                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                    <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                        {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
-                                    </p>
-                                    <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
-                                </div>
-
-                                <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
-                                    <div className="flex flex-col items-center">
-                                        <span className="font-bold text-gray-400">💰 Invested</span>
-                                        <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <span className="font-bold text-gray-400">📊 Current Value</span>
-                                        <p className="font-bold text-blue-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
-                                    </div>
-                                </div>
-
-                                {lastUpdated && (
-                                    <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
-                                        <span>🕒 Last price update: {lastUpdated}</span>
-                                        <button
-                                            onClick={async () => {
-                                                const storedUser = localStorage.getItem("user");
-                                                if (storedUser) {
-                                                    const user = JSON.parse(storedUser);
-                                                    setRefreshing(true); // bắt đầu xoay
-                                                    await fetchPortfolioWithRetry(user.uid);
-                                                    setRefreshing(false); // ngừng xoay
-                                                }
-                                            }}
-                                            className="min-w-[80px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-yellow-300 rounded-full border border-yellow-400 text-xs font-semibold transition active:scale-95 z-10 flex items-center gap-1"
+                                        <span
+                                            className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
+                                                }`}
                                         >
-                                            <span
-                                                className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
-                                                    }`}
-                                            >
-                                                🔄
-  </span>
-                                            {refreshing ? "Refreshing..." : "Refresh"}
-                                        </button>
+                                            🔄
+                                        </span>
+                                        {refreshing ? "Refreshing..." : "Refresh"}
+                                    </button>
 
-                                    </div>
-                                )}
+                                </div>
+                            )}
 
 
-                            </>
-                        )}
+                        </>
+                    )}
                 </div>
                 {/* Market Overview */}
                 <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow">
@@ -531,6 +531,18 @@ function Dashboard() {
                     );
                 })}
             </div>
+            {/* FAB chỉ hiển thị khi không mở modal và chỉ trên mobile */}
+            {!showModal && (
+                <div className="fixed bottom-6 right-6 z-50 md:hidden">
+                    <button
+                        onClick={() => router.push("/add-transaction")}
+                        className="bg-yellow-400 hover:bg-yellow-500 hover:scale-105 active:scale-95 text-black text-3xl rounded-full shadow-lg w-14 h-14 flex items-center justify-center transition-all duration-300"
+                        title="Add Transaction"
+                    >
+                        +
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
