@@ -461,62 +461,63 @@ function Dashboard() {
                     const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
                         ? (netInvested / coin.total_quantity)
                         : 0;
-                    const originalInvested = coin.total_invested;
-
-                    let profitLossPercentage = "–";
-                    if (originalInvested > 0) {
-                        profitLossPercentage = ((coin.profit_loss / originalInvested) * 100).toFixed(1) + "%";
-                    } else if (netInvested > 0) {
-                        profitLossPercentage = ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%";
-                    } else if (coin.profit_loss > 0) {
-                        profitLossPercentage = "∞%";
-                    } else {
-                        profitLossPercentage = "0%";
-                    }
-
-                    const priceChangeText = avgPrice > 0 ? (
-                        <span className={`ml-2 text-sm font-semibold ${(((coin.current_price - avgPrice) / avgPrice) * 100) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                            ({(((coin.current_price - avgPrice) / avgPrice) * 100).toFixed(2)}% {((coin.current_price - avgPrice) >= 0 ? "▲" : "▼")})
-                        </span>
-                    ) : null;
+                    const profitLossPercentage = netInvested > 0
+                        ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
+                        : coin.profit_loss > 0 ? "∞%" : "0%";
 
                     return (
-                        <div key={index} className="bg-[#0e1628] hover:scale-105 hover:shadow-2xl transition-all duration-300 p-6 rounded-xl shadow-md flex flex-col items-center text-white w-full">
-                            <div className="flex items-center gap-3 mb-2">
-                                {getCoinIcon(coin.coin_symbol)}
-                                <div className="text-left">
+                        <div key={index} className="bg-[#0e1628] hover:scale-105 hover:shadow-2xl transition-all duration-300 p-6 rounded-xl shadow-md flex flex-col text-white w-full">
+                            <div className="flex flex-col items-center justify-center mb-4">
+                                <div className="flex items-center gap-2">
+                                    {getCoinIcon(coin.coin_symbol)}
                                     <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
-                                    <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
+                                </div>
+                                <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
+                            </div>
+
+                            <div className="w-full text-center mb-4">
+                                <p className="text-sm text-gray-400">Current Price - Avg. Buy Price</p>
+                                <p className="text-lg font-mono text-yellow-300">
+                                    ${coin.current_price.toLocaleString()} <span className="text-white">-</span> {avgPrice > 0 ? `$${avgPrice.toFixed(3)}` : "–"}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
+                                <div>
+                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
+                                    <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
+                                    <p className="text-lg font-mono text-orange-400">${coin.total_invested.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
+                                    <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${netInvested.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
+                                    <p className="text-lg font-mono text-blue-400">${coin.current_value.toLocaleString()}</p>
+                                </div>
+                                <div className="col-span-2 border-t border-gray-700 pt-2">
+                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                        {(() => {
+                                            const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
+                                            if (ratio > 0.5) return "🤑";
+                                            if (ratio > 0.1) return "😎";
+                                            if (ratio > 0) return "🙂";
+                                            if (ratio > -0.1) return "😕";
+                                            if (ratio > -0.5) return "😢";
+                                            return "😭";
+                                        })()} Profit / Loss
+                                    </p>
+                                    <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                        ${coin.profit_loss.toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
+                                    </p>
                                 </div>
                             </div>
 
-                            <p className="text-gray-400 text-sm mt-2">Current Price - Avg. Buy Price</p>
-                            <p className="text-lg font-mono text-yellow-300">
-                                ${coin.current_price.toLocaleString()} <span className="text-white">-</span> {avgPrice > 0 ? `$${avgPrice.toFixed(3)}` : "–"}
-                                {priceChangeText}
-                            </p>
-
-                            <p className="text-gray-400 text-sm mt-2">Total Quantity</p>
-                            <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
-
-                            <p className="text-gray-400 text-sm mt-2">Total Invested</p>
-                            <p className="text-lg font-mono text-orange-400">
-                                ${coin.total_invested.toLocaleString()}
-                            </p>
-
-                            <p className="text-gray-400 text-sm mt-2">Net Invested</p>
-                            <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>
-                                ${netInvested.toLocaleString()}
-                            </p>
-
-                            <p className="text-gray-400 text-sm mt-2">Current Value</p>
-                            <p className="text-lg font-mono text-blue-400">${coin.current_value.toLocaleString()}</p>
-
-                            <p className="text-gray-400 text-sm mt-2">Profit / Loss</p>
-                            <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                ${coin.profit_loss.toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
-                            </p>
-                            <div className="mt-4 flex gap-4">
+                            <div className="mt-4 flex justify-center gap-4">
                                 <button
                                     onClick={() => handleOpenTradeModal(coin, "buy")}
                                     className="bg-green-600 hover:bg-green-700 px-4 py-1 rounded text-white text-sm"
@@ -526,7 +527,6 @@ function Dashboard() {
                                     className="bg-red-600 hover:bg-red-700 px-4 py-1 rounded text-white text-sm"
                                 >Sell</button>
                             </div>
-
                         </div>
                     );
                 })}
