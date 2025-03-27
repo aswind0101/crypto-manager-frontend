@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Link from "next/link";
 import withAuthProtection from "../hoc/withAuthProtection";
+import { getAuth } from "firebase/auth";
+
 function Transactions() {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -16,7 +18,17 @@ function Transactions() {
 
     const fetchTransactions = async () => {
         try {
-            const response = await fetch("https://crypto-manager-backend.onrender.com/api/transactions");
+            const auth = getAuth();
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const idToken = await user.getIdToken();
+
+            const response = await fetch("https://crypto-manager-backend.onrender.com/api/transactions", {
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
             const data = await response.json();
             setTransactions(data);
         } catch (error) {
@@ -32,8 +44,16 @@ function Transactions() {
 
         setDeletingId(id);
         try {
+            const auth = getAuth();
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const idToken = await user.getIdToken();
             const res = await fetch(`https://crypto-manager-backend.onrender.com/api/transactions/${id}`, {
-                method: "DELETE"
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
             });
 
             if (res.ok) {

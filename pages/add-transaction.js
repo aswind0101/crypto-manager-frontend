@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
+import { getAuth } from "firebase/auth";
+
 
 function AddTransaction() {
     const [coinSymbol, setCoinSymbol] = useState("");
@@ -12,20 +14,36 @@ function AddTransaction() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!coinSymbol || !quantity || !price || !type) {
-            setStatus("Please fill in all fields.");
+        const storedUser = localStorage.getItem("user");
+        const user = storedUser ? JSON.parse(storedUser) : null;
+
+        console.log("👤 User from localStorage:", user); // ⚠️ Ghi log kiểm tra
+
+        if (!coinSymbol || !quantity || !price || !type || !user) {
+            setStatus("❗ Please fill in all fields and make sure you're logged in.");
             return;
         }
-
         try {
+            const auth = getAuth();
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) {
+                setStatus("❗ User not authenticated");
+                return;
+            }
+
+            const idToken = await firebaseUser.getIdToken();
             const res = await fetch("https://crypto-manager-backend.onrender.com/api/transactions", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${idToken}`,
+                },
                 body: JSON.stringify({
                     coin_symbol: coinSymbol,
                     quantity: parseFloat(quantity),
                     price: parseFloat(price),
-                    transaction_type: type
+                    transaction_type: type,
+                    user_id: firebaseUser.uid
                 })
             });
 
@@ -103,11 +121,12 @@ function AddTransaction() {
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded transition"
                 >
                     Add Transaction
-        </button>
+                </button>
 
                 {status && <p className="text-center mt-2 text-sm text-yellow-300">{status}</p>}
             </form>
         </div>
     );
 }
+
 export default withAuthProtection(AddTransaction);
