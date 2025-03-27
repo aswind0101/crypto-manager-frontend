@@ -11,6 +11,8 @@ import { FaCoins } from "react-icons/fa";
 import { useCoinIcons } from "../components/useCoinIcons";
 import { useRouter } from "next/router";
 import withAuthProtection from "../hoc/withAuthProtection";
+import { getAuth } from "firebase/auth";
+
 
 function Dashboard() {
     const formatNumber = (num) => {
@@ -36,7 +38,7 @@ function Dashboard() {
     const [tradeType, setTradeType] = useState("buy");
     const [quantity, setQuantity] = useState("");
     const [price, setPrice] = useState("");
-    const [showModal, setShowModal] = useState(false);  
+    const [showModal, setShowModal] = useState(false);
 
     const [globalMarketCap, setGlobalMarketCap] = useState(null);
     const [topCoins, setTopCoins] = useState([]);
@@ -57,9 +59,42 @@ function Dashboard() {
         return url ? (
             <img src={url} alt={symbol} className="w-8 h-8 object-contain rounded-full" />
         ) : (
-                <FaCoins className="text-gray-500 text-2xl" />
-            );
+            <FaCoins className="text-gray-500 text-2xl" />
+        );
     };
+    const fetchMarketData = async (useCache = true) => {
+        if (useCache) {
+          const cachedCap = localStorage.getItem("cachedMarketCap");
+          const cachedTop = localStorage.getItem("cachedTopCoins");
+          if (cachedCap && cachedTop) {
+            setGlobalMarketCap(Number(cachedCap));
+            setTopCoins(JSON.parse(cachedTop));
+          }
+        }
+      
+        try {
+          const [globalRes, topRes] = await Promise.all([
+            fetch("https://api.coingecko.com/api/v3/global"),
+            fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=3&page=1")
+          ]);
+      
+          if (!globalRes.ok || !topRes.ok) {
+            throw new Error("CoinGecko API failed");
+          }
+      
+          const globalData = await globalRes.json();
+          const topData = await topRes.json();
+      
+          setGlobalMarketCap(globalData.data.total_market_cap.usd);
+          setTopCoins(topData);
+      
+          localStorage.setItem("cachedMarketCap", globalData.data.total_market_cap.usd);
+          localStorage.setItem("cachedTopCoins", JSON.stringify(topData));
+        } catch (error) {
+          console.error("⚠️ Failed to fetch market data:", error.message || error);
+        }
+      };
+      
 
     useEffect(() => {
         const cached = localStorage.getItem("cachedPortfolio");
@@ -91,12 +126,12 @@ function Dashboard() {
         }
         const user = JSON.parse(storedUser);
         fetchPortfolioWithRetry(user.uid);
-        fetchMarketData();
-        
+        fetchMarketData(true);
+
         if (!intervalRef.current) {
             intervalRef.current = setInterval(() => {
                 fetchPortfolioWithRetry(user.uid);
-                fetchGlobalMarketCap(); // ✅ thêm dòng này để tự động cập nhật
+                fetchMarketData(false); // ✅ thêm dòng này để tự động cập nhật
             }, 60000);
         }
 
@@ -109,45 +144,27 @@ function Dashboard() {
         };
     }, []);
 
-    const fetchMarketData = async () => {
-        const cachedCap = localStorage.getItem("cachedMarketCap");
-        const cachedTop = localStorage.getItem("cachedTopCoins");
-        if (cachedCap && cachedTop) {
-            setGlobalMarketCap(Number(cachedCap));
-            setTopCoins(JSON.parse(cachedTop));
-        }
-
-        try {
-            const [globalRes, topRes] = await Promise.all([
-                fetch("https://api.coingecko.com/api/v3/global"),
-                fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=3&page=1")
-            ]);
-
-            // ✅ Kiểm tra nếu fetch thành công
-            if (!globalRes.ok || !topRes.ok) {
-                throw new Error("CoinGecko API failed");
-            }
-
-            const globalData = await globalRes.json();
-            const topData = await topRes.json();
-
-            setGlobalMarketCap(globalData.data.total_market_cap.usd);
-            setTopCoins(topData);
-
-            // ✅ Lưu cache
-            localStorage.setItem("cachedMarketCap", globalData.data.total_market_cap.usd);
-            localStorage.setItem("cachedTopCoins", JSON.stringify(topData));
-        } catch (error) {
-            console.error("⚠️ Failed to fetch market data:", error.message || error);
-        }
-    };
-
+   
 
 
     const fetchPortfolioWithRetry = async (userId, retryCount = 0) => {
         try {
             if (!firstLoaded) setLoading(true);
-            const response = await fetch(`https://crypto-manager-backend.onrender.com/api/portfolio?userId=${userId}`);
+
+            const auth = getAuth();
+            const user = auth.currentUser;
+            if (!user) {
+                router.push("/login");
+                return;
+            }
+
+            const idToken = await user.getIdToken();
+
+            const response = await fetch("https://crypto-manager-backend.onrender.com/api/portfolio", {
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
             const data = await response.json();
 
             const totalValue = data.portfolio.reduce((sum, coin) => sum + coin.current_value, 0);
@@ -203,19 +220,24 @@ function Dashboard() {
             return;
         }
         setIsSubmitting(true);
-        const user = JSON.parse(localStorage.getItem("user"));
+
+        const auth = getAuth();
+        const user = auth.currentUser;
         if (!user) return;
 
+        const idToken = await user.getIdToken();
         try {
             await fetch("https://crypto-manager-backend.onrender.com/api/transactions", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${idToken}`,
+                },
                 body: JSON.stringify({
                     coin_symbol: selectedCoin.coin_symbol,
                     quantity: parseFloat(quantity),
                     price: parseFloat(price),
                     transaction_type: tradeType,
-                    user_id: user.uid
                 })
             });
             setShowModal(false);
@@ -243,7 +265,7 @@ function Dashboard() {
     return (
         <div className="p-0 max-w-5xl mx-auto">
             <Navbar />
-            
+
             <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
                 {/* Modal */}
                 {showModal && selectedCoin && (
@@ -295,59 +317,59 @@ function Dashboard() {
                             </p>
                         </div>
                     ) : (
-                            <>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <RadialBarChart
-                                        innerRadius="70%"
-                                        outerRadius="100%"
-                                        data={portfolio.map(coin => ({
-                                            name: coin.coin_symbol,
-                                            value: coin.current_value,
-                                            fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
-                                        }))}
-                                        startAngle={180}
-                                        endAngle={0}
-                                    >
-                                        <RadialBar minAngle={15} background clockWise dataKey="value" />
-                                    </RadialBarChart>
-                                </ResponsiveContainer>
+                        <>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <RadialBarChart
+                                    innerRadius="70%"
+                                    outerRadius="100%"
+                                    data={portfolio.map(coin => ({
+                                        name: coin.coin_symbol,
+                                        value: coin.current_value,
+                                        fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
+                                    }))}
+                                    startAngle={180}
+                                    endAngle={0}
+                                >
+                                    <RadialBar minAngle={15} background clockWise dataKey="value" />
+                                </RadialBarChart>
+                            </ResponsiveContainer>
 
-                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                    <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                        {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
-                                    </p>
-                                    <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                                <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
+                                </p>
+                                <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
+                            </div>
+
+                            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
+                                <div className="flex flex-col items-center">
+                                    <span className="font-bold text-gray-400">💰 Invested</span>
+                                    <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
                                 </div>
-
-                                <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
-                                    <div className="flex flex-col items-center">
-                                        <span className="font-bold text-gray-400">💰 Invested</span>
-                                        <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <span className="font-bold text-gray-400">📊 Current Value</span>
-                                        <p className="font-bold text-blue-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
-                                    </div>
+                                <div className="flex flex-col items-center">
+                                    <span className="font-bold text-gray-400">📊 Current Value</span>
+                                    <p className="font-bold text-blue-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
                                 </div>
+                            </div>
 
-                                {lastUpdated && (
-                                    <div className="absolute bottom-2 w-full text-center text-xs text-gray-400">
-                                        🕒 Last price update: {lastUpdated}
-                                    </div>
-                                )}
-                            </>
-                        )}
+                            {lastUpdated && (
+                                <div className="absolute bottom-2 w-full text-center text-xs text-gray-400">
+                                    🕒 Last price update: {lastUpdated}
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
                 {/* Market Overview */}
                 <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow">
                     <div className="flex items-center justify-between cursor-pointer transition-colors duration-200"
- onClick={() => setShowMarketOverview(!showMarketOverview)}>
-        <h2 className="text-lg font-bold">🌐 Market Overview</h2>
-                <span className="text-sm text-blue-400 hover:underline flex items-center gap-1">
-                    <span className={`transform transition-transform duration-300 ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
-                </span>
-        </div>
-                    
+                        onClick={() => setShowMarketOverview(!showMarketOverview)}>
+                        <h2 className="text-lg font-bold">🌐 Market Overview</h2>
+                        <span className="text-sm text-blue-400 hover:underline flex items-center gap-1">
+                            <span className={`transform transition-transform duration-300 ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
+                        </span>
+                    </div>
+
                     {showMarketOverview && (
                         <>
                             <p className="text-sm text-gray-300 mb-4">
