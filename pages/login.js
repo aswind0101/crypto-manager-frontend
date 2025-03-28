@@ -12,6 +12,7 @@ export default function Login() {
     const handleLogin = async () => {
         const provider = new GoogleAuthProvider();
         try {
+            await setPersistence(auth, browserLocalPersistence); // ✅ Chờ setPersistence trước
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
             localStorage.setItem("user", JSON.stringify({
