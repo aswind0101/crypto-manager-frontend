@@ -427,8 +427,6 @@ function Dashboard() {
 
                                 </div>
                             )}
-
-
                         </>
                     )}
                 </div>
@@ -436,18 +434,21 @@ function Dashboard() {
                 <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow ">
                     <div className="flex items-center justify-between cursor-pointer transition-colors duration-200"
                         onClick={() => setShowMarketOverview(!showMarketOverview)}>
-                        <h2 className="text-lg font-bold">🌐 Market Overview</h2>
-                        <span className="text-sm text-blue-400 hover:underline flex items-center gap-1">
+                        <h2 className="text-lg font-bold flex items-center gap-2">
+                            🌐 Market Overview
+                            <span className="text-sm text-gray-400">(${formatNumber(globalMarketCap)})</span>
+                        </h2>
+                        <span className="text-sm text-blue-400 hover:underline cursor-pointer" onClick={() => setShowMarketOverview(!showMarketOverview)}>
                             <span className={`transform transition-transform duration-300 ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
                         </span>
                     </div>
 
                     {showMarketOverview && (
                         <>
-                            <p className="text-sm text-gray-300 mb-4">
-                                <span className="text-sm text-gray-400">Total Market Cap: </span>
-                                <span className="text-sm text-gray-400">${formatNumber(globalMarketCap)}</span>
-                            </p>
+                            <div className="flex items-center gap-2 text-gray-300 mb-2">
+
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {topCoins.map((coin) => (
                                     <div key={coin.id} className="bg-gray-800 rounded p-3">
