@@ -372,7 +372,7 @@ function Dashboard() {
                                     (<CountUp
                                         key={totalProfitLoss + '-' + totalNetInvested}
                                         end={parseFloat((Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0) * 100)}
-                                        duration={1.5}
+                                        duration={10}
                                         decimals={1}
                                     />%
                                     {totalProfitLoss >= 0 ? '▲' : '▼'})
