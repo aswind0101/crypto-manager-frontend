@@ -45,7 +45,7 @@ function Dashboard() {
 
     const [globalMarketCap, setGlobalMarketCap] = useState(null);
     const [topCoins, setTopCoins] = useState([]);
-    const [showMarketOverview, setShowMarketOverview] = useState(true);
+    const [showMarketOverview, setShowMarketOverview] = useState(false);
 
     const [refreshing, setRefreshing] = useState(false);
 
