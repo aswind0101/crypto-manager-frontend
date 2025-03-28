@@ -14,6 +14,8 @@ import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth } from "firebase/auth";
 
 import CountUp from "react-countup";
+import { motion, AnimatePresence } from "framer-motion";
+
 
 function Dashboard() {
     const formatNumber = (num) => {
@@ -448,19 +450,32 @@ function Dashboard() {
                             <div className="flex items-center gap-2 text-gray-300 mb-2">
 
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {topCoins.map((coin) => (
-                                    <div key={coin.id} className="bg-gray-800 rounded p-3">
-                                        <div className="flex items-center gap-2">
-                                            <img src={coin.image} alt={coin.name} className="w-6 h-6" />
-                                            <span className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</span>
+                            {/* Market Overview Details */}
+                            <AnimatePresence>
+                                {showMarketOverview && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="col-span-2 mt-2"
+                                    >
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {topCoins.map((coin) => (
+                                                <div key={coin.id} className="bg-gray-800 rounded p-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <img src={coin.image} alt={coin.name} className="w-6 h-6" />
+                                                        <span className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</span>
+                                                    </div>
+                                                    <p className="text-sm mt-1">💵 ${formatNumber(coin.current_price)}</p>
+                                                    <p className="text-sm text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <p className="text-sm mt-1">💵 ${formatNumber(coin.current_price)}</p>
-                                        <p className="text-sm text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
-                                    </div>
-                                ))}
-                            </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
                         </>
                     )}
                 </div>
