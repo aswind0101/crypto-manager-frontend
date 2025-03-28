@@ -514,8 +514,13 @@ function Dashboard() {
 
                     return (
                         <div key={index} className="bg-[#0e1628] hover:scale-105 hover:shadow-2xl transition-all duration-300 p-6 rounded-xl shadow-md flex flex-col text-white w-full">
-                            <div className="flex flex-col items-center justify-center mb-4">
+                            {/* Hint for mobile users */}
+                            <div className="text-center text-xs text-gray-500 italic mb-2">
+                                (Tap any coin to view transaction details)
+                            </div>
+                            <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
                                 <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 text-sm">👉</span>
                                     {getCoinIcon(coin.coin_symbol)}
                                     <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
                                 </div>
