@@ -60,8 +60,8 @@ function Dashboard() {
     const intervalRef = useRef(null);
     const router = useRouter();
 
+    const isMounted = useRef(false);
     const coinIcons = useCoinIcons();
-
     const getCoinIcon = (symbol) => {
         const url = coinIcons[symbol.toUpperCase()];
         return url ? (
@@ -70,6 +70,74 @@ function Dashboard() {
             <FaCoins className="text-gray-500 text-2xl" />
         );
     };
+
+    const fetchCoinList = async () => {
+        const cache = localStorage.getItem("coinList");
+        const cacheTime = localStorage.getItem("coinListUpdated");
+        const now = Date.now();
+
+        if (cache && cacheTime && now - parseInt(cacheTime) < 86400000) {
+            return JSON.parse(cache);
+        }
+
+        try {
+            const res = await fetch("https://api.coingecko.com/api/v3/coins/list");
+            if (!res.ok) throw new Error("CoinGecko list fetch failed");
+            const coins = await res.json();
+            localStorage.setItem("coinList", JSON.stringify(coins));
+            localStorage.setItem("coinListUpdated", now.toString());
+            return coins;
+        } catch (err) {
+            console.warn("⚠️ fetchCoinList failed", err);
+            if (cache) return JSON.parse(cache);
+            return [];
+        }
+    };
+
+    const getCoinPrices = async (symbols = []) => {
+        try {
+            const allCoins = await fetchCoinList();
+            const ids = symbols.map(symbol => {
+                const match = allCoins.find(coin => coin.symbol.toLowerCase() === symbol.toLowerCase());
+                return match?.id || null;
+            }).filter(Boolean);
+
+            if (ids.length === 0) return {};
+
+            const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}&vs_currencies=usd`);
+
+            if (!res.ok) throw new Error("❌ Failed to fetch coin prices");
+
+            const data = await res.json();
+
+            const priceMap = {};
+            symbols.forEach(symbol => {
+                const matched = allCoins.find(c => c.symbol.toLowerCase() === symbol.toLowerCase());
+                const id = matched?.id;
+                if (id && data[id]) {
+                    const price = data[id].usd;
+                    priceMap[symbol.toUpperCase()] = price;
+                    localStorage.setItem("price_" + symbol.toUpperCase(), price); // ✅ Cache lại
+                } else {
+                    // fallback nếu không có trong data
+                    const cached = localStorage.getItem("price_" + symbol.toUpperCase());
+                    priceMap[symbol.toUpperCase()] = cached ? parseFloat(cached) : 0;
+                }
+            });
+
+            return priceMap;
+        } catch (e) {
+            console.warn("⚠️ getCoinPrices failed, dùng giá từ cache nếu có", e);
+            const fallback = {};
+            symbols.forEach(symbol => {
+                const cached = localStorage.getItem("price_" + symbol.toUpperCase());
+                fallback[symbol.toUpperCase()] = cached ? parseFloat(cached) : 0;
+            });
+            return fallback;
+        }
+    };
+
+
     const fetchMarketData = async (useCache = true) => {
         if (useCache) {
             const cachedCap = localStorage.getItem("cachedMarketCap");
@@ -105,6 +173,7 @@ function Dashboard() {
 
 
     useEffect(() => {
+        let isMounted = true;
         const cached = localStorage.getItem("cachedPortfolio");
         const cachedTime = localStorage.getItem("lastUpdated");
         if (cached) {
@@ -149,6 +218,7 @@ function Dashboard() {
 
 
         return () => {
+            isMounted = false;
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
@@ -184,36 +254,51 @@ function Dashboard() {
 
             const data = await response.json();
 
-            const totalValue = data.portfolio.reduce((sum, coin) => sum + coin.current_value, 0);
-            const netTotalInvested = data.portfolio.reduce((sum, coin) => sum + coin.total_invested, 0);
-            const totalProfit = data.portfolio.reduce((sum, coin) => sum + coin.profit_loss, 0);
+            const symbols = data.portfolio.map(c => c.coin_symbol);
+            const prices = await getCoinPrices(symbols);
+            const updatedPortfolio = data.portfolio.map(c => ({
+                ...c,
+                current_price: prices[c.coin_symbol.toUpperCase()] || 0,
+                current_value: (prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity,
+                profit_loss: ((prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity) - (c.total_invested - c.total_sold)
+            }));
+
+
+            const totalValue = updatedPortfolio.reduce((sum, coin) => sum + coin.current_value, 0);
+            const netTotalInvested = updatedPortfolio.reduce((sum, coin) => sum + coin.total_invested, 0);
+            const totalProfit = updatedPortfolio.reduce((sum, coin) => sum + coin.profit_loss, 0);
             //Thêm để tính % lời lỗ
-            const totalNet = data.portfolio.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
+            const totalNet = updatedPortfolio.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
 
 
 
             if (totalValue > 0) {
                 // ✅ Cập nhật cache
-                localStorage.setItem("cachedPortfolio", JSON.stringify(data.portfolio));
-                localStorage.setItem("lastUpdated", new Date().toISOString());
+                //localStorage.setItem("cachedPortfolio", JSON.stringify(data.portfolio));
+                //localStorage.setItem("lastUpdated", new Date().toISOString());
 
                 // ✅ Cập nhật state
-                setPortfolio(data.portfolio);
-                setTotalInvested(netTotalInvested);
-                //Thêm để tính % lời lỗ
-                settotalNetInvested(totalNet);
-                setTotalProfitLoss(totalProfit);
-                setTotalCurrentValue(totalValue);
+                if (isMounted && totalValue > 0) {
+                    setPortfolio(updatedPortfolio);
+                    setTotalInvested(netTotalInvested);
+                    //Thêm để tính % lời lỗ
+                    settotalNetInvested(totalNet);
+                    setTotalProfitLoss(totalProfit);
+                    setTotalCurrentValue(totalValue);
 
-                // ✅ Cập nhật định dạng thời gian như bản gốc của Hiền
-                setLastUpdated(new Date().toLocaleString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit"
-                }));
+                    // ✅ Cập nhật định dạng thời gian như bản gốc của Hiền
+                    setLastUpdated(new Date().toLocaleString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                    }));
 
-                setPriceFetchFailed(false);
-                setFirstLoaded(true);
+                    setPriceFetchFailed(false);
+                    setFirstLoaded(true);
+                    localStorage.setItem("cachedPortfolio", JSON.stringify(updatedPortfolio));
+                    localStorage.setItem("lastUpdated", new Date().toISOString());
+                }
+
             } else {
                 if (!firstLoaded) {
                     setPriceFetchFailed(true);
