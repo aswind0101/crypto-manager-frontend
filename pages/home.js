@@ -13,6 +13,7 @@ import { useRouter } from "next/router";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth } from "firebase/auth";
 
+import CountUp from "react-countup";
 
 function Dashboard() {
     const formatNumber = (num) => {
@@ -25,6 +26,8 @@ function Dashboard() {
     };
     const [portfolio, setPortfolio] = useState([]);
     const [totalInvested, setTotalInvested] = useState(0);
+    const [totalNetInvested, settotalNetInvested] = useState(0);
+
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
     const [totalCurrentValue, setTotalCurrentValue] = useState(0);
     const [searchTerm, setSearchTerm] = useState("");
@@ -112,8 +115,12 @@ function Dashboard() {
             const totalValue = parsed.reduce((sum, coin) => sum + coin.current_value, 0);
             const netTotalInvested = parsed.reduce((sum, coin) => sum + coin.total_invested, 0);
             const totalProfit = parsed.reduce((sum, coin) => sum + coin.profit_loss, 0);
+            //Thêm để tính % lời lỗ
+            const totalNet = parsed.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
 
             setTotalInvested(netTotalInvested);
+            //Thêm để tính % lời lỗ
+            settotalNetInvested(totalNet);
             setTotalCurrentValue(totalValue);
             setTotalProfitLoss(totalProfit);
 
@@ -178,6 +185,10 @@ function Dashboard() {
             const totalValue = data.portfolio.reduce((sum, coin) => sum + coin.current_value, 0);
             const netTotalInvested = data.portfolio.reduce((sum, coin) => sum + coin.total_invested, 0);
             const totalProfit = data.portfolio.reduce((sum, coin) => sum + coin.profit_loss, 0);
+            //Thêm để tính % lời lỗ
+            const totalNet = data.portfolio.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
+
+
 
             if (totalValue > 0) {
                 // ✅ Cập nhật cache
@@ -187,6 +198,8 @@ function Dashboard() {
                 // ✅ Cập nhật state
                 setPortfolio(data.portfolio);
                 setTotalInvested(netTotalInvested);
+                //Thêm để tính % lời lỗ
+                settotalNetInvested(totalNet);
                 setTotalProfitLoss(totalProfit);
                 setTotalCurrentValue(totalValue);
 
@@ -353,20 +366,38 @@ function Dashboard() {
                             </ResponsiveContainer>
 
                             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalProfitLoss)}
+                                <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'} shadow-md`}>$<CountUp key={totalProfitLoss} end={Math.round(totalProfitLoss)} duration={1.5} separator="," />
                                 </p>
-                                <p className="font-bold text-gray-400 text-sm">Profit/Loss</p>
+                                <p className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    (<CountUp
+                                        key={totalProfitLoss + '-' + totalNetInvested}
+                                        end={parseFloat((Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0) * 100)}
+                                        duration={1.5}
+                                        decimals={1}
+                                    />%
+                                    {totalProfitLoss >= 0 ? '▲' : '▼'})
+                                </p>
+                                <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                    {(() => {
+                                        const ratio = Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0;
+                                        if (ratio > 0.5) return "🤑";
+                                        if (ratio > 0.1) return "😎";
+                                        if (ratio > 0) return "🙂";
+                                        if (ratio > -0.1) return "😕";
+                                        if (ratio > -0.5) return "😢";
+                                        return "😭";
+                                    })()} Total Profit / Loss
+                                </p>
                             </div>
 
                             <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-gray-400">💰 Invested</span>
-                                    <p className="font-bold text-green-400 text-xl">${totalInvested.toLocaleString()}</p>
+                                    <p className="font-bold text-green-400 text-xl">${Math.round(totalInvested).toLocaleString()}</p>
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-gray-400">📊 Current Value</span>
-                                    <p className="font-bold text-blue-400 text-xl">${totalCurrentValue.toLocaleString()}</p>
+                                    <p className="font-bold text-blue-400 text-xl">${Math.round(totalCurrentValue).toLocaleString()}</p>
                                 </div>
                             </div>
 
@@ -402,7 +433,7 @@ function Dashboard() {
                     )}
                 </div>
                 {/* Market Overview */}
-                <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow">
+                <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow ">
                     <div className="flex items-center justify-between cursor-pointer transition-colors duration-200"
                         onClick={() => setShowMarketOverview(!showMarketOverview)}>
                         <h2 className="text-lg font-bold">🌐 Market Overview</h2>
@@ -489,15 +520,15 @@ function Dashboard() {
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
-                                    <p className="text-lg font-mono text-orange-400">${coin.total_invested.toLocaleString()}</p>
+                                    <p className="text-lg font-mono text-orange-400">${Math.round(coin.total_invested).toLocaleString()}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                    <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${netInvested.toLocaleString()}</p>
+                                    <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${Math.round(netInvested).toLocaleString()}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
-                                    <p className="text-lg font-mono text-blue-400">${coin.current_value.toLocaleString()}</p>
+                                    <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
                                 </div>
                                 <div className="col-span-2 border-t border-gray-700 pt-2">
                                     <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
@@ -512,7 +543,7 @@ function Dashboard() {
                                         })()} Profit / Loss
                                     </p>
                                     <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                        ${coin.profit_loss.toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
+                                        ${Math.round(coin.profit_loss).toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
                                     </p>
                                 </div>
                             </div>
