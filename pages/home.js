@@ -436,10 +436,10 @@ function Dashboard() {
                         onClick={() => setShowMarketOverview(!showMarketOverview)}>
                         <h2 className="text-lg font-bold flex items-center gap-2">
                             🌐 Market Overview
-                            <span className="text-sm text-gray-400">(${formatNumber(globalMarketCap)})</span>
+                            <span className="text-sm text-yellow-300">(${formatNumber(globalMarketCap)})</span>
                         </h2>
                         <span className="text-sm text-blue-400 hover:underline cursor-pointer" onClick={() => setShowMarketOverview(!showMarketOverview)}>
-                            <span className={`transform transition-transform duration-300 ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
+                            <span className={`transform transition-transform duration-300 inline-block ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
                         </span>
                     </div>
 
