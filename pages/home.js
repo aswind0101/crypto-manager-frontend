@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from "react";
 import React from "react";
 import Navbar from "../components/Navbar";
+import SwipeDashboard from "../components/SwipeDashboard";
+
 import {
     ResponsiveContainer,
     RadialBarChart,
@@ -29,6 +31,8 @@ function Dashboard() {
     const [portfolio, setPortfolio] = useState([]);
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalNetInvested, settotalNetInvested] = useState(0);
+    const [showLastUpdate, setShowLastUpdate] = useState(true);
+
 
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
     const [totalCurrentValue, setTotalCurrentValue] = useState(0);
@@ -436,85 +440,42 @@ function Dashboard() {
                         </div>
                     ) : (
                         <>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <RadialBarChart
-                                    innerRadius="70%"
-                                    outerRadius="100%"
-                                    data={portfolio.map(coin => ({
-                                        name: coin.coin_symbol,
-                                        value: coin.current_value,
-                                        fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
-                                    }))}
-                                    startAngle={180}
-                                    endAngle={0}
-                                >
-                                    <RadialBar minAngle={15} background clockWise dataKey="value" />
-                                </RadialBarChart>
-                            </ResponsiveContainer>
+                            <SwipeDashboard
+                                portfolio={portfolio}
+                                totalCurrentValue={totalCurrentValue}
+                                totalProfitLoss={totalProfitLoss}
+                                totalNetInvested={totalNetInvested}
+                                coinIcons={coinIcons}
+                                onSlideChange={(slideIndex) => setShowLastUpdate(slideIndex === 0)}
+                            />
 
-                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'} shadow-md`}>$<CountUp key={totalProfitLoss} end={Math.round(totalProfitLoss)} duration={10} separator="," />
-                                </p>
-                                <p className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    (<CountUp
-                                        key={totalProfitLoss + '-' + totalNetInvested}
-                                        end={parseFloat((Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0) * 100)}
-                                        duration={10}
-                                        decimals={1}
-                                    />%
-                                    {totalProfitLoss >= 0 ? '▲' : '▼'})
-                                </p>
-                                <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
-                                    {(() => {
-                                        const ratio = Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0;
-                                        if (ratio > 0.5) return "🤑";
-                                        if (ratio > 0.1) return "😎";
-                                        if (ratio > 0) return "🙂";
-                                        if (ratio > -0.1) return "😕";
-                                        if (ratio > -0.5) return "😢";
-                                        return "😭";
-                                    })()} Total Profit / Loss
-                                </p>
-                            </div>
-
-                            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
-                                <div className="flex flex-col items-center">
-                                    <span className="font-bold text-gray-400">💰 Invested</span>
-                                    <p className="font-bold text-green-400 text-xl">${Math.round(totalInvested).toLocaleString()}</p>
-                                </div>
-                                <div className="flex flex-col items-center">
-                                    <span className="font-bold text-gray-400">📊 Current Value</span>
-                                    <p className="font-bold text-blue-400 text-xl">$$<CountUp key={totalCurrentValue} end={Math.round(totalCurrentValue)} duration={10} separator="," /></p>
-                                </div>
-                            </div>
-
-                            {lastUpdated && (
-                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
-                                    <span>🕒 Last price update: {lastUpdated}</span>
-                                    <button
-                                        onClick={async () => {
-                                            const storedUser = localStorage.getItem("user");
-                                            if (storedUser) {
-                                                const user = JSON.parse(storedUser);
-                                                setRefreshing(true); // bắt đầu xoay
-                                                await fetchPortfolioWithRetry(user.uid);
-                                                setRefreshing(false); // ngừng xoay
-                                            }
-                                        }}
-                                        className="min-w-[80px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-yellow-300 rounded-full border border-yellow-400 text-xs font-semibold transition active:scale-95 z-10 flex items-center gap-1"
-                                    >
-                                        <span
-                                            className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
-                                                }`}
-                                        >
-                                            🔄
-                                        </span>
-                                        {refreshing ? "Refreshing..." : "Refresh"}
-                                    </button>
-
-                                </div>
-                            )}
                         </>
+                    )}
+                    {lastUpdated && showLastUpdate &&(
+                        <div className="absolute bottom-0 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
+                            <span>🕒 Last price update: {lastUpdated}</span>
+                            <button
+                                onClick={async () => {
+                                    const storedUser = localStorage.getItem("user");
+                                    if (storedUser) {
+                                        const user = JSON.parse(storedUser);
+                                        setRefreshing(true); // bắt đầu xoay
+                                        await fetchPortfolioWithRetry(user.uid);
+                                        setRefreshing(false); // ngừng xoay
+                                    }
+                                }}
+                                className="min-w-[80px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-yellow-300 rounded-full border border-yellow-400 text-xs font-semibold transition active:scale-95 z-10 flex items-center gap-1"
+                            >
+                                <span
+                                    className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
+                                        }`}
+                                >
+                                    🔄
+                                </span>
+                                {refreshing ? "Refreshing..." : "Refresh"}
+                            </button>
+
+                        </div>
                     )}
                 </div>
                 {/* Market Overview */}
