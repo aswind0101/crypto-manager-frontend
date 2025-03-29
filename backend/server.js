@@ -131,44 +131,34 @@ app.delete("/api/transactions/:id", verifyToken, async (req, res) => {
 });
 
 // Get Coin Prices
+// ✅ Phiên bản backend - chính xác, không hardcode, đồng bộ với frontend
 async function getCoinPrices(symbols = []) {
     try {
-        // 1. Gọi CoinGecko để lấy danh sách ID/Symbol
-        const res = await fetch("https://api.coingecko.com/api/v3/coins/list");
-        const allCoins = await res.json(); // [{ id, symbol, name }]
+        const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=250&page=1");
+        if (!res.ok) throw new Error("Failed to fetch coin market data");
 
-        // 2. Mapping: symbol từ DB => id của CoinGecko
-        const ids = symbols
-            .map(symbol => {
-                const match = allCoins.find(coin => coin.symbol.toLowerCase() === symbol.toLowerCase());
-                return match?.id || null;
-            })
-            .filter(Boolean);
+        const allMarkets = await res.json(); // [{ id, symbol, current_price, ... }]
 
-        if (ids.length === 0) return {};
-
-        // 3. Gọi API giá
-        const priceRes = await fetch(
-            `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}&vs_currencies=usd`
-        );
-        const priceData = await priceRes.json(); // { bitcoin: { usd: 68000 }, ... }
-
-        // 4. Trả ra map { BTC: 68000 }
         const priceMap = {};
         symbols.forEach(symbol => {
-            const matched = allCoins.find(c => c.symbol.toLowerCase() === symbol.toLowerCase());
-            const id = matched?.id;
-            if (id && priceData[id]) {
-                priceMap[symbol.toUpperCase()] = priceData[id].usd;
+            const matches = allMarkets.filter(c => c.symbol.toLowerCase() === symbol.toLowerCase());
+
+            if (matches.length > 0) {
+                // Ưu tiên coin có market_cap lớn nhất
+                const selected = matches.reduce((a, b) =>
+                    (a.market_cap || 0) > (b.market_cap || 0) ? a : b
+                );
+                priceMap[symbol.toUpperCase()] = selected.current_price;
             }
         });
 
         return priceMap;
     } catch (error) {
-        console.error("⚠️ getCoinPrices error:", error);
+        console.error("⚠️ getCoinPrices error (backend):", error);
         return {};
     }
 }
+
 
 
 // Health check

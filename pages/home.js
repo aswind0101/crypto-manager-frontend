@@ -28,6 +28,24 @@ function Dashboard() {
         if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
         return Number(num).toLocaleString();
     };
+    const formatPrice = (price) => {
+        if (!price || isNaN(price)) return "–";
+        if (price >= 1) return price.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        if (price >= 0.01) return price.toFixed(4);
+        if (price >= 0.0001) return price.toFixed(6);
+        return price.toFixed(8); // ví dụ như SHIB
+    };
+    
+    const formatMoney = (num) => {
+        if (num === null || num === undefined || isNaN(num)) return "–";
+        if (num >= 1) return "$" + num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        if (num >= 0.01) return "$" + num.toFixed(4);
+        if (num >= 0.0001) return "$" + num.toFixed(6);
+        return "$" + num.toFixed(8); // cho SHIB, PEPE, BONK...
+    };
+    
+    
+
     const [portfolio, setPortfolio] = useState([]);
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalNetInvested, settotalNetInvested] = useState(0);
@@ -100,30 +118,24 @@ function Dashboard() {
 
     const getCoinPrices = async (symbols = []) => {
         try {
-            const allCoins = await fetchCoinList();
-            const ids = symbols.map(symbol => {
-                const match = allCoins.find(coin => coin.symbol.toLowerCase() === symbol.toLowerCase());
-                return match?.id || null;
-            }).filter(Boolean);
+            const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=250&page=1");
+            if (!res.ok) throw new Error("Failed to fetch coin market data");
 
-            if (ids.length === 0) return {};
-
-            const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}&vs_currencies=usd`);
-
-            if (!res.ok) throw new Error("❌ Failed to fetch coin prices");
-
-            const data = await res.json();
+            const allMarkets = await res.json(); // [{ id, symbol, current_price, ... }]
 
             const priceMap = {};
             symbols.forEach(symbol => {
-                const matched = allCoins.find(c => c.symbol.toLowerCase() === symbol.toLowerCase());
-                const id = matched?.id;
-                if (id && data[id]) {
-                    const price = data[id].usd;
-                    priceMap[symbol.toUpperCase()] = price;
-                    localStorage.setItem("price_" + symbol.toUpperCase(), price); // ✅ Cache lại
+                const matches = allMarkets.filter(c => c.symbol.toLowerCase() === symbol.toLowerCase());
+
+                if (matches.length > 0) {
+                    // Ưu tiên coin có market_cap lớn nhất (đầu danh sách)
+                    const selected = matches.reduce((a, b) =>
+                        (a.market_cap || 0) > (b.market_cap || 0) ? a : b
+                    );
+                    priceMap[symbol.toUpperCase()] = selected.current_price;
+                    localStorage.setItem("price_" + symbol.toUpperCase(), selected.current_price);
                 } else {
-                    // fallback nếu không có trong data
+                    // fallback nếu không có
                     const cached = localStorage.getItem("price_" + symbol.toUpperCase());
                     priceMap[symbol.toUpperCase()] = cached ? parseFloat(cached) : 0;
                 }
@@ -131,7 +143,7 @@ function Dashboard() {
 
             return priceMap;
         } catch (e) {
-            console.warn("⚠️ getCoinPrices failed, dùng giá từ cache nếu có", e);
+            console.warn("⚠️ getCoinPrices fallback to cache", e);
             const fallback = {};
             symbols.forEach(symbol => {
                 const cached = localStorage.getItem("price_" + symbol.toUpperCase());
@@ -140,6 +152,8 @@ function Dashboard() {
             return fallback;
         }
     };
+
+
 
 
     const fetchMarketData = async (useCache = true) => {
@@ -451,7 +465,7 @@ function Dashboard() {
 
                         </>
                     )}
-                    {lastUpdated && showLastUpdate &&(
+                    {lastUpdated && showLastUpdate && (
                         <div className="absolute bottom-0 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
                             <span>🕒 Last price update: {lastUpdated}</span>
                             <button
@@ -513,7 +527,7 @@ function Dashboard() {
                                                         <img src={coin.image} alt={coin.name} className="w-6 h-6" />
                                                         <span className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</span>
                                                     </div>
-                                                    <p className="text-sm mt-1">💵 ${formatNumber(coin.current_price)}</p>
+                                                    <p className="text-sm mt-1">💵 ${formatPrice(coin.current_price)}</p>
                                                     <p className="text-sm text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
                                                 </div>
                                             ))}
@@ -576,7 +590,7 @@ function Dashboard() {
                             <div className="w-full text-center mb-4">
                                 <p className="text-sm text-gray-400">Current Price - Avg. Buy Price</p>
                                 <p className="text-lg font-mono text-yellow-300">
-                                    ${coin.current_price.toLocaleString()} <span className="text-white">-</span> {avgPrice > 0 ? `$${avgPrice.toFixed(3)}` : "–"}
+                                {formatMoney(coin.current_price)} <span className="text-white">-</span> {avgPrice > 0 ? `${formatMoney(avgPrice)}` : "–"}
                                 </p>
                             </div>
 
@@ -587,11 +601,11 @@ function Dashboard() {
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
-                                    <p className="text-lg font-mono text-orange-400">${Math.round(coin.total_invested).toLocaleString()}</p>
+                                    <p className="text-lg font-mono text-orange-400">{formatMoney(coin.total_invested)}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                    <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${Math.round(netInvested).toLocaleString()}</p>
+                                    <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>{formatMoney(netInvested)}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
