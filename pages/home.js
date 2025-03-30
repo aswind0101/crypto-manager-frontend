@@ -119,36 +119,26 @@ function Dashboard() {
 
     const getCoinPrices = async (symbols = []) => {
         try {
-            const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=250&page=1&price_change_percentage=24h");
+            const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=250&page=1");
             if (!res.ok) throw new Error("Failed to fetch coin market data");
 
-            const allMarkets = await res.json(); // [{ symbol, current_price, price_change_percentage_24h, ... }]
+            const allMarkets = await res.json(); // [{ id, symbol, current_price, ... }]
 
             const priceMap = {};
-
             symbols.forEach(symbol => {
                 const matches = allMarkets.filter(c => c.symbol.toLowerCase() === symbol.toLowerCase());
 
                 if (matches.length > 0) {
-                    // Ưu tiên coin có market_cap lớn nhất
+                    // Ưu tiên coin có market_cap lớn nhất (đầu danh sách)
                     const selected = matches.reduce((a, b) =>
                         (a.market_cap || 0) > (b.market_cap || 0) ? a : b
                     );
-
-                    priceMap[symbol.toUpperCase()] = {
-                        current_price: selected.current_price,
-                        price_change_24h: selected.price_change_percentage_24h || 0
-                    };
-
-                    // Cache giá
+                    priceMap[symbol.toUpperCase()] = selected.current_price;
                     localStorage.setItem("price_" + symbol.toUpperCase(), selected.current_price);
                 } else {
-                    // fallback nếu không tìm thấy trên CoinGecko
+                    // fallback nếu không có
                     const cached = localStorage.getItem("price_" + symbol.toUpperCase());
-                    priceMap[symbol.toUpperCase()] = {
-                        current_price: cached ? parseFloat(cached) : 0,
-                        price_change_24h: 0
-                    };
+                    priceMap[symbol.toUpperCase()] = cached ? parseFloat(cached) : 0;
                 }
             });
 
@@ -158,14 +148,14 @@ function Dashboard() {
             const fallback = {};
             symbols.forEach(symbol => {
                 const cached = localStorage.getItem("price_" + symbol.toUpperCase());
-                fallback[symbol.toUpperCase()] = {
-                    current_price: cached ? parseFloat(cached) : 0,
-                    price_change_24h: 0
-                };
+                fallback[symbol.toUpperCase()] = cached ? parseFloat(cached) : 0;
             });
             return fallback;
         }
     };
+
+
+
 
     const fetchMarketData = async (useCache = true) => {
         if (useCache) {
@@ -242,7 +232,7 @@ function Dashboard() {
             intervalRef.current = setInterval(() => {
                 fetchPortfolioWithRetry(user.uid);
                 fetchMarketData(false); // ✅ thêm dòng này để tự động cập nhật
-            }, 300000);
+            }, 60000);
         }
 
 
@@ -308,19 +298,12 @@ function Dashboard() {
             const symbols = data.portfolio.map(c => c.coin_symbol);
             const prices = await getCoinPrices(symbols);
 
-            const updatedPortfolio = data.portfolio.map(c => {
-                const coinData = prices[c.coin_symbol.toUpperCase()] || { current_price: 0, price_change_24h: 0 };
-                const current_price = coinData.current_price;
-                const price_change_24h = coinData.price_change_24h;
-
-                return {
-                    ...c,
-                    current_price,
-                    price_change_24h,
-                    current_value: current_price * c.total_quantity,
-                    profit_loss: (current_price * c.total_quantity) - (c.total_invested - c.total_sold)
-                };
-            });
+            const updatedPortfolio = data.portfolio.map(c => ({
+                ...c,
+                current_price: prices[c.coin_symbol.toUpperCase()] || 0,
+                current_value: (prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity,
+                profit_loss: ((prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity) - (c.total_invested - c.total_sold)
+            }));
 
             if (updatedPortfolio.length > 0) {
                 if (isMounted && updatedPortfolio.length > 0) {
@@ -629,18 +612,6 @@ function Dashboard() {
                                     <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
                                 </div>
                                 <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
-                                {typeof coin.price_change_24h === 'number' && (
-                                    <p className="text-sm mt-1 font-semibold flex items-center justify-center gap-1">
-                                        <span className={coin.price_change_24h >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                            {coin.price_change_24h >= 0 ? '🔺' : '🔻'}
-                                        </span>
-                                        <span className={coin.price_change_24h >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                            {coin.price_change_24h >= 0
-                                                ? `Gained ${coin.price_change_24h.toFixed(1)}% in 24h`
-                                                : `Dropped ${Math.abs(coin.price_change_24h).toFixed(1)}% in 24h`}
-                                        </span>
-                                    </p>
-                                )}
                             </div>
 
                             <div className="w-full text-center mb-4">
