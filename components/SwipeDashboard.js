@@ -34,6 +34,37 @@ const SwipeDashboard = ({
             }
         }
     };
+    // Ngưỡng % để gộp coin nhỏ
+    const threshold = 0.5;
+
+    // Tính lại danh sách coins sau khi gộp
+    const processedPortfolio = (() => {
+        let othersValue = 0;
+        const majorCoins = [];
+
+        portfolio.forEach((coin) => {
+            const percent = totalCurrentValue > 0
+                ? (coin.current_value / totalCurrentValue) * 100
+                : 0;
+
+            if (percent >= threshold) {
+                majorCoins.push({ ...coin, percent });
+            } else {
+                othersValue += coin.current_value;
+            }
+        });
+
+        if (othersValue > 0) {
+            majorCoins.push({
+                coin_symbol: "OTHERS",
+                current_value: othersValue,
+                profit_loss: 0, // hoặc giữ giá trị nếu muốn
+                percent: totalCurrentValue > 0 ? (othersValue / totalCurrentValue) * 100 : 0
+            });
+        }
+
+        return majorCoins;
+    })();
 
     return (
         <div className="relative w-full h-80 overflow-hidden bg-black rounded-xl">
@@ -110,7 +141,6 @@ const SwipeDashboard = ({
                         </div>
                     </motion.div>
                 )}
-
                 {currentSlide === 1 && (
                     <motion.div
                         key="slide-1"
@@ -126,33 +156,46 @@ const SwipeDashboard = ({
                             if (info.offset.x > 100) handleSwipe("right");
                         }}
                     >
-                        <div className="h-full w-full flex items-center justify-center bg-black text-white">
-                            <div className="text-center w-full px-4 overflow-y-auto max-h-72">
-                                <h2 className="text-lg font-bold mb-3 text-yellow-400">📊 Portfolio Allocation</h2>
-                                <div className="space-y-3 text-left">
-                                    {portfolio.map((coin) => {
-                                        const percentage = totalCurrentValue > 0 ? (coin.current_value / totalCurrentValue) * 100 : 0;
-                                        const barColor = coin.profit_loss >= 0 ? "bg-green-400" : "bg-red-400";
-                                        return (
-                                            <div key={coin.coin_symbol}>
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <img src={coinIcons[coin.coin_symbol.toUpperCase()]} alt={coin.coin_symbol} className="w-5 h-5 rounded-full" />
-                                                        <span className="font-semibold">{coin.coin_symbol.toUpperCase()}</span>
-                                                    </div>
-                                                    <span className="text-sm text-gray-300">{percentage.toFixed(1)}%</span>
-                                                </div>
-                                                <div className="w-full bg-gray-700 h-2 rounded">
-                                                    <div className={`h-2 rounded ${barColor}`} style={{ width: `${percentage}%` }}></div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                        <div className="h-full w-full flex flex-col items-center justify-center bg-black text-white p-4">
+                            <h2 className="text-2xl font-bold text-yellow-400 mb-3">📈 Portfolio Allocation</h2>
+
+                            {/* Vertical Bars */}
+                            <div className="flex items-end justify-center gap-3 w-full h-[300px]">
+                                {processedPortfolio.map((coin, index) => {
+                                    const height = coin.percent * 2.5;
+                                    return (
+                                        <div key={index} className="flex flex-col items-center w-10">
+                                            <div
+                                                className={`w-3 rounded-t ${coin.profit_loss >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                                                style={{ height: `${height}px`, minHeight: '8px' }}
+                                            />
+                                            <span className="mt-1 text-[10px] text-white">{coin.coin_symbol.toUpperCase()}</span>
+                                            <span className="text-[10px] text-yellow-300">{coin.percent.toFixed(1)}%</span>
+                                        </div>
+                                    );
+                                })}
+
+                            </div>
+
+                            {/* Legend */}
+                            <div className="flex justify-center items-center gap-4 mt-4 text-xs font-mono flex-wrap">
+                                <div className="flex items-center gap-1">
+                                    <div className="w-3 h-3 rounded bg-green-500" />
+                                    <span>Profit</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <div className="w-3 h-3 rounded bg-red-500" />
+                                    <span>Loss</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <div className="w-3 h-3 rounded bg-yellow-300" />
+                                    <span>% of Portfolio</span>
                                 </div>
                             </div>
                         </div>
                     </motion.div>
                 )}
+
             </AnimatePresence>
         </div>
     );
