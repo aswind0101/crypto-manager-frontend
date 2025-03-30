@@ -35,7 +35,7 @@ function Dashboard() {
         if (price >= 0.0001) return price.toFixed(6);
         return price.toFixed(8); // ví dụ như SHIB
     };
-    
+
     const formatMoney = (num) => {
         if (num === null || num === undefined || isNaN(num)) return "–";
         if (num >= 1) return "$" + num.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -43,14 +43,15 @@ function Dashboard() {
         if (num >= 0.0001) return "$" + num.toFixed(6);
         return "$" + num.toFixed(8); // cho SHIB, PEPE, BONK...
     };
-    
-    
+
+
 
     const [portfolio, setPortfolio] = useState([]);
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalNetInvested, settotalNetInvested] = useState(0);
     const [showLastUpdate, setShowLastUpdate] = useState(true);
 
+    const [includeSoldCoins, setIncludeSoldCoins] = useState(false);
 
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
     const [totalCurrentValue, setTotalCurrentValue] = useState(0);
@@ -244,8 +245,30 @@ function Dashboard() {
         };
     }, []);
 
+    useEffect(() => {
+        if (!portfolio || portfolio.length === 0) return;
+
+        const filtered = portfolio.filter((c) => includeSoldCoins || c.total_quantity > 0);
+
+        const value = filtered.reduce((sum, c) => sum + c.current_value, 0);
+        const netInvested = filtered.reduce((sum, c) => sum + (c.total_invested - c.total_sold), 0);
+        const profit = filtered.reduce((sum, c) => sum + c.profit_loss, 0);
+
+        setTotalCurrentValue(value);
+        settotalNetInvested(netInvested);
+        setTotalProfitLoss(profit);
+    }, [portfolio, includeSoldCoins]);
 
 
+    useEffect(() => {
+        if (!includeSoldCoins) {
+            const storedUser = localStorage.getItem("user");
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                fetchPortfolioWithRetry(user.uid);
+            }
+        }
+    }, [includeSoldCoins]);
 
     const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -274,6 +297,7 @@ function Dashboard() {
 
             const symbols = data.portfolio.map(c => c.coin_symbol);
             const prices = await getCoinPrices(symbols);
+
             const updatedPortfolio = data.portfolio.map(c => ({
                 ...c,
                 current_price: prices[c.coin_symbol.toUpperCase()] || 0,
@@ -281,30 +305,10 @@ function Dashboard() {
                 profit_loss: ((prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity) - (c.total_invested - c.total_sold)
             }));
 
-
-            const totalValue = updatedPortfolio.reduce((sum, coin) => sum + coin.current_value, 0);
-            const netTotalInvested = updatedPortfolio.reduce((sum, coin) => sum + coin.total_invested, 0);
-            const totalProfit = updatedPortfolio.reduce((sum, coin) => sum + coin.profit_loss, 0);
-            //Thêm để tính % lời lỗ
-            const totalNet = updatedPortfolio.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
-
-
-
-            if (totalValue > 0) {
-                // ✅ Cập nhật cache
-                //localStorage.setItem("cachedPortfolio", JSON.stringify(data.portfolio));
-                //localStorage.setItem("lastUpdated", new Date().toISOString());
-
-                // ✅ Cập nhật state
-                if (isMounted && totalValue > 0) {
+            if (updatedPortfolio.length > 0) {
+                if (isMounted && updatedPortfolio.length > 0) {
                     setPortfolio(updatedPortfolio);
-                    setTotalInvested(netTotalInvested);
-                    //Thêm để tính % lời lỗ
-                    settotalNetInvested(totalNet);
-                    setTotalProfitLoss(totalProfit);
-                    setTotalCurrentValue(totalValue);
 
-                    // ✅ Cập nhật định dạng thời gian như bản gốc của Hiền
                     setLastUpdated(new Date().toLocaleString("en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -313,10 +317,10 @@ function Dashboard() {
 
                     setPriceFetchFailed(false);
                     setFirstLoaded(true);
+
                     localStorage.setItem("cachedPortfolio", JSON.stringify(updatedPortfolio));
                     localStorage.setItem("lastUpdated", new Date().toISOString());
                 }
-
             } else {
                 if (!firstLoaded) {
                     setPriceFetchFailed(true);
@@ -328,7 +332,7 @@ function Dashboard() {
             console.error(`❌ Retry ${retryCount + 1} failed:`, error.message || error);
 
             if (retryCount < 2) {
-                const waitTime = 3000 * (retryCount + 1); // 3s, 6s
+                const waitTime = 3000 * (retryCount + 1);
                 await delay(waitTime);
                 return fetchPortfolioWithRetry(userId, retryCount + 1);
             } else {
@@ -340,10 +344,12 @@ function Dashboard() {
     };
 
 
+
+
     const handleOpenTradeModal = (coin, type) => {
         setSelectedCoin(coin);
         setTradeType(type);
-        setQuantity("");
+        setQuantity(type === "sell" ? coin.total_quantity.toString() : "");
         setPrice(coin.current_price || "");
         setShowModal(true);
         setFormError("");
@@ -351,8 +357,14 @@ function Dashboard() {
 
 
     const handleConfirmTrade = async () => {
-        if (!quantity || parseFloat(quantity) <= 0) {
-            setFormError("Please enter a valid quantity > 0.");
+        const qty = parseFloat(quantity);
+        if (!quantity || qty <= 0) {
+            setFormError("❗ Please enter a valid quantity > 0.");
+            return;
+        }
+        // Kiểm tra nếu là bán
+        if (tradeType === "sell" && selectedCoin && qty > selectedCoin.total_quantity) {
+            setFormError("❗ Cannot sell more than you own.");
             return;
         }
         setIsSubmitting(true);
@@ -386,17 +398,21 @@ function Dashboard() {
     };
 
 
-    const filteredPortfolio = portfolio.filter((coin) => {
-        const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
+    const filteredPortfolio = portfolio
+        .filter((coin) => includeSoldCoins || coin.total_quantity > 0) // ✅ lọc theo checkbox
+        .filter((coin) => {
+            const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesProfit =
-            filterByProfit === "all" ||
-            (filterByProfit === "profit" && coin.profit_loss >= 0) ||
-            (filterByProfit === "loss" && coin.profit_loss < 0);
+            const matchesProfit =
+                filterByProfit === "all" ||
+                (filterByProfit === "profit" && coin.profit_loss >= 0) ||
+                (filterByProfit === "loss" && coin.profit_loss < 0);
 
-        return matchesSearch && matchesProfit;
-    }).sort((a, b) => b.current_value - a.current_value);
+            return matchesSearch && matchesProfit;
+        })
+        .sort((a, b) => b.current_value - a.current_value);
+
 
     return (
         <div className="p-0 max-w-5xl mx-auto">
@@ -541,26 +557,37 @@ function Dashboard() {
                 </div>
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center text-white mt-4">
                         <input
                             type="text"
                             placeholder="🔍 Search by coin name or symbol..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="p-2 rounded-lg w-full md:w-1/2 bg-gray-800 text-white outline-none"
+                            className="p-2 rounded-lg bg-gray-800 text-white outline-none w-full"
                         />
 
                         <select
                             value={filterByProfit}
                             onChange={(e) => setFilterByProfit(e.target.value)}
-                            className="p-2 rounded-lg bg-gray-800 text-white w-full md:w-1/4 outline-none"
+                            className="p-2 rounded-lg bg-gray-800 text-white outline-none w-full"
                         >
                             <option value="all">All</option>
                             <option value="profit">🟢 Profit</option>
                             <option value="loss">🔴 Loss</option>
                         </select>
+
+                        <label className="text-sm text-gray-300 flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                checked={includeSoldCoins}
+                                onChange={(e) => setIncludeSoldCoins(e.target.checked)}
+                                className="accent-yellow-400"
+                            />
+                            Include sold coins
+                        </label>
                     </div>
                 )}
+
 
                 {/* phần còn lại giữ nguyên */}
                 {filteredPortfolio.map((coin, index) => {
@@ -590,7 +617,7 @@ function Dashboard() {
                             <div className="w-full text-center mb-4">
                                 <p className="text-sm text-gray-400">Current Price - Avg. Buy Price</p>
                                 <p className="text-lg font-mono text-yellow-300">
-                                {formatMoney(coin.current_price)} <span className="text-white">-</span> {avgPrice > 0 ? `${formatMoney(avgPrice)}` : "–"}
+                                    {formatMoney(coin.current_price)} <span className="text-white">-</span> {avgPrice > 0 ? `${formatMoney(avgPrice)}` : "–"}
                                 </p>
                             </div>
 
@@ -633,12 +660,23 @@ function Dashboard() {
                                 <button
                                     onClick={() => handleOpenTradeModal(coin, "buy")}
                                     className="bg-green-600 hover:bg-green-700 px-4 py-1 rounded text-white text-sm"
-                                >Buy</button>
+                                >
+                                    Buy
+                                </button>
+
                                 <button
-                                    onClick={() => handleOpenTradeModal(coin, "sell")}
-                                    className="bg-red-600 hover:bg-red-700 px-4 py-1 rounded text-white text-sm"
-                                >Sell</button>
+                                    onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
+                                    disabled={coin.total_quantity === 0}
+                                    className={`px-4 py-1 rounded text-white text-sm 
+      ${coin.total_quantity === 0
+                                            ? "bg-gray-600 cursor-not-allowed"
+                                            : "bg-red-600 hover:bg-red-700"}
+    `}
+                                >
+                                    Sell
+                                </button>
                             </div>
+
                         </div>
                     );
                 })}

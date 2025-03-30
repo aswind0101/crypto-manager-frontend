@@ -90,11 +90,14 @@ const SwipeDashboard = ({
                                     <RadialBarChart
                                         innerRadius="70%"
                                         outerRadius="100%"
-                                        data={portfolio.map(coin => ({
+                                        data={portfolio
+                                          .filter(coin => coin.total_quantity > 0) // ✅ chỉ lấy coin đang giữ
+                                          .map(coin => ({
                                             name: coin.coin_symbol,
                                             value: coin.current_value,
                                             fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
-                                        }))}
+                                          }))
+                                        }
                                         startAngle={180}
                                         endAngle={0}
                                     >
