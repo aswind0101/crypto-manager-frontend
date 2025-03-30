@@ -2,26 +2,36 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Link from "next/link";
 import withAuthProtection from "../hoc/withAuthProtection";
-import { getAuth } from "firebase/auth";
-import { useRouter } from "next/router"; // ✅ Thêm router
-
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/router";
 
 function Transactions() {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
 
     const [selectedCoin, setSelectedCoin] = useState("All");
     const [selectedType, setSelectedType] = useState("All");
 
-    const router = useRouter(); // ✅ Dùng router để lấy query
+    const router = useRouter();
     const queryCoin = router.query.coin?.toUpperCase();
     const isFilteredByQueryCoin = !!queryCoin;
 
-
-
+    // Lấy user từ Firebase và gọi fetch
     useEffect(() => {
-        fetchTransactions();
+        const auth = getAuth();
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setCurrentUser(user);
+                fetchTransactions(user);
+            } else {
+                setCurrentUser(null);
+                setTransactions([]);
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -30,12 +40,10 @@ function Transactions() {
         }
     }, [queryCoin]);
 
-    const fetchTransactions = async () => {
-        try {
-            const auth = getAuth();
-            const user = auth.currentUser;
-            if (!user) return;
+    const fetchTransactions = async (user) => {
+        if (!user) return;
 
+        try {
             const idToken = await user.getIdToken();
 
             const response = await fetch("https://crypto-manager-backend.onrender.com/api/transactions", {
@@ -53,16 +61,14 @@ function Transactions() {
     };
 
     const deleteTransaction = async (id) => {
+        if (!currentUser) return;
+
         const confirmDelete = window.confirm("Are you sure you want to delete this transaction?");
         if (!confirmDelete) return;
 
         setDeletingId(id);
         try {
-            const auth = getAuth();
-            const user = auth.currentUser;
-            if (!user) return;
-
-            const idToken = await user.getIdToken();
+            const idToken = await currentUser.getIdToken();
             const res = await fetch(`https://crypto-manager-backend.onrender.com/api/transactions/${id}`, {
                 method: "DELETE",
                 headers: {
@@ -82,7 +88,6 @@ function Transactions() {
         }
     };
 
-    // 📌 Lọc dữ liệu
     const filteredTransactions = transactions.filter((tx) => {
         const matchesCoin = selectedCoin === "All" || tx.coin_symbol.toUpperCase() === selectedCoin;
         const matchesType = selectedType === "All" || tx.transaction_type.toLowerCase() === selectedType.toLowerCase();
@@ -90,8 +95,6 @@ function Transactions() {
         return matchesCoin && matchesType && matchesQuery;
     });
 
-
-    // 📌 Tạo danh sách coin duy nhất từ dữ liệu
     const coinOptions = [...new Set(transactions.map((tx) => tx.coin_symbol.toUpperCase()))];
 
     return (
@@ -123,7 +126,6 @@ function Transactions() {
                         ))}
                     </select>
                 )}
-
 
                 <select
                     value={selectedType}
@@ -177,12 +179,7 @@ function Transactions() {
                                     <td className="px-4 py-2 font-semibold text-yellow-300">
                                         {tx.coin_symbol.toUpperCase()}
                                     </td>
-                                    <td
-                                        className={`px-4 py-2 font-medium ${tx.transaction_type === "buy"
-                                            ? "text-green-400"
-                                            : "text-red-400"
-                                            }`}
-                                    >
+                                    <td className={`px-4 py-2 font-medium ${tx.transaction_type === "buy" ? "text-green-400" : "text-red-400"}`}>
                                         {tx.transaction_type.toUpperCase()}
                                     </td>
                                     <td className="px-4 py-2">
@@ -218,8 +215,8 @@ function Transactions() {
             >
                 +
             </Link>
-
         </div>
     );
 }
+
 export default withAuthProtection(Transactions);
