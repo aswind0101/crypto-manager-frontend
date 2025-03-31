@@ -59,20 +59,19 @@ export default function Navbar() {
 
     const handleLogout = async () => {
         try {
-            await signOut(auth);
-            localStorage.removeItem("user");
-            // Xóa cache giá riêng biệt cho từng user
-            clearAppCache();
-
-            setShowToast(true);
-            setTimeout(() => {
-                setShowToast(false);
-                router.push("/login");
-            }, 1500);
+          // Đăng xuất khỏi Firebase Auth
+          await signOut(auth);
+      
+          // ✅ Xoá toàn bộ localStorage (bao gồm: user, cachedPortfolio, coinList, price_...)
+          localStorage.clear();
+      
+          // ✅ Reload để reset toàn bộ state trong app
+          router.push("/login"); // hoặc dùng: window.location.href = "/login";
         } catch (error) {
-            console.error("Logout error:", error);
+          console.error("Logout error:", error);
         }
-    };
+      };
+      
 
     return (
         <>
