@@ -91,7 +91,10 @@ app.get("/api/transactions", verifyToken, async (req, res) => {
 app.post("/api/transactions", verifyToken, async (req, res) => {
     const userId = req.user.uid;
     const { coin_symbol, quantity, price, transaction_type } = req.body;
+
+    console.log("✅ [API] POST /api/transactions CALLED");
     console.log("🔥 UID from token:", userId);
+    console.log("📥 Inserting:", coin_symbol, quantity, price, transaction_type, userId);
 
     if (!coin_symbol || !quantity || !price || !transaction_type) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -99,11 +102,15 @@ app.post("/api/transactions", verifyToken, async (req, res) => {
 
     try {
         const result = await pool.query(
-            `INSERT INTO transactions (coin_symbol, quantity, price, transaction_type, user_id) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            `INSERT INTO transactions (coin_symbol, quantity, price, transaction_type, user_id)
+           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
             [coin_symbol, quantity, price, transaction_type, userId]
         );
-        res.status(201).json(result.rows[0]);
+
+        res.status(201).json({
+            inserted: result.rows[0],
+            uid: userId // ✅ gửi về để kiểm tra nhanh ở frontend
+        });
     } catch (error) {
         console.error("Error adding transaction:", error);
         res.status(500).json({ error: "Internal Server Error" });

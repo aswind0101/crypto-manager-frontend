@@ -43,16 +43,16 @@ function AddTransaction() {
                     quantity: parseFloat(quantity),
                     price: parseFloat(price),
                     transaction_type: type,
-                    user_id: firebaseUser.uid
+                    //user_id: firebaseUser.uid
                 })
             });
-
             if (res.ok) {
                 setStatus("✅ Transaction added successfully!");
                 setCoinSymbol("");
                 setQuantity("");
                 setPrice("");
                 setType("buy");
+                console.log("✅ Response from backend:", data); // 👈 Kiểm tra UID tại đây
             } else {
                 const err = await res.json();
                 setStatus("❌ Error: " + err.error);
