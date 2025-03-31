@@ -91,6 +91,7 @@ app.get("/api/transactions", verifyToken, async (req, res) => {
 app.post("/api/transactions", verifyToken, async (req, res) => {
     const userId = req.user.uid;
     const { coin_symbol, quantity, price, transaction_type } = req.body;
+    console.log("🔥 UID from token:", userId);
 
     if (!coin_symbol || !quantity || !price || !transaction_type) {
         return res.status(400).json({ error: "Missing required fields" });
