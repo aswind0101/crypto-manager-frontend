@@ -467,6 +467,19 @@ function Dashboard() {
                             <p className="text-yellow-400 text-sm text-center animate-pulse">
                                 ⚠️ Unable to fetch the latest prices. Please wait while we try again...
                             </p>
+                            <button
+                                onClick={async () => {
+                                    const storedUser = localStorage.getItem("user");
+                                    if (storedUser) {
+                                        const user = JSON.parse(storedUser);
+                                        await fetchPortfolioWithRetry(user.uid);
+                                    }
+                                }}
+                                className="mt-2 px-4 py-2 bg-yellow-500 text-black rounded font-semibold text-sm hover:bg-yellow-600"
+                            >
+                                🔁 Retry Now
+                            </button>
+
                         </div>
                     ) : (
                         <>
