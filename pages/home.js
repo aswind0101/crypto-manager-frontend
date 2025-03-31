@@ -294,7 +294,16 @@ function Dashboard() {
             if (!response.ok) throw new Error("Failed to fetch portfolio");
 
             const data = await response.json();
-            const updatedPortfolio = data.portfolio;
+
+            const symbols = data.portfolio.map(c => c.coin_symbol);
+            const prices = await getCoinPrices(symbols);
+
+            const updatedPortfolio = data.portfolio.map(c => ({
+                ...c,
+                current_price: prices[c.coin_symbol.toUpperCase()] || 0,
+                current_value: (prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity,
+                profit_loss: ((prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity) - (c.total_invested - c.total_sold)
+            }));
 
             if (updatedPortfolio.length > 0) {
                 if (isMounted && updatedPortfolio.length > 0) {
@@ -458,19 +467,6 @@ function Dashboard() {
                             <p className="text-yellow-400 text-sm text-center animate-pulse">
                                 ⚠️ Unable to fetch the latest prices. Please wait while we try again...
                             </p>
-                            <button
-                                onClick={async () => {
-                                    const storedUser = localStorage.getItem("user");
-                                    if (storedUser) {
-                                        const user = JSON.parse(storedUser);
-                                        await fetchPortfolioWithRetry(user.uid);
-                                    }
-                                }}
-                                className="mt-2 px-4 py-2 bg-yellow-500 text-black rounded font-semibold text-sm hover:bg-yellow-600"
-                            >
-                                🔁 Retry Now
-                            </button>
-
                         </div>
                     ) : (
                         <>
