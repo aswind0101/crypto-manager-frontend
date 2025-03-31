@@ -11,6 +11,7 @@ export default function Login() {
 
     const handleLogin = async () => {
         const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
         try {
             await setPersistence(auth, browserLocalPersistence); // ✅ Chờ setPersistence trước
             const result = await signInWithPopup(auth, provider);
