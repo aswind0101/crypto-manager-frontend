@@ -232,7 +232,7 @@ function Dashboard() {
             intervalRef.current = setInterval(() => {
                 fetchPortfolioWithRetry(user.uid);
                 fetchMarketData(false); // ✅ thêm dòng này để tự động cập nhật
-            }, 60000);
+            }, 300000);
         }
 
 
