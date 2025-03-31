@@ -119,29 +119,38 @@ function Dashboard() {
 
     const getCoinPrices = async (symbols = []) => {
         try {
-            const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=250&page=1");
-            if (!res.ok) throw new Error("Failed to fetch coin market data");
-
-            const allMarkets = await res.json(); // [{ id, symbol, current_price, ... }]
-
-            const priceMap = {};
+            const coinList = await fetchCoinList(); // danh sách từ CoinGecko (có id + symbol)
+    
+            // Map symbol => id
+            const symbolToId = {};
             symbols.forEach(symbol => {
-                const matches = allMarkets.filter(c => c.symbol.toLowerCase() === symbol.toLowerCase());
-
-                if (matches.length > 0) {
-                    // Ưu tiên coin có market_cap lớn nhất (đầu danh sách)
-                    const selected = matches.reduce((a, b) =>
-                        (a.market_cap || 0) > (b.market_cap || 0) ? a : b
-                    );
-                    priceMap[symbol.toUpperCase()] = selected.current_price;
-                    localStorage.setItem("price_" + symbol.toUpperCase(), selected.current_price);
-                } else {
-                    // fallback nếu không có
-                    const cached = localStorage.getItem("price_" + symbol.toUpperCase());
-                    priceMap[symbol.toUpperCase()] = cached ? parseFloat(cached) : 0;
+                const match = coinList.find(c => c.symbol.toLowerCase() === symbol.toLowerCase());
+                if (match) {
+                    symbolToId[symbol.toUpperCase()] = match.id;
                 }
             });
-
+    
+            const ids = Object.values(symbolToId);
+            if (ids.length === 0) return {};
+    
+            const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}&vs_currencies=usd`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("CoinGecko simple/price failed");
+    
+            const data = await res.json(); // { bitcoin: { usd: 70000 }, ... }
+    
+            const priceMap = {};
+            for (const [symbol, id] of Object.entries(symbolToId)) {
+                const price = data[id]?.usd;
+                if (price) {
+                    priceMap[symbol] = price;
+                    localStorage.setItem("price_" + symbol, price); // lưu cache
+                } else {
+                    const cached = localStorage.getItem("price_" + symbol);
+                    priceMap[symbol] = cached ? parseFloat(cached) : 0;
+                }
+            }
+    
             return priceMap;
         } catch (e) {
             console.warn("⚠️ getCoinPrices fallback to cache", e);
@@ -153,6 +162,7 @@ function Dashboard() {
             return fallback;
         }
     };
+    
 
 
 
