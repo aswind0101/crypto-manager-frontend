@@ -15,22 +15,20 @@ export default function Navbar() {
     const menuRef = useRef();
 
     function clearAppCache() {
-        const allowPrefixes = [
-            "cachedPortfolio_",
-            "lastUpdated_",
-            "price_",
-            "coinList",
-            "coinListUpdated"
-        ];
-
+        const keysToKeep = ["cachedPortfolio", "lastUpdated"];
+      
         Object.keys(localStorage).forEach((key) => {
-            if (
-                allowPrefixes.some(prefix => key.startsWith(prefix))
-            ) {
-                localStorage.removeItem(key);
-            }
+          if (
+            key === "user" ||
+            key.startsWith("price_") ||
+            key === "coinList" ||
+            key === "coinListUpdated"
+          ) {
+            localStorage.removeItem(key);
+          }
         });
-    }
+      }
+      
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -59,18 +57,20 @@ export default function Navbar() {
 
     const handleLogout = async () => {
         try {
-          // Đăng xuất khỏi Firebase Auth
           await signOut(auth);
+          localStorage.removeItem("user"); // vẫn xoá user
+          clearAppCache();                 // xoá cache giá, coinList, nhưng giữ cachedPortfolio
       
-          // ✅ Xoá toàn bộ localStorage (bao gồm: user, cachedPortfolio, coinList, price_...)
-          localStorage.clear();
-      
-          // ✅ Reload để reset toàn bộ state trong app
-          router.push("/login"); // hoặc dùng: window.location.href = "/login";
+          setShowToast(true);
+          setTimeout(() => {
+            setShowToast(false);
+            router.push("/login");
+          }, 1000);
         } catch (error) {
           console.error("Logout error:", error);
         }
       };
+      
       
 
     return (
