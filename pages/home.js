@@ -294,16 +294,7 @@ function Dashboard() {
             if (!response.ok) throw new Error("Failed to fetch portfolio");
 
             const data = await response.json();
-
-            const symbols = data.portfolio.map(c => c.coin_symbol);
-            const prices = await getCoinPrices(symbols);
-
-            const updatedPortfolio = data.portfolio.map(c => ({
-                ...c,
-                current_price: prices[c.coin_symbol.toUpperCase()] || 0,
-                current_value: (prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity,
-                profit_loss: ((prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity) - (c.total_invested - c.total_sold)
-            }));
+            const updatedPortfolio = data.portfolio;
 
             if (updatedPortfolio.length > 0) {
                 if (isMounted && updatedPortfolio.length > 0) {
