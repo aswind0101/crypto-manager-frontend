@@ -1,27 +1,38 @@
-import { useEffect } from "react";
-import { getAuth, signInWithPopup,setPersistence,
-    browserLocalPersistence, GoogleAuthProvider, onAuthStateChanged } from "firebase/auth";
+import { useEffect, useRef } from "react";
+import {
+    getAuth,
+    signInWithPopup,
+    setPersistence,
+    browserLocalPersistence,
+    GoogleAuthProvider,
+    onAuthStateChanged
+} from "firebase/auth";
 import { useRouter } from "next/router";
 import { app } from "../firebase";
 
 export default function Login() {
     const router = useRouter();
     const auth = getAuth(app);
-    setPersistence(auth, browserLocalPersistence);//Thêm auth.setPersistence() để bảo đảm phiên đăng nhập lưu lâu hơn
+    const loginClicked = useRef(false); // ✅ Đánh dấu trạng thái click login
 
     const handleLogin = async () => {
+        loginClicked.current = true; // ✅ User đã click login
+
         const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
+        provider.setCustomParameters({ prompt: "select_account" }); // ✅ Bắt buộc hiện chọn tài khoản
+
         try {
-            await setPersistence(auth, browserLocalPersistence); // ✅ Chờ setPersistence trước
+            await setPersistence(auth, browserLocalPersistence); // ✅ Đảm bảo session được lưu
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
+
             localStorage.setItem("user", JSON.stringify({
                 uid: user.uid,
                 name: user.displayName,
                 email: user.email,
                 photo: user.photoURL
             }));
+
             router.push("/home");
         } catch (error) {
             console.error("Login failed:", error);
@@ -30,7 +41,7 @@ export default function Login() {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
+            if (user && !loginClicked.current) {
                 localStorage.setItem("user", JSON.stringify({
                     uid: user.uid,
                     name: user.displayName,
