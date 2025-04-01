@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import React from "react";
 import Navbar from "../components/Navbar";
 import SwipeDashboard from "../components/SwipeDashboard";
+import Link from "next/link";
 
 import {
     ResponsiveContainer,
@@ -193,8 +194,16 @@ function Dashboard() {
 
     useEffect(() => {
         let isMounted = true;
-        const cached = localStorage.getItem("cachedPortfolio");
-        const cachedTime = localStorage.getItem("lastUpdated");
+        const storedUser = localStorage.getItem("user");
+        if (!storedUser) {
+            router.push("/login");
+            return;
+        }
+        const user = JSON.parse(storedUser);
+
+        const cached = localStorage.getItem(`portfolio_${user.uid}`);
+        const cachedTime = localStorage.getItem(`lastUpdated_${user.uid}`);
+
         if (cached) {
             setHasCache(true);
             const parsed = JSON.parse(cached);
@@ -205,11 +214,9 @@ function Dashboard() {
             const totalValue = parsed.reduce((sum, coin) => sum + coin.current_value, 0);
             const netTotalInvested = parsed.reduce((sum, coin) => sum + coin.total_invested, 0);
             const totalProfit = parsed.reduce((sum, coin) => sum + coin.profit_loss, 0);
-            //Thêm để tính % lời lỗ
             const totalNet = parsed.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
 
             setTotalInvested(netTotalInvested);
-            //Thêm để tính % lời lỗ
             settotalNetInvested(totalNet);
             setTotalCurrentValue(totalValue);
             setTotalProfitLoss(totalProfit);
@@ -219,22 +226,15 @@ function Dashboard() {
             }
         }
 
-        const storedUser = localStorage.getItem("user");
-        if (!storedUser) {
-            router.push("/login");
-            return;
-        }
-        const user = JSON.parse(storedUser);
         fetchPortfolioWithRetry(user.uid);
         fetchMarketData(true);
 
         if (!intervalRef.current) {
             intervalRef.current = setInterval(() => {
                 fetchPortfolioWithRetry(user.uid);
-                fetchMarketData(false); // ✅ thêm dòng này để tự động cập nhật
+                fetchMarketData(false);
             }, 300000);
         }
-
 
         return () => {
             isMounted = false;
@@ -296,6 +296,15 @@ function Dashboard() {
             const data = await response.json();
 
             const symbols = data.portfolio.map(c => c.coin_symbol);
+
+            // ✅ Nếu user chưa có giao dịch, không cần fetch giá
+            if (symbols.length === 0) {
+                setPortfolio([]);
+                setFirstLoaded(true);
+                setLoading(false);
+                return;
+            }
+
             const prices = await getCoinPrices(symbols);
 
             const updatedPortfolio = data.portfolio.map(c => ({
@@ -318,14 +327,13 @@ function Dashboard() {
                     setPriceFetchFailed(false);
                     setFirstLoaded(true);
 
-                    localStorage.setItem("cachedPortfolio", JSON.stringify(updatedPortfolio));
-                    localStorage.setItem("lastUpdated", new Date().toISOString());
+                    localStorage.setItem(`portfolio_${user.uid}`, JSON.stringify(updatedPortfolio));
+                    localStorage.setItem(`lastUpdated_${user.uid}`, new Date().toISOString());
                 }
             } else {
                 if (!firstLoaded) {
+                    setPortfolio([]); // clear
                     setPriceFetchFailed(true);
-                } else {
-                    console.warn("⚠️ Skipped update, giữ nguyên dữ liệu cũ.");
                 }
             }
         } catch (error) {
@@ -342,10 +350,23 @@ function Dashboard() {
             if (firstLoaded) setLoading(false);
         }
     };
-
-
-
-
+    if (!loading && portfolio.length === 0) {
+        return (
+            <div className="p-4 max-w-3xl mx-auto text-center text-white">
+                <Navbar />
+                <div className="mt-12 bg-[#0e1628] rounded-xl p-6 shadow-md">
+                    <h1 className="text-xl font-bold text-yellow-400 mb-4">🕊️ No Transactions Found</h1>
+                    <p className="text-gray-300 mb-6">You haven't added any crypto transactions yet.</p>
+                    <Link
+                        href="/add-transaction"
+                        className="inline-block bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-semibold"
+                    >
+                        ➕ Add your first transaction
+                    </Link>
+                </div>
+            </div>
+        );
+    }
     const handleOpenTradeModal = (coin, type) => {
         setSelectedCoin(coin);
         setTradeType(type);
@@ -413,7 +434,7 @@ function Dashboard() {
         })
         .sort((a, b) => b.current_value - a.current_value);
 
-
+    
     return (
         <div className="p-0 max-w-5xl mx-auto">
             <Navbar />
@@ -510,17 +531,20 @@ function Dashboard() {
                 </div>
                 {/* Market Overview */}
                 <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow ">
-                    <div className="flex items-center justify-between cursor-pointer transition-colors duration-200"
-                        onClick={() => setShowMarketOverview(!showMarketOverview)}>
-                        <h2 className="text-lg font-bold flex items-center gap-2">
-                            🌐 Market Overview
-                            <span className="text-sm text-yellow-300">(${formatNumber(globalMarketCap)})</span>
-                        </h2>
-                        <span className="text-sm text-blue-400 hover:underline cursor-pointer" onClick={() => setShowMarketOverview(!showMarketOverview)}>
-                            <span className={`transform transition-transform duration-300 inline-block ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
-                        </span>
-                    </div>
-
+                    {portfolio.length > 0 && (
+                        <>
+                            <div className="flex items-center justify-between cursor-pointer transition-colors duration-200"
+                                onClick={() => setShowMarketOverview(!showMarketOverview)}>
+                                <h2 className="text-lg font-bold flex items-center gap-2">
+                                    🌐 Market Overview
+                                    <span className="text-sm text-yellow-300">(${formatNumber(globalMarketCap)})</span>
+                                </h2>
+                                <span className="text-sm text-blue-400 hover:underline cursor-pointer" onClick={() => setShowMarketOverview(!showMarketOverview)}>
+                                    <span className={`transform transition-transform duration-300 inline-block ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
+                                </span>
+                            </div>
+                        </>
+                    )}
                     {showMarketOverview && (
                         <>
                             <div className="flex items-center gap-2 text-gray-300 mb-2">
