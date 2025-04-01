@@ -307,12 +307,24 @@ function Dashboard() {
 
             const prices = await getCoinPrices(symbols);
 
-            const updatedPortfolio = data.portfolio.map(c => ({
-                ...c,
-                current_price: prices[c.coin_symbol.toUpperCase()] || 0,
-                current_value: (prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity,
-                profit_loss: ((prices[c.coin_symbol.toUpperCase()] || 0) * c.total_quantity) - (c.total_invested - c.total_sold)
-            }));
+            const updatedPortfolio = data.portfolio.map(c => {
+                const symbol = c.coin_symbol.toUpperCase();
+                const fetchedPrice = prices[symbol];
+                const fallbackPrice = c.total_quantity > 0
+                    ? (c.total_invested - c.total_sold) / c.total_quantity
+                    : 0;
+
+                const isFallback = !fetchedPrice || fetchedPrice === 0;
+
+                return {
+                    ...c,
+                    current_price: fetchedPrice || fallbackPrice,
+                    current_value: (fetchedPrice || fallbackPrice) * c.total_quantity,
+                    profit_loss: ((fetchedPrice || fallbackPrice) * c.total_quantity) - (c.total_invested - c.total_sold),
+                    is_fallback_price: isFallback
+                };
+            });
+
 
             if (updatedPortfolio.length > 0) {
                 if (isMounted && updatedPortfolio.length > 0) {
@@ -434,7 +446,7 @@ function Dashboard() {
         })
         .sort((a, b) => b.current_value - a.current_value);
 
-    
+
     return (
         <div className="p-0 max-w-5xl mx-auto">
             <Navbar />
@@ -643,7 +655,14 @@ function Dashboard() {
                                 <p className="text-lg font-mono text-yellow-300">
                                     {formatMoney(coin.current_price)} <span className="text-white">-</span> {avgPrice > 0 ? `${formatMoney(avgPrice)}` : "–"}
                                 </p>
+
+                                {coin.is_fallback_price && (
+                                    <p className="text-xs text-yellow-400 mt-1">
+                                        ⚠️ Price will be updated in a few minutes. Using your buy price now.
+                                    </p>
+                                )}
                             </div>
+
 
                             <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
                                 <div>
