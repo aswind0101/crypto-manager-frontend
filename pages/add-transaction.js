@@ -11,6 +11,36 @@ function AddTransaction() {
     const [type, setType] = useState("buy");
     const [status, setStatus] = useState("");
 
+    const [coinList, setCoinList] = useState([]);
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    useEffect(() => {
+        const fetchCoinList = async () => {
+            const cache = localStorage.getItem("coinList");
+            const cacheTime = localStorage.getItem("coinListUpdated");
+            const now = Date.now();
+
+            if (cache && cacheTime && now - parseInt(cacheTime) < 86400000) {
+                setCoinList(JSON.parse(cache));
+            } else {
+                try {
+                    const res = await fetch("https://api.coingecko.com/api/v3/coins/list");
+                    const data = await res.json();
+                    setCoinList(data);
+                    localStorage.setItem("coinList", JSON.stringify(data));
+                    localStorage.setItem("coinListUpdated", now.toString());
+                } catch (err) {
+                    console.warn("⚠️ Failed to fetch coin list", err);
+                    if (cache) setCoinList(JSON.parse(cache));
+                }
+            }
+        };
+
+        fetchCoinList();
+    }, []);
+
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -74,10 +104,48 @@ function AddTransaction() {
                     <input
                         type="text"
                         value={coinSymbol}
-                        onChange={(e) => setCoinSymbol(e.target.value.toUpperCase())}
+                        onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setCoinSymbol(val);
+
+                            if (val.length >= 1) {
+                                const filtered = coinList
+                                    .filter(c => c.symbol.toUpperCase().startsWith(val))
+                                    .slice(0, 10);
+                                setSuggestions(filtered);
+                                setShowSuggestions(true);
+                            } else {
+                                setSuggestions([]);
+                                setShowSuggestions(false);
+                            }
+                        }}
+                        onFocus={() => {
+                            if (suggestions.length > 0) setShowSuggestions(true);
+                        }}
+                        onBlur={() => {
+                            // Trễ một chút để click được suggestion
+                            setTimeout(() => setShowSuggestions(false), 150);
+                        }}
                         placeholder="e.g., NEAR"
                         className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
                     />
+                    {showSuggestions && suggestions.length > 0 && (
+                        <ul className="bg-gray-800 border border-gray-700 rounded mt-1 max-h-40 overflow-y-auto text-sm text-white z-10 relative">
+                            {suggestions.map((coin) => (
+                                <li
+                                    key={coin.id}
+                                    onClick={() => {
+                                        setCoinSymbol(coin.symbol.toUpperCase());
+                                        setShowSuggestions(false);
+                                    }}
+                                    className="px-4 py-2 hover:bg-yellow-500 hover:text-black cursor-pointer"
+                                >
+                                    {coin.symbol.toUpperCase()} – {coin.name}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
                 </div>
 
                 <div>
