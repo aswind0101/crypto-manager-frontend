@@ -15,20 +15,21 @@ export default function Navbar() {
     const menuRef = useRef();
 
     function clearAppCache() {
-        const keysToKeep = ["cachedPortfolio", "lastUpdated"];
-      
-        Object.keys(localStorage).forEach((key) => {
-          if (
-            key === "user" ||
-            key.startsWith("price_") ||
-            key === "coinList" ||
-            key === "coinListUpdated"
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
-      }
-      
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+            // ❌ Xoá cache portfolio của user hiện tại
+            localStorage.removeItem(`portfolio_${user.uid}`);
+            localStorage.removeItem(`lastUpdated_${user.uid}`);
+        }
+    
+        // ✅ Giữ nguyên cache giá coin và coinList
+        // KHÔNG xóa các key bắt đầu bằng "price_"
+        // KHÔNG xóa "coinList", "coinListUpdated", "price_xxx"
+    
+        // ❌ Chỉ xóa thông tin đăng nhập
+        localStorage.removeItem("user");
+    }
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -57,21 +58,20 @@ export default function Navbar() {
 
     const handleLogout = async () => {
         try {
-          await signOut(auth);
-          localStorage.removeItem("user"); // vẫn xoá user
-          clearAppCache();                 // xoá cache giá, coinList, nhưng giữ cachedPortfolio
-      
-          setShowToast(true);
-          setTimeout(() => {
-            setShowToast(false);
-            router.push("/login");
-          }, 1000);
+            await signOut(auth);
+            localStorage.removeItem("user");
+            // Xóa cache giá riêng biệt cho từng user
+            clearAppCache();
+
+            setShowToast(true);
+            setTimeout(() => {
+                setShowToast(false);
+                router.push("/login");
+            }, 1500);
         } catch (error) {
-          console.error("Logout error:", error);
+            console.error("Logout error:", error);
         }
-      };
-      
-      
+    };
 
     return (
         <>
