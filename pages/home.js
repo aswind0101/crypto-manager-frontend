@@ -137,7 +137,7 @@ function Dashboard() {
 
     const getCoinPrices = async (symbols = []) => {
         try {
-            const baseUrl = "http://localhost:5000"; // 🔁 đổi thành domain backend của Hiền
+            const baseUrl = "https://crypto-manager-backend.onrender.com"; // 🔁 đổi thành domain backend của Hiền
             const query = symbols.join(",");
             const res = await fetch(`${baseUrl}/api/price?symbols=${query}`);
 
