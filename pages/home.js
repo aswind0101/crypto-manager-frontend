@@ -120,30 +120,20 @@ function Dashboard() {
 
     const getCoinPrices = async (symbols = []) => {
         try {
-            const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=250&page=1");
-            if (!res.ok) throw new Error("Failed to fetch coin market data");
+            const baseUrl = "https://crypto-manager-backend.onrender.com"; // 🔁 đổi thành domain backend của Hiền
+            const query = symbols.join(",");
+            const res = await fetch(`${baseUrl}/api/price?symbols=${query}`);
 
-            const allMarkets = await res.json(); // [{ id, symbol, current_price, ... }]
+            if (!res.ok) throw new Error("Price fetch failed");
 
-            const priceMap = {};
-            symbols.forEach(symbol => {
-                const matches = allMarkets.filter(c => c.symbol.toLowerCase() === symbol.toLowerCase());
+            const data = await res.json(); // { BTC: 72800, NEAR: 7.3 }
 
-                if (matches.length > 0) {
-                    // Ưu tiên coin có market_cap lớn nhất (đầu danh sách)
-                    const selected = matches.reduce((a, b) =>
-                        (a.market_cap || 0) > (b.market_cap || 0) ? a : b
-                    );
-                    priceMap[symbol.toUpperCase()] = selected.current_price;
-                    localStorage.setItem("price_" + symbol.toUpperCase(), selected.current_price);
-                } else {
-                    // fallback nếu không có
-                    const cached = localStorage.getItem("price_" + symbol.toUpperCase());
-                    priceMap[symbol.toUpperCase()] = cached ? parseFloat(cached) : 0;
-                }
+            // Lưu lại cache từng coin
+            Object.entries(data).forEach(([symbol, price]) => {
+                localStorage.setItem("price_" + symbol.toUpperCase(), price);
             });
 
-            return priceMap;
+            return data;
         } catch (e) {
             console.warn("⚠️ getCoinPrices fallback to cache", e);
             const fallback = {};
@@ -154,9 +144,6 @@ function Dashboard() {
             return fallback;
         }
     };
-
-
-
 
     const fetchMarketData = async (useCache = true) => {
         if (useCache) {
