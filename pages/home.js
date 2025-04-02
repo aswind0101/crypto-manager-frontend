@@ -20,6 +20,7 @@ import CountUp from "react-countup";
 import { motion, AnimatePresence } from "framer-motion";
 
 
+
 function Dashboard() {
     const formatNumber = (num) => {
         if (!num || isNaN(num)) return '–';
@@ -45,7 +46,7 @@ function Dashboard() {
         return "$" + num.toFixed(8); // cho SHIB, PEPE, BONK...
     };
 
-
+    const [coinList, setCoinList] = useState([]);
 
     const [portfolio, setPortfolio] = useState([]);
     const [totalInvested, setTotalInvested] = useState(0);
@@ -85,6 +86,8 @@ function Dashboard() {
     const router = useRouter();
 
     const isMounted = useRef(false);
+
+
     const coinIcons = useCoinIcons();
     const getCoinIcon = (symbol) => {
         const url = coinIcons[symbol.toUpperCase()];
@@ -99,28 +102,42 @@ function Dashboard() {
         const cache = localStorage.getItem("coinList");
         const cacheTime = localStorage.getItem("coinListUpdated");
         const now = Date.now();
-
-        if (cache && cacheTime && now - parseInt(cacheTime) < 86400000) {
-            return JSON.parse(cache);
+      
+        const oneDay = 86400000;
+        const cacheExpired = !cacheTime || now - parseInt(cacheTime) > oneDay;
+      
+        // ✅ Nếu có cache → dùng ngay để tránh delay
+        if (cache) {
+          try {
+            const parsed = JSON.parse(cache);
+            setCoinList(parsed); // gán vào state
+          } catch (err) {
+            console.warn("⚠️ Corrupted coinList cache", err);
+          }
         }
-
-        try {
+      
+        // ✅ Nếu cache hết hạn → gọi API cập nhật
+        if (cacheExpired) {
+          try {
             const res = await fetch("https://api.coingecko.com/api/v3/coins/list");
-            if (!res.ok) throw new Error("CoinGecko list fetch failed");
-            const coins = await res.json();
-            localStorage.setItem("coinList", JSON.stringify(coins));
+            if (!res.ok) throw new Error("CoinGecko fetch failed");
+      
+            const freshData = await res.json();
+            localStorage.setItem("coinList", JSON.stringify(freshData));
             localStorage.setItem("coinListUpdated", now.toString());
-            return coins;
-        } catch (err) {
-            console.warn("⚠️ fetchCoinList failed", err);
-            if (cache) return JSON.parse(cache);
-            return [];
+            setCoinList(freshData);
+          } catch (err) {
+            console.warn("⚠️ Failed to fetch new coinList:", err.message);
+            // KHÔNG xoá cache cũ
+          }
         }
-    };
+      };
+      
+
 
     const getCoinPrices = async (symbols = []) => {
         try {
-            const baseUrl = "https://crypto-manager-backend.onrender.com"; // 🔁 đổi thành domain backend của Hiền
+            const baseUrl = "http://localhost:5000"; // 🔁 đổi thành domain backend của Hiền
             const query = symbols.join(",");
             const res = await fetch(`${baseUrl}/api/price?symbols=${query}`);
 

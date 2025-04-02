@@ -21,21 +21,36 @@ function AddTransaction() {
             const cacheTime = localStorage.getItem("coinListUpdated");
             const now = Date.now();
 
-            if (cache && cacheTime && now - parseInt(cacheTime) < 86400000) {
-                setCoinList(JSON.parse(cache));
-            } else {
+            const oneDay = 86400000;
+            const cacheExpired = !cacheTime || now - parseInt(cacheTime) > oneDay;
+
+            // ✅ Bước 1: nếu có cache → dùng ngay để tránh gián đoạn UI
+            if (cache) {
+                try {
+                    const parsed = JSON.parse(cache);
+                    setCoinList(parsed); // hoặc return parsed nếu là function helper
+                } catch (err) {
+                    console.warn("⚠️ Corrupted coinList cache", err);
+                }
+            }
+
+            // ✅ Bước 2: nếu cache hết hạn → gọi API CoinGecko
+            if (cacheExpired) {
                 try {
                     const res = await fetch("https://api.coingecko.com/api/v3/coins/list");
-                    const data = await res.json();
-                    setCoinList(data);
-                    localStorage.setItem("coinList", JSON.stringify(data));
+                    if (!res.ok) throw new Error("CoinGecko fetch failed");
+
+                    const freshData = await res.json();
+                    localStorage.setItem("coinList", JSON.stringify(freshData));
                     localStorage.setItem("coinListUpdated", now.toString());
+                    setCoinList(freshData); // hoặc return freshData nếu là function helper
                 } catch (err) {
-                    console.warn("⚠️ Failed to fetch coin list", err);
-                    if (cache) setCoinList(JSON.parse(cache));
+                    console.warn("⚠️ Failed to fetch new coinList:", err.message);
+                    // ❌ KHÔNG xoá cache cũ, vì còn dùng được
                 }
             }
         };
+
 
         fetchCoinList();
     }, []);
