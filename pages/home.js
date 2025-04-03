@@ -385,7 +385,13 @@ function Dashboard() {
             </div>
         );
     }
-    if (isReadyToRender && !loading && portfolio.length === 0 && !hasRawPortfolioData) {
+    if (
+        isReadyToRender &&
+        !loading &&
+        portfolio.length === 0 &&
+        !hasRawPortfolioData &&
+        firstLoaded // ✅ chỉ khi chắc chắn đã xử lý xong cache/server
+      ) {
         return (
             <div className="p-4 max-w-3xl mx-auto text-center text-white">
                 <Navbar />
