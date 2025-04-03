@@ -63,7 +63,7 @@ const SwipeDashboard = ({
             });
         }
 
-        return majorCoins;
+        return majorCoins.sort((a, b) => b.percent - a.percent);
     })();
 
     return (
@@ -91,12 +91,12 @@ const SwipeDashboard = ({
                                         innerRadius="70%"
                                         outerRadius="100%"
                                         data={portfolio
-                                          .filter(coin => coin.total_quantity > 0) // ✅ chỉ lấy coin đang giữ
-                                          .map(coin => ({
-                                            name: coin.coin_symbol,
-                                            value: coin.current_value,
-                                            fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
-                                          }))
+                                            .filter(coin => coin.total_quantity > 0) // ✅ chỉ lấy coin đang giữ
+                                            .map(coin => ({
+                                                name: coin.coin_symbol,
+                                                value: coin.current_value,
+                                                fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
+                                            }))
                                         }
                                         startAngle={180}
                                         endAngle={0}
@@ -163,22 +163,31 @@ const SwipeDashboard = ({
                             <h2 className="text-2xl font-bold text-yellow-400 mb-3">📈 Portfolio Allocation</h2>
 
                             {/* Vertical Bars */}
-                            <div className="flex items-end justify-center gap-3 w-full h-[300px]">
-                                {processedPortfolio.map((coin, index) => {
-                                    const height = coin.percent * 2.5;
-                                    return (
-                                        <div key={index} className="flex flex-col items-center w-10">
-                                            <div
-                                                className={`w-3 rounded-t ${coin.profit_loss >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                                                style={{ height: `${height}px`, minHeight: '8px' }}
-                                            />
-                                            <span className="mt-1 text-[10px] text-white">{coin.coin_symbol.toUpperCase()}</span>
-                                            <span className="text-[10px] text-yellow-300">{coin.percent.toFixed(1)}%</span>
-                                        </div>
-                                    );
-                                })}
-
-                            </div>
+                            {/* Nếu chỉ có 1 coin → show đơn giản */}
+                            {processedPortfolio.length === 1 ? (
+                                <div className="flex flex-col items-center justify-center text-yellow-300 mt-6">
+                                    <p className="text-lg font-bold">💼 100% in {processedPortfolio[0].coin_symbol.toUpperCase()}</p>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Biểu đồ dạng cột giới hạn chiều cao */}
+                                    <div className="flex items-end justify-center gap-3 w-full h-[200px] max-h-[200px] overflow-y-hidden">
+                                        {processedPortfolio.map((coin, index) => {
+                                            const height = coin.percent * 2.5;
+                                            return (
+                                                <div key={index} className="flex flex-col items-center w-10">
+                                                    <div
+                                                        className={`w-3 rounded-t ${coin.profit_loss >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                                                        style={{ height: `${height}px`, minHeight: '8px' }}
+                                                    />
+                                                    <span className="mt-1 text-[10px] text-white">{coin.coin_symbol.toUpperCase()}</span>
+                                                    <span className="text-[10px] text-yellow-300">{coin.percent.toFixed(1)}%</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
 
                             {/* Legend */}
                             <div className="flex justify-center items-center gap-4 mt-4 text-xs font-mono flex-wrap">
