@@ -76,6 +76,8 @@ function Dashboard() {
 
     const [refreshing, setRefreshing] = useState(false);
 
+    const [hasRawPortfolioData, setHasRawPortfolioData] = useState(false);
+    const [isReadyToRender, setIsReadyToRender] = useState(false);
 
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,37 +104,37 @@ function Dashboard() {
         const cache = localStorage.getItem("coinList");
         const cacheTime = localStorage.getItem("coinListUpdated");
         const now = Date.now();
-      
+
         const oneDay = 86400000;
         const cacheExpired = !cacheTime || now - parseInt(cacheTime) > oneDay;
-      
+
         // ✅ Nếu có cache → dùng ngay để tránh delay
         if (cache) {
-          try {
-            const parsed = JSON.parse(cache);
-            setCoinList(parsed); // gán vào state
-          } catch (err) {
-            console.warn("⚠️ Corrupted coinList cache", err);
-          }
+            try {
+                const parsed = JSON.parse(cache);
+                setCoinList(parsed); // gán vào state
+            } catch (err) {
+                console.warn("⚠️ Corrupted coinList cache", err);
+            }
         }
-      
+
         // ✅ Nếu cache hết hạn → gọi API cập nhật
         if (cacheExpired) {
-          try {
-            const res = await fetch("https://api.coingecko.com/api/v3/coins/list");
-            if (!res.ok) throw new Error("CoinGecko fetch failed");
-      
-            const freshData = await res.json();
-            localStorage.setItem("coinList", JSON.stringify(freshData));
-            localStorage.setItem("coinListUpdated", now.toString());
-            setCoinList(freshData);
-          } catch (err) {
-            console.warn("⚠️ Failed to fetch new coinList:", err.message);
-            // KHÔNG xoá cache cũ
-          }
+            try {
+                const res = await fetch("https://api.coingecko.com/api/v3/coins/list");
+                if (!res.ok) throw new Error("CoinGecko fetch failed");
+
+                const freshData = await res.json();
+                localStorage.setItem("coinList", JSON.stringify(freshData));
+                localStorage.setItem("coinListUpdated", now.toString());
+                setCoinList(freshData);
+            } catch (err) {
+                console.warn("⚠️ Failed to fetch new coinList:", err.message);
+                // KHÔNG xoá cache cũ
+            }
         }
-      };
-      
+    };
+
 
 
     const getCoinPrices = async (symbols = []) => {
@@ -299,6 +301,10 @@ function Dashboard() {
 
             const data = await response.json();
 
+            if (data.portfolio.length > 0) {
+                setHasRawPortfolioData(true);  // ✅ Có dữ liệu giao dịch thực tế
+            }
+
             const symbols = data.portfolio.map(c => c.coin_symbol);
 
             // ✅ Nếu user chưa có giao dịch, không cần fetch giá
@@ -306,6 +312,7 @@ function Dashboard() {
                 setPortfolio([]);
                 setFirstLoaded(true);
                 setLoading(false);
+                setIsReadyToRender(true);
                 return;
             }
 
@@ -342,6 +349,7 @@ function Dashboard() {
 
                     setPriceFetchFailed(false);
                     setFirstLoaded(true);
+                    setIsReadyToRender(true);
 
                     localStorage.setItem(`portfolio_${user.uid}`, JSON.stringify(updatedPortfolio));
                     localStorage.setItem(`lastUpdated_${user.uid}`, new Date().toISOString());
@@ -363,10 +371,21 @@ function Dashboard() {
                 setPriceFetchFailed(true);
             }
         } finally {
-            if (firstLoaded) setLoading(false);
+            setLoading(false); // ❗ luôn đảm bảo setLoading(false)
+            setIsReadyToRender(true);
         }
     };
-    if (!loading && portfolio.length === 0) {
+    if (!isReadyToRender) {
+        return (
+            <div className="p-4 max-w-3xl mx-auto text-center text-white">
+                <Navbar />
+                <div className="mt-12 bg-[#0e1628] rounded-xl p-6 shadow-md">
+                    <p className="text-yellow-400 animate-pulse">⏳ Preparing your dashboard...</p>
+                </div>
+            </div>
+        );
+    }
+    if (!loading && portfolio.length === 0 && !hasRawPortfolioData) {
         return (
             <div className="p-4 max-w-3xl mx-auto text-center text-white">
                 <Navbar />

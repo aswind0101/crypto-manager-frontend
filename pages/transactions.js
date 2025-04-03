@@ -78,6 +78,13 @@ function Transactions() {
 
             if (res.ok) {
                 setTransactions((prev) => prev.filter((t) => t.id !== id));
+                // ✅ Xoá cache portfolio để đảm bảo Dashboard sẽ fetch lại dữ liệu mới
+                const storedUser = localStorage.getItem("user");
+                if (storedUser) {
+                    const user = JSON.parse(storedUser);
+                    localStorage.removeItem(`portfolio_${user.uid}`);
+                    localStorage.removeItem(`lastUpdated_${user.uid}`);
+                }
             } else {
                 console.error("Failed to delete transaction");
             }
