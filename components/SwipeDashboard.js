@@ -190,6 +190,7 @@ const SwipeDashboard = ({
                             )}
 
                             {/* Legend */}
+                            {processedPortfolio.length > 1 && (
                             <div className="flex justify-center items-center gap-4 mt-4 text-xs font-mono flex-wrap">
                                 <div className="flex items-center gap-1">
                                     <div className="w-3 h-3 rounded bg-green-500" />
@@ -204,6 +205,7 @@ const SwipeDashboard = ({
                                     <span>% of Portfolio</span>
                                 </div>
                             </div>
+                            )}
                         </div>
                     </motion.div>
                 )}
