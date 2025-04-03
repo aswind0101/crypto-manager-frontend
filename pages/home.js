@@ -385,7 +385,7 @@ function Dashboard() {
             </div>
         );
     }
-    if (!loading && portfolio.length === 0 && !hasRawPortfolioData) {
+    if (isReadyToRender && !loading && portfolio.length === 0 && !hasRawPortfolioData) {
         return (
             <div className="p-4 max-w-3xl mx-auto text-center text-white">
                 <Navbar />
