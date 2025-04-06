@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ResponsiveContainer, RadialBarChart, RadialBar } from "recharts";
 import CountUp from "react-countup";
+
 
 
 const SwipeDashboard = ({
@@ -10,9 +11,20 @@ const SwipeDashboard = ({
     totalProfitLoss,
     totalNetInvested,
     coinIcons,
+    lastUpdated,
     onSlideChange }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [direction, setDirection] = useState('left');
+    const prevProfitLossRef = useRef(totalProfitLoss);
+    const prevNetInvestedRef = useRef(totalNetInvested);
+    const prevCurrentValueRef = useRef(totalCurrentValue);
+
+    useEffect(() => {
+        prevProfitLossRef.current = totalProfitLoss;
+        prevNetInvestedRef.current = totalNetInvested;
+        prevCurrentValueRef.current = totalCurrentValue;
+      }, [lastUpdated]);
+      
 
     const handleSwipe = (direction) => {
         const totalSlides = 2;
@@ -105,11 +117,12 @@ const SwipeDashboard = ({
                                     </RadialBarChart>
                                 </ResponsiveContainer>
                                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                    <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'} shadow-md`}>$<CountUp key={totalProfitLoss} end={Math.round(totalProfitLoss)} duration={10} separator="," />
+                                    <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'} shadow-md`}>
+                                        $<CountUp key={totalProfitLoss} end={Math.round(totalProfitLoss)} duration={10} separator="," />
                                     </p>
                                     <p className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                         (<CountUp
-                                            key={totalProfitLoss + '-' + totalNetInvested}
+                                            key={prevProfitLossRef.current  + '-' + prevNetInvestedRef.current}
                                             end={parseFloat((Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0) * 100)}
                                             duration={10}
                                             decimals={1}
@@ -136,7 +149,7 @@ const SwipeDashboard = ({
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-gray-400">📊 Current Value</span>
-                                    <p className="font-bold text-blue-400 text-xl">$<CountUp key={totalCurrentValue} end={Math.round(totalCurrentValue)} duration={10} separator="," /></p>
+                                    <p className="font-bold text-blue-400 text-xl">$<CountUp key={prevCurrentValueRef.current} end={Math.round(totalCurrentValue)} duration={10} separator="," /></p>
 
                                 </div>
 
@@ -191,20 +204,20 @@ const SwipeDashboard = ({
 
                             {/* Legend */}
                             {processedPortfolio.length > 1 && (
-                            <div className="flex justify-center items-center gap-4 mt-4 text-xs font-mono flex-wrap">
-                                <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 rounded bg-green-500" />
-                                    <span>Profit</span>
+                                <div className="flex justify-center items-center gap-4 mt-4 text-xs font-mono flex-wrap">
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-3 h-3 rounded bg-green-500" />
+                                        <span>Profit</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-3 h-3 rounded bg-red-500" />
+                                        <span>Loss</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-3 h-3 rounded bg-yellow-300" />
+                                        <span>% of Portfolio</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 rounded bg-red-500" />
-                                    <span>Loss</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 rounded bg-yellow-300" />
-                                    <span>% of Portfolio</span>
-                                </div>
-                            </div>
                             )}
                         </div>
                     </motion.div>
