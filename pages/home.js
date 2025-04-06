@@ -442,7 +442,6 @@ function Dashboard() {
                                 totalProfitLoss={totalProfitLoss}
                                 totalNetInvested={totalNetInvested}
                                 coinIcons={coinIcons}
-                                lastUpdated={lastUpdated}
                                 onSlideChange={(slideIndex) => setShowLastUpdate(slideIndex === 0)}
                             />
 
