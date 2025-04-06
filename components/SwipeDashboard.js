@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { ResponsiveContainer, RadialBarChart, RadialBar } from "recharts";
 import CountUp from "react-countup";
 
@@ -15,16 +15,7 @@ const SwipeDashboard = ({
     onSlideChange }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [direction, setDirection] = useState('left');
-    const prevProfitLossRef = useRef(totalProfitLoss);
-    const prevNetInvestedRef = useRef(totalNetInvested);
-    const prevCurrentValueRef = useRef(totalCurrentValue);
-
-    useEffect(() => {
-        prevProfitLossRef.current = totalProfitLoss;
-        prevNetInvestedRef.current = totalNetInvested;
-        prevCurrentValueRef.current = totalCurrentValue;
-      }, [lastUpdated]);
-      
+    
 
     const handleSwipe = (direction) => {
         const totalSlides = 2;
@@ -122,7 +113,7 @@ const SwipeDashboard = ({
                                     </p>
                                     <p className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                         (<CountUp
-                                            key={prevProfitLossRef.current  + '-' + prevNetInvestedRef.current}
+                                            key={totalProfitLoss + '-' + totalNetInvested}
                                             end={parseFloat((Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0) * 100)}
                                             duration={10}
                                             decimals={1}
@@ -149,7 +140,7 @@ const SwipeDashboard = ({
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-gray-400">📊 Current Value</span>
-                                    <p className="font-bold text-blue-400 text-xl">$<CountUp key={prevCurrentValueRef.current} end={Math.round(totalCurrentValue)} duration={10} separator="," /></p>
+                                    <p className="font-bold text-blue-400 text-xl">$<CountUp key={totalCurrentValue} end={Math.round(totalCurrentValue)} duration={10} separator="," /></p>
 
                                 </div>
 
