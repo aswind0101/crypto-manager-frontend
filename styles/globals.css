@@ -13,7 +13,8 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: 'Outfit', sans-serif;
+  background: linear-gradient(to bottom right, #0b1e3d, #183b69);
+  color: #ffffff;
+  font-family: 'Poppins', sans-serif;
 }
+

@@ -486,54 +486,71 @@ function Dashboard() {
                 </div>
 
                 {/* Market Overview */}
-                <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow ">
+                <div className="mt-4 bg-[#0f1f3a] rounded-lg p-4 text-white shadow ">
                     {portfolio.length > 0 && (
                         <>
-                            <div className="flex items-center justify-between cursor-pointer transition-colors duration-200"
-                                onClick={() => setShowMarketOverview(!showMarketOverview)}>
+                            {/* Market Overview Header */}
+                            <div
+                                className="flex items-center justify-between px-4 py-3 bg-[#0f1f3a]  text-white cursor-pointer transition-colors duration-200"
+                                onClick={() => setShowMarketOverview(!showMarketOverview)}
+                            >
                                 <h2 className="text-lg font-bold flex items-center gap-2">
                                     🌐 Market Overview
-                                    <span className="text-sm text-yellow-300">(${formatNumber(globalMarketCap)})</span>
+                                    <span className="text-sm text-yellow-300">
+                                        (${formatNumber(globalMarketCap)})
+                                    </span>
                                 </h2>
-                                <span className="text-sm text-blue-400 hover:underline cursor-pointer" onClick={() => setShowMarketOverview(!showMarketOverview)}>
-                                    <span className={`transform transition-transform duration-300 inline-block ${showMarketOverview ? 'rotate-180' : ''}`}>▼</span>
+                                <span
+                                    className="text-sm text-blue-300 hover:underline transition-transform"
+                                >
+                                    <span
+                                        className={`transform transition-transform duration-300 inline-block ${showMarketOverview ? "rotate-180" : ""
+                                            }`}
+                                    >
+                                        ▼
+                                    </span>
                                 </span>
                             </div>
-                        </>
-                    )}
-                    {showMarketOverview && (
-                        <>
-                            <div className="flex items-center gap-2 text-gray-300 mb-2">
 
-                            </div>
-                            {/* Market Overview Details */}
-                            <AnimatePresence>
-                                {showMarketOverview && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.3 }}
-                                        className="col-span-2 mt-2"
-                                    >
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            {topCoins.map((coin) => (
-                                                <div key={coin.id} className="bg-gray-800 rounded p-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <img src={coin.image} alt={coin.name} className="w-6 h-6" />
-                                                        <span className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</span>
+                            {/* Market Overview Content */}
+                            {showMarketOverview && (
+                                <>
+                                    <AnimatePresence>
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                            className="col-span-2 mt-3"
+                                        >
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                {topCoins.map((coin) => (
+                                                    <div
+                                                        key={coin.id}
+                                                        className="bg-[#0f1f3a] rounded-2xl p-4 text-white shadow-[0_2px_8px_rgba(255,255,255,0.02),0_4px_16px_rgba(0,0,0,0.35)] transition-transform duration-200 hover:scale-[1.02]"
+                                                    >
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <img src={coin.image} alt={coin.name} className="w-6 h-6" />
+                                                            <span className="font-semibold">
+                                                                {coin.name} ({coin.symbol.toUpperCase()})
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-blue-100">
+                                                            💵 ${formatCurrency(coin.current_price)}
+                                                        </p>
+                                                        <p className="text-sm text-blue-300">
+                                                            Market Cap: ${formatNumber(coin.market_cap)}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-sm mt-1">💵 ${formatCurrency(coin.current_price)}</p>
-                                                    <p className="text-sm text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    </AnimatePresence>
+                                </>
+                            )}
                         </>
                     )}
+
                 </div>
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
@@ -543,20 +560,20 @@ function Dashboard() {
                             placeholder="🔍 Search by coin name or symbol..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="p-2 rounded-lg bg-gray-800 text-white outline-none w-full"
+                            className="bg-[#0f1f3a] text-white placeholder-blue-200 px-4 py-2 rounded-xl shadow-inner w-full"
                         />
 
                         <select
                             value={filterByProfit}
                             onChange={(e) => setFilterByProfit(e.target.value)}
-                            className="p-2 rounded-lg bg-gray-800 text-white outline-none w-full"
+                            className="bg-[#0f1f3a] text-white px-4 py-2 rounded-xl shadow-inner"
                         >
                             <option value="all">All</option>
                             <option value="profit">🟢 Profit</option>
                             <option value="loss">🔴 Loss</option>
                         </select>
 
-                        <label className="text-sm text-gray-300 flex items-center gap-2">
+                        <label className="flex items-center gap-2 text-sm text-blue-100">
                             <input
                                 type="checkbox"
                                 checked={includeSoldCoins}
@@ -639,7 +656,7 @@ function Dashboard() {
                                             })()} Profit / Loss
                                         </p>
                                         <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                            ${Math.round(coin.profit_loss).toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
+                                            ${Math.round(coin.profit_loss).toLocaleString()}<span className="text-xs">({profitLossPercentage})</span>
                                         </p>
                                     </div>
                                 </div>
