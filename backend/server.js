@@ -2,6 +2,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import axios from "axios";
+
 
 import pkg from "pg";
 const { Pool } = pkg; // ✅ Chính xác
@@ -22,6 +24,11 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+import priceRoute from './routes/price.js';
+app.use("/api/price", priceRoute);
+
+
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -48,7 +55,13 @@ app.get("/api/portfolio", verifyToken, async (req, res) => {
 
         //const coinPrices = await getCoinPrices();Thay thế dòng này bằng:
         const symbols = result.rows.map((coin) => coin.coin_symbol);
-        const coinPrices = await getCoinPrices(symbols);
+        // Gọi nội bộ API backend để lấy giá từ price.js
+        //const priceUrl = `${process.env.BACKEND_URL || "https://crypto-manager-backend.onrender.com"}/api/price?symbols=${symbols.join(",")}`;
+        const priceUrl = `https://crypto-manager-backend.onrender.com/api/price?symbols=${symbols.join(",")}`;
+
+        const priceRes = await axios.get(priceUrl);
+        const coinPrices = priceRes.data; // { BTC: 72000, NEAR: 7.3, ... }
+
         const portfolio = result.rows.map((coin) => {
             const currentPrice = coinPrices[coin.coin_symbol.toUpperCase()] || 0;
             const currentValue = coin.total_quantity * currentPrice;
@@ -134,23 +147,20 @@ app.delete("/api/transactions/:id", verifyToken, async (req, res) => {
 
 // Get Coin Prices
 // ✅ Phiên bản backend - chính xác, không hardcode, đồng bộ với frontend
-// Get Coin Prices
-async function getCoinPrices(symbols = [], retryCount = 0) {
+/* Đã thay bằng routes/price
+async function getCoinPrices(symbols = []) {
     try {
-        const response = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=250&page=1");
+        const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=250&page=1");
+        if (!res.ok) throw new Error("Failed to fetch coin market data");
 
-        if (!response.ok) {
-            const errorMessage = `❌ CoinGecko API error (${response.status}): ${response.statusText}`;
-            throw new Error(errorMessage);
-        }
-
-        const allMarkets = await response.json(); // [{ id, symbol, current_price, ... }]
+        const allMarkets = await res.json(); // [{ id, symbol, current_price, ... }]
 
         const priceMap = {};
         symbols.forEach(symbol => {
             const matches = allMarkets.filter(c => c.symbol.toLowerCase() === symbol.toLowerCase());
 
             if (matches.length > 0) {
+                // Ưu tiên coin có market_cap lớn nhất
                 const selected = matches.reduce((a, b) =>
                     (a.market_cap || 0) > (b.market_cap || 0) ? a : b
                 );
@@ -160,18 +170,11 @@ async function getCoinPrices(symbols = [], retryCount = 0) {
 
         return priceMap;
     } catch (error) {
-        console.error(`⚠️ getCoinPrices error [Attempt ${retryCount + 1}]:`, error.message || error);
-
-        if (retryCount < 2) {
-            const waitTime = 1000 * (retryCount + 1); // exponential backoff: 1s, 2s
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-            return getCoinPrices(symbols, retryCount + 1);
-        }
-
-        return {}; // fallback: empty map
+        console.error("⚠️ getCoinPrices error (backend):", error);
+        return {};
     }
 }
-
+*/
 
 
 // Health check

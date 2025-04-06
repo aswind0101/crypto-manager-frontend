@@ -70,7 +70,7 @@ const SwipeDashboard = ({
     })();
 
     return (
-        <div className="relative w-full h-80 overflow-hidden bg-black rounded-xl">
+        <div className="relative w-full h-80 overflow-hidden rounded-xl">
             <AnimatePresence initial={false} mode="wait">
                 {currentSlide === 0 && (
                     <motion.div
@@ -87,7 +87,7 @@ const SwipeDashboard = ({
                             if (info.offset.x > 100) handleSwipe("right");
                         }}
                     >
-                        <div className="h-full w-full flex flex-col items-center justify-center bg-black text-white">
+                        <div className="h-full w-full flex flex-col items-center justify-center text-white rounded-xl shadow-lg">
                             <div className="relative w-full h-80">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RadialBarChart
@@ -108,7 +108,7 @@ const SwipeDashboard = ({
                                     </RadialBarChart>
                                 </ResponsiveContainer>
                                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                    <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'} shadow-md`}>
+                                    <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                         $<CountUp key={totalProfitLoss} end={Math.round(totalProfitLoss)} duration={10} separator="," />
                                     </p>
                                     <p className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -163,7 +163,7 @@ const SwipeDashboard = ({
                             if (info.offset.x > 100) handleSwipe("right");
                         }}
                     >
-                        <div className="h-full w-full flex flex-col items-center justify-center bg-black text-white p-4">
+                        <div className="h-full w-full flex flex-col items-center justify-center  text-white p-4">
                             <h2 className="text-2xl font-bold text-yellow-400 mb-3">📈 Portfolio Allocation</h2>
 
                             {/* Vertical Bars */}

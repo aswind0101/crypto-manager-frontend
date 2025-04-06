@@ -381,13 +381,13 @@ function Dashboard() {
 
 
     return (
-        <div className="p-0 max-w-5xl mx-auto">
+        <div className="p-0 max-w-5xl mx-auto min-h-screen text-white ">
             <Navbar />
 
-            <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-black">
+            <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
                 {/* Modal */}
                 {showModal && selectedCoin && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="fixed inset-0 bg-[#132649] bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-gray-900 p-6 rounded-lg w-96 shadow-xl">
                             <h2 className="text-xl font-bold mb-4 text-white">
                                 {tradeType === "buy" ? "Buy" : "Sell"} {selectedCoin.coin_symbol.toUpperCase()}
@@ -410,23 +410,34 @@ function Dashboard() {
                             <div className="flex justify-between">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white"
+                                    className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
                                     disabled={isSubmitting}
-                                >Cancel</button>
+                                >
+                                    Cancel
+                                </button>
+
                                 <button
                                     onClick={handleConfirmTrade}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white"
                                     disabled={isSubmitting}
-                                >{isSubmitting ? "Processing..." : "Confirm"}</button>
+                                    className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200
+        ${tradeType === "buy"
+                                            ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
+                                            : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
+        ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
+    `}
+                                >
+                                    {isSubmitting ? "Processing..." : "Confirm"}
+                                </button>
+
                             </div>
                         </div>
                     </div>
                 )}
 
 
-                <div className="relative h-80 rounded-xl shadow-lg bg-black overflow-hidden">
+                <div className="relative w-full">
                     {!hasCache && priceFetchFailed ? (
-                        <div className="flex flex-col items-center justify-center h-full space-y-4">
+                        <div className="flex flex-col items-center justify-center h-80 space-y-4">
                             <div className="w-56 h-2 bg-gray-700 rounded-full overflow-hidden">
                                 <div className="h-full bg-yellow-400 animate-pulse w-full"></div>
                             </div>
@@ -442,38 +453,39 @@ function Dashboard() {
                                 totalProfitLoss={totalProfitLoss}
                                 totalNetInvested={totalNetInvested}
                                 coinIcons={coinIcons}
+                                lastUpdated={lastUpdated}
                                 onSlideChange={(slideIndex) => setShowLastUpdate(slideIndex === 0)}
                             />
 
+                            {lastUpdated && showLastUpdate && (
+                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-300 z-10">
+                                    <span>🕒 Last price update: {lastUpdated}</span>
+                                    <button
+                                        onClick={async () => {
+                                            const storedUser = localStorage.getItem("user");
+                                            if (storedUser) {
+                                                const user = JSON.parse(storedUser);
+                                                setRefreshing(true);
+                                                await fetchPortfolioWithRetry(user.uid);
+                                                setRefreshing(false);
+                                            }
+                                        }}
+                                        className="bg-[#3399ff] hover:bg-blue-600 text-white px-4 py-1.5 text-sm rounded-full shadow transition-all duration-200"
+                                    >
+                                        <span
+                                            className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
+                                                }`}
+                                        >
+                                            🔄
+                                        </span>
+                                        {refreshing ? "Refreshing..." : "Refresh"}
+                                    </button>
+                                </div>
+                            )}
                         </>
                     )}
-                    {lastUpdated && showLastUpdate && (
-                        <div className="absolute bottom-0 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
-                            <span>🕒 Last price update: {lastUpdated}</span>
-                            <button
-                                onClick={async () => {
-                                    const storedUser = localStorage.getItem("user");
-                                    if (storedUser) {
-                                        const user = JSON.parse(storedUser);
-                                        setRefreshing(true); // bắt đầu xoay
-                                        await fetchPortfolioWithRetry(user.uid);
-                                        setRefreshing(false); // ngừng xoay
-                                    }
-                                }}
-                                className="min-w-[80px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-yellow-300 rounded-full border border-yellow-400 text-xs font-semibold transition active:scale-95 z-10 flex items-center gap-1"
-                            >
-                                <span
-                                    className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
-                                        }`}
-                                >
-                                    🔄
-                                </span>
-                                {refreshing ? "Refreshing..." : "Refresh"}
-                            </button>
-
-                        </div>
-                    )}
                 </div>
+
                 {/* Market Overview */}
                 <div className="mt-4 bg-gray-900 rounded-lg p-4 text-white shadow ">
                     {portfolio.length > 0 && (
@@ -570,7 +582,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
 
                         return (
-                            <div key={index} className="bg-[#0e1628] hover:scale-105 hover:shadow-2xl transition-all duration-300 p-6 rounded-xl shadow-md flex flex-col text-white w-full">
+                            <div key={index} className="bg-[#0f1f3a] hover:scale-105 hover:shadow-lg transition-all duration-300 p-6 rounded-3xl shadow-3xl flex flex-col text-white w-full border border-[#1e3a5f]">
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
                                     (Tap any coin to view transaction details)
@@ -585,9 +597,9 @@ function Dashboard() {
                                 </div>
 
                                 <div className="w-full text-center mb-4">
-                                    <p className="text-sm text-gray-400">Current Price - Avg. Buy Price</p>
+                                    <p className="text-sm text-blue-200 font-medium">Current Price - Avg. Buy Price</p>
                                     <p className="text-lg font-mono text-yellow-300">
-                                        {formatCurrency(coin.current_price)} <span className="text-white">-</span> {avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
+                                        ${formatCurrency(coin.current_price)} <span className="text-white">-</span> ${avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
                                     </p>
 
                                     {coin.is_fallback_price && (
@@ -605,11 +617,11 @@ function Dashboard() {
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
-                                        <p className="text-lg font-mono text-orange-400">{formatCurrency(coin.total_invested)}</p>
+                                        <p className="text-lg font-mono text-orange-400">${formatCurrency(coin.total_invested)}</p>
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                        <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>{formatCurrency(netInvested)}</p>
+                                        <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
@@ -636,22 +648,26 @@ function Dashboard() {
                                 <div className="mt-4 flex justify-center gap-4">
                                     <button
                                         onClick={() => handleOpenTradeModal(coin, "buy")}
-                                        className="bg-green-600 hover:bg-green-700 px-4 py-1 rounded text-white text-sm"
+                                        className="px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm shadow transition-all duration-200"
                                     >
                                         Buy
                                     </button>
 
+
                                     <button
                                         onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
                                         disabled={coin.total_quantity === 0}
-                                        className={`px-4 py-1 rounded text-white text-sm 
-                                            ${coin.total_quantity === 0
+                                        className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200
+        ${coin.total_quantity === 0
                                                 ? "bg-gray-600 cursor-not-allowed"
-                                                : "bg-red-600 hover:bg-red-700"}
-                                                `}
+                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
+    `}
                                     >
                                         Sell
                                     </button>
+
+
+
                                 </div>
 
                             </div>

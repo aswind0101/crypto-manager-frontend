@@ -1,3 +1,4 @@
+// components/Navbar.js
 import Link from "next/link";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
@@ -13,23 +14,6 @@ export default function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const menuRef = useRef();
-
-    function clearAppCache() {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-            const user = JSON.parse(storedUser);
-            // ❌ Xoá cache portfolio của user hiện tại
-            localStorage.removeItem(`portfolio_${user.uid}`);
-            localStorage.removeItem(`lastUpdated_${user.uid}`);
-        }
-    
-        // ✅ Giữ nguyên cache giá coin và coinList
-        // KHÔNG xóa các key bắt đầu bằng "price_"
-        // KHÔNG xóa "coinList", "coinListUpdated", "price_xxx"
-    
-        // ❌ Chỉ xóa thông tin đăng nhập
-        localStorage.removeItem("user");
-    }
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -60,8 +44,10 @@ export default function Navbar() {
         try {
             await signOut(auth);
             localStorage.removeItem("user");
-            // Xóa cache giá riêng biệt cho từng user
-            clearAppCache();
+
+            const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+            localStorage.removeItem(`portfolio_${storedUser.uid}`);
+            localStorage.removeItem(`lastUpdated_${storedUser.uid}`);
 
             setShowToast(true);
             setTimeout(() => {
@@ -75,103 +61,97 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="w-full bg-yellow-400 shadow-md px-6 py-3 flex justify-between items-center rounded-b-lg relative">
-                {/* Logo */}
-                <div className="flex items-center gap-2 text-black font-extrabold text-xl">
-                    <span>💰</span>
-                    <span>CMA</span>
+            <nav className="w-full bg-gradient-to-r from-[#0d1b3d] to-[#163269] shadow-lg px-6 py-3 flex justify-between items-center rounded-b-2xl text-white z-50">
+                {/* Logo + App name */}
+                <div className="flex items-center gap-2 font-bold text-xl">
+                    💰 <span className="tracking-wide">Crypto Manager</span>
                 </div>
 
-                {/* User Info */}
+                {/* Desktop User Info */}
                 {user && (
-                    <div className="hidden md:flex flex-col items-end text-black font-semibold text-sm mr-4">
+                    <div className="hidden md:flex flex-col items-end text-sm mr-4">
                         <span>
-                            Hello, <span className="ml-1 font-bold">{user.name}</span>
+                            Hello, <span className="font-bold">{user.name}</span>
                         </span>
-                        <span className="text-xs text-gray-700">
+                        <span className="text-xs text-blue-200">
                             UID: <span className="font-mono">{user.uid}</span>
                         </span>
                     </div>
                 )}
 
                 {/* Desktop Menu */}
-                <div className="hidden md:flex items-center gap-4 font-semibold text-sm">
-                    <Link href="/home" className="text-black hover:text-white transition flex items-center gap-1">
+                <div className="hidden md:flex items-center gap-6 font-medium">
+                    <Link href="/home" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiHome /> Home
                     </Link>
-                    <Link href="/transactions" className="text-black hover:text-white transition flex items-center gap-1">
+                    <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiList /> Transactions
                     </Link>
                     {user && (
                         <button
                             onClick={handleLogout}
-                            className="text-black hover:text-white transition flex items-center gap-1"
+                            className="hover:text-red-400 transition flex items-center gap-1"
                         >
                             <FiLogOut /> Logout
                         </button>
                     )}
                 </div>
 
-                {/* Mobile Menu Toggle */}
-                <button
-                    className="md:hidden text-black text-xl focus:outline-none"
-                    onClick={() => setMenuOpen(!menuOpen)}
-                >
+                {/* Mobile Toggle */}
+                <button className="md:hidden text-2xl" onClick={() => setMenuOpen(!menuOpen)}>
                     {menuOpen ? <FaTimes /> : <FaBars />}
                 </button>
-
-                {/* Mobile Menu with animation */}
-                <AnimatePresence>
-                    {menuOpen && (
-                        <motion.div
-                            ref={menuRef}
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 0.95, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.2 }}
-                            className="absolute top-16 left-0 w-full bg-[#fefce8] text-black py-4 px-6 flex flex-col gap-4 font-semibold text-sm rounded-b-xl shadow-xl z-50"
-                        >
-                            {user && (
-                                <div className="text-gray-700 text-base font-medium mb-2">
-                                    👋 Hello, <span className="font-bold">{user.name}</span>
-                                    <div className="text-xs mt-1">
-                                        UID: <span className="font-mono">{user.uid}</span>
-                                    </div>
-                                </div>
-                            )}
-                            <Link
-                                href="/home"
-                                onClick={() => setMenuOpen(false)}
-                                className="flex items-center gap-2 hover:text-yellow-600"
-                            >
-                                <FiHome /> Home
-                            </Link>
-                            <Link
-                                href="/transactions"
-                                onClick={() => setMenuOpen(false)}
-                                className="flex items-center gap-2 hover:text-yellow-600"
-                            >
-                                <FiList /> Transactions
-                            </Link>
-                            {user && (
-                                <button
-                                    className="text-left flex items-center gap-2 hover:text-red-500"
-                                    onClick={() => {
-                                        handleLogout();
-                                        setMenuOpen(false);
-                                    }}
-                                >
-                                    <FiLogOut /> Logout
-                                </button>
-                            )}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </nav>
+
+            {/* Mobile Menu */}
+            <AnimatePresence>
+                {menuOpen && (
+                    <motion.div
+                        ref={menuRef}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="bg-[#132649] text-white px-6 py-4 rounded-b-2xl shadow-lg flex flex-col gap-4 text-sm md:hidden z-40"
+                    >
+                        {user && (
+                            <div className="text-sm text-blue-200">
+                                👋 Hello, <span className="font-bold">{user.name}</span>
+                                <div className="text-xs mt-1 font-mono">UID: {user.uid}</div>
+                            </div>
+                        )}
+                        <Link
+                            href="/home"
+                            onClick={() => setMenuOpen(false)}
+                            className="hover:text-cyan-300 flex items-center gap-2"
+                        >
+                            <FiHome /> Home
+                        </Link>
+                        <Link
+                            href="/transactions"
+                            onClick={() => setMenuOpen(false)}
+                            className="hover:text-cyan-300 flex items-center gap-2"
+                        >
+                            <FiList /> Transactions
+                        </Link>
+                        {user && (
+                            <button
+                                className="text-left flex items-center gap-2 hover:text-red-400"
+                                onClick={() => {
+                                    handleLogout();
+                                    setMenuOpen(false);
+                                }}
+                            >
+                                <FiLogOut /> Logout
+                            </button>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Toast */}
             {showToast && (
-                <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50 animate-fade">
+                <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50">
                     👋 Logged out successfully
                 </div>
             )}
