@@ -4,22 +4,14 @@ import React from "react";
 import Navbar from "../components/Navbar";
 import SwipeDashboard from "../components/SwipeDashboard";
 import Link from "next/link";
-
-import {
-    ResponsiveContainer,
-    RadialBarChart,
-    RadialBar
-} from "recharts";
 import { FaCoins } from "react-icons/fa";
 import { useCoinIcons } from "../components/useCoinIcons";
 import { useRouter } from "next/router";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth } from "firebase/auth";
-
-import CountUp from "react-countup";
 import { motion, AnimatePresence } from "framer-motion";
-
-
+import LoadingScreen from "../components/LoadingScreen";
+import EmptyPortfolioView from "../components/EmptyPortfolioView";
 
 function Dashboard() {
     const formatNumber = (num) => {
@@ -30,31 +22,18 @@ function Dashboard() {
         if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
         return Number(num).toLocaleString();
     };
-    const formatPrice = (price) => {
-        if (!price || isNaN(price)) return "–";
-        if (price >= 1) return price.toLocaleString(undefined, { maximumFractionDigits: 2 });
-        if (price >= 0.01) return price.toFixed(4);
-        if (price >= 0.0001) return price.toFixed(6);
-        return price.toFixed(8); // ví dụ như SHIB
+    const formatCurrency = (num, options = { prefix: "", fallback: "–" }) => {
+        if (num === null || num === undefined || isNaN(num)) return options.fallback;
+        if (num >= 1) return options.prefix + num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        if (num >= 0.01) return options.prefix + num.toFixed(4);
+        if (num >= 0.0001) return options.prefix + num.toFixed(6);
+        return options.prefix + num.toFixed(8);
     };
-
-    const formatMoney = (num) => {
-        if (num === null || num === undefined || isNaN(num)) return "–";
-        if (num >= 1) return "$" + num.toLocaleString(undefined, { maximumFractionDigits: 2 });
-        if (num >= 0.01) return "$" + num.toFixed(4);
-        if (num >= 0.0001) return "$" + num.toFixed(6);
-        return "$" + num.toFixed(8); // cho SHIB, PEPE, BONK...
-    };
-
-    const [coinList, setCoinList] = useState([]);
 
     const [portfolio, setPortfolio] = useState([]);
-    const [totalInvested, setTotalInvested] = useState(0);
     const [totalNetInvested, settotalNetInvested] = useState(0);
     const [showLastUpdate, setShowLastUpdate] = useState(true);
-
     const [includeSoldCoins, setIncludeSoldCoins] = useState(false);
-
     const [totalProfitLoss, setTotalProfitLoss] = useState(0);
     const [totalCurrentValue, setTotalCurrentValue] = useState(0);
     const [searchTerm, setSearchTerm] = useState("");
@@ -69,26 +48,26 @@ function Dashboard() {
     const [quantity, setQuantity] = useState("");
     const [price, setPrice] = useState("");
     const [showModal, setShowModal] = useState(false);
-
     const [globalMarketCap, setGlobalMarketCap] = useState(null);
     const [topCoins, setTopCoins] = useState([]);
     const [showMarketOverview, setShowMarketOverview] = useState(false);
-
     const [refreshing, setRefreshing] = useState(false);
-
     const [hasRawPortfolioData, setHasRawPortfolioData] = useState(false);
     const [isReadyToRender, setIsReadyToRender] = useState(false);
-
-
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState("");
-
-
     const intervalRef = useRef(null);
     const router = useRouter();
 
-    const isMounted = useRef(false);
-
+    useEffect(() => {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+            // Reset filter mỗi khi user login
+            setSearchTerm("");
+            setFilterByProfit("all");
+            setIncludeSoldCoins(false);
+        }
+    }, [typeof window !== "undefined" && localStorage.getItem("user")]);
 
     const coinIcons = useCoinIcons();
     const getCoinIcon = (symbol) => {
@@ -99,43 +78,6 @@ function Dashboard() {
             <FaCoins className="text-gray-500 text-2xl" />
         );
     };
-
-    const fetchCoinList = async () => {
-        const cache = localStorage.getItem("coinList");
-        const cacheTime = localStorage.getItem("coinListUpdated");
-        const now = Date.now();
-
-        const oneDay = 86400000;
-        const cacheExpired = !cacheTime || now - parseInt(cacheTime) > oneDay;
-
-        // ✅ Nếu có cache → dùng ngay để tránh delay
-        if (cache) {
-            try {
-                const parsed = JSON.parse(cache);
-                setCoinList(parsed); // gán vào state
-            } catch (err) {
-                console.warn("⚠️ Corrupted coinList cache", err);
-            }
-        }
-
-        // ✅ Nếu cache hết hạn → gọi API cập nhật
-        if (cacheExpired) {
-            try {
-                const res = await fetch("https://api.coingecko.com/api/v3/coins/list");
-                if (!res.ok) throw new Error("CoinGecko fetch failed");
-
-                const freshData = await res.json();
-                localStorage.setItem("coinList", JSON.stringify(freshData));
-                localStorage.setItem("coinListUpdated", now.toString());
-                setCoinList(freshData);
-            } catch (err) {
-                console.warn("⚠️ Failed to fetch new coinList:", err.message);
-                // KHÔNG xoá cache cũ
-            }
-        }
-    };
-
-
 
     const getCoinPrices = async (symbols = []) => {
         try {
@@ -199,7 +141,6 @@ function Dashboard() {
 
 
     useEffect(() => {
-        let isMounted = true;
         const storedUser = localStorage.getItem("user");
         if (!storedUser) {
             router.push("/login");
@@ -218,11 +159,9 @@ function Dashboard() {
             setLoading(false);
 
             const totalValue = parsed.reduce((sum, coin) => sum + coin.current_value, 0);
-            const netTotalInvested = parsed.reduce((sum, coin) => sum + coin.total_invested, 0);
             const totalProfit = parsed.reduce((sum, coin) => sum + coin.profit_loss, 0);
             const totalNet = parsed.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
 
-            setTotalInvested(netTotalInvested);
             settotalNetInvested(totalNet);
             setTotalCurrentValue(totalValue);
             setTotalProfitLoss(totalProfit);
@@ -243,7 +182,6 @@ function Dashboard() {
         }
 
         return () => {
-            isMounted = false;
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
@@ -264,17 +202,6 @@ function Dashboard() {
         settotalNetInvested(netInvested);
         setTotalProfitLoss(profit);
     }, [portfolio, includeSoldCoins]);
-
-
-    useEffect(() => {
-        if (!includeSoldCoins) {
-            const storedUser = localStorage.getItem("user");
-            if (storedUser) {
-                const user = JSON.parse(storedUser);
-                fetchPortfolioWithRetry(user.uid);
-            }
-        }
-    }, [includeSoldCoins]);
 
     const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -338,22 +265,20 @@ function Dashboard() {
 
 
             if (updatedPortfolio.length > 0) {
-                if (isMounted && updatedPortfolio.length > 0) {
-                    setPortfolio(updatedPortfolio);
+                setPortfolio(updatedPortfolio);
 
-                    setLastUpdated(new Date().toLocaleString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit"
-                    }));
+                setLastUpdated(new Date().toLocaleString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit"
+                }));
 
-                    setPriceFetchFailed(false);
-                    setFirstLoaded(true);
-                    setIsReadyToRender(true);
+                setPriceFetchFailed(false);
+                setFirstLoaded(true);
+                setIsReadyToRender(true);
 
-                    localStorage.setItem(`portfolio_${user.uid}`, JSON.stringify(updatedPortfolio));
-                    localStorage.setItem(`lastUpdated_${user.uid}`, new Date().toISOString());
-                }
+                localStorage.setItem(`portfolio_${user.uid}`, JSON.stringify(updatedPortfolio));
+                localStorage.setItem(`lastUpdated_${user.uid}`, new Date().toISOString());
             } else {
                 if (!firstLoaded) {
                     setPortfolio([]); // clear
@@ -376,47 +301,25 @@ function Dashboard() {
         }
     };
     if (!isReadyToRender) {
-        return (
-            <div className="p-4 max-w-3xl mx-auto text-center text-white">
-                <Navbar />
-                <div className="mt-12 bg-[#0e1628] rounded-xl p-6 shadow-md">
-                    <p className="text-yellow-400 animate-pulse">⏳ Preparing your dashboard...</p>
-                </div>
-            </div>
-        );
+        return <LoadingScreen />;
     }
-    if (
+    const isEmptyPortfolioView =
         isReadyToRender &&
         !loading &&
         portfolio.length === 0 &&
         !hasRawPortfolioData &&
-        firstLoaded // ✅ chỉ khi chắc chắn đã xử lý xong cache/server
-      ) {
-        return (
-            <div className="p-4 max-w-3xl mx-auto text-center text-white">
-                <Navbar />
-                <div className="mt-12 bg-[#0e1628] rounded-xl p-6 shadow-md">
-                    <h1 className="text-xl font-bold text-yellow-400 mb-4">🕊️ No Transactions Found</h1>
-                    <p className="text-gray-300 mb-6">You haven&apos;t added any crypto transactions yet.</p>
-                    <Link
-                        href="/add-transaction"
-                        className="inline-block bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-semibold"
-                    >
-                        ➕ Add your first transaction
-                    </Link>
-                </div>
-            </div>
-        );
+        firstLoaded;
+    if (isEmptyPortfolioView) {
+        return <EmptyPortfolioView />;
     }
     const handleOpenTradeModal = (coin, type) => {
         setSelectedCoin(coin);
         setTradeType(type);
         setQuantity(type === "sell" ? coin.total_quantity.toString() : "");
-        setPrice(coin.current_price || "");
+        setPrice((coin.current_price ?? 0).toString());
         setShowModal(true);
         setFormError("");
     };
-
 
     const handleConfirmTrade = async () => {
         const qty = parseFloat(quantity);
@@ -608,7 +511,7 @@ function Dashboard() {
                                                         <img src={coin.image} alt={coin.name} className="w-6 h-6" />
                                                         <span className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</span>
                                                     </div>
-                                                    <p className="text-sm mt-1">💵 ${formatPrice(coin.current_price)}</p>
+                                                    <p className="text-sm mt-1">💵 ${formatCurrency(coin.current_price)}</p>
                                                     <p className="text-sm text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
                                                 </div>
                                             ))}
@@ -655,103 +558,105 @@ function Dashboard() {
 
 
                 {/* phần còn lại giữ nguyên */}
-                {filteredPortfolio.map((coin, index) => {
-                    const netInvested = coin.total_invested - coin.total_sold;
-                    const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
-                        ? (netInvested / coin.total_quantity)
-                        : 0;
-                    const profitLossPercentage = netInvested > 0
-                        ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
-                        : coin.profit_loss > 0 ? "∞%" : "0%";
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                    {filteredPortfolio.map((coin, index) => {
+                        const netInvested = coin.total_invested - coin.total_sold;
+                        const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
+                            ? (netInvested / coin.total_quantity)
+                            : 0;
+                        const profitLossPercentage = netInvested > 0
+                            ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
+                            : coin.profit_loss > 0 ? "∞%" : "0%";
 
-                    return (
-                        <div key={index} className="bg-[#0e1628] hover:scale-105 hover:shadow-2xl transition-all duration-300 p-6 rounded-xl shadow-md flex flex-col text-white w-full">
-                            {/* Hint for mobile users */}
-                            <div className="text-center text-xs text-gray-500 italic mb-2">
-                                (Tap any coin to view transaction details)
-                            </div>
-                            <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-gray-400 text-sm">👉</span>
-                                    {getCoinIcon(coin.coin_symbol)}
-                                    <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
+                        return (
+                            <div key={index} className="bg-[#0e1628] hover:scale-105 hover:shadow-2xl transition-all duration-300 p-6 rounded-xl shadow-md flex flex-col text-white w-full">
+                                {/* Hint for mobile users */}
+                                <div className="text-center text-xs text-gray-500 italic mb-2">
+                                    (Tap any coin to view transaction details)
                                 </div>
-                                <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
-                            </div>
+                                <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-gray-400 text-sm">👉</span>
+                                        {getCoinIcon(coin.coin_symbol)}
+                                        <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
+                                    </div>
+                                    <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
+                                </div>
 
-                            <div className="w-full text-center mb-4">
-                                <p className="text-sm text-gray-400">Current Price - Avg. Buy Price</p>
-                                <p className="text-lg font-mono text-yellow-300">
-                                    {formatMoney(coin.current_price)} <span className="text-white">-</span> {avgPrice > 0 ? `${formatMoney(avgPrice)}` : "–"}
-                                </p>
-
-                                {coin.is_fallback_price && (
-                                    <p className="text-xs text-yellow-400 mt-1">
-                                        ⚠️ Price will be updated in a few minutes. Using your buy price now.
+                                <div className="w-full text-center mb-4">
+                                    <p className="text-sm text-gray-400">Current Price - Avg. Buy Price</p>
+                                    <p className="text-lg font-mono text-yellow-300">
+                                        {formatCurrency(coin.current_price)} <span className="text-white">-</span> {avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
                                     </p>
-                                )}
+
+                                    {coin.is_fallback_price && (
+                                        <p className="text-xs text-yellow-400 mt-1">
+                                            ⚠️ Price will be updated in a few minutes. Using your buy price now.
+                                        </p>
+                                    )}
+                                </div>
+
+
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
+                                        <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
+                                        <p className="text-lg font-mono text-orange-400">{formatCurrency(coin.total_invested)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
+                                        <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>{formatCurrency(netInvested)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
+                                        <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
+                                    </div>
+                                    <div className="col-span-2 border-t border-gray-700 pt-2">
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                            {(() => {
+                                                const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
+                                                if (ratio > 0.5) return "🤑";
+                                                if (ratio > 0.1) return "😎";
+                                                if (ratio > 0) return "🙂";
+                                                if (ratio > -0.1) return "😕";
+                                                if (ratio > -0.5) return "😢";
+                                                return "😭";
+                                            })()} Profit / Loss
+                                        </p>
+                                        <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                            ${Math.round(coin.profit_loss).toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 flex justify-center gap-4">
+                                    <button
+                                        onClick={() => handleOpenTradeModal(coin, "buy")}
+                                        className="bg-green-600 hover:bg-green-700 px-4 py-1 rounded text-white text-sm"
+                                    >
+                                        Buy
+                                    </button>
+
+                                    <button
+                                        onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
+                                        disabled={coin.total_quantity === 0}
+                                        className={`px-4 py-1 rounded text-white text-sm 
+                                            ${coin.total_quantity === 0
+                                                ? "bg-gray-600 cursor-not-allowed"
+                                                : "bg-red-600 hover:bg-red-700"}
+                                                `}
+                                    >
+                                        Sell
+                                    </button>
+                                </div>
+
                             </div>
-
-
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
-                                <div>
-                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
-                                    <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
-                                    <p className="text-lg font-mono text-orange-400">{formatMoney(coin.total_invested)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                    <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>{formatMoney(netInvested)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
-                                    <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
-                                </div>
-                                <div className="col-span-2 border-t border-gray-700 pt-2">
-                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
-                                        {(() => {
-                                            const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
-                                            if (ratio > 0.5) return "🤑";
-                                            if (ratio > 0.1) return "😎";
-                                            if (ratio > 0) return "🙂";
-                                            if (ratio > -0.1) return "😕";
-                                            if (ratio > -0.5) return "😢";
-                                            return "😭";
-                                        })()} Profit / Loss
-                                    </p>
-                                    <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                        ${Math.round(coin.profit_loss).toLocaleString()} <span className="text-xs">({profitLossPercentage})</span>
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="mt-4 flex justify-center gap-4">
-                                <button
-                                    onClick={() => handleOpenTradeModal(coin, "buy")}
-                                    className="bg-green-600 hover:bg-green-700 px-4 py-1 rounded text-white text-sm"
-                                >
-                                    Buy
-                                </button>
-
-                                <button
-                                    onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
-                                    disabled={coin.total_quantity === 0}
-                                    className={`px-4 py-1 rounded text-white text-sm 
-      ${coin.total_quantity === 0
-                                            ? "bg-gray-600 cursor-not-allowed"
-                                            : "bg-red-600 hover:bg-red-700"}
-    `}
-                                >
-                                    Sell
-                                </button>
-                            </div>
-
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
             {/* FAB chỉ hiển thị khi không mở modal và chỉ trên mobile */}
             {!showModal && (
