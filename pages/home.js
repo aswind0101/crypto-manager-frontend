@@ -380,10 +380,10 @@ function Dashboard() {
 
 
     return (
-        <div className="p-0 max-w-[1280px] mx-auto min-h-screen text-white ">
+        <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
 
-            <div className="mt-4 grid grid-cols-1 gap-4 p-8 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
+            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-[#132649] bg-opacity-50 flex items-center justify-center z-50">
@@ -569,7 +569,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
 
                         return (
-                            <div key={index} // ✅ Thêm dòng này
+                            <div key={index}
                                 className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
   shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
   transition-all duration-300"
