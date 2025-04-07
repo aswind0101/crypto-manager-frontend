@@ -569,7 +569,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
 
                         return (
-                            <div
+                            <div key={index} // ✅ Thêm dòng này
                                 className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
   shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
   transition-all duration-300"
