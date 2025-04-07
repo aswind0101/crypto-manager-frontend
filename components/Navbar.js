@@ -61,7 +61,7 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="w-full bg-gradient-to-r from-[#0d1b3d] to-[#163269] shadow-lg px-6 py-3 flex justify-between items-center rounded-b-2xl text-white z-50">
+            <nav className="w-full whote== shadow-lg px-6 py-3 flex justify-between items-center rounded-b-2xl text-white z-50">
                 {/* Logo + App name */}
                 <div className="flex items-center gap-2 font-bold text-xl">
                     💰 <span className="tracking-wide">Crypto Manager</span>
@@ -112,7 +112,7 @@ export default function Navbar() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="bg-[#132649] text-white px-6 py-4 rounded-b-2xl shadow-lg flex flex-col gap-4 text-sm md:hidden z-40"
+                        className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] text-white px-6 py-4 rounded-b-2xl shadow-lg flex flex-col gap-4 text-sm md:hidden z-40"
                     >
                         {user && (
                             <div className="text-sm text-blue-200">

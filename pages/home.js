@@ -380,10 +380,10 @@ function Dashboard() {
 
 
     return (
-        <div className="p-0 max-w-5xl mx-auto min-h-screen text-white ">
+        <div className="p-0 max-w-[1280px] mx-auto min-h-screen text-white ">
             <Navbar />
 
-            <div className="mt-4 grid grid-cols-1 gap-4 p-6 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
+            <div className="mt-4 grid grid-cols-1 gap-4 p-8 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-[#132649] bg-opacity-50 flex items-center justify-center z-50">
@@ -486,75 +486,45 @@ function Dashboard() {
                 </div>
 
                 {/* Market Overview */}
-                <div className="mt-4 bg-[#0f1f3a] rounded-lg p-4 text-white shadow ">
-                    {portfolio.length > 0 && (
-                        <>
-                            {/* Market Overview Header */}
-                            <div
-                                className="flex items-center justify-between px-4 py-3 bg-[#0f1f3a]  text-white cursor-pointer transition-colors duration-200"
-                                onClick={() => setShowMarketOverview(!showMarketOverview)}
-                            >
-                                <h2 className="text-lg font-bold flex items-center gap-2">
-                                    🌐 Market Overview
-                                    <span className="text-sm text-yellow-300">
-                                        (${formatNumber(globalMarketCap)})
-                                    </span>
-                                </h2>
-                                <span
-                                    className="text-sm text-blue-300 hover:underline transition-transform"
-                                >
-                                    <span
-                                        className={`transform transition-transform duration-300 inline-block ${showMarketOverview ? "rotate-180" : ""
-                                            }`}
+                {portfolio.length > 0 && (
+                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
+
+                        {/* Header trắng nằm trên cùng */}
+                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-3">
+                            <h2 className="text-xl text-center font-semibold text-white font-bold ">🌐 Market Overview</h2>
+                            <p className="text-sm text-gray-400 text-center">
+                                Total Market Cap: <span className="text-lg text-yellow-300 font-mono font-bold">${formatNumber(globalMarketCap)}</span>
+                            </p>
+                        </div>
+                        {/* Nội dung bên trong card như cũ */}
+                        <div className="p-6">
+                            <div className="flex flex-col divide-y divide-[#2c4069] gap-4">
+                                {topCoins.map((coin) => (
+                                    <div
+                                        key={coin.id}
+                                        className="rounded-xl px-4 py-3 flex justify-between items-center"
                                     >
-                                        ▼
-                                    </span>
-                                </span>
-                            </div>
-
-                            {/* Market Overview Content */}
-                            {showMarketOverview && (
-                                <>
-                                    <AnimatePresence>
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.3 }}
-                                            className="col-span-2 mt-3"
-                                        >
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                {topCoins.map((coin) => (
-                                                    <div
-                                                        key={coin.id}
-                                                        className="bg-[#0f1f3a] rounded-2xl p-4 text-white shadow-[0_2px_8px_rgba(255,255,255,0.02),0_4px_16px_rgba(0,0,0,0.35)] transition-transform duration-200 hover:scale-[1.02]"
-                                                    >
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <img src={coin.image} alt={coin.name} className="w-6 h-6" />
-                                                            <span className="font-semibold">
-                                                                {coin.name} ({coin.symbol.toUpperCase()})
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-sm text-blue-100">
-                                                            💵 ${formatCurrency(coin.current_price)}
-                                                        </p>
-                                                        <p className="text-sm text-blue-300">
-                                                            Market Cap: ${formatNumber(coin.market_cap)}
-                                                        </p>
-                                                    </div>
-                                                ))}
+                                        <div className="flex items-center gap-3">
+                                            <img src={coin.image} alt={coin.name} className="w-8 h-8 rounded-full" />
+                                            <div>
+                                                <p className="font-semibold text-white">{coin.name} ({coin.symbol.toUpperCase()})</p>
+                                                <p className="text-sm text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
                                             </div>
-                                        </motion.div>
-                                    </AnimatePresence>
-                                </>
-                            )}
-                        </>
-                    )}
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-lg text-yellow-300 font-mono">${formatCurrency(coin.current_price)}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
-                </div>
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center text-white mt-4">
+                        {/* Tạm thời ẩn chức năng filter vì không có nhiểu coin
                         <input
                             type="text"
                             placeholder="🔍 Search by coin name or symbol..."
@@ -562,32 +532,33 @@ function Dashboard() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="bg-[#0f1f3a] text-white placeholder-blue-200 px-4 py-2 rounded-xl shadow-inner w-full"
                         />
-
+                        */}
                         <select
                             value={filterByProfit}
                             onChange={(e) => setFilterByProfit(e.target.value)}
-                            className="bg-[#0f1f3a] text-white px-4 py-2 rounded-xl shadow-inner"
+                            className="bg-[#162b4d] text-white px-4 py-2 rounded-full shadow-inner border border-[#2c4069] focus:outline-none"
                         >
                             <option value="all">All</option>
                             <option value="profit">🟢 Profit</option>
                             <option value="loss">🔴 Loss</option>
                         </select>
 
-                        <label className="flex items-center gap-2 text-sm text-blue-100">
+                        <label className="flex items-center gap-2 text-sm text-blue-100 bg-[#162b4d] px-4 py-2 rounded-full shadow-inner border border-[#2c4069]">
                             <input
                                 type="checkbox"
                                 checked={includeSoldCoins}
                                 onChange={(e) => setIncludeSoldCoins(e.target.checked)}
-                                className="accent-yellow-400"
+                                className="accent-yellow-400 w-4 h-4"
                             />
                             Include sold coins
                         </label>
+
                     </div>
                 )}
 
 
                 {/* phần còn lại giữ nguyên */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-4">
                     {filteredPortfolio.map((coin, index) => {
                         const netInvested = coin.total_invested - coin.total_sold;
                         const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
@@ -598,7 +569,11 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
 
                         return (
-                            <div key={index} className="bg-[#0f1f3a] hover:scale-105 hover:shadow-lg transition-all duration-300 p-6 rounded-3xl shadow-3xl flex flex-col text-white w-full border border-[#1e3a5f]">
+                            <div
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
+  shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
+  transition-all duration-300"
+                            >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
                                     (Tap any coin to view transaction details)
