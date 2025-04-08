@@ -119,7 +119,7 @@ function Dashboard() {
         try {
             const [globalRes, topRes] = await Promise.all([
                 fetch("https://api.coingecko.com/api/v3/global"),
-                fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=3&page=1")
+                fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1")
             ]);
 
             if (!globalRes.ok || !topRes.ok) {
@@ -457,8 +457,8 @@ function Dashboard() {
                             />
 
                             {lastUpdated && showLastUpdate && (
-                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-300 z-10">
-                                    <span>🕒 Last price update: {lastUpdated}</span>
+                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-6 text-xs text-gray-300 z-10">
+                                    <span>🕒 Last update: {lastUpdated}</span>
                                     <button
                                         onClick={async () => {
                                             const storedUser = localStorage.getItem("user");
@@ -469,7 +469,9 @@ function Dashboard() {
                                                 setRefreshing(false);
                                             }
                                         }}
-                                        className="bg-[#3399ff] hover:bg-blue-600 text-white px-4 py-1.5 text-sm rounded-full shadow transition-all duration-200"
+                                        className="flex items-center gap-1 px-4 py-1 text-xs rounded-full 
+    bg-[#1a2f46] text-yellow-300 hover:bg-yellow-400 hover:text-black 
+    transition duration-200 shadow-inner border border-[#2c4069]"
                                     >
                                         <span
                                             className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
@@ -481,6 +483,7 @@ function Dashboard() {
                                     </button>
                                 </div>
                             )}
+
                         </>
                     )}
                 </div>
@@ -498,25 +501,28 @@ function Dashboard() {
                         </div>
                         {/* Nội dung bên trong card như cũ */}
                         <div className="p-6">
-                            <div className="flex flex-col divide-y divide-[#2c4069] gap-4">
-                                {topCoins.map((coin) => (
+                            <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-4 py-3 text-sm scrollbar-hide">
+                                {topCoins.slice(0, 10).map((coin) => (
                                     <div
                                         key={coin.id}
-                                        className="rounded-xl px-4 py-3 flex justify-between items-center"
+                                        className="rounded-lg py-2 px-2 flex justify-between items-center text-sm"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <img src={coin.image} alt={coin.name} className="w-8 h-8 rounded-full" />
+                                        <div className="flex items-center gap-2">
+                                            <img src={coin.image} alt={coin.name} className="w-5 h-5" />
                                             <div>
-                                                <p className="font-semibold text-white">{coin.name} ({coin.symbol.toUpperCase()})</p>
-                                                <p className="text-sm text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
+                                                <p className="font-medium text-white">{coin.name} ({coin.symbol.toUpperCase()})</p>
+                                                <p className="text-xs text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-lg text-yellow-300 font-mono">${formatCurrency(coin.current_price)}</p>
+                                            <p className="text-sm text-yellow-300 font-mono">
+                                                ${formatCurrency(coin.current_price)}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
                             </div>
+
                         </div>
                     </div>
                 )}
@@ -558,7 +564,7 @@ function Dashboard() {
 
 
                 {/* phần còn lại giữ nguyên */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                     {filteredPortfolio.map((coin, index) => {
                         const netInvested = coin.total_invested - coin.total_sold;
                         const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
