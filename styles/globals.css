@@ -12,8 +12,18 @@
   }
 }
 
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE + Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
 body {
   background: linear-gradient(to bottom right, #0b1e3d, #183b69);
   color: #ffffff;
   font-family: 'Poppins', sans-serif;
 }
+
