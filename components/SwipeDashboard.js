@@ -15,7 +15,7 @@ const SwipeDashboard = ({
     onSlideChange }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [direction, setDirection] = useState('left');
-    
+
 
     const handleSwipe = (direction) => {
         const totalSlides = 2;
@@ -70,7 +70,7 @@ const SwipeDashboard = ({
     })();
 
     return (
-        <div className="relative w-full h-80 overflow-hidden rounded-xl">
+        <div className="relative w-full h-80 overflow-hidden rounded-xl ">
             <AnimatePresence initial={false} mode="wait">
                 {currentSlide === 0 && (
                     <motion.div
@@ -180,14 +180,23 @@ const SwipeDashboard = ({
                                             const height = coin.percent * 2.5;
                                             return (
                                                 <div key={index} className="flex flex-col items-center w-10">
+                                                    {/* Thêm phần trăm lời/lỗ trên đầu */}
+                                                    <span className={`mb-1 text-[11px] font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                                        {(coin.total_invested - coin.total_sold) > 0
+                                                            ? `${((coin.profit_loss / (coin.total_invested - coin.total_sold)) * 100).toFixed(1)}%`
+                                                            : coin.profit_loss > 0 ? "∞%" : "0%"}
+                                                    </span>
+
                                                     <div
                                                         className={`w-3 rounded-t ${coin.profit_loss >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
                                                         style={{ height: `${height}px`, minHeight: '8px' }}
                                                     />
-                                                    <span className="mt-1 text-[10px] text-white">{coin.coin_symbol.toUpperCase()}</span>
+
+                                                    <span className="mt-1 text-[11px] text-white">{coin.coin_symbol.toUpperCase()}</span>
                                                     <span className="text-[10px] text-yellow-300">{coin.percent.toFixed(1)}%</span>
                                                 </div>
                                             );
+
                                         })}
                                     </div>
                                 </>

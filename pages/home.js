@@ -81,7 +81,7 @@ function Dashboard() {
 
     const getCoinPrices = async (symbols = []) => {
         try {
-            const baseUrl = "https://crypto-manager-backend.onrender.com"; // 🔁 đổi thành domain backend của Hiền
+            const baseUrl = "https://crypto-manager-backend.onrender.com/api/transactions"; // 🔁 đổi thành domain backend của Hiền
             const query = symbols.join(",");
             const res = await fetch(`${baseUrl}/api/price?symbols=${query}`);
 
@@ -529,37 +529,38 @@ function Dashboard() {
 
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center text-white mt-4">
-                        {/* Tạm thời ẩn chức năng filter vì không có nhiểu coin
-                        <input
-                            type="text"
-                            placeholder="🔍 Search by coin name or symbol..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-[#0f1f3a] text-white placeholder-blue-200 px-4 py-2 rounded-xl shadow-inner w-full"
-                        />
-                        */}
-                        <select
-                            value={filterByProfit}
-                            onChange={(e) => setFilterByProfit(e.target.value)}
-                            className="bg-[#162b4d] text-white px-4 py-2 rounded-full shadow-inner border border-[#2c4069] focus:outline-none"
-                        >
-                            <option value="all">All</option>
-                            <option value="profit">🟢 Profit</option>
-                            <option value="loss">🔴 Loss</option>
-                        </select>
+                    <div className="w-full flex items-center gap-3 mt-2">
+                        {/* Select */}
+                        <div className="relative w-1/2">
+                            <select
+                                value={filterByProfit}
+                                onChange={(e) => setFilterByProfit(e.target.value)}
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
+        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
+        focus:outline-none appearance-none"
+                            >
+                                <option className="text-black" value="all">All</option>
+                                <option className="text-black" value="profit">🟢 Profit</option>
+                                <option className="text-black" value="loss">🔴 Loss</option>
+                            </select>
+                            <div className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-xs leading-none">
+                                ▲<br />▼
+                            </div>
+                        </div>
 
-                        <label className="flex items-center gap-2 text-sm text-blue-100 bg-[#162b4d] px-4 py-2 rounded-full shadow-inner border border-[#2c4069]">
+                        {/* Checkbox */}
+                        <label className="w-1/2 flex items-center gap-2 text-sm text-white h-9 px-4">
                             <input
                                 type="checkbox"
                                 checked={includeSoldCoins}
                                 onChange={(e) => setIncludeSoldCoins(e.target.checked)}
                                 className="accent-yellow-400 w-4 h-4"
                             />
-                            Include sold coins
+                            Include sold
                         </label>
-
                     </div>
+
+
                 )}
 
 
