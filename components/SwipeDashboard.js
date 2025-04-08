@@ -175,7 +175,7 @@ const SwipeDashboard = ({
                             ) : (
                                 <>
                                     {/* Biểu đồ dạng cột giới hạn chiều cao */}
-                                    <div className="flex items-end justify-center gap-3 w-full h-[200px] max-h-[200px] overflow-y-hidden">
+                                    <div className="flex items-end justify-center gap-3 w-full min-h-[240px] h-[200px] md:h-[240px] overflow-y-visible pt-6">
                                         {processedPortfolio.map((coin, index) => {
                                             const height = coin.percent * 2.5;
                                             return (
