@@ -386,30 +386,54 @@ function Dashboard() {
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
                 {/* Modal */}
                 {showModal && selectedCoin && (
-                    <div className="fixed inset-0 bg-[#132649] bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-gray-900 p-6 rounded-lg w-96 shadow-xl">
-                            <h2 className="text-xl font-bold mb-4 text-white">
-                                {tradeType === "buy" ? "Buy" : "Sell"} {selectedCoin.coin_symbol.toUpperCase()}
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-[#0e1628] max-w-md w-full mx-4 p-6 rounded-xl shadow-2xl text-white space-y-4 relative z-50">
+                            <h2 className="text-xl font-bold text-yellow-400 text-center">
+                                {tradeType === "buy" ? "➕ Buy" : "➖ Sell"} {selectedCoin.coin_symbol.toUpperCase()}
                             </h2>
-                            <input
-                                type="number"
-                                value={quantity}
-                                onChange={(e) => setQuantity(e.target.value)}
-                                placeholder="Quantity"
-                                className="w-full mb-2 p-2 rounded bg-gray-800 text-white"
-                            />
-                            <input
-                                type="number"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                                placeholder="Price"
-                                className="w-full mb-2 p-2 rounded bg-gray-800 text-white"
-                            />
-                            {formError && <p className="text-red-400 text-sm mb-2">{formError}</p>}
-                            <div className="flex justify-between">
+
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
+                                <select
+                                    value={tradeType}
+                                    onChange={(e) => setTradeType(e.target.value)}
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                >
+                                    <option value="buy">Buy</option>
+                                    <option value="sell">Sell</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Quantity</label>
+                                <input
+                                    type="number"
+                                    value={quantity}
+                                    onChange={(e) => setQuantity(e.target.value)}
+                                    placeholder="e.g., 100"
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    step="any"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
+                                <input
+                                    type="number"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                    placeholder="e.g., 2.5"
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    step="any"
+                                />
+                            </div>
+
+                            {formError && <p className="text-red-400 text-sm text-center">{formError}</p>}
+
+                            <div className="flex justify-between gap-4 mt-2">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
+                                    className="w-1/2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
                                     disabled={isSubmitting}
                                 >
                                     Cancel
@@ -418,21 +442,19 @@ function Dashboard() {
                                 <button
                                     onClick={handleConfirmTrade}
                                     disabled={isSubmitting}
-                                    className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200
-        ${tradeType === "buy"
+                                    className={`w-1/2 px-4 py-2 rounded text-white text-sm shadow transition
+            ${tradeType === "buy"
                                             ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
                                             : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
-        ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
-    `}
+            ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
+          `}
                                 >
                                     {isSubmitting ? "Processing..." : "Confirm"}
                                 </button>
-
                             </div>
                         </div>
                     </div>
                 )}
-
 
                 <div className="relative w-full">
                     {!hasCache && priceFetchFailed ? (
