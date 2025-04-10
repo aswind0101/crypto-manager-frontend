@@ -58,6 +58,8 @@ function Dashboard() {
     const [formError, setFormError] = useState("");
     const intervalRef = useRef(null);
     const router = useRouter();
+    //const baseUrl = "http://192.168.1.58:5000"; // 🔁 đổi thành domain backend của Hiền
+    const baseUrl = "https://crypto-manager-backend.onrender.com"
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -78,10 +80,10 @@ function Dashboard() {
             <FaCoins className="text-gray-500 text-2xl" />
         );
     };
-
+  
     const getCoinPrices = async (symbols = []) => {
         try {
-            const baseUrl = "https://crypto-manager-backend.onrender.com"; // 🔁 đổi thành domain backend của Hiền
+            
             const query = symbols.join(",");
             const res = await fetch(`${baseUrl}/api/price?symbols=${query}`);
 
@@ -218,7 +220,7 @@ function Dashboard() {
 
             const idToken = await user.getIdToken();
 
-            const response = await fetch("https://crypto-manager-backend.onrender.com/api/portfolio", {
+            const response = await fetch(`${baseUrl}/api/portfolio`, {
                 headers: {
                     Authorization: `Bearer ${idToken}`,
                 },
@@ -264,7 +266,7 @@ function Dashboard() {
             });
 
 
-            if (updatedPortfolio.length > 0) {
+            if (updatedPortfolio.length > 0 ) {
                 setPortfolio(updatedPortfolio);
 
                 setLastUpdated(new Date().toLocaleString("en-US", {
@@ -340,7 +342,7 @@ function Dashboard() {
 
         const idToken = await user.getIdToken();
         try {
-            await fetch("https://crypto-manager-backend.onrender.com/api/transactions", {
+            await fetch(`${baseUrl}/api/transactions`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
