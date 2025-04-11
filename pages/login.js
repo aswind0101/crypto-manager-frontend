@@ -72,14 +72,21 @@ export default function Login() {
                 localStorage.setItem("user", JSON.stringify(userData));
 
                 // ✅ Gửi API nếu login bằng session
-                await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        user_id: user.uid,
-                        email: user.email
-                    })
-                });
+                try {
+                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            user_id: user.uid,
+                            email: user.email
+                        })
+                    });
+
+                    const result = await res.json();
+                    console.log("✅ Session init /user-alerts/init:", result);
+                } catch (err) {
+                    console.error("❌ Error calling /user-alerts/init (session):", err);
+                }
 
                 router.push("/home");
             }
