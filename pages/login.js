@@ -26,30 +26,39 @@ export default function Login() {
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
 
-            // ✅ Lưu thông tin vào localStorage
             const userData = {
                 uid: user.uid,
                 name: user.displayName,
                 email: user.email,
                 photo: user.photoURL
             };
+
             localStorage.setItem("user", JSON.stringify(userData));
 
-            // ✅ Gửi dữ liệu khởi tạo vào backend
-            await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id: user.uid,
-                    email: user.email
-                })
-            });
+            // ✅ Gọi API trước khi chuyển trang
+            try {
+                const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        user_id: user.uid,
+                        email: user.email
+                    })
+                });
 
+                const result = await res.json();
+                console.log("✅ API /user-alerts/init:", result);
+            } catch (apiErr) {
+                console.error("❌ Failed to call /api/user-alerts/init:", apiErr);
+            }
+
+            // ✅ Chuyển trang sau khi gọi API
             router.push("/home");
         } catch (error) {
             console.error("Login failed:", error);
         }
     };
+
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
