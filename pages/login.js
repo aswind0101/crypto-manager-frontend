@@ -13,25 +13,37 @@ import { app } from "../firebase";
 export default function Login() {
     const router = useRouter();
     const auth = getAuth(app);
-    const loginClicked = useRef(false); // ✅ Đánh dấu trạng thái click login
+    const loginClicked = useRef(false);
 
     const handleLogin = async () => {
-        loginClicked.current = true; // ✅ User đã click login
+        loginClicked.current = true;
 
         const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: "select_account" }); // ✅ Bắt buộc hiện chọn tài khoản
+        provider.setCustomParameters({ prompt: "select_account" });
 
         try {
-            await setPersistence(auth, browserLocalPersistence); // ✅ Đảm bảo session được lưu
+            await setPersistence(auth, browserLocalPersistence);
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
 
-            localStorage.setItem("user", JSON.stringify({
+            // ✅ Lưu thông tin vào localStorage
+            const userData = {
                 uid: user.uid,
                 name: user.displayName,
                 email: user.email,
                 photo: user.photoURL
-            }));
+            };
+            localStorage.setItem("user", JSON.stringify(userData));
+
+            // ✅ Gửi dữ liệu khởi tạo vào backend
+            await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: user.uid,
+                    email: user.email
+                })
+            });
 
             router.push("/home");
         } catch (error) {
@@ -40,17 +52,30 @@ export default function Login() {
     };
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user && !loginClicked.current) {
-                localStorage.setItem("user", JSON.stringify({
+                const userData = {
                     uid: user.uid,
                     name: user.displayName,
                     email: user.email,
                     photo: user.photoURL
-                }));
+                };
+                localStorage.setItem("user", JSON.stringify(userData));
+
+                // ✅ Gửi API nếu login bằng session
+                await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        user_id: user.uid,
+                        email: user.email
+                    })
+                });
+
                 router.push("/home");
             }
         });
+
         return () => unsubscribe();
     }, []);
 
