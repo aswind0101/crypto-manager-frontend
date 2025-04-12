@@ -80,10 +80,9 @@ function Dashboard() {
             <FaCoins className="text-gray-500 text-2xl" />
         );
     };
-  
+
     const getCoinPrices = async (symbols = []) => {
         try {
-            
             const query = symbols.join(",");
             const res = await fetch(`${baseUrl}/api/price?symbols=${query}`);
 
@@ -91,9 +90,10 @@ function Dashboard() {
 
             const data = await res.json(); // { BTC: 72800, NEAR: 7.3 }
 
-            // Lưu lại cache từng coin
+            // ✅ Lưu lại cache từng coin và timestamp
             Object.entries(data).forEach(([symbol, price]) => {
                 localStorage.setItem("price_" + symbol.toUpperCase(), price);
+                localStorage.setItem("price_updated_" + symbol.toUpperCase(), Date.now().toString()); // ✅ NEW
             });
 
             return data;
@@ -107,6 +107,7 @@ function Dashboard() {
             return fallback;
         }
     };
+
 
     const fetchMarketData = async (useCache = true) => {
         if (useCache) {
@@ -244,7 +245,7 @@ function Dashboard() {
             } else {
                 setHasRawPortfolioData(true);
             }
-            
+
             const symbols = data.portfolio.map(c => c.coin_symbol);
 
             // ✅ Nếu user chưa có giao dịch, không cần fetch giá
@@ -266,18 +267,23 @@ function Dashboard() {
                     : 0;
 
                 const isFallback = !fetchedPrice || fetchedPrice === 0;
+                const lastCachedTime = localStorage.getItem("price_updated_" + symbol);
 
                 return {
                     ...c,
                     current_price: fetchedPrice || fallbackPrice,
                     current_value: (fetchedPrice || fallbackPrice) * c.total_quantity,
                     profit_loss: ((fetchedPrice || fallbackPrice) * c.total_quantity) - (c.total_invested - c.total_sold),
-                    is_fallback_price: isFallback
+                    is_fallback_price: isFallback,
+                    fallback_updated_at: isFallback && lastCachedTime
+                        ? new Date(parseInt(lastCachedTime)).toLocaleTimeString()
+                        : null
                 };
             });
 
 
-            if (updatedPortfolio.length > 0 ) {
+
+            if (updatedPortfolio.length > 0) {
                 setPortfolio(updatedPortfolio);
 
                 setLastUpdated(new Date().toLocaleString("en-US", {
@@ -637,9 +643,13 @@ function Dashboard() {
 
                                     {coin.is_fallback_price && (
                                         <p className="text-xs text-yellow-400 mt-1">
-                                            ⚠️ Price will be updated in a few minutes. Using your buy price now.
+                                            ⚠️ Using fallback price.
+                                            {coin.fallback_updated_at
+                                                ? ` Last updated at ${coin.fallback_updated_at}.`
+                                                : ` Price will be updated in a few minutes.`}
                                         </p>
                                     )}
+
                                 </div>
 
 
