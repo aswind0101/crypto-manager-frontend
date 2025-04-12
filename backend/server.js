@@ -84,6 +84,7 @@ app.get("/api/portfolio", verifyToken, async (req, res) => {
 
         const totalInvested = portfolio.reduce((sum, coin) => sum + coin.total_invested, 0);
         const totalProfitLoss = portfolio.reduce((sum, coin) => sum + coin.profit_loss, 0);
+        /*
         // === Check for alert ==================================================================
         const alertResult = await pool.query(
             "SELECT last_profit_loss, alert_threshold FROM user_alerts WHERE user_id = $1",
@@ -111,6 +112,7 @@ app.get("/api/portfolio", verifyToken, async (req, res) => {
         }
 
         // ======================================================================================
+        */
         res.json({ portfolio, totalInvested, totalProfitLoss });
     } catch (error) {
         console.error("Error fetching portfolio:", error);
@@ -224,7 +226,100 @@ app.post("/api/user-alerts/init", async (req, res) => {
         res.status(500).json({ error: "Failed to insert" });
     }
 });
+app.get("/api/check-profit-alerts", async (req, res) => {
+    try {
+        const { rows: users } = await pool.query(`
+            SELECT DISTINCT user_id FROM transactions
+        `);
 
+        const alertResults = [];
+
+        for (const user of users) {
+            const userId = user.user_id;
+
+            const result = await pool.query(
+                `SELECT 
+                    coin_symbol, 
+                    SUM(CASE WHEN transaction_type = 'buy' THEN quantity ELSE -quantity END) AS total_quantity,
+                    SUM(CASE WHEN transaction_type = 'buy' THEN quantity * price ELSE 0 END) AS total_invested,
+                    SUM(CASE WHEN transaction_type = 'sell' THEN quantity * price ELSE 0 END) AS total_sold
+                FROM transactions
+                WHERE user_id = $1
+                GROUP BY coin_symbol
+                ORDER BY total_invested DESC`,
+                [userId]
+            );
+
+            const coinRows = result.rows.filter(r => parseFloat(r.total_quantity) > 0);
+            if (coinRows.length === 0) continue;
+
+            const symbols = coinRows.map(c => c.coin_symbol);
+            if (symbols.length === 0) continue;
+
+            let coinPrices = {};
+            try {
+                const priceUrl = `${process.env.BACKEND_URL || "https://crypto-manager-backend.onrender.com"}/api/price?symbols=${symbols.join(",")}`;
+                const { data } = await axios.get(priceUrl);
+                coinPrices = data;
+            } catch (err) {
+                console.error(`❌ Price fetch failed for user ${userId}:`, err.response?.data || err.message);
+                continue; // skip user if price fetch fails
+            }
+
+            const portfolio = coinRows.map((coin) => {
+                const currentPrice = coinPrices[coin.coin_symbol.toUpperCase()] || 0;
+                const currentValue = coin.total_quantity * currentPrice;
+                const profitLoss = currentValue - (coin.total_invested - coin.total_sold);
+
+                return {
+                    coin_symbol: coin.coin_symbol,
+                    total_quantity: parseFloat(coin.total_quantity),
+                    total_invested: parseFloat(coin.total_invested),
+                    total_sold: parseFloat(coin.total_sold),
+                    current_price: currentPrice,
+                    current_value: currentValue,
+                    profit_loss: profitLoss,
+                };
+            });
+
+            const totalProfitLoss = portfolio.reduce((sum, coin) => sum + coin.profit_loss, 0);
+
+            const { rows: alerts } = await pool.query(
+                "SELECT last_profit_loss, alert_threshold, email FROM user_alerts WHERE user_id = $1",
+                [userId]
+            );
+
+            const previous = alerts[0]?.last_profit_loss ?? 0;
+            const threshold = alerts[0]?.alert_threshold ?? 5;
+            const toEmail = alerts[0]?.email;
+
+            const diff = Math.abs(totalProfitLoss - previous);
+            const percentChange = Math.abs(previous) > 0 ? (diff / Math.abs(previous)) * 100 : 100;
+
+            if (percentChange >= threshold && toEmail) {
+                try {
+                    await sendAlertEmail(toEmail, totalProfitLoss, percentChange.toFixed(1), portfolio);
+
+                    await pool.query(
+                        `INSERT INTO user_alerts (user_id, last_profit_loss)
+                        VALUES ($1, $2)
+                        ON CONFLICT (user_id) DO UPDATE SET last_profit_loss = EXCLUDED.last_profit_loss`,
+                        [userId, totalProfitLoss]
+                    );
+
+                    alertResults.push({ userId, email: toEmail, status: "sent" });
+                } catch (err) {
+                    console.warn(`⚠️ Skipping user ${userId} – email error:`, err.message);
+                }
+            }
+        }
+
+        res.json({ status: "done", alerts: alertResults });
+    } catch (err) {
+        console.error("❌ CRON alert error:", err.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 
 // Health check
 app.get("/", (req, res) => {
