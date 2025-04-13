@@ -151,7 +151,29 @@ function Dashboard() {
             console.error("⚠️ Failed to fetch market data:", error.message || error);
         }
     };
+    const checkIfHasTransactions = async (uid) => {
+        try {
+            const auth = getAuth();
+            const user = auth.currentUser;
+            if (!user) return false;
 
+            const idToken = await user.getIdToken();
+
+            const response = await fetch(`${baseUrl}/api/transactions`, {
+                headers: {
+                    Authorization: `Bearer ${idToken}`
+                }
+            });
+
+            if (!response.ok) throw new Error("Failed to fetch transactions");
+
+            const data = await response.json();
+            return data && data.length > 0;
+        } catch (error) {
+            console.error("⚠️ checkIfHasTransactions error:", error.message || error);
+            return false;
+        }
+    };
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -160,40 +182,50 @@ function Dashboard() {
             return;
         }
         const user = JSON.parse(storedUser);
+        checkIfHasTransactions(user.uid).then(hasTx => {
+            if (!hasTx) {
+                // ❌ Không có giao dịch → render EmptyPortfolioView
+                setPortfolio([]);
+                setHasRawPortfolioData(false);
+                setFirstLoaded(true);
+                setIsReadyToRender(true);
+                setLoading(false);
+            } else {
 
-        const cached = localStorage.getItem(`portfolio_${user.uid}`);
-        const cachedTime = localStorage.getItem(`lastUpdated_${user.uid}`);
+                const cached = localStorage.getItem(`portfolio_${user.uid}`);
+                const cachedTime = localStorage.getItem(`lastUpdated_${user.uid}`);
 
-        if (cached) {
-            setHasCache(true);
-            const parsed = JSON.parse(cached);
-            setPortfolio(parsed);
-            setFirstLoaded(true);
-            setLoading(false);
+                if (cached) {
+                    setHasCache(true);
+                    const parsed = JSON.parse(cached);
+                    setPortfolio(parsed);
+                    setFirstLoaded(true);
+                    setLoading(false);
 
-            const totalValue = parsed.reduce((sum, coin) => sum + coin.current_value, 0);
-            const totalProfit = parsed.reduce((sum, coin) => sum + coin.profit_loss, 0);
-            const totalNet = parsed.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
+                    const totalValue = parsed.reduce((sum, coin) => sum + coin.current_value, 0);
+                    const totalProfit = parsed.reduce((sum, coin) => sum + coin.profit_loss, 0);
+                    const totalNet = parsed.reduce((sum, coin) => sum + (coin.total_invested - coin.total_sold), 0);
 
-            settotalNetInvested(totalNet);
-            setTotalCurrentValue(totalValue);
-            setTotalProfitLoss(totalProfit);
+                    settotalNetInvested(totalNet);
+                    setTotalCurrentValue(totalValue);
+                    setTotalProfitLoss(totalProfit);
 
-            if (cachedTime) {
-                setLastUpdated(new Date(cachedTime).toLocaleTimeString());
-            }
-        }
+                    if (cachedTime) {
+                        setLastUpdated(new Date(cachedTime).toLocaleTimeString());
+                    }
+                }
 
-        fetchPortfolioWithRetry(user.uid);
-        fetchMarketData(true);
-
-        if (!intervalRef.current) {
-            intervalRef.current = setInterval(() => {
                 fetchPortfolioWithRetry(user.uid);
-                fetchMarketData(false);
-            }, 300000);
-        }
+                fetchMarketData(true);
 
+                if (!intervalRef.current) {
+                    intervalRef.current = setInterval(() => {
+                        fetchPortfolioWithRetry(user.uid);
+                        fetchMarketData(false);
+                    }, 300000);
+                }
+            }
+        });
         return () => {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
@@ -399,7 +431,7 @@ function Dashboard() {
     if (isEmptyPortfolioView) {
         return <EmptyPortfolioView />;
     }
-    
+
     return (
         <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
