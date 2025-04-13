@@ -43,7 +43,6 @@ function Dashboard() {
     const [priceFetchFailed, setPriceFetchFailed] = useState(false);
     const [firstLoaded, setFirstLoaded] = useState(false);
     const [hasCache, setHasCache] = useState(false);
-    const [iconsReady, setIconsReady] = useState(false);
     const [selectedCoin, setSelectedCoin] = useState(null);
     const [tradeType, setTradeType] = useState("buy");
     const [quantity, setQuantity] = useState("");
@@ -81,12 +80,7 @@ function Dashboard() {
             <FaCoins className="text-gray-500 text-2xl" />
         );
     };
-    useEffect(() => {
-        if (coinIcons && Object.keys(coinIcons).length > 0) {
-            setIconsReady(true);
-        }
-    }, [coinIcons]);
-    
+
     const getCoinPrices = async (symbols = []) => {
         const prices = {};
 
@@ -437,9 +431,7 @@ function Dashboard() {
     if (isEmptyPortfolioView) {
         return <EmptyPortfolioView />;
     }
-    if (!iconsReady) {
-        return <LoadingScreen />; // hoặc bạn có thể dùng div đang loading
-    }    
+
     return (
         <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
