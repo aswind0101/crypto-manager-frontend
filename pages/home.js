@@ -659,11 +659,12 @@ function Dashboard() {
                                         </p>
                                     )}
 
-                                    {!coin.is_fallback_price && coin.price_last_updated && coin.current_price === parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase())) && (
+                                    {!coin.is_fallback_price && coin.price_last_updated && Math.abs(coin.current_price - parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase()))) < 0.000001 && (
                                         <p className="text-xs text-gray-400 mt-1">
-                                            ⚠️ Cached price from {Math.round((Date.now() - coin.price_last_updated) / 60000)} min ago
+                                            ⚠️ Last price from {Math.round((Date.now() - coin.price_last_updated) / 60000)} min ago
                                         </p>
                                     )}
+
 
                                 </div>
 
