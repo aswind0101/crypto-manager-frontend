@@ -134,7 +134,7 @@ export default function Navbar() {
                         >
                             <FiList /> Transactions
                         </Link>
-                        <Link href="/settings" className="text-black hover:text-white transition flex items-center gap-1">
+                        <Link href="/settings" className="hover:text-cyan-300 flex items-center gap-2">
                             ⚙️ Settings
                         </Link>
                         {user && (
