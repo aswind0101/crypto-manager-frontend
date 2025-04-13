@@ -264,17 +264,20 @@ function Dashboard() {
                 const fallbackPrice = c.total_quantity > 0
                     ? (c.total_invested - c.total_sold) / c.total_quantity
                     : 0;
-
+            
                 const isFallback = !fetchedPrice || fetchedPrice === 0;
-
+                const finalPrice = isFallback ? fallbackPrice : fetchedPrice;
+                const currentValue = finalPrice * c.total_quantity;
+                const netInvested = c.total_invested - c.total_sold;
+            
                 return {
                     ...c,
-                    current_price: fetchedPrice || fallbackPrice,
-                    current_value: (fetchedPrice || fallbackPrice) * c.total_quantity,
-                    profit_loss: ((fetchedPrice || fallbackPrice) * c.total_quantity) - (c.total_invested - c.total_sold),
+                    current_price: finalPrice,
+                    current_value: currentValue,
+                    profit_loss: currentValue - netInvested,
                     is_fallback_price: isFallback
                 };
-            });
+            });            
 
 
             if (updatedPortfolio.length > 0 ) {
