@@ -476,7 +476,7 @@ function Dashboard() {
                 )}
 
                 <div className="relative w-full">
-                    {!hasCache && priceFetchFailed ? (
+                    {!hasCache && priceFetchFailed && portfolio.length > 0 ? (
                         <div className="flex flex-col items-center justify-center h-80 space-y-4">
                             <div className="w-56 h-2 bg-gray-700 rounded-full overflow-hidden">
                                 <div className="h-full bg-yellow-400 animate-pulse w-full"></div>
