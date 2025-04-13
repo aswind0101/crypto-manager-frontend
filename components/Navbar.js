@@ -134,6 +134,9 @@ export default function Navbar() {
                         >
                             <FiList /> Transactions
                         </Link>
+                        <Link href="/settings" className="text-black hover:text-white transition flex items-center gap-1">
+                            ⚙️ Settings
+                        </Link>
                         {user && (
                             <button
                                 className="text-left flex items-center gap-2 hover:text-red-400"
