@@ -99,6 +99,7 @@ function Dashboard() {
                     // ✅ Giá hợp lệ → dùng
                     prices[upper] = price;
                     localStorage.setItem("price_" + upper, price); // cập nhật cache
+                    localStorage.setItem("price_" + upper + "_updated", Date.now().toString());
                 } else {
                     // ⚠️ Giá không có hoặc = 0 → thử lấy cache
                     const cached = localStorage.getItem("price_" + upper);
@@ -276,7 +277,10 @@ function Dashboard() {
                     : 0;
 
                 const isFallback = !fetchedPrice || fetchedPrice === 0;
+                //const finalPrice = isFallback ? fallbackPrice : fetchedPrice;
                 const finalPrice = isFallback ? fallbackPrice : fetchedPrice;
+                const lastUpdatedKey = "price_" + symbol + "_updated";
+                const lastUpdated = localStorage.getItem(lastUpdatedKey);
                 const currentValue = finalPrice * c.total_quantity;
                 const netInvested = c.total_invested - c.total_sold;
 
@@ -285,7 +289,8 @@ function Dashboard() {
                     current_price: finalPrice,
                     current_value: currentValue,
                     profit_loss: currentValue - netInvested,
-                    is_fallback_price: isFallback
+                    is_fallback_price: isFallback,
+                    price_last_updated: lastUpdated ? parseInt(lastUpdated) : null,
                 };
             });
 
@@ -650,9 +655,16 @@ function Dashboard() {
 
                                     {coin.is_fallback_price && (
                                         <p className="text-xs text-yellow-400 mt-1">
-                                            ⚠️ Price will be updated in a few minutes. Using your buy price now.
+                                            ⚠️ Using fallback price (buy price).
                                         </p>
                                     )}
+
+                                    {!coin.is_fallback_price && coin.price_last_updated && (
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            ⚠️ Last price updated: {Math.round((Date.now() - coin.price_last_updated) / 60000)} min ago
+                                        </p>
+                                    )}
+
                                 </div>
 
 
