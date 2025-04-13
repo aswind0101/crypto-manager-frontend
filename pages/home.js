@@ -24,10 +24,21 @@ function Dashboard() {
     };
     const formatCurrency = (num, options = { prefix: "", fallback: "–" }) => {
         if (num === null || num === undefined || isNaN(num)) return options.fallback;
-        if (num >= 1) return options.prefix + num.toLocaleString(undefined, { maximumFractionDigits: 2 });
-        if (num >= 0.01) return options.prefix + num.toFixed(4);
-        if (num >= 0.0001) return options.prefix + num.toFixed(6);
-        return options.prefix + num.toFixed(8);
+
+        const absNum = Math.abs(num);
+        let formatted;
+
+        if (absNum >= 1) {
+            formatted = absNum.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        } else if (absNum >= 0.01) {
+            formatted = absNum.toFixed(4);
+        } else if (absNum >= 0.0001) {
+            formatted = absNum.toFixed(6);
+        } else {
+            formatted = absNum.toFixed(8);
+        }
+
+        return `${num < 0 ? "-" : ""}${options.prefix}${formatted}`;
     };
 
     const [portfolio, setPortfolio] = useState([]);
