@@ -663,14 +663,12 @@ function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                     {filteredPortfolio.map((coin, index) => {
                         const netInvested = coin.total_invested - coin.total_sold;
-                        const avgPrice = (coin.total_quantity > 0 && coin.total_invested > coin.total_sold)
-                        ? ( (coin.total_invested - coin.total_sold) / coin.total_quantity )
-                        : (coin.total_quantity > 0 ? coin.total_invested / coin.total_quantity : 0);
-                      
+                        const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
+                            ? (netInvested / coin.total_quantity)
+                            : 0;
                         const profitLossPercentage = netInvested > 0
                             ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
                             : coin.profit_loss > 0 ? "∞%" : "0%";
-
                         return (
                             <div key={index}
                                 className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
