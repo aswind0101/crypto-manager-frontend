@@ -251,29 +251,9 @@ function Dashboard() {
                 return;
             }
 
-            if (data.portfolio.length > 0) {
-                setHasRawPortfolioData(true);  // ✅ Có dữ liệu giao dịch thực tế
-            }
-
-            if (data.portfolio.length === 0) {
-                setHasRawPortfolioData(false);
-                setPortfolio([]); // cần thiết
-                setFirstLoaded(true);
-                setIsReadyToRender(true);
-                setLoading(false);
-                return;
-            }
-
+            setHasRawPortfolioData(true);  // ✅ Có dữ liệu giao dịch thực tế
+            
             const symbols = data.portfolio.map(c => c.coin_symbol);
-
-            // ✅ Nếu user chưa có giao dịch, không cần fetch giá
-            if (symbols.length === 0) {
-                setPortfolio([]);
-                setFirstLoaded(true);
-                setLoading(false);
-                setIsReadyToRender(true);
-                return;
-            }
 
             const prices = await getCoinPrices(symbols);
 
