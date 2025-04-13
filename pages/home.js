@@ -240,6 +240,16 @@ function Dashboard() {
             if (!response.ok) throw new Error("Failed to fetch portfolio");
 
             const data = await response.json();
+            // ✅ Nếu user chưa có giao dịch, dừng tại đây, KHÔNG cần gọi API giá
+            if (!data.portfolio || data.portfolio.length === 0) {
+                setHasRawPortfolioData(false);
+                setPortfolio([]);
+                setFirstLoaded(true);
+                setLoading(false);
+                setIsReadyToRender(true);
+                setPriceFetchFailed(false); // ✅ Không hiển thị lỗi giá
+                return;
+            }
 
             if (data.portfolio.length > 0) {
                 setHasRawPortfolioData(true);  // ✅ Có dữ liệu giao dịch thực tế
@@ -252,8 +262,6 @@ function Dashboard() {
                 setIsReadyToRender(true);
                 setLoading(false);
                 return;
-            } else {
-                setHasRawPortfolioData(true);
             }
 
             const symbols = data.portfolio.map(c => c.coin_symbol);
