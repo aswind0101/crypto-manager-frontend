@@ -72,16 +72,6 @@ function Dashboard() {
     //const baseUrl = "http://192.168.1.58:5000"; // 🔁 đổi thành domain backend của Hiền
     const baseUrl = "https://crypto-manager-backend.onrender.com"
 
-    useEffect(() => {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-            // Reset filter mỗi khi user login
-            setSearchTerm("");
-            setFilterByProfit("all");
-            setIncludeSoldCoins(false);
-        }
-    }, [typeof window !== "undefined" && localStorage.getItem("user")]);
-
     const coinIcons = useCoinIcons();
     const getCoinIcon = (symbol) => {
         const url = coinIcons[symbol.toUpperCase()];
