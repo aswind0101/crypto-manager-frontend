@@ -80,31 +80,41 @@ function Dashboard() {
             <FaCoins className="text-gray-500 text-2xl" />
         );
     };
-  
+
     const getCoinPrices = async (symbols = []) => {
+        const prices = {};
+
         try {
-            
             const query = symbols.join(",");
             const res = await fetch(`${baseUrl}/api/price?symbols=${query}`);
-
             if (!res.ok) throw new Error("Price fetch failed");
 
             const data = await res.json(); // { BTC: 72800, NEAR: 7.3 }
 
-            // Lưu lại cache từng coin
-            Object.entries(data).forEach(([symbol, price]) => {
-                localStorage.setItem("price_" + symbol.toUpperCase(), price);
+            symbols.forEach(symbol => {
+                const upper = symbol.toUpperCase();
+                const price = data[upper];
+
+                if (price && price > 0) {
+                    // ✅ Giá hợp lệ → dùng
+                    prices[upper] = price;
+                    localStorage.setItem("price_" + upper, price); // cập nhật cache
+                } else {
+                    // ⚠️ Giá không có hoặc = 0 → thử lấy cache
+                    const cached = localStorage.getItem("price_" + upper);
+                    prices[upper] = cached ? parseFloat(cached) : 0;
+                }
             });
 
-            return data;
+            return prices;
         } catch (e) {
-            console.warn("⚠️ getCoinPrices fallback to cache", e);
-            const fallback = {};
+            console.warn("⚠️ Price fetch failed – fallback to cache", e.message);
             symbols.forEach(symbol => {
-                const cached = localStorage.getItem("price_" + symbol.toUpperCase());
-                fallback[symbol.toUpperCase()] = cached ? parseFloat(cached) : 0;
+                const upper = symbol.toUpperCase();
+                const cached = localStorage.getItem("price_" + upper);
+                prices[upper] = cached ? parseFloat(cached) : 0;
             });
-            return fallback;
+            return prices;
         }
     };
 
@@ -244,7 +254,7 @@ function Dashboard() {
             } else {
                 setHasRawPortfolioData(true);
             }
-            
+
             const symbols = data.portfolio.map(c => c.coin_symbol);
 
             // ✅ Nếu user chưa có giao dịch, không cần fetch giá
@@ -264,12 +274,12 @@ function Dashboard() {
                 const fallbackPrice = c.total_quantity > 0
                     ? (c.total_invested - c.total_sold) / c.total_quantity
                     : 0;
-            
+
                 const isFallback = !fetchedPrice || fetchedPrice === 0;
                 const finalPrice = isFallback ? fallbackPrice : fetchedPrice;
                 const currentValue = finalPrice * c.total_quantity;
                 const netInvested = c.total_invested - c.total_sold;
-            
+
                 return {
                     ...c,
                     current_price: finalPrice,
@@ -277,10 +287,10 @@ function Dashboard() {
                     profit_loss: currentValue - netInvested,
                     is_fallback_price: isFallback
                 };
-            });            
+            });
 
 
-            if (updatedPortfolio.length > 0 ) {
+            if (updatedPortfolio.length > 0) {
                 setPortfolio(updatedPortfolio);
 
                 setLastUpdated(new Date().toLocaleString("en-US", {
