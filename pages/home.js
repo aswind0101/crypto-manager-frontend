@@ -252,7 +252,7 @@ function Dashboard() {
             }
 
             setHasRawPortfolioData(true);  // ✅ Có dữ liệu giao dịch thực tế
-            
+
             const symbols = data.portfolio.map(c => c.coin_symbol);
 
             const prices = await getCoinPrices(symbols);
@@ -319,18 +319,7 @@ function Dashboard() {
             setIsReadyToRender(true);
         }
     };
-    if (!isReadyToRender) {
-        return <LoadingScreen />;
-    }
-    const isEmptyPortfolioView =
-        isReadyToRender &&
-        !loading &&
-        portfolio.length === 0 &&
-        !hasRawPortfolioData &&
-        firstLoaded;
-    if (isEmptyPortfolioView) {
-        return <EmptyPortfolioView />;
-    }
+
     const handleOpenTradeModal = (coin, type) => {
         setSelectedCoin(coin);
         setTradeType(type);
@@ -397,7 +386,19 @@ function Dashboard() {
         })
         .sort((a, b) => b.current_value - a.current_value);
 
+    if (!isReadyToRender) {
+        return <LoadingScreen />;
+    }
+    const isEmptyPortfolioView =
+        isReadyToRender &&
+        !loading &&
+        (!portfolio || portfolio.length === 0) &&
+        firstLoaded;
 
+    if (isEmptyPortfolioView) {
+        return <EmptyPortfolioView />;
+    }
+    
     return (
         <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
