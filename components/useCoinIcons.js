@@ -9,16 +9,27 @@ export function useCoinIcons() {
       try {
         // 1. Lấy danh sách coin đang đầu tư
         const storedUser = localStorage.getItem("user");
-        const storedPortfolio = storedUser
-          ? JSON.parse(localStorage.getItem("portfolio_" + JSON.parse(storedUser).uid))
-          : [];
+        if (!storedUser) return;
 
-        const symbols = storedPortfolio.map((coin) => coin.coin_symbol.toUpperCase());
+        const uid = JSON.parse(storedUser).uid;
+
+        let storedPortfolio = localStorage.getItem("portfolio_" + uid);
+
+        // Nếu chưa có → chờ 300ms rồi thử lại 1 lần (chờ fetchPortfolio chạy xong)
+        if (!storedPortfolio) {
+          await new Promise(res => setTimeout(res, 300));
+          storedPortfolio = localStorage.getItem("portfolio_" + uid);
+        }
+
+        if (!storedPortfolio) {
+          console.warn("⚠️ No portfolio found in localStorage. Skipping icon fetch.");
+          return;
+        }
+
+        const parsedPortfolio = JSON.parse(storedPortfolio);
+        const symbols = parsedPortfolio.map((coin) => coin.coin_symbol.toUpperCase());
         const uniqueSymbols = [...new Set(symbols)];
 
-        const iconMap = {};
-
-        const symbolsToFetch = [];
 
         // 2. Kiểm tra cache icon
         uniqueSymbols.forEach((symbol) => {
