@@ -176,24 +176,30 @@ function Dashboard() {
     };
 
     useEffect(() => {
-        const storedUser = localStorage.getItem("user");
-        if (!storedUser) {
-            router.push("/login");
-            return;
-        }
-        const user = JSON.parse(storedUser);
-        checkIfHasTransactions(user.uid).then(hasTx => {
+        const unsubscribe = getAuth().onAuthStateChanged(async (user) => {
+            if (!user) {
+                router.push("/login");
+                return;
+            }
+
+            const uid = user.uid;
+
+            // Reset filter
+            setSearchTerm("");
+            setFilterByProfit("all");
+            setIncludeSoldCoins(false);
+
+            const hasTx = await checkIfHasTransactions(uid);
+
             if (!hasTx) {
-                // ❌ Không có giao dịch → render EmptyPortfolioView
                 setPortfolio([]);
                 setHasRawPortfolioData(false);
                 setFirstLoaded(true);
                 setIsReadyToRender(true);
                 setLoading(false);
             } else {
-
-                const cached = localStorage.getItem(`portfolio_${user.uid}`);
-                const cachedTime = localStorage.getItem(`lastUpdated_${user.uid}`);
+                const cached = localStorage.getItem(`portfolio_${uid}`);
+                const cachedTime = localStorage.getItem(`lastUpdated_${uid}`);
 
                 if (cached) {
                     setHasCache(true);
@@ -215,24 +221,27 @@ function Dashboard() {
                     }
                 }
 
-                fetchPortfolioWithRetry(user.uid);
+                fetchPortfolioWithRetry(uid);
                 fetchMarketData(true);
 
                 if (!intervalRef.current) {
                     intervalRef.current = setInterval(() => {
-                        fetchPortfolioWithRetry(user.uid);
+                        fetchPortfolioWithRetry(uid);
                         fetchMarketData(false);
                     }, 300000);
                 }
             }
         });
+
         return () => {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
             }
+            unsubscribe(); // cleanup listener
         };
     }, []);
+
 
     useEffect(() => {
         if (!portfolio || portfolio.length === 0) return;
