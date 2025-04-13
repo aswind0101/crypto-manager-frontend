@@ -312,6 +312,7 @@ function Dashboard() {
                 await delay(waitTime);
                 return fetchPortfolioWithRetry(userId, retryCount + 1);
             } else {
+                setFirstLoaded(true); // ✅ Đảm bảo tránh treo app
                 setPriceFetchFailed(true);
             }
         } finally {
