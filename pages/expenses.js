@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import Link from "next/link";
 
 function Expenses() {
     const [expenses, setExpenses] = useState([]);
@@ -143,7 +144,10 @@ function Expenses() {
                 </select>
                 {categories.filter((c) => c.type === type).length === 0 && (
                     <p className="text-sm text-yellow-400 mt-2">
-                        ⚠️ You have no categories yet. Please add some in <a href="/settings" className="underline hover:text-yellow-300">Settings</a>.
+                        ⚠️ You have no categories yet. Please add some in{" "}
+                        <Link href="/settings" className="underline hover:text-yellow-300">
+                            Settings
+                        </Link>.
                     </p>
                 )}
 
