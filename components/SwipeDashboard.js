@@ -68,6 +68,18 @@ const SwipeDashboard = ({
 
         return majorCoins.sort((a, b) => b.percent - a.percent);
     })();
+    const getProfitLossColor = (coin) => {
+        const netInvested = coin.total_invested - coin.total_sold;
+        const percent = netInvested > 0 ? (coin.profit_loss / netInvested) * 100 : 0;
+
+        if (percent >= 0) {
+            const lightness = Math.max(30, 70 - percent); // lời càng nhiều → màu xanh càng đậm
+            return `hsl(140, 70%, ${lightness}%)`;
+        } else {
+            const lightness = Math.max(30, 70 + percent); // lỗ càng nhiều → màu đỏ càng đậm
+            return `hsl(0, 70%, ${lightness}%)`;
+        }
+    };
 
     return (
         <div className="relative w-full h-80 overflow-hidden rounded-xl ">
@@ -188,8 +200,12 @@ const SwipeDashboard = ({
                                                     </span>
 
                                                     <div
-                                                        className={`w-3 rounded-t ${coin.profit_loss >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                                                        style={{ height: `${height}px`, minHeight: '8px' }}
+                                                        className="w-3 rounded-t"
+                                                        style={{
+                                                            height: `${height}px`,
+                                                            minHeight: '8px',
+                                                            backgroundColor: getProfitLossColor(coin),
+                                                        }}
                                                     />
 
                                                     <span className="mt-1 text-[11px] text-white">{coin.coin_symbol.toUpperCase()}</span>
