@@ -87,6 +87,13 @@ export default function Navbar() {
                     <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiList /> Transactions
                     </Link>
+                    <Link href="/expenses" className="hover:text-cyan-300 transition flex items-center gap-1">
+                        💸 Expenses
+                    </Link>
+                    <Link href="/settings" className="hover:text-cyan-300 transition flex items-center gap-1">
+                        ⚙️ Settings
+                    </Link>
+
                     {user && (
                         <button
                             onClick={handleLogout}
@@ -133,6 +140,13 @@ export default function Navbar() {
                             className="hover:text-cyan-300 flex items-center gap-2"
                         >
                             <FiList /> Transactions
+                        </Link>
+                        <Link
+                            href="/expenses"
+                            onClick={() => setMenuOpen(false)}
+                            className="hover:text-cyan-300 flex items-center gap-2"
+                        >
+                            💸 Expenses
                         </Link>
                         <Link href="/settings" className="hover:text-cyan-300 flex items-center gap-2">
                             ⚙️ Settings
