@@ -80,6 +80,12 @@ const SwipeDashboard = ({
             return `hsl(0, 70%, ${lightness}%)`;
         }
     };
+    const colorPalette = [
+        "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0",
+        "#9966FF", "#FF9F40", "#00C49F", "#FF4444", "#8884d8", "#00BFFF"
+    ];
+
+    const getColorByIndex = (index) => colorPalette[index % colorPalette.length];
 
     return (
         <div className="relative w-full h-80 overflow-hidden rounded-xl ">
@@ -88,9 +94,9 @@ const SwipeDashboard = ({
                     <motion.div
                         key="slide-0"
                         className="absolute top-0 left-0 w-full h-full"
-                        initial={{ x: direction === 'left' ? 300 : -300, opacity: 0 }}
+                        initial={{ x: direction === "left" ? 300 : -300, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
-                        exit={{ x: direction === 'left' ? -300 : 300, opacity: 0 }}
+                        exit={{ x: direction === "left" ? -300 : 300, opacity: 0 }}
                         transition={{ duration: 0.3 }}
                         drag="x"
                         dragConstraints={{ left: 0, right: 0 }}
@@ -99,67 +105,153 @@ const SwipeDashboard = ({
                             if (info.offset.x > 100) handleSwipe("right");
                         }}
                     >
-                        <div className="h-full w-full flex flex-col items-center justify-center text-white rounded-xl shadow-lg">
+                        <div className="h-full w-full flex flex-col items-center justify-center text-white rounded-xl shadow-lg px-4 py-2">
                             <div className="relative w-full h-80">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <RadialBarChart
-                                        innerRadius="70%"
-                                        outerRadius="100%"
-                                        data={portfolio
-                                            .filter(coin => coin.total_quantity > 0) // ✅ chỉ lấy coin đang giữ
-                                            .map(coin => ({
+                                {/* Tính dữ liệu biểu đồ */}
+                                {(() => {
+                                    const colorPalette = [
+                                        "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0",
+                                        "#9966FF", "#FF9F40", "#00C49F", "#FF4444", "#8884d8", "#00BFFF"
+                                    ];
+                                    const getColorByIndex = (i) => colorPalette[i % colorPalette.length];
+                                    const totalValue = portfolio.reduce((sum, c) => sum + c.current_value, 0);
+
+                                    const radialData = portfolio
+                                        .filter(coin => coin.total_quantity > 0)
+                                        .map((coin, i) => {
+                                            const net = coin.total_invested - coin.total_sold;
+                                            const percentHold = totalValue > 0 ? (coin.current_value / totalValue) * 100 : 0;
+                                            const percentProfit = net > 0 ? (coin.profit_loss / net) * 100 : 0;
+                                            return {
                                                 name: coin.coin_symbol,
                                                 value: coin.current_value,
-                                                fill: getProfitLossColor(coin)
-                                            }))
-                                        }
-                                        startAngle={180}
-                                        endAngle={0}
-                                    >
-                                        <RadialBar minAngle={15} background clockWise dataKey="value" />
-                                    </RadialBarChart>
-                                </ResponsiveContainer>
-                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                    <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        $<CountUp key={totalProfitLoss} end={Math.round(totalProfitLoss)} duration={10} separator="," />
-                                    </p>
-                                    <p className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        (<CountUp
-                                            key={totalProfitLoss + '-' + totalNetInvested}
-                                            end={parseFloat((Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0) * 100)}
-                                            duration={10}
-                                            decimals={1}
-                                        />%
-                                        {totalProfitLoss >= 0 ? '▲' : '▼'})
-                                    </p>
-                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
-                                        {(() => {
-                                            const ratio = Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0;
-                                            if (ratio > 0.5) return "🤑";
-                                            if (ratio > 0.1) return "😎";
-                                            if (ratio > 0) return "🙂";
-                                            if (ratio > -0.1) return "😕";
-                                            if (ratio > -0.5) return "😢";
-                                            return "😭";
-                                        })()} Total Profit / Loss
-                                    </p>
-                                </div>
+                                                fill: getColorByIndex(i),
+                                                holdPercent: percentHold.toFixed(1),
+                                                profitPercent: percentProfit.toFixed(1),
+                                            };
+                                        });
+
+                                    return (
+                                        <>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <RadialBarChart
+                                                    innerRadius="70%"
+                                                    outerRadius="100%"
+                                                    data={radialData}
+                                                    startAngle={180}
+                                                    endAngle={0}
+                                                >
+                                                    <RadialBar minAngle={15} background clockWise dataKey="value" />
+                                                </RadialBarChart>
+                                            </ResponsiveContainer>
+
+                                            {/* Total P/L hiển thị ở giữa */}
+                                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                                                <p
+                                                    className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? "text-green-400" : "text-red-400"
+                                                        }`}
+                                                >
+                                                    $
+                                                    <CountUp
+                                                        key={totalProfitLoss}
+                                                        end={Math.round(totalProfitLoss)}
+                                                        duration={10}
+                                                        separator=","
+                                                    />
+                                                </p>
+                                                <p
+                                                    className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? "text-green-400" : "text-red-400"
+                                                        }`}
+                                                >
+                                                    (
+                                                    <CountUp
+                                                        key={totalProfitLoss + "-" + totalNetInvested}
+                                                        end={
+                                                            parseFloat(
+                                                                (Math.abs(totalNetInvested) > 0
+                                                                    ? (totalProfitLoss / Math.abs(totalNetInvested)) * 100
+                                                                    : 0
+                                                                )
+                                                            )
+                                                        }
+                                                        duration={10}
+                                                        decimals={1}
+                                                    />
+                                                    %
+                                                    {totalProfitLoss >= 0 ? "▲" : "▼"})
+                                                </p>
+                                                <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                                    {(() => {
+                                                        const ratio =
+                                                            Math.abs(totalNetInvested) > 0
+                                                                ? totalProfitLoss / Math.abs(totalNetInvested)
+                                                                : 0;
+                                                        if (ratio > 0.5) return "🤑";
+                                                        if (ratio > 0.1) return "😎";
+                                                        if (ratio > 0) return "🙂";
+                                                        if (ratio > -0.1) return "😕";
+                                                        if (ratio > -0.5) return "😢";
+                                                        return "😭";
+                                                    })()}{" "}
+                                                    Total Profit / Loss
+                                                </p>
+                                            </div>
+
+                                            {/* Legend bên dưới biểu đồ */}
+                                            <div className="mt-4 space-y-2 text-sm text-white max-h-[160px] overflow-y-auto">
+                                                {radialData.map((coin, index) => (
+                                                    <div key={index} className="flex items-center gap-2">
+                                                        <div
+                                                            className="w-3 h-3 rounded-full"
+                                                            style={{ backgroundColor: coin.fill }}
+                                                        ></div>
+                                                        <span className="font-semibold">{coin.name}</span>
+                                                        <span className="text-gray-400 ml-auto">
+                                                            💼 {coin.holdPercent}%
+                                                            {parseFloat(coin.profitPercent) !== 0 && (
+                                                                <span
+                                                                    className={`ml-1 ${coin.profitPercent >= 0
+                                                                            ? "text-green-400"
+                                                                            : "text-red-400"
+                                                                        }`}
+                                                                >
+                                                                    ({coin.profitPercent}%)
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
+
+                            {/* Dòng tổng đầu tư + giá trị hiện tại */}
                             <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-gray-400">💰 Invested</span>
-                                    <p className="font-bold text-green-400 text-xl">${Math.round(totalNetInvested).toLocaleString()}</p>
+                                    <p className="font-bold text-green-400 text-xl">
+                                        ${Math.round(totalNetInvested).toLocaleString()}
+                                    </p>
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-gray-400">📊 Current Value</span>
-                                    <p className="font-bold text-blue-400 text-xl">$<CountUp key={totalCurrentValue} end={Math.round(totalCurrentValue)} duration={10} separator="," /></p>
-
+                                    <p className="font-bold text-blue-400 text-xl">
+                                        $
+                                        <CountUp
+                                            key={totalCurrentValue}
+                                            end={Math.round(totalCurrentValue)}
+                                            duration={10}
+                                            separator=","
+                                        />
+                                    </p>
                                 </div>
-
                             </div>
                         </div>
                     </motion.div>
                 )}
+
                 {currentSlide === 1 && (
                     <motion.div
                         key="slide-1"
