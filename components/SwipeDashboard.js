@@ -110,7 +110,7 @@ const SwipeDashboard = ({
                                             .map(coin => ({
                                                 name: coin.coin_symbol,
                                                 value: coin.current_value,
-                                                fill: coin.profit_loss >= 0 ? "#32CD32" : "#FF0000"
+                                                fill: getProfitLossColor(coin)
                                             }))
                                         }
                                         startAngle={180}
