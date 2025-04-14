@@ -143,8 +143,9 @@ const SwipeDashboard = ({
                                                 >
                                                     <RadialBar minAngle={15} background clockWise dataKey="value" />
                                                 </RadialBarChart>
-                                                {/* Legend bên dưới biểu đồ */}
-                                                <div className="mt-4 space-y-2 text-sm text-white max-h-[160px] overflow-y-auto">
+                                            </ResponsiveContainer>
+                                            {/* Legend bên dưới biểu đồ */}
+                                            <div className="mt-4 space-y-2 text-sm text-white max-h-[160px] overflow-y-auto">
                                                     {radialData.map((coin, index) => (
                                                         <div key={index} className="flex items-center gap-2">
                                                             <div
@@ -166,8 +167,6 @@ const SwipeDashboard = ({
                                                         </div>
                                                     ))}
                                                 </div>
-
-                                            </ResponsiveContainer>
 
                                             {/* Total P/L hiển thị ở giữa */}
                                             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
