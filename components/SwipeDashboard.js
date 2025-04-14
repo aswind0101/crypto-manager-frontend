@@ -143,6 +143,30 @@ const SwipeDashboard = ({
                                                 >
                                                     <RadialBar minAngle={15} background clockWise dataKey="value" />
                                                 </RadialBarChart>
+                                                {/* Legend bên dưới biểu đồ */}
+                                                <div className="mt-4 space-y-2 text-sm text-white max-h-[160px] overflow-y-auto">
+                                                    {radialData.map((coin, index) => (
+                                                        <div key={index} className="flex items-center gap-2">
+                                                            <div
+                                                                className="w-3 h-3 rounded-full"
+                                                                style={{ backgroundColor: coin.fill }}
+                                                            ></div>
+                                                            <span className="font-semibold">{coin.name}</span>
+                                                            <span className="text-gray-400 ml-auto">
+                                                                💼 {coin.holdPercent}%
+                                                                {parseFloat(coin.profitPercent) !== 0 && (
+                                                                    <span
+                                                                        className={`ml-1 ${coin.profitPercent >= 0 ? "text-green-400" : "text-red-400"
+                                                                            }`}
+                                                                    >
+                                                                        ({coin.profitPercent}%)
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
                                             </ResponsiveContainer>
 
                                             {/* Total P/L hiển thị ở giữa */}
@@ -197,31 +221,6 @@ const SwipeDashboard = ({
                                                 </p>
                                             </div>
 
-                                            {/* Legend bên dưới biểu đồ */}
-                                            <div className="mt-4 space-y-2 text-sm text-white max-h-[160px] overflow-y-auto">
-                                                {radialData.map((coin, index) => (
-                                                    <div key={index} className="flex items-center gap-2">
-                                                        <div
-                                                            className="w-3 h-3 rounded-full"
-                                                            style={{ backgroundColor: coin.fill }}
-                                                        ></div>
-                                                        <span className="font-semibold">{coin.name}</span>
-                                                        <span className="text-gray-400 ml-auto">
-                                                            💼 {coin.holdPercent}%
-                                                            {parseFloat(coin.profitPercent) !== 0 && (
-                                                                <span
-                                                                    className={`ml-1 ${coin.profitPercent >= 0
-                                                                            ? "text-green-400"
-                                                                            : "text-red-400"
-                                                                        }`}
-                                                                >
-                                                                    ({coin.profitPercent}%)
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
                                         </>
                                     );
                                 })()}
