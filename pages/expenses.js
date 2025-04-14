@@ -13,6 +13,11 @@ function Expenses() {
     const [status, setStatus] = useState("");
     const [currentUser, setCurrentUser] = useState(null);
     const [categories, setCategories] = useState([]);
+    const [date, setDate] = useState(() => {
+        const today = new Date();
+        return today.toISOString().split("T")[0]; // định dạng yyyy-mm-dd
+    });
+
 
 
     useEffect(() => {
@@ -60,7 +65,7 @@ function Expenses() {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${idToken}`,
             },
-            body: JSON.stringify({ amount: parseFloat(amount), category, type, description }),
+            body: JSON.stringify({ amount: parseFloat(amount), category, type, description, expense_date: date, }),
         });
 
         if (res.ok) {
@@ -145,12 +150,19 @@ function Expenses() {
                 {categories.filter((c) => c.type === type).length === 0 && (
                     <p className="text-sm text-yellow-400 mt-2">
                         ⚠️ You have no categories yet. Please add some in{" "}
-                        <Link href="/settings" className="underline hover:text-yellow-300">
-                            Settings
+                        <Link href="/categories" className="underline hover:text-yellow-300">
+                            Category
                         </Link>.
                     </p>
                 )}
 
+                <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+                    required
+                />
 
                 <input
                     type="text"
