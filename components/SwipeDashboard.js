@@ -105,34 +105,35 @@ const SwipeDashboard = ({
                             if (info.offset.x > 100) handleSwipe("right");
                         }}
                     >
-                        <div className="h-full w-full flex flex-col items-center justify-center text-white rounded-xl shadow-lg px-4 py-2">
-                            <div className="relative w-full h-80">
-                                {/* Tính dữ liệu biểu đồ */}
-                                {(() => {
-                                    const colorPalette = [
-                                        "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0",
-                                        "#9966FF", "#FF9F40", "#00C49F", "#FF4444", "#8884d8", "#00BFFF"
-                                    ];
-                                    const getColorByIndex = (i) => colorPalette[i % colorPalette.length];
-                                    const totalValue = portfolio.reduce((sum, c) => sum + c.current_value, 0);
+                        <div className="h-full w-full flex flex-col items-center justify-start text-white rounded-xl shadow-lg px-4 py-4 overflow-y-auto">
+                            {/* ====== Biểu đồ bán nguyệt ====== */}
+                            {(() => {
+                                const colorPalette = [
+                                    "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0",
+                                    "#9966FF", "#FF9F40", "#00C49F", "#FF4444", "#8884d8", "#00BFFF"
+                                ];
+                                const getColorByIndex = (i) => colorPalette[i % colorPalette.length];
+                                const totalValue = portfolio.reduce((sum, c) => sum + c.current_value, 0);
 
-                                    const radialData = portfolio
-                                        .filter(coin => coin.total_quantity > 0)
-                                        .map((coin, i) => {
-                                            const net = coin.total_invested - coin.total_sold;
-                                            const percentHold = totalValue > 0 ? (coin.current_value / totalValue) * 100 : 0;
-                                            const percentProfit = net > 0 ? (coin.profit_loss / net) * 100 : 0;
-                                            return {
-                                                name: coin.coin_symbol,
-                                                value: coin.current_value,
-                                                fill: getColorByIndex(i),
-                                                holdPercent: percentHold.toFixed(1),
-                                                profitPercent: percentProfit.toFixed(1),
-                                            };
-                                        });
+                                const radialData = portfolio
+                                    .filter(coin => coin.total_quantity > 0)
+                                    .map((coin, i) => {
+                                        const net = coin.total_invested - coin.total_sold;
+                                        const percentHold = totalValue > 0 ? (coin.current_value / totalValue) * 100 : 0;
+                                        const percentProfit = net > 0 ? (coin.profit_loss / net) * 100 : 0;
+                                        return {
+                                            name: coin.coin_symbol,
+                                            value: coin.current_value,
+                                            fill: getColorByIndex(i),
+                                            holdPercent: percentHold.toFixed(1),
+                                            profitPercent: percentProfit.toFixed(1),
+                                        };
+                                    });
 
-                                    return (
-                                        <>
+                                return (
+                                    <>
+                                        {/* BIỂU ĐỒ */}
+                                        <div className="relative w-full h-80">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <RadialBarChart
                                                     innerRadius="70%"
@@ -144,36 +145,10 @@ const SwipeDashboard = ({
                                                     <RadialBar minAngle={15} background clockWise dataKey="value" />
                                                 </RadialBarChart>
                                             </ResponsiveContainer>
-                                            {/* Legend bên dưới biểu đồ */}
-                                            <div className="mt-4 space-y-2 text-sm text-white max-h-[160px] overflow-y-auto">
-                                                    {radialData.map((coin, index) => (
-                                                        <div key={index} className="flex items-center gap-2">
-                                                            <div
-                                                                className="w-3 h-3 rounded-full"
-                                                                style={{ backgroundColor: coin.fill }}
-                                                            ></div>
-                                                            <span className="font-semibold">{coin.name}</span>
-                                                            <span className="text-gray-400 ml-auto">
-                                                                💼 {coin.holdPercent}%
-                                                                {parseFloat(coin.profitPercent) !== 0 && (
-                                                                    <span
-                                                                        className={`ml-1 ${coin.profitPercent >= 0 ? "text-green-400" : "text-red-400"
-                                                                            }`}
-                                                                    >
-                                                                        ({coin.profitPercent}%)
-                                                                    </span>
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
 
-                                            {/* Total P/L hiển thị ở giữa */}
+                                            {/* Total P/L ở giữa biểu đồ */}
                                             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                                <p
-                                                    className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? "text-green-400" : "text-red-400"
-                                                        }`}
-                                                >
+                                                <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                                     $
                                                     <CountUp
                                                         key={totalProfitLoss}
@@ -182,51 +157,65 @@ const SwipeDashboard = ({
                                                         separator=","
                                                     />
                                                 </p>
-                                                <p
-                                                    className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? "text-green-400" : "text-red-400"
-                                                        }`}
-                                                >
+                                                <p className={`text-sm flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                                     (
                                                     <CountUp
                                                         key={totalProfitLoss + "-" + totalNetInvested}
-                                                        end={
-                                                            parseFloat(
-                                                                (Math.abs(totalNetInvested) > 0
-                                                                    ? (totalProfitLoss / Math.abs(totalNetInvested)) * 100
-                                                                    : 0
-                                                                )
+                                                        end={parseFloat(
+                                                            (Math.abs(totalNetInvested) > 0
+                                                                ? (totalProfitLoss / Math.abs(totalNetInvested)) * 100
+                                                                : 0
                                                             )
-                                                        }
+                                                        )}
                                                         duration={10}
                                                         decimals={1}
                                                     />
-                                                    %
-                                                    {totalProfitLoss >= 0 ? "▲" : "▼"})
+                                                    % {totalProfitLoss >= 0 ? "▲" : "▼"})
                                                 </p>
                                                 <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
                                                     {(() => {
-                                                        const ratio =
-                                                            Math.abs(totalNetInvested) > 0
-                                                                ? totalProfitLoss / Math.abs(totalNetInvested)
-                                                                : 0;
+                                                        const ratio = Math.abs(totalNetInvested) > 0
+                                                            ? totalProfitLoss / Math.abs(totalNetInvested)
+                                                            : 0;
                                                         if (ratio > 0.5) return "🤑";
                                                         if (ratio > 0.1) return "😎";
                                                         if (ratio > 0) return "🙂";
                                                         if (ratio > -0.1) return "😕";
                                                         if (ratio > -0.5) return "😢";
                                                         return "😭";
-                                                    })()}{" "}
-                                                    Total Profit / Loss
+                                                    })()} Total Profit / Loss
                                                 </p>
                                             </div>
+                                        </div>
 
-                                        </>
-                                    );
-                                })()}
-                            </div>
+                                        {/* LEGEND ở bên ngoài biểu đồ, không bị giới hạn bởi h-80 */}
+                                        <div className="mt-4 space-y-2 text-sm text-white max-h-[160px] overflow-y-auto w-full">
+                                            {radialData.map((coin, index) => (
+                                                <div key={index} className="flex items-center gap-2">
+                                                    <div
+                                                        className="w-3 h-3 rounded-full"
+                                                        style={{ backgroundColor: coin.fill }}
+                                                    ></div>
+                                                    <span className="font-semibold">{coin.name}</span>
+                                                    <span className="text-gray-400 ml-auto">
+                                                        💼 {coin.holdPercent}%
+                                                        {parseFloat(coin.profitPercent) !== 0 && (
+                                                            <span
+                                                                className={`ml-1 ${coin.profitPercent >= 0 ? "text-green-400" : "text-red-400"}`}
+                                                            >
+                                                                ({coin.profitPercent}%)
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                );
+                            })()}
 
-                            {/* Dòng tổng đầu tư + giá trị hiện tại */}
-                            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
+                            {/* TỔNG INVESTED + VALUE */}
+                            <div className="mt-6 flex justify-center gap-x-12 text-sm text-gray-300">
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-gray-400">💰 Invested</span>
                                     <p className="font-bold text-green-400 text-xl">
