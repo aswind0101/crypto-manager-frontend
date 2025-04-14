@@ -87,9 +87,20 @@ export default function Navbar() {
                     <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiList /> Transactions
                     </Link>
-                    <Link href="/expenses" className="hover:text-cyan-300 transition flex items-center gap-1">
-                        💸 Expenses
-                    </Link>
+                    <div className="relative group">
+                        <button className="flex items-center gap-1 hover:text-cyan-300 transition">
+                            💸 Expenses ▾
+                        </button>
+                        <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
+                            <Link href="/expenses" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                                View Expenses
+                            </Link>
+                            <Link href="/categories" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                Manage Categories
+                            </Link>
+                        </div>
+                    </div>
+
                     <Link href="/settings" className="hover:text-cyan-300 transition flex items-center gap-1">
                         ⚙️ Settings
                     </Link>
@@ -146,8 +157,16 @@ export default function Navbar() {
                             onClick={() => setMenuOpen(false)}
                             className="hover:text-cyan-300 flex items-center gap-2"
                         >
-                            💸 Expenses
+                            💸 View Expenses
                         </Link>
+                        <Link
+                            href="/categories"
+                            onClick={() => setMenuOpen(false)}
+                            className="hover:text-cyan-300 flex items-center gap-2 pl-6"
+                        >
+                            ↳ Manage Categories
+                        </Link>
+
                         <Link href="/settings" className="hover:text-cyan-300 flex items-center gap-2">
                             ⚙️ Settings
                         </Link>
