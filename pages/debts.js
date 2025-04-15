@@ -3,6 +3,7 @@ import React from "react";
 import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
 
 function Debts() {
     const [debts, setDebts] = useState([]);
@@ -174,24 +175,24 @@ function Debts() {
                                     className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
                                     onClick={() => setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)}
                                 >
-                                    <td className="px-4 py-2 font-bold text-yellow-300">{d.lender_name}</td>
+                                    <td className="px-4 py-2 font-bold text-yellow-300 flex items-center gap-2">
+                                        {expandedLender === d.lender_id ? <FaMinusCircle className="text-yellow-400" /> : <FaPlusCircle className="text-yellow-400" />}
+                                        {d.lender_name}
+                                    </td>
                                     <td className="px-4 py-2">${parseFloat(d.total_amount || 0).toFixed(2)}</td>
                                     <td className="px-4 py-2 text-green-400">${parseFloat(d.total_paid || 0).toFixed(2)}</td>
                                     <td className="px-4 py-2 text-red-400">${parseFloat(d.remaining || 0).toFixed(2)}</td>
                                 </tr>
-
-                                {expandedLender === d.lender_id &&
-                                    d.details.map((detail) => (
-                                        <tr key={detail.id} className="bg-[#101d33] border-t border-gray-800 text-sm">
-                                            <td className="px-8 py-2" colSpan={4}>
-                                                📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 ${parseFloat(detail.total_amount || 0).toFixed(2)} | 🧾 {detail.note || "No note"}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                {expandedLender === d.lender_id && d.details.map((detail) => (
+                                    <tr key={detail.id} className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                        <td className="px-8 py-2" colSpan={4}>
+                                            📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 ${parseFloat(detail.total_amount || 0).toFixed(2)} | 🧾 {detail.note || "No note"}
+                                        </td>
+                                    </tr>
+                                ))}
                             </React.Fragment>
                         ))}
                     </tbody>
-
                 </table>
             </div>
         </div>
