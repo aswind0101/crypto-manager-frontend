@@ -36,23 +36,30 @@ ORDER BY d.created_at DESC
 router.post("/", verifyToken, async (req, res) => {
     const userId = req.user.uid;
     const { lender_id, total_amount, note, created_at } = req.body;
-
-
-    if (!lender_name || !total_amount) {
-        return res.status(400).json({ error: "Missing lender name or amount" });
+  
+    if (!lender_id || !total_amount) {
+      return res.status(400).json({ error: "Missing lender ID or amount" });
     }
-
+    console.log("➡️ Add debt", {
+        userId,
+        lender_id,
+        total_amount,
+        note,
+        created_at
+      });
+      
     try {
-        const result = await pool.query(`
-        INSERT INTO debts (user_id, lender_id, total_amount, note, created_at)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-      `, [userId, lender_id, total_amount, note, created_at || new Date()]);
-        res.status(201).json(result.rows[0]);
+      const result = await pool.query(
+        `INSERT INTO debts (user_id, lender_id, total_amount, note, created_at)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [userId, lender_id, total_amount, note, created_at || new Date()]
+      );
+      res.status(201).json(result.rows[0]);
     } catch (err) {
-        console.error("Error adding debt:", err.message);
+        console.error("❌ Error adding debt:", err); // log toàn bộ lỗi
         res.status(500).json({ error: "Internal Server Error" });
     }
-});
+  });  
 
 export default router;
