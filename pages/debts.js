@@ -342,6 +342,13 @@ function Debts() {
 
                 </table>
             </div>
+            <Link
+                href="/add-debt"
+                className="fixed bottom-6 right-6 bg-green-600 hover:bg-green-700 text-white rounded-full w-14 h-14 flex items-center justify-center text-2xl shadow-lg z-50"
+                title="Add Debt"
+            >
+                ➕
+            </Link>
         </div>
     );
 }
