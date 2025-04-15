@@ -5,7 +5,8 @@ import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
 import Link from "next/link";
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
+
 
 
 function Debts() {
@@ -69,11 +70,13 @@ function Debts() {
         const grouped = groupDebtsByLender(data);
         setGroupedDebts(grouped);
 
-        const chartData = grouped.map((item) => ({
+        const barData = grouped.map((item) => ({
             name: item.lender_name,
-            value: parseFloat(item.total_amount || 0),
+            borrowed: parseFloat(item.total_amount || 0),
+            paid: parseFloat(item.total_paid || 0),
+            remaining: parseFloat(item.remaining || 0),
         }));
-        setChartByLender(chartData);
+        setBarChartData(barData);
 
 
         // ✅ Tính tổng đã trả và còn lại
@@ -233,30 +236,23 @@ function Debts() {
                     </PieChart>
                 </ResponsiveContainer>
             </div>
-            <div className="bg-[#1a2f46] max-w-xl mx-auto p-4 rounded-2xl border border-[#2c4069] shadow-lg mb-6">
-                <h2 className="text-lg font-semibold text-yellow-400 mb-4 text-center">📊 Borrowed by Lender</h2>
+            <div className="bg-[#1a2f46] max-w-4xl mx-auto p-4 rounded-2xl border border-[#2c4069] shadow-lg mb-6">
+                <h2 className="text-lg font-semibold text-yellow-400 mb-4 text-center">📊 Debts by Lender</h2>
 
-                <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                        <Pie
-                            data={chartByLender}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={90}
-                            innerRadius={50}
-                            label
-                        >
-                            {chartByLender.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                        </Pie>
+                <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" tick={{ fill: "#ffffff" }} />
+                        <YAxis tick={{ fill: "#ffffff" }} />
                         <Tooltip />
                         <Legend />
-                    </PieChart>
+                        <Bar dataKey="borrowed" fill="#8884d8" name="Borrowed" />
+                        <Bar dataKey="paid" fill="#00C49F" name="Paid" />
+                        <Bar dataKey="remaining" fill="#FF8042" name="Remaining" />
+                    </BarChart>
                 </ResponsiveContainer>
             </div>
+
 
 
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
@@ -380,13 +376,13 @@ function Debts() {
 
             </div>
             <div className="text-center mt-6">
-                    <Link
-                        href="/add-debt"
-                        className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-full shadow-md transition"
-                    >
-                        ➕ Add Debt
-                    </Link>
-                </div>
+                <Link
+                    href="/add-debt"
+                    className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-full shadow-md transition"
+                >
+                    ➕ Add Debt
+                </Link>
+            </div>
         </div>
     );
 }
