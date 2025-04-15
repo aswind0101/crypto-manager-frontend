@@ -377,7 +377,9 @@ function Debts() {
                     </tbody>
 
                 </table>
-                <div className="text-center mt-6">
+
+            </div>
+            <div className="text-center mt-6">
                     <Link
                         href="/add-debt"
                         className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-full shadow-md transition"
@@ -385,8 +387,6 @@ function Debts() {
                         ➕ Add Debt
                     </Link>
                 </div>
-
-            </div>
         </div>
     );
 }
