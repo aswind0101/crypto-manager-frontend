@@ -168,9 +168,8 @@ function Debts() {
                     </thead>
                     <tbody>
                         {groupedDebts.map((d) => (
-                            <>
+                            <React.Fragment key={d.lender_id}>
                                 <tr
-                                    key={d.lender_id}
                                     className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
                                     onClick={() => setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)}
                                 >
@@ -179,14 +178,16 @@ function Debts() {
                                     <td className="px-4 py-2 text-green-400">${d.total_paid.toFixed(2)}</td>
                                     <td className="px-4 py-2 text-red-400">${d.remaining.toFixed(2)}</td>
                                 </tr>
-                                {expandedLender === d.lender_id && d.details.map((detail) => (
-                                    <tr key={detail.id} className="bg-[#101d33] border-t border-gray-800 text-sm">
-                                        <td className="px-8 py-2" colSpan={4}>
-                                            📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 ${detail.total_amount.toFixed(2)} | 🧾 {detail.note || "No note"}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </>
+                                {expandedLender === d.lender_id &&
+                                    d.details.map((detail) => (
+                                        <tr key={detail.id} className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                            <td className="px-8 py-2" colSpan={4}>
+                                                📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 ${detail.total_amount.toFixed(2)} | 🧾 {detail.note || "No note"}
+                                            </td>
+                                        </tr>
+                                    ))}
+                            </React.Fragment>
+
                         ))}
                     </tbody>
                 </table>
