@@ -224,15 +224,17 @@ function Debts() {
                             cy="50%"
                             outerRadius={80}
                             innerRadius={50}
-                            label
+                            label={({ name, value }) =>
+                                `${name}: $${parseFloat(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                            }
                         >
                             <Cell fill="#00C49F" />
                             <Cell fill="#FF8042" />
                         </Pie>
-                        <Tooltip />
                         <Legend />
                     </PieChart>
                 </ResponsiveContainer>
+
             </div>
             <div className="bg-[#1a2f46] max-w-4xl mx-auto p-4 rounded-2xl border border-[#2c4069] shadow-lg mb-6">
                 <h2 className="text-lg font-semibold text-yellow-400 mb-4 text-center">📊 Debts by Lender</h2>
@@ -242,13 +244,32 @@ function Debts() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" tick={{ fill: "#ffffff" }} />
                         <YAxis tick={{ fill: "#ffffff" }} />
-                        <Tooltip />
                         <Legend />
-                        {/* ✅ Cột chồng (stacked) */}
-                        <Bar dataKey="paid" stackId="a" fill="#00C49F" name="Paid" />
-                        <Bar dataKey="remaining" stackId="a" fill="#FF8042" name="Remaining" />
+                        <Bar
+                            dataKey="paid"
+                            stackId="a"
+                            fill="#00C49F"
+                            name="Paid"
+                            label={{
+                                position: "top",
+                                fill: "#00C49F",
+                                formatter: (value) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+                            }}
+                        />
+                        <Bar
+                            dataKey="remaining"
+                            stackId="a"
+                            fill="#FF8042"
+                            name="Remaining"
+                            label={{
+                                position: "top",
+                                fill: "#FF8042",
+                                formatter: (value) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+                            }}
+                        />
                     </BarChart>
                 </ResponsiveContainer>
+
             </div>
 
 
