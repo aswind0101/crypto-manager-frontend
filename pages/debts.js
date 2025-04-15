@@ -5,6 +5,8 @@ import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
 import Link from "next/link";
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
+
 
 function Debts() {
     const [debts, setDebts] = useState([]);
@@ -25,6 +27,10 @@ function Debts() {
     const [payAmount, setPayAmount] = useState("");
     const [payNote, setPayNote] = useState("");
     const [payStatus, setPayStatus] = useState("");
+
+    const [totalPaid, setTotalPaid] = useState(0);
+    const [totalRemaining, setTotalRemaining] = useState(0);
+
 
 
     useEffect(() => {
@@ -51,13 +57,22 @@ function Debts() {
     const fetchDebts = async (user) => {
         const idToken = await user.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/debts", {
-            headers: { Authorization: `Bearer ${idToken}` },
+          headers: { Authorization: `Bearer ${idToken}` },
         });
         const data = await res.json();
+      
         setDebts(data);
+      
         const grouped = groupDebtsByLender(data);
         setGroupedDebts(grouped);
-    };
+      
+        // ✅ Tính tổng đã trả và còn lại
+        const paid = grouped.reduce((sum, d) => sum + parseFloat(d.total_paid || 0), 0);
+        const remaining = grouped.reduce((sum, d) => sum + parseFloat(d.remaining || 0), 0);
+        setTotalPaid(paid);
+        setTotalRemaining(remaining);
+      };
+      
 
     const groupDebtsByLender = (debts) => {
         const grouped = {};
@@ -182,47 +197,33 @@ function Debts() {
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">💳 Debt Manager</h1>
 
-            <form onSubmit={handleAdd} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
-                <h2 className="text-lg font-semibold text-yellow-400">➕ Add New Debt</h2>
-                <select
-                    value={selectedLenderId}
-                    onChange={(e) => setSelectedLenderId(e.target.value)}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
-                    required
-                >
-                    <option value="">-- Select Lender --</option>
-                    {lenders.map((lender) => (
-                        <option key={lender.id} value={lender.id}>{lender.name}</option>
-                    ))}
-                </select>
-                <input
-                    type="number"
-                    placeholder="Total amount borrowed"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
-                    step="any"
-                    required
-                />
-                <input
-                    type="text"
-                    placeholder="Note (optional)"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
-                />
-                <input
-                    type="date"
-                    value={createdDate}
-                    onChange={(e) => setCreatedDate(e.target.value)}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
-                    required
-                />
-                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full">
-                    Add Debt
-                </button>
-                {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
-            </form>
+            <div className="bg-[#1a2f46] max-w-xl mx-auto p-4 rounded-2xl border border-[#2c4069] shadow-lg mb-6">
+                <h2 className="text-lg font-semibold text-yellow-400 mb-4 text-center">💹 Debt Overview</h2>
+
+                <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                        <Pie
+                            data={[
+                                { name: "Paid", value: totalPaid },
+                                { name: "Remaining", value: totalRemaining },
+                            ]}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            innerRadius={50}
+                            label
+                        >
+                            <Cell fill="#00C49F" />
+                            <Cell fill="#FF8042" />
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                    </PieChart>
+                </ResponsiveContainer>
+            </div>
+
 
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-sm text-white">
