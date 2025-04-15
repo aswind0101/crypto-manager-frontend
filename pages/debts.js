@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
+import Link from "next/link";
 
 function Debts() {
     const [debts, setDebts] = useState([]);
