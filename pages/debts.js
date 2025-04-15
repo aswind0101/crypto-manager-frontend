@@ -216,13 +216,15 @@ function Debts() {
                                     }
                                 >
                                     <td className="px-4 py-2 font-bold text-yellow-300">
-                                        <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-                                            {expandedLender === d.lender_id ? (
-                                                <FaMinusCircle className="text-yellow-400 flex-shrink-0" />
-                                            ) : (
-                                                <FaPlusCircle className="text-yellow-400 flex-shrink-0" />
-                                            )}
-                                            <span className="truncate max-w-[90px] sm:max-w-none">{d.lender_name}</span>
+                                        <div className="flex items-center justify-between gap-2 w-full">
+                                            <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
+                                                {expandedLender === d.lender_id ? (
+                                                    <FaMinusCircle className="text-yellow-400 flex-shrink-0" />
+                                                ) : (
+                                                    <FaPlusCircle className="text-yellow-400 flex-shrink-0" />
+                                                )}
+                                                <span className="truncate max-w-[90px] sm:max-w-none">{d.lender_name}</span>
+                                            </div>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -231,12 +233,13 @@ function Debts() {
                                                     setPayAmount("");
                                                     setPayNote("");
                                                 }}
-                                                className="ml-3 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shrink-0"
+                                                className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shrink-0"
                                             >
                                                 💸 Pay
                                             </button>
                                         </div>
                                     </td>
+
 
                                     <td className="px-4 py-2">${parseFloat(d.total_amount || 0).toFixed(2)}</td>
                                     <td className="px-4 py-2 text-green-400">${parseFloat(d.total_paid || 0).toFixed(2)}</td>
