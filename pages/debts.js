@@ -217,28 +217,34 @@ function Debts() {
                 {barChartData.length === 0 ? (
                     <p className="text-yellow-300">✅ No active debts</p>
                 ) : (
-                    <div className="flex items-end justify-center gap-4 w-full max-w-4xl min-h-[240px] h-[240px] overflow-x-auto pt-6">
+                    <div className="flex items-end justify-center gap-2 w-full max-w-5xl min-h-[260px] h-[260px] overflow-x-auto pt-6">
                         {barChartData.map((item, index) => {
                             const total = item.remaining + item.paid;
                             const percent = total > 0 ? (item.remaining / total) * 100 : 0;
                             const height = Math.min(percent * 2.5, 160);
 
+                            // Tạo màu khác nhau dựa vào index
+                            const colors = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
+                            const color = colors[index % colors.length];
+
                             return (
-                                <div key={index} className="flex flex-col items-center w-20 min-w-[64px]">
-                                    <span className="mb-1 text-[11px] font-mono text-red-400">{percent.toFixed(1)}%</span>
+                                <div key={index} className="flex flex-col items-center w-16 min-w-[60px]">
+                                    <span className="mb-1 text-[11px] font-mono text-white">
+                                        ${item.remaining.toLocaleString()}
+                                    </span>
                                     <div
                                         className="w-4 rounded-t"
                                         style={{
                                             height: `${height}px`,
                                             minHeight: "8px",
-                                            backgroundColor: "#f87171", // red-400
+                                            backgroundColor: color,
                                         }}
                                     />
                                     <span className="mt-1 text-[11px] text-white text-center leading-tight break-words">
                                         {item.name}
                                     </span>
                                     <span className="text-[11px] text-yellow-300 font-semibold">
-                                        ${parseFloat(item.remaining).toLocaleString()}
+                                        ${item.borrowed.toLocaleString()}
                                     </span>
                                 </div>
                             );
@@ -248,16 +254,21 @@ function Debts() {
 
                 {/* Legend */}
                 {barChartData.length > 1 && (
-                    <div className="flex justify-center items-center gap-2 mt-4 text-xs font-mono flex-wrap">
-                        <div className="flex items-center gap-1">
-                            <div className="w-3 h-3 rounded-full bg-red-400" />
-                            <span>Remaining</span>
-                        </div>
+                    <div className="flex justify-center items-center gap-4 mt-6 text-xs font-mono flex-wrap">
+                        {barChartData.map((item, index) => {
+                            const colors = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
+                            const color = colors[index % colors.length];
+
+                            return (
+                                <div key={index} className="flex items-center gap-1">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                                    <span>{item.name}</span>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
-
-
 
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-sm text-white">
