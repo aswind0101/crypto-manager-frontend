@@ -87,9 +87,20 @@ export default function Navbar() {
                     <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiList /> Transactions
                     </Link>
-                    <Link href="/debts" className="hover:text-cyan-300 transition flex items-center gap-1">
-                        💳 Debts
-                    </Link>
+                    <div className="relative group">
+                        <button className="flex items-center gap-1 hover:text-cyan-300 transition">
+                            💳 Debts ▾
+                        </button>
+                        <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
+                            <Link href="/debts" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                                View Debts
+                            </Link>
+                            <Link href="/lenders" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                Manage Lenders
+                            </Link>
+                        </div>
+                    </div>
+
                     <div className="relative group">
                         <button className="flex items-center gap-1 hover:text-cyan-300 transition">
                             💸 Expenses ▾
@@ -160,9 +171,15 @@ export default function Navbar() {
                             onClick={() => setMenuOpen(false)}
                             className="hover:text-cyan-300 flex items-center gap-2"
                         >
-                            💳 Debts
+                            💳 View Debts
                         </Link>
-
+                        <Link
+                            href="/lenders"
+                            onClick={() => setMenuOpen(false)}
+                            className="hover:text-cyan-300 flex items-center gap-2 pl-6"
+                        >
+                            ↳ 👥 Manage Lenders
+                        </Link>
                         <Link
                             href="/expenses"
                             onClick={() => setMenuOpen(false)}

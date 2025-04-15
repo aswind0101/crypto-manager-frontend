@@ -17,6 +17,8 @@ function Debts() {
         const today = new Date();
         return today.toISOString().split("T")[0]; // yyyy-mm-dd
     });
+    const [lenders, setLenders] = useState([]);
+    const [selectedLenderId, setSelectedLenderId] = useState("");
 
 
 
@@ -26,11 +28,19 @@ function Debts() {
             if (user) {
                 setCurrentUser(user);
                 fetchDebts(user);
+                fetchLenders(user);
             }
         });
         return () => unsub();
     }, []);
-
+    const fetchLenders = async (user) => {
+        const idToken = await user.getIdToken();
+        const res = await fetch("https://crypto-manager-backend.onrender.com/api/lenders", {
+            headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await res.json();
+        setLenders(data);
+    };
     const fetchDebts = async (user) => {
         const idToken = await user.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/debts", {
@@ -88,10 +98,12 @@ function Debts() {
                 Authorization: `Bearer ${idToken}`,
             },
             body: JSON.stringify({
-                lender_name: lender.trim(),
+                lender_id: selectedLenderId,
                 total_amount: parseFloat(amount),
                 note,
+                created_at: createdDate,
             }),
+
         });
 
         if (res.ok) {
@@ -114,14 +126,20 @@ function Debts() {
             {/* Form thêm khoản nợ */}
             <form onSubmit={handleAdd} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
                 <h2 className="text-lg font-semibold text-yellow-400">➕ Add New Debt</h2>
-                <input
-                    type="text"
-                    placeholder="Lender name (e.g., Mom, Bank)"
-                    value={lender}
-                    onChange={(e) => setLender(e.target.value)}
+                <select
+                    value={selectedLenderId}
+                    onChange={(e) => setSelectedLenderId(e.target.value)}
                     className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
                     required
-                />
+                >
+                    <option value="">-- Select Lender --</option>
+                    {lenders.map((lender) => (
+                        <option key={lender.id} value={lender.id}>
+                            {lender.name}
+                        </option>
+                    ))}
+                </select>
+
                 <input
                     type="number"
                     placeholder="Total amount borrowed"
