@@ -74,6 +74,7 @@ function Debts() {
             paid: parseFloat(item.total_paid || 0),
             remaining: parseFloat(item.remaining || 0),
         }));
+        barData.sort((a, b) => b.remaining - a.remaining);
         setBarChartData(barData);
 
 
