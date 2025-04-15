@@ -30,6 +30,9 @@ function Debts() {
 
     const [totalPaid, setTotalPaid] = useState(0);
     const [totalRemaining, setTotalRemaining] = useState(0);
+    const [chartByLender, setChartByLender] = useState([]);
+
+    const COLORS = ["#00C49F", "#FF8042", "#8884d8", "#FFBB28", "#0088FE", "#FF6666"];
 
 
 
@@ -57,22 +60,29 @@ function Debts() {
     const fetchDebts = async (user) => {
         const idToken = await user.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/debts", {
-          headers: { Authorization: `Bearer ${idToken}` },
+            headers: { Authorization: `Bearer ${idToken}` },
         });
         const data = await res.json();
-      
+
         setDebts(data);
-      
+
         const grouped = groupDebtsByLender(data);
         setGroupedDebts(grouped);
-      
+
+        const chartData = grouped.map((item) => ({
+            name: item.lender_name,
+            value: parseFloat(item.total_amount || 0),
+        }));
+        setChartByLender(chartData);
+
+
         // ✅ Tính tổng đã trả và còn lại
         const paid = grouped.reduce((sum, d) => sum + parseFloat(d.total_paid || 0), 0);
         const remaining = grouped.reduce((sum, d) => sum + parseFloat(d.remaining || 0), 0);
         setTotalPaid(paid);
         setTotalRemaining(remaining);
-      };
-      
+    };
+
 
     const groupDebtsByLender = (debts) => {
         const grouped = {};
@@ -217,6 +227,30 @@ function Debts() {
                         >
                             <Cell fill="#00C49F" />
                             <Cell fill="#FF8042" />
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                    </PieChart>
+                </ResponsiveContainer>
+            </div>
+            <div className="bg-[#1a2f46] max-w-xl mx-auto p-4 rounded-2xl border border-[#2c4069] shadow-lg mb-6">
+                <h2 className="text-lg font-semibold text-yellow-400 mb-4 text-center">📊 Borrowed by Lender</h2>
+
+                <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                        <Pie
+                            data={chartByLender}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={90}
+                            innerRadius={50}
+                            label
+                        >
+                            {chartByLender.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
                         </Pie>
                         <Tooltip />
                         <Legend />
