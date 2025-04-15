@@ -5,22 +5,17 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 function Debts() {
     const [debts, setDebts] = useState([]);
-    const [lender, setLender] = useState("");
     const [amount, setAmount] = useState("");
     const [note, setNote] = useState("");
     const [status, setStatus] = useState("");
     const [currentUser, setCurrentUser] = useState(null);
-    const [selectedDebtId, setSelectedDebtId] = useState(null);
-    const [paymentAmount, setPaymentAmount] = useState("");
-    const [paymentNote, setPaymentNote] = useState("");
     const [createdDate, setCreatedDate] = useState(() => {
         const today = new Date();
-        return today.toISOString().split("T")[0]; // yyyy-mm-dd
+        return today.toISOString().split("T")[0];
     });
     const [lenders, setLenders] = useState([]);
     const [selectedLenderId, setSelectedLenderId] = useState("");
-
-
+    const [groupedDebts, setGroupedDebts] = useState([]);
 
     useEffect(() => {
         const auth = getAuth();
@@ -33,6 +28,7 @@ function Debts() {
         });
         return () => unsub();
     }, []);
+
     const fetchLenders = async (user) => {
         const idToken = await user.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/lenders", {
@@ -41,6 +37,7 @@ function Debts() {
         const data = await res.json();
         setLenders(data);
     };
+
     const fetchDebts = async (user) => {
         const idToken = await user.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/debts", {
@@ -48,47 +45,40 @@ function Debts() {
         });
         const data = await res.json();
         setDebts(data);
+        const grouped = groupDebtsByLender(data);
+        setGroupedDebts(grouped);
     };
-    const handleAddPayment = async (e, debtId) => {
-        e.preventDefault();
-        if (!debtId || !paymentAmount) {
-            setStatus("❗ Please enter amount.");
-            return;
-        }
 
-        const idToken = await currentUser.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/debt-payments", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({
-                debt_id: debtId,
-                amount_paid: parseFloat(paymentAmount),
-                note: paymentNote,
-            }),
+    const groupDebtsByLender = (debts) => {
+        const grouped = {};
+
+        debts.forEach((d) => {
+            const lenderId = d.lender_id;
+            if (!grouped[lenderId]) {
+                grouped[lenderId] = {
+                    lender_id: d.lender_id,
+                    lender_name: d.lender_name,
+                    total_amount: 0,
+                    total_paid: 0,
+                };
+            }
+
+            grouped[lenderId].total_amount += parseFloat(d.total_amount || 0);
+            grouped[lenderId].total_paid += parseFloat(d.total_paid || 0);
         });
 
-        if (res.ok) {
-            setPaymentAmount("");
-            setPaymentNote("");
-            setSelectedDebtId(null);
-            setStatus("✅ Payment recorded!");
-            fetchDebts(currentUser);
-        } else {
-            const err = await res.json();
-            setStatus("❌ " + err.error);
-        }
+        return Object.values(grouped).map((item) => ({
+            ...item,
+            remaining: item.total_amount - item.total_paid,
+        }));
     };
-
 
     const handleAdd = async (e) => {
         e.preventDefault();
         if (!selectedLenderId || !amount) {
             setStatus("❗ Please select lender and enter amount.");
             return;
-          }          
+        }
 
         const idToken = await currentUser.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/debts", {
@@ -103,11 +93,9 @@ function Debts() {
                 note,
                 created_at: createdDate,
             }),
-
         });
 
         if (res.ok) {
-            setLender("");
             setAmount("");
             setNote("");
             setStatus("✅ Debt added!");
@@ -173,69 +161,26 @@ function Debts() {
                 {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
             </form>
 
-            {/* Danh sách khoản nợ */}
+            {/* Bảng danh sách nợ gộp theo lender */}
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-sm text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
                             <th className="px-4 py-2 text-left">Lender</th>
-                            <th className="px-4 py-2 text-left">Borrowed</th>
-                            <th className="px-4 py-2 text-left">Paid</th>
+                            <th className="px-4 py-2 text-left">Total Borrowed</th>
+                            <th className="px-4 py-2 text-left">Total Paid</th>
                             <th className="px-4 py-2 text-left">Remaining</th>
-                            <th className="px-4 py-2 text-left">Note</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {debts.map((d) => (
-                            <>
-                                <tr key={d.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                                    <td className="px-4 py-2 font-bold text-yellow-300">{d.lender_name}</td>
-                                    <td className="px-4 py-2">${parseFloat(d.total_amount).toFixed(2)}</td>
-                                    <td className="px-4 py-2 text-green-400">${parseFloat(d.total_paid).toFixed(2)}</td>
-                                    <td className="px-4 py-2 text-red-400">${parseFloat(d.remaining).toFixed(2)}</td>
-                                    <td className="px-4 py-2">{d.note || "-"}</td>
-                                </tr>
-
-                                {/* Form trả tiền */}
-                                <tr>
-                                    <td colSpan={5}>
-                                        <form
-                                            onSubmit={(e) => handleAddPayment(e, d.id)}
-                                            className="flex flex-col md:flex-row gap-2 px-4 py-2 items-center bg-[#101d33]"
-                                        >
-                                            <input
-                                                type="number"
-                                                placeholder="Amount"
-                                                value={selectedDebtId === d.id ? paymentAmount : ""}
-                                                onChange={(e) => {
-                                                    setSelectedDebtId(d.id);
-                                                    setPaymentAmount(e.target.value);
-                                                }}
-                                                step="any"
-                                                className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-40"
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="Note (optional)"
-                                                value={selectedDebtId === d.id ? paymentNote : ""}
-                                                onChange={(e) => {
-                                                    setSelectedDebtId(d.id);
-                                                    setPaymentNote(e.target.value);
-                                                }}
-                                                className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-60"
-                                            />
-                                            <button
-                                                type="submit"
-                                                className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-full text-white font-medium text-sm"
-                                            >
-                                                Record Payment
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            </>
+                        {groupedDebts.map((d) => (
+                            <tr key={d.lender_id} className="border-t border-gray-700 hover:bg-[#162330]">
+                                <td className="px-4 py-2 font-bold text-yellow-300">{d.lender_name}</td>
+                                <td className="px-4 py-2">${d.total_amount.toFixed(2)}</td>
+                                <td className="px-4 py-2 text-green-400">${d.total_paid.toFixed(2)}</td>
+                                <td className="px-4 py-2 text-red-400">${d.remaining.toFixed(2)}</td>
+                            </tr>
                         ))}
-
                     </tbody>
                 </table>
             </div>
