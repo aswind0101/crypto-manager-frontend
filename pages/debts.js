@@ -216,14 +216,17 @@ function Debts() {
                                         setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)
                                     }
                                 >
-                                    <td className="px-4 py-2 font-bold text-yellow-300 whitespace-nowrap flex items-center gap-2">
-                                        {expandedLender === d.lender_id ? (
-                                            <FaMinusCircle className="text-yellow-400" />
-                                        ) : (
-                                            <FaPlusCircle className="text-yellow-400" />
-                                        )}
-                                        {d.lender_name}
+                                    <td className="px-4 py-2 font-bold text-yellow-300 align-middle">
+                                        <div className="flex items-center gap-2">
+                                            {expandedLender === d.lender_id ? (
+                                                <FaMinusCircle className="text-yellow-400" />
+                                            ) : (
+                                                <FaPlusCircle className="text-yellow-400" />
+                                            )}
+                                            <span className="whitespace-nowrap">{d.lender_name}</span>
+                                        </div>
                                     </td>
+
                                     <td className="px-4 py-2">
                                         ${parseFloat(d.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
