@@ -16,6 +16,7 @@ function Debts() {
     const [lenders, setLenders] = useState([]);
     const [selectedLenderId, setSelectedLenderId] = useState("");
     const [groupedDebts, setGroupedDebts] = useState([]);
+    const [expandedLender, setExpandedLender] = useState(null);
 
     useEffect(() => {
         const auth = getAuth();
@@ -60,11 +61,13 @@ function Debts() {
                     lender_name: d.lender_name,
                     total_amount: 0,
                     total_paid: 0,
+                    details: [],
                 };
             }
 
             grouped[lenderId].total_amount += parseFloat(d.total_amount || 0);
             grouped[lenderId].total_paid += parseFloat(d.total_paid || 0);
+            grouped[lenderId].details.push(d);
         });
 
         return Object.values(grouped).map((item) => ({
@@ -111,7 +114,6 @@ function Debts() {
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">💳 Debt Manager</h1>
 
-            {/* Form thêm khoản nợ */}
             <form onSubmit={handleAdd} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
                 <h2 className="text-lg font-semibold text-yellow-400">➕ Add New Debt</h2>
                 <select
@@ -122,12 +124,9 @@ function Debts() {
                 >
                     <option value="">-- Select Lender --</option>
                     {lenders.map((lender) => (
-                        <option key={lender.id} value={lender.id}>
-                            {lender.name}
-                        </option>
+                        <option key={lender.id} value={lender.id}>{lender.name}</option>
                     ))}
                 </select>
-
                 <input
                     type="number"
                     placeholder="Total amount borrowed"
@@ -151,17 +150,12 @@ function Debts() {
                     className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
                     required
                 />
-
-                <button
-                    type="submit"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full"
-                >
+                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full">
                     Add Debt
                 </button>
                 {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
             </form>
 
-            {/* Bảng danh sách nợ gộp theo lender */}
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-sm text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
@@ -174,12 +168,25 @@ function Debts() {
                     </thead>
                     <tbody>
                         {groupedDebts.map((d) => (
-                            <tr key={d.lender_id} className="border-t border-gray-700 hover:bg-[#162330]">
-                                <td className="px-4 py-2 font-bold text-yellow-300">{d.lender_name}</td>
-                                <td className="px-4 py-2">${d.total_amount.toFixed(2)}</td>
-                                <td className="px-4 py-2 text-green-400">${d.total_paid.toFixed(2)}</td>
-                                <td className="px-4 py-2 text-red-400">${d.remaining.toFixed(2)}</td>
-                            </tr>
+                            <>
+                                <tr
+                                    key={d.lender_id}
+                                    className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
+                                    onClick={() => setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)}
+                                >
+                                    <td className="px-4 py-2 font-bold text-yellow-300">{d.lender_name}</td>
+                                    <td className="px-4 py-2">${d.total_amount.toFixed(2)}</td>
+                                    <td className="px-4 py-2 text-green-400">${d.total_paid.toFixed(2)}</td>
+                                    <td className="px-4 py-2 text-red-400">${d.remaining.toFixed(2)}</td>
+                                </tr>
+                                {expandedLender === d.lender_id && d.details.map((detail) => (
+                                    <tr key={detail.id} className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                        <td className="px-8 py-2" colSpan={4}>
+                                            📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 ${detail.total_amount.toFixed(2)} | 🧾 {detail.note || "No note"}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </>
                         ))}
                     </tbody>
                 </table>
