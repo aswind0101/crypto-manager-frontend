@@ -85,10 +85,10 @@ function Debts() {
 
     const handleAdd = async (e) => {
         e.preventDefault();
-        if (!lender || !amount) {
-            setStatus("❗ Please enter lender name and amount.");
+        if (!selectedLenderId || !amount) {
+            setStatus("❗ Please select lender and enter amount.");
             return;
-        }
+          }          
 
         const idToken = await currentUser.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/debts", {
