@@ -263,7 +263,7 @@ function Debts() {
                                     <td className="px-4 py-2 text-red-400">
                                         ${parseFloat(d.remaining || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td className="px-4 py-2 text-center align-middle">
+                                    <td className="px-4 py-2 text-right">
                                         {parseFloat(d.remaining) > 0 && (
                                             <button
                                                 onClick={(e) => {
@@ -273,10 +273,11 @@ function Debts() {
                                                     setPayAmount("");
                                                     setPayNote("");
                                                 }}
-                                                className="text-xs px-3 py-1 min-w-[60px] bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm"
+                                                className="text-xs px-2 py-1 min-w-[60px] bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm"
                                             >
                                                 💸 Pay
                                             </button>
+
                                         )}
                                     </td>
 
