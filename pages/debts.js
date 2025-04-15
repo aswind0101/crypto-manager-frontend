@@ -204,6 +204,7 @@ function Debts() {
                             <th className="px-4 py-2 text-left">Total Borrowed</th>
                             <th className="px-4 py-2 text-left">Total Paid</th>
                             <th className="px-4 py-2 text-left">Remaining</th>
+                            <th className="px-4 py-2 text-left">Action</th> {/* ✅ THÊM DÒNG NÀY */}
                         </tr>
                     </thead>
                     <tbody>
