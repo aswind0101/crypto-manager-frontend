@@ -241,9 +241,15 @@ function Debts() {
                                     </td>
 
 
-                                    <td className="px-4 py-2">${parseFloat(d.total_amount || 0).toFixed(2)}</td>
-                                    <td className="px-4 py-2 text-green-400">${parseFloat(d.total_paid || 0).toFixed(2)}</td>
-                                    <td className="px-4 py-2 text-red-400">${parseFloat(d.remaining || 0).toFixed(2)}</td>
+                                    <td className="px-4 py-2">
+                                        ${parseFloat(d.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="px-4 py-2 text-green-400">
+                                        ${parseFloat(d.total_paid || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="px-4 py-2 text-red-400">
+                                        ${parseFloat(d.remaining || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                    </td>
                                 </tr>
 
                                 {/* ✅ Form trả tiền tổng theo lender */}
@@ -290,7 +296,7 @@ function Debts() {
                                         >
                                             <td className="px-8 py-2" colSpan={4}>
                                                 📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 $
-                                                {parseFloat(detail.total_amount || 0).toFixed(2)} | 🧾{" "}
+                                                {parseFloat(detail.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} | 🧾{" "}
                                                 {detail.note || "No note"}
                                             </td>
                                         </tr>
