@@ -92,15 +92,15 @@ function Expenses() {
 
             {/* Tổng kết */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
-                <div className="bg-[#1f2937] p-4 rounded-xl shadow-lg">
+                <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] p-4 rounded-xl shadow-lg">
                     <h2 className="text-gray-400">Income</h2>
                     <p className="text-green-400 text-xl font-bold">${totalIncome.toFixed(2)}</p>
                 </div>
-                <div className="bg-[#1f2937] p-4 rounded-xl shadow-lg">
+                <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] p-4 rounded-xl shadow-lg">
                     <h2 className="text-gray-400">Expenses</h2>
                     <p className="text-red-400 text-xl font-bold">${totalExpense.toFixed(2)}</p>
                 </div>
-                <div className="bg-[#1f2937] p-4 rounded-xl shadow-lg">
+                <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] p-4 rounded-xl shadow-lg">
                     <h2 className="text-gray-400">Balance</h2>
                     <p className={`text-xl font-bold ${balance >= 0 ? "text-yellow-300" : "text-red-500"}`}>
                         ${balance.toFixed(2)}
