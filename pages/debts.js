@@ -244,12 +244,13 @@ function Debts() {
                         <YAxis tick={{ fill: "#ffffff" }} />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="borrowed" fill="#8884d8" name="Borrowed" />
-                        <Bar dataKey="paid" fill="#00C49F" name="Paid" />
-                        <Bar dataKey="remaining" fill="#FF8042" name="Remaining" />
+                        {/* ✅ Cột chồng (stacked) */}
+                        <Bar dataKey="paid" stackId="a" fill="#00C49F" name="Paid" />
+                        <Bar dataKey="remaining" stackId="a" fill="#FF8042" name="Remaining" />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
+
 
 
 
