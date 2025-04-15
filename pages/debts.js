@@ -13,6 +13,11 @@ function Debts() {
     const [selectedDebtId, setSelectedDebtId] = useState(null);
     const [paymentAmount, setPaymentAmount] = useState("");
     const [paymentNote, setPaymentNote] = useState("");
+    const [createdDate, setCreatedDate] = useState(() => {
+        const today = new Date();
+        return today.toISOString().split("T")[0]; // yyyy-mm-dd
+    });
+
 
 
     useEffect(() => {
@@ -133,6 +138,14 @@ function Debts() {
                     onChange={(e) => setNote(e.target.value)}
                     className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
                 />
+                <input
+                    type="date"
+                    value={createdDate}
+                    onChange={(e) => setCreatedDate(e.target.value)}
+                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+                    required
+                />
+
                 <button
                     type="submit"
                     className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full"
