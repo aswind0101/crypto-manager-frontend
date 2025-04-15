@@ -273,7 +273,7 @@ function Debts() {
                                                     setPayAmount("");
                                                     setPayNote("");
                                                 }}
-                                                className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded w-full"
+                                                className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm"
                                             >
                                                 💸 Pay
                                             </button>
