@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import React from "react";
 import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -168,9 +169,8 @@ function Debts() {
                     </thead>
                     <tbody>
                         {groupedDebts.map((d) => (
-                            <>
+                            <React.Fragment key={d.lender_id}>
                                 <tr
-                                    key={d.lender_id}
                                     className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
                                     onClick={() => setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)}
                                 >
@@ -186,7 +186,7 @@ function Debts() {
                                         </td>
                                     </tr>
                                 ))}
-                            </>
+                            </React.Fragment>
                         ))}
                     </tbody>
                 </table>
