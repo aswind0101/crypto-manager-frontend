@@ -87,6 +87,9 @@ export default function Navbar() {
                     <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiList /> Transactions
                     </Link>
+                    <Link href="/debts" className="hover:text-cyan-300 transition flex items-center gap-1">
+                        💳 Debts
+                    </Link>
                     <div className="relative group">
                         <button className="flex items-center gap-1 hover:text-cyan-300 transition">
                             💸 Expenses ▾
@@ -152,6 +155,14 @@ export default function Navbar() {
                         >
                             <FiList /> Transactions
                         </Link>
+                        <Link
+                            href="/debts"
+                            onClick={() => setMenuOpen(false)}
+                            className="hover:text-cyan-300 flex items-center gap-2"
+                        >
+                            💳 Debts
+                        </Link>
+
                         <Link
                             href="/expenses"
                             onClick={() => setMenuOpen(false)}
