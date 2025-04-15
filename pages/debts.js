@@ -31,9 +31,7 @@ function Debts() {
 
     const [totalPaid, setTotalPaid] = useState(0);
     const [totalRemaining, setTotalRemaining] = useState(0);
-    const [chartByLender, setChartByLender] = useState([]);
-
-    const COLORS = ["#00C49F", "#FF8042", "#8884d8", "#FFBB28", "#0088FE", "#FF6666"];
+    const [barChartData, setBarChartData] = useState([]);
 
 
 
