@@ -20,6 +20,12 @@ function Debts() {
     const [groupedDebts, setGroupedDebts] = useState([]);
     const [expandedLender, setExpandedLender] = useState(null);
 
+    const [payingLenderId, setPayingLenderId] = useState(null);
+    const [payAmount, setPayAmount] = useState("");
+    const [payNote, setPayNote] = useState("");
+    const [payStatus, setPayStatus] = useState("");
+
+
     useEffect(() => {
         const auth = getAuth();
         const unsub = onAuthStateChanged(auth, (user) => {
@@ -76,6 +82,38 @@ function Debts() {
             ...item,
             remaining: item.total_amount - item.total_paid,
         }));
+    };
+    const handleLenderPayment = async (e, lenderId) => {
+        e.preventDefault();
+        if (!payAmount) {
+            setPayStatus("❗ Please enter amount to pay.");
+            return;
+        }
+
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch("https://crypto-manager-backend.onrender.com/api/debt-payments/by-lender", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+                lender_id: lenderId,
+                amount_paid: parseFloat(payAmount),
+                note: payNote,
+            }),
+        });
+
+        if (res.ok) {
+            setPayStatus("✅ Payment recorded!");
+            setPayingLenderId(null);
+            setPayAmount("");
+            setPayNote("");
+            fetchDebts(currentUser); // reload debts
+        } else {
+            const err = await res.json();
+            setPayStatus("❌ " + err.error);
+        }
     };
 
     const handleAdd = async (e) => {
@@ -169,29 +207,93 @@ function Debts() {
                         </tr>
                     </thead>
                     <tbody>
-                        {groupedDebts.map((d) => (
-                            <React.Fragment key={d.lender_id}>
-                                <tr
-                                    className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
-                                    onClick={() => setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)}
-                                >
-                                    <td className="px-4 py-2 font-bold text-yellow-300 flex items-center gap-2">
-                                        {expandedLender === d.lender_id ? <FaMinusCircle className="text-yellow-400" /> : <FaPlusCircle className="text-yellow-400" />}
-                                        {d.lender_name}
-                                    </td>
-                                    <td className="px-4 py-2">${parseFloat(d.total_amount || 0).toFixed(2)}</td>
-                                    <td className="px-4 py-2 text-green-400">${parseFloat(d.total_paid || 0).toFixed(2)}</td>
-                                    <td className="px-4 py-2 text-red-400">${parseFloat(d.remaining || 0).toFixed(2)}</td>
-                                </tr>
-                                {expandedLender === d.lender_id && d.details.map((detail) => (
-                                    <tr key={detail.id} className="bg-[#101d33] border-t border-gray-800 text-sm">
-                                        <td className="px-8 py-2" colSpan={4}>
-                                            📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 ${parseFloat(detail.total_amount || 0).toFixed(2)} | 🧾 {detail.note || "No note"}
+                        <tbody>
+                            {groupedDebts.map((d) => (
+                                <React.Fragment key={d.lender_id}>
+                                    <tr
+                                        className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
+                                        onClick={() =>
+                                            setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)
+                                        }
+                                    >
+                                        <td className="px-4 py-2 font-bold text-yellow-300 flex items-center gap-2">
+                                            {expandedLender === d.lender_id ? (
+                                                <FaMinusCircle className="text-yellow-400" />
+                                            ) : (
+                                                <FaPlusCircle className="text-yellow-400" />
+                                            )}
+                                            {d.lender_name}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setPayingLenderId(payingLenderId === d.lender_id ? null : d.lender_id);
+                                                    setPayStatus("");
+                                                    setPayAmount("");
+                                                    setPayNote("");
+                                                }}
+                                                className="ml-3 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                                            >
+                                                💸 Pay
+                                            </button>
                                         </td>
+                                        <td className="px-4 py-2">${parseFloat(d.total_amount || 0).toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-green-400">${parseFloat(d.total_paid || 0).toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-red-400">${parseFloat(d.remaining || 0).toFixed(2)}</td>
                                     </tr>
-                                ))}
-                            </React.Fragment>
-                        ))}
+
+                                    {/* ✅ Form trả tiền tổng theo lender */}
+                                    {payingLenderId === d.lender_id && (
+                                        <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                            <td colSpan={4} className="px-6 py-3">
+                                                <form onSubmit={(e) => handleLenderPayment(e, d.lender_id)} className="flex flex-col md:flex-row items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        value={payAmount}
+                                                        onChange={(e) => setPayAmount(e.target.value)}
+                                                        placeholder="Amount to pay"
+                                                        step="any"
+                                                        className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-40"
+                                                        required
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={payNote}
+                                                        onChange={(e) => setPayNote(e.target.value)}
+                                                        placeholder="Note (optional)"
+                                                        className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-60"
+                                                    />
+                                                    <button
+                                                        type="submit"
+                                                        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-full text-white font-medium text-sm"
+                                                    >
+                                                        Submit
+                                                    </button>
+                                                    {payStatus && (
+                                                        <p className="text-yellow-300 text-xs">{payStatus}</p>
+                                                    )}
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    )}
+
+                                    {/* Dòng chi tiết khoản nợ */}
+                                    {expandedLender === d.lender_id &&
+                                        d.details.map((detail) => (
+                                            <tr
+                                                key={detail.id}
+                                                className="bg-[#101d33] border-t border-gray-800 text-sm"
+                                            >
+                                                <td className="px-8 py-2" colSpan={4}>
+                                                    📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 $
+                                                    {parseFloat(detail.total_amount || 0).toFixed(2)} | 🧾{" "}
+                                                    {detail.note || "No note"}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </React.Fragment>
+                            ))}
+                        </tbody>
+
                     </tbody>
                 </table>
             </div>
