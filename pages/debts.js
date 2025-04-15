@@ -223,7 +223,7 @@ function Debts() {
                                                 ) : (
                                                     <FaPlusCircle className="text-yellow-400 flex-shrink-0" />
                                                 )}
-                                                <span className="truncate max-w-[90px] sm:max-w-none">{d.lender_name}</span>
+                                                <span className="truncate max-w-[200px] sm:max-w-none">{d.lender_name}</span>
                                             </div>
                                             <button
                                                 onClick={(e) => {
