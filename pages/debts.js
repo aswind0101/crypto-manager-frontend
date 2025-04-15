@@ -215,33 +215,14 @@ function Debts() {
                                         setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)
                                     }
                                 >
-                                    <td className="px-4 py-2 font-bold text-yellow-300">
-                                        <div className="flex items-center justify-between gap-2 w-full">
-                                            <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-                                                {expandedLender === d.lender_id ? (
-                                                    <FaMinusCircle className="text-yellow-400 flex-shrink-0" />
-                                                ) : (
-                                                    <FaPlusCircle className="text-yellow-400 flex-shrink-0" />
-                                                )}
-                                                <span className="whitespace-nowrap">{d.lender_name}</span>
-
-                                            </div>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setPayingLenderId(payingLenderId === d.lender_id ? null : d.lender_id);
-                                                    setPayStatus("");
-                                                    setPayAmount("");
-                                                    setPayNote("");
-                                                }}
-                                                className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shrink-0"
-                                            >
-                                                💸 Pay
-                                            </button>
-                                        </div>
+                                    <td className="px-4 py-2 font-bold text-yellow-300 whitespace-nowrap flex items-center gap-2">
+                                        {expandedLender === d.lender_id ? (
+                                            <FaMinusCircle className="text-yellow-400" />
+                                        ) : (
+                                            <FaPlusCircle className="text-yellow-400" />
+                                        )}
+                                        {d.lender_name}
                                     </td>
-
-
                                     <td className="px-4 py-2">
                                         ${parseFloat(d.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
@@ -251,12 +232,26 @@ function Debts() {
                                     <td className="px-4 py-2 text-red-400">
                                         ${parseFloat(d.remaining || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
+                                    <td className="px-4 py-2 text-right">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPayingLenderId(payingLenderId === d.lender_id ? null : d.lender_id);
+                                                setPayStatus("");
+                                                setPayAmount("");
+                                                setPayNote("");
+                                            }}
+                                            className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                                        >
+                                            💸 Pay
+                                        </button>
+                                    </td>
                                 </tr>
 
                                 {/* ✅ Form trả tiền tổng theo lender */}
                                 {payingLenderId === d.lender_id && (
                                     <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
-                                        <td colSpan={4} className="px-6 py-3">
+                                        <td colSpan={5} className="px-6 py-3">
                                             <form onSubmit={(e) => handleLenderPayment(e, d.lender_id)} className="flex flex-col md:flex-row items-center gap-2">
                                                 <input
                                                     type="number"
@@ -291,11 +286,8 @@ function Debts() {
                                 {/* Dòng chi tiết khoản nợ */}
                                 {expandedLender === d.lender_id &&
                                     d.details.map((detail) => (
-                                        <tr
-                                            key={detail.id}
-                                            className="bg-[#101d33] border-t border-gray-800 text-sm"
-                                        >
-                                            <td className="px-8 py-2" colSpan={4}>
+                                        <tr key={detail.id} className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                            <td className="px-8 py-2" colSpan={5}>
                                                 📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 $
                                                 {parseFloat(detail.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} | 🧾{" "}
                                                 {detail.note || "No note"}
@@ -305,6 +297,7 @@ function Debts() {
                             </React.Fragment>
                         ))}
                     </tbody>
+
                 </table>
             </div>
         </div>
