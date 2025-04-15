@@ -279,6 +279,13 @@ function Debts() {
                                                 >
                                                     Submit
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPayingLenderId(null)} // ✅ Đóng form
+                                                    className="bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-full text-white font-medium text-sm"
+                                                >
+                                                    Cancel
+                                                </button>
                                                 {payStatus && (
                                                     <p className="text-yellow-300 text-xs">{payStatus}</p>
                                                 )}
