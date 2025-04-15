@@ -208,50 +208,54 @@ function Debts() {
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">💳 Debt Manager</h1>
 
-            <div className="bg-[#1a2f46] max-w-xl mx-auto p-4 rounded-2xl border border-[#2c4069] shadow-lg mb-6">
-                <h2 className="text-lg font-semibold text-yellow-400 mb-4 text-center">💹 Debt Overview</h2>
+            {/* Biểu đồ cột nợ theo người cho vay */}
+            <div className="mt-8 flex flex-col items-center justify-center text-white p-4">
+                <h2 className="text-2xl font-bold text-yellow-400 mb-4">📊 Debts by Lender</h2>
 
-                <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                        <Pie
-                            data={[
-                                { name: "Paid", value: totalPaid },
-                                { name: "Remaining", value: totalRemaining },
-                            ]}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            innerRadius={50}
-                            label
-                        >
-                            <Cell fill="#00C49F" />
-                            <Cell fill="#FF8042" />
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                    </PieChart>
-                </ResponsiveContainer>
+                {barChartData.length === 0 ? (
+                    <p className="text-yellow-300">✅ No active debts</p>
+                ) : (
+                    <div className="flex items-end justify-center gap-3 w-full min-h-[240px] h-[200px] md:h-[240px] overflow-y-visible pt-6">
+                        {barChartData.map((item, index) => {
+                            const total = item.remaining + item.paid;
+                            const percent = total > 0 ? (item.remaining / total) * 100 : 0;
+                            const height = Math.min(percent * 2.5, 160);
+
+                            return (
+                                <div key={index} className="flex flex-col items-center w-10">
+                                    <span className="mb-1 text-[11px] font-mono text-red-400">
+                                        {percent.toFixed(1)}%
+                                    </span>
+                                    <div
+                                        className="w-3 rounded-t"
+                                        style={{
+                                            height: `${height}px`,
+                                            minHeight: '8px',
+                                            backgroundColor: '#f87171',
+                                        }}
+                                    />
+                                    <span className="mt-1 text-[11px] text-white text-center">
+                                        {item.name.length > 6 ? item.name.slice(0, 6) + "…" : item.name}
+                                    </span>
+                                    <span className="text-[10px] text-yellow-300">
+                                        ${item.remaining.toLocaleString()}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Legend */}
+                {barChartData.length > 1 && (
+                    <div className="flex justify-center items-center gap-4 mt-4 text-xs font-mono flex-wrap">
+                        <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded bg-red-400" />
+                            <span>Remaining</span>
+                        </div>
+                    </div>
+                )}
             </div>
-            <div className="bg-[#1a2f46] max-w-4xl mx-auto p-4 rounded-2xl border border-[#2c4069] shadow-lg mb-6">
-                <h2 className="text-lg font-semibold text-yellow-400 mb-4 text-center">📊 Debts by Lender</h2>
-
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" tick={{ fill: "#ffffff" }} />
-                        <YAxis tick={{ fill: "#ffffff" }} />
-                        <Tooltip />
-                        <Legend />
-                        {/* ✅ Cột chồng (stacked) */}
-                        <Bar dataKey="paid" stackId="a" fill="#00C49F" name="Paid" />
-                        <Bar dataKey="remaining" stackId="a" fill="#FF8042" name="Remaining" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-
-
 
 
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
