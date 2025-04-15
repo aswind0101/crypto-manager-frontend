@@ -85,36 +85,63 @@ function Debts() {
     };
     const handleLenderPayment = async (e, lenderId) => {
         e.preventDefault();
+
         if (!payAmount) {
             setPayStatus("❗ Please enter amount to pay.");
             return;
         }
 
-        const idToken = await currentUser.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/debt-payments/by-lender", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({
-                lender_id: lenderId,
-                amount_paid: parseFloat(payAmount),
-                note: payNote,
-            }),
-        });
+        const paying = parseFloat(payAmount);
+        if (isNaN(paying) || paying <= 0) {
+            setPayStatus("❗ Amount must be a valid positive number.");
+            return;
+        }
 
-        if (res.ok) {
-            setPayStatus("✅ Payment recorded!");
-            setPayingLenderId(null);
-            setPayAmount("");
-            setPayNote("");
-            fetchDebts(currentUser); // reload debts
-        } else {
-            const err = await res.json();
-            setPayStatus("❌ " + err.error);
+        // 🔍 Tìm lender để lấy số tiền còn lại
+        const lenderData = groupedDebts.find((item) => item.lender_id === lenderId);
+        const remaining = parseFloat(lenderData?.remaining || 0);
+
+        if (remaining <= 0) {
+            setPayStatus("❗ This debt is already fully paid.");
+            return;
+        }
+
+        if (paying > remaining) {
+            setPayStatus(`❗ Amount exceeds remaining debt ($${remaining.toLocaleString("en-US", { minimumFractionDigits: 2 })})`);
+            return;
+        }
+
+        try {
+            const idToken = await currentUser.getIdToken();
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/debt-payments/by-lender", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    lender_id: lenderId,
+                    amount_paid: paying,
+                    note: payNote,
+                }),
+            });
+
+            if (res.ok) {
+                setPayStatus("✅ Payment recorded!");
+                setPayingLenderId(null);
+                setPayAmount("");
+                setPayNote("");
+                fetchDebts(currentUser); // 🔄 reload danh sách
+            } else {
+                const err = await res.json();
+                setPayStatus("❌ " + err.error);
+            }
+        } catch (error) {
+            console.error("Payment error:", error);
+            setPayStatus("❌ Something went wrong.");
         }
     };
+
 
     const handleAdd = async (e) => {
         e.preventDefault();
@@ -237,19 +264,22 @@ function Debts() {
                                         ${parseFloat(d.remaining || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-4 py-2 text-right">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setPayingLenderId(payingLenderId === d.lender_id ? null : d.lender_id);
-                                                setPayStatus("");
-                                                setPayAmount("");
-                                                setPayNote("");
-                                            }}
-                                            className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
-                                        >
-                                            💸 Pay
-                                        </button>
+                                        {parseFloat(d.remaining) > 0 && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setPayingLenderId(payingLenderId === d.lender_id ? null : d.lender_id);
+                                                    setPayStatus("");
+                                                    setPayAmount("");
+                                                    setPayNote("");
+                                                }}
+                                                className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded w-full"
+                                            >
+                                                💸 Pay
+                                            </button>
+                                        )}
                                     </td>
+
                                 </tr>
 
                                 {/* ✅ Form trả tiền tổng theo lender */}
