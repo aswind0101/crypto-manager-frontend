@@ -239,8 +239,9 @@ function Expenses() {
                                                                     <FaPlusCircle className="text-yellow-400" />
                                                                 )}
                                                                 <span className={`font-bold text-[11px] ${type === "income" ? "text-green-400" : "text-red-400"}`}>
-                                                                    {type === "income" ? "Income" : "Expenses"}
+                                                                    {type === "income" ? "Income" : "Expenses"} ({monthData.filter((e) => e.type === type).length})
                                                                 </span>
+
                                                             </div>
                                                         </td>
                                                     </tr>
