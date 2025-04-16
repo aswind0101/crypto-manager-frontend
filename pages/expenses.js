@@ -116,16 +116,6 @@ function Expenses() {
             {/* Biểu đồ dòng tiền */}
             <div className="bg-[#1f2937] rounded-xl shadow-lg p-4 mb-6">
                 <h2 className="text-lg font-bold text-yellow-400 mb-4 text-center">📊 Cash Flow Overview</h2>
-                <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none text-sm"
-                >
-                    {availableYears.map((year) => (
-                        <option key={year} value={year}>{year}</option>
-                    ))}
-                </select>
-                
                 {chartData.length === 0 ? (
                     <p className="text-yellow-300 text-center">No data to display</p>
                 ) : (
@@ -141,7 +131,18 @@ function Expenses() {
                     </ResponsiveContainer>
                 )}
             </div>
-
+            {/* Dropdown chọn năm */}
+            <div className="flex justify-start items-center mb-4">
+                <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none text-sm"
+                >
+                    {availableYears.map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                    ))}
+                </select>
+            </div>
             {/* Bảng hiển thị lịch sử */}
             <div className="mb-6 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
                 <table className="min-w-full text-[11px] text-white">
