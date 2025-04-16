@@ -280,20 +280,23 @@ function Debts() {
                 )}
             </div>
             {/* 🧾 Legend - Dạng dọc, nhỏ gọn, nằm giữa */}
-            <div className="mt-6 mb-6 flex flex-col items-center justify-center text-[11px] font-mono text-white space-y-2">
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-yellow-300" />
-                    <span className="text-left">💵 Borrowed: ${totalBorrowed.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-green-400" />
-                    <span className="text-left">✅ Paid: ${totalPaid.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-400" />
-                    <span className="text-left">❗ Remaining: ${totalRemaining.toLocaleString()}</span>
+            <div className="mt-6 mb-10 flex flex-col items-center justify-center">
+                <div className="flex flex-col items-start text-[11px] font-mono text-white space-y-2">
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-yellow-300" />
+                        <span className="text-left">💵 Borrowed: ${totalBorrowed.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-400" />
+                        <span className="text-left">✅ Paid: ${totalPaid.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-400" />
+                        <span className="text-left">❗ Remaining: ${totalRemaining.toLocaleString()}</span>
+                    </div>
                 </div>
             </div>
+
 
 
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
