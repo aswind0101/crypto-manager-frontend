@@ -156,18 +156,21 @@ function Expenses() {
                         </tr>
                     </thead>
                     <tbody>
-                        {expenses.map((e) => (
-                            <tr key={e.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{new Date(e.expense_date).toLocaleDateString()}</td>
-                                <td className={`px-4 py-2 text-[11px] whitespace-nowrap font-bold ${e.type === "income" ? "text-green-400" : "text-red-400"}`}>
-                                    {e.type.toUpperCase()}
-                                </td>
-                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.category}</td>
-                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">${parseFloat(e.amount).toFixed(2)}</td>
-                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.description}</td>
-                            </tr>
-                        ))}
+                        {expenses
+                            .filter((e) => new Date(e.expense_date).getFullYear() === selectedYear)
+                            .map((e) => (
+                                <tr key={e.id} className="border-t border-gray-700 hover:bg-[#162330]">
+                                    <td className="px-4 py-2 text-[11px] whitespace-nowrap">{new Date(e.expense_date).toLocaleDateString()}</td>
+                                    <td className={`px-4 py-2 text-[11px] whitespace-nowrap font-bold ${e.type === "income" ? "text-green-400" : "text-red-400"}`}>
+                                        {e.type.toUpperCase()}
+                                    </td>
+                                    <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.category}</td>
+                                    <td className="px-4 py-2 text-[11px] whitespace-nowrap">${parseFloat(e.amount).toFixed(2)}</td>
+                                    <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.description}</td>
+                                </tr>
+                            ))}
                     </tbody>
+
                 </table>
             </div>
 
