@@ -187,23 +187,23 @@ function Expenses() {
                 <table className="min-w-full text-[11px] text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Date</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Type</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Category</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Amount</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Description</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Date</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Type</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Category</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Amount</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Description</th>
                         </tr>
                     </thead>
                     <tbody>
                         {expenses.map((e) => (
                             <tr key={e.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                                <td className="px-4 py-2">{new Date(e.expense_date).toLocaleDateString()}</td>
-                                <td className={`px-4 py-2 font-bold ${e.type === "income" ? "text-green-400" : "text-red-400"}`}>
+                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{new Date(e.expense_date).toLocaleDateString()}</td>
+                                <td className={`px-4 py-2 text-[11px] whitespace-nowrap font-bold ${e.type === "income" ? "text-green-400" : "text-red-400"}`}>
                                     {e.type.toUpperCase()}
                                 </td>
-                                <td className="px-4 py-2">{e.category}</td>
-                                <td className="px-4 py-2">${parseFloat(e.amount).toFixed(2)}</td>
-                                <td className="px-4 py-2">{e.description}</td>
+                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.category}</td>
+                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">${parseFloat(e.amount).toFixed(2)}</td>
+                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.description}</td>
                             </tr>
                         ))}
                     </tbody>
