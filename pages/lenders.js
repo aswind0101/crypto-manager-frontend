@@ -57,6 +57,31 @@ function Lenders() {
       setStatus("❌ " + err.error);
     }
   };
+  const handleDeleteLender = async (lenderId) => {
+    if (!confirm("Do you want to delete this lender?")) return;
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(`https://crypto-manager-backend.onrender.com/api/lenders/${lenderId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert("❌ " + data.error);
+      } else {
+        alert("✅ Lender deleted.");
+        fetchLenders(currentUser); // reload danh sách
+      }
+    } catch (err) {
+      console.error("❌ Delete lender error:", err.message);
+      alert("❌ Something went wrong.");
+    }
+  };
 
   return (
     <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
@@ -106,6 +131,13 @@ function Lenders() {
                 <td className="px-4 py-2 font-bold text-yellow-300">{l.name}</td>
                 <td className="px-4 py-2">{l.note || "-"}</td>
                 <td className="px-4 py-2">{new Date(l.created_at).toLocaleDateString()}</td>
+                <button
+                  className="text-red-400 hover:text-red-600 text-xs underline ml-4"
+                  onClick={() => handleDeleteLender(l.id)}
+                >
+                  🗑️ Delete
+                </button>
+
               </tr>
             ))}
           </tbody>
