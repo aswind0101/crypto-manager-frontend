@@ -108,6 +108,36 @@ function Expenses() {
                 </div>
             </div>
 
+
+
+            {/* Bảng hiển thị lịch sử */}
+            <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
+                <table className="min-w-full text-[11px] text-white">
+                    <thead className="bg-[#183b69] text-yellow-300">
+                        <tr>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Date</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Type</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Category</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Amount</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {expenses.map((e) => (
+                            <tr key={e.id} className="border-t border-gray-700 hover:bg-[#162330]">
+                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{new Date(e.expense_date).toLocaleDateString()}</td>
+                                <td className={`px-4 py-2 text-[11px] whitespace-nowrap font-bold ${e.type === "income" ? "text-green-400" : "text-red-400"}`}>
+                                    {e.type.toUpperCase()}
+                                </td>
+                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.category}</td>
+                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">${parseFloat(e.amount).toFixed(2)}</td>
+                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.description}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
             {/* Form thêm thu/chi */}
             <form onSubmit={handleSubmit} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
                 <h2 className="text-lg font-semibold text-yellow-400">➕ Add New Entry</h2>
@@ -181,34 +211,6 @@ function Expenses() {
 
                 {status && <p className="text-sm text-center text-yellow-300">{status}</p>}
             </form>
-
-            {/* Bảng hiển thị lịch sử */}
-            <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
-                <table className="min-w-full text-[11px] text-white">
-                    <thead className="bg-[#183b69] text-yellow-300">
-                        <tr>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Date</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Type</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Category</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Amount</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {expenses.map((e) => (
-                            <tr key={e.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{new Date(e.expense_date).toLocaleDateString()}</td>
-                                <td className={`px-4 py-2 text-[11px] whitespace-nowrap font-bold ${e.type === "income" ? "text-green-400" : "text-red-400"}`}>
-                                    {e.type.toUpperCase()}
-                                </td>
-                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.category}</td>
-                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">${parseFloat(e.amount).toFixed(2)}</td>
-                                <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.description}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
         </div>
     );
 }
