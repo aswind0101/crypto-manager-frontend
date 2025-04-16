@@ -279,11 +279,20 @@ function Debts() {
                     </>
                 )}
             </div>
-            {/* 🟡 Tổng số dưới biểu đồ */}
-            <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm font-mono text-white">
-                <div><span className="text-yellow-300 font-bold">💵 Borrowed:</span> ${totalBorrowed.toLocaleString()}</div>
-                <div><span className="text-green-400 font-bold">✅ Paid:</span> ${totalPaid.toLocaleString()}</div>
-                <div><span className="text-red-400 font-bold">❗ Remaining:</span> ${totalRemaining.toLocaleString()}</div>
+            {/* 🆕 Legend mini gọn */}
+            <div className="mt-4 flex justify-center items-center gap-6 text-xs font-mono text-white flex-wrap">
+                <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded bg-yellow-300" />
+                    <span>Borrowed: ${totalBorrowed.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded bg-green-400" />
+                    <span>Paid: ${totalPaid.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded bg-red-400" />
+                    <span>Remaining: ${totalRemaining.toLocaleString()}</span>
+                </div>
             </div>
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-sm text-white">
