@@ -185,33 +185,33 @@ function Debts() {
     const handleDeleteItem = async (item) => {
         const isBorrow = item.type === "borrow";
         const confirmText = isBorrow
-          ? "Do you want to delete this borrow entry?"
-          : "Do you want to delete this payment entry?";
-      
+            ? "Do you want to delete this borrow entry?"
+            : "Do you want to delete this payment entry?";
+
         if (!confirm(confirmText)) return;
-      
+
         try {
-          const idToken = await currentUser.getIdToken();
-          const res = await fetch(`https://crypto-manager-backend.onrender.com/api/${isBorrow ? "debts" : "debt-payments"}/${item.id}`, {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${idToken}`,
-            },
-          });
-      
-          if (res.ok) {
-            await fetchDebts(currentUser);
-            await fetchDebtPayments(currentUser);
-          } else {
-            const err = await res.json();
-            alert("❌ Failed to delete: " + err.error);
-          }
+            const idToken = await currentUser.getIdToken();
+            const res = await fetch(`https://crypto-manager-backend.onrender.com/api/${isBorrow ? "debts" : "debt-payments"}/${item.id}`, {
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
+
+            if (res.ok) {
+                await fetchDebts(currentUser);
+                await fetchDebtPayments(currentUser);
+            } else {
+                const err = await res.json();
+                alert("❌ Failed to delete: " + err.error);
+            }
         } catch (err) {
-          console.error("❌ Delete error:", err.message);
-          alert("❌ Something went wrong.");
+            console.error("❌ Delete error:", err.message);
+            alert("❌ Something went wrong.");
         }
-      };
-      
+    };
+
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
@@ -377,6 +377,7 @@ function Debts() {
                                     // Lấy tất cả khoản mượn & trả liên quan tới lender này
                                     const combinedItems = [
                                         ...d.details.map(debt => ({
+                                            id: debt.id, // 🆕 để xoá được khoản mượn
                                             type: "borrow",
                                             date: debt.created_at,
                                             amount: parseFloat(debt.total_amount || 0),
@@ -385,6 +386,7 @@ function Debts() {
                                         ...debtPayments
                                             .filter(p => d.details.some(debt => debt.id === p.debt_id))
                                             .map(p => ({
+                                                id: p.id, // 🆕 để xoá được khoản trả nợ
                                                 type: "payment",
                                                 date: p.payment_date,
                                                 amount: parseFloat(p.amount_paid),
