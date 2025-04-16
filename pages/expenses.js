@@ -184,14 +184,14 @@ function Expenses() {
 
             {/* Bảng hiển thị lịch sử */}
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
-                <table className="min-w-full text-sm text-white">
+                <table className="min-w-full text-[11px] text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
-                            <th className="px-4 py-2 text-left">Date</th>
-                            <th className="px-4 py-2 text-left">Type</th>
-                            <th className="px-4 py-2 text-left">Category</th>
-                            <th className="px-4 py-2 text-left">Amount</th>
-                            <th className="px-4 py-2 text-left">Description</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Date</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Type</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Category</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Amount</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Description</th>
                         </tr>
                     </thead>
                     <tbody>

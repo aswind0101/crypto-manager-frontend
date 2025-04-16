@@ -120,18 +120,18 @@ function Lenders() {
         <table className="min-w-full text-sm text-white">
           <thead className="bg-[#183b69] text-yellow-300">
             <tr>
-              <th className="px-4 py-2 text-left">Name</th>
-              <th className="px-4 py-2 text-left">Note</th>
-              <th className="px-4 py-2 text-left">Date</th>
-              <th className="px-4 py-2 text-left">Action</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">Name</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">Note</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">Date</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
             </tr>
           </thead>
           <tbody>
             {lenders.map((l) => (
               <tr key={l.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                <td className="px-4 py-2 font-bold text-yellow-300 text-center align-middle">{l.name}</td>
-                <td className="px-4 py-2 text-center align-middle">{l.note || "-"}</td>
-                <td className="px-4 py-2 text-center align-middle">{new Date(l.created_at).toLocaleDateString()}</td>
+                <td className="px-4 py-2 font-bold text-yellow-300 text-center align-middle whitespace-nowrap">{l.name}</td>
+                <td className="px-4 py-2 text-center align-middle whitespace-nowrap">{l.note || "-"}</td>
+                <td className="px-4 py-2 text-center align-middle whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</td>
                 <button
                   className="text-red-400 hover:text-red-600 text-xs underline ml-4"
                   onClick={() => handleDeleteLender(l.id)}
