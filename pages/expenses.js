@@ -191,12 +191,17 @@ function Expenses() {
                             <XAxis dataKey="month" stroke="#ccc" />
                             <YAxis stroke="#ccc" />
                             <Tooltip />
-                            {/* Chi tiêu luôn đen */}
+                            {/* 🟥 Expenses luôn màu đen */}
                             <Bar dataKey="expense" stackId="a" fill="#111111" name="Expenses">
                                 <LabelList dataKey="expense" position="top" fill="#facc15" fontSize={10} />
                             </Bar>
-                            {/* Thu nhập dùng màu cố định hoặc tuỳ chọn mỗi tháng nếu muốn */}
-                            <Bar dataKey="income" stackId="a" fill="#3b82f6" name="Income" />
+                            {/* 🟦 Income có màu theo từng tháng */}
+                            <Bar
+                                dataKey="income"
+                                stackId="a"
+                                name="Income"
+                                fill="#3b82f6"
+                            />
                         </BarChart>
                     </ResponsiveContainer>
                 )}
