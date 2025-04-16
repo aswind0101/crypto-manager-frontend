@@ -23,6 +23,7 @@ function Expenses() {
     });
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [expandedMonth, setExpandedMonth] = useState(null);
+    const [expandedCategory, setExpandedCategory] = useState({});
 
 
     useEffect(() => {
@@ -114,39 +115,39 @@ function Expenses() {
 
     const groupedByMonth = (() => {
         const grouped = {};
-      
+
         expenses.forEach((e) => {
-          const dateObj = new Date(e.expense_date);
-          const year = dateObj.getFullYear();
-          if (year !== selectedYear) return; // ✅ chỉ lấy năm được chọn
-      
-          const month = dateObj.getMonth() + 1;
-          const date = dateObj.toLocaleDateString(); // ví dụ "4/5/2025"
-      
-          if (!grouped[month]) {
-            grouped[month] = {
-              income: 0,
-              expense: 0,
-              days: {}
-            };
-          }
-      
-          if (e.type === "income") {
-            grouped[month].income += parseFloat(e.amount);
-          } else {
-            grouped[month].expense += parseFloat(e.amount);
-          }
-      
-          if (!grouped[month].days[date]) {
-            grouped[month].days[date] = [];
-          }
-      
-          grouped[month].days[date].push(e);
+            const dateObj = new Date(e.expense_date);
+            const year = dateObj.getFullYear();
+            if (year !== selectedYear) return; // ✅ chỉ lấy năm được chọn
+
+            const month = dateObj.getMonth() + 1;
+            const date = dateObj.toLocaleDateString(); // ví dụ "4/5/2025"
+
+            if (!grouped[month]) {
+                grouped[month] = {
+                    income: 0,
+                    expense: 0,
+                    days: {}
+                };
+            }
+
+            if (e.type === "income") {
+                grouped[month].income += parseFloat(e.amount);
+            } else {
+                grouped[month].expense += parseFloat(e.amount);
+            }
+
+            if (!grouped[month].days[date]) {
+                grouped[month].days[date] = [];
+            }
+
+            grouped[month].days[date].push(e);
         });
-      
+
         return grouped;
-      })();
-      
+    })();
+
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
@@ -181,65 +182,109 @@ function Expenses() {
                     ))}
                 </select>
             </div>
-            {/* 🧾 Bảng tổng hợp theo tháng */}
-            <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg mb-6">
+            {/* Bảng tổng hợp theo tháng */}
+            <div className="mb-8 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
                 <table className="min-w-full text-[11px] text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Month</th>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Income</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Expense</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Expenses</th>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Balance</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {Object.entries(groupedByMonth).map(([month, data]) => {
-                            const isExpanded = expandedMonth === month;
-                            const balance = data.income - data.expense;
+                        {Object.keys(groupedByMonth)
+                            .filter((month) =>
+                                groupedByMonth[month].some((e) => new Date(e.expense_date).getFullYear() === selectedYear)
+                            )
+                            .map((month) => {
+                                const monthData = groupedByMonth[month].filter(
+                                    (e) => new Date(e.expense_date).getFullYear() === selectedYear
+                                );
+                                const income = monthData.filter((e) => e.type === "income").reduce((sum, e) => sum + parseFloat(e.amount), 0);
+                                const expense = monthData.filter((e) => e.type === "expense").reduce((sum, e) => sum + parseFloat(e.amount), 0);
+                                const balance = income - expense;
 
-                            return (
-                                <React.Fragment key={month}>
-                                    <tr className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer">
-                                        <td
-                                            className="px-4 py-2 font-bold text-yellow-300"
-                                            onClick={() => setExpandedMonth(isExpanded ? null : month)}
+                                return (
+                                    <React.Fragment key={month}>
+                                        {/* 📅 Dòng tổng tháng */}
+                                        <tr
+                                            className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
+                                            onClick={() =>
+                                                setExpandedMonth((prev) => (prev === month ? null : month))
+                                            }
                                         >
-                                            <div className="flex items-center gap-2">
-                                                {isExpanded ? (
-                                                    <FaMinusCircle className="text-yellow-400" />
-                                                ) : (
-                                                    <FaPlusCircle className="text-yellow-400" />
-                                                )}
-                                                <span>Month {month}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-2 text-green-400 font-mono">
-                                            ${data.income.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-2 text-red-400 font-mono">
-                                            ${data.expense.toLocaleString()}
-                                        </td>
-                                        <td className={`px-4 py-2 font-mono ${balance >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                            ${balance.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-2 text-right">–</td>
-                                    </tr>
-
-                                    {/* 🧩 Bước 4 sẽ thêm dòng con tại đây */}
-                                    {isExpanded && (
-                                        <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
-                                            <td colSpan={5} className="px-6 py-2 text-white font-mono italic">
-                                                📂 Income & Expenses detail (sẽ xử lý tiếp ở bước 4...)
+                                            <td className="px-4 py-2 font-bold text-yellow-300">
+                                                <div className="flex items-center gap-2">
+                                                    {expandedMonth === month ? (
+                                                        <FaMinusCircle className="text-yellow-400" />
+                                                    ) : (
+                                                        <FaPlusCircle className="text-yellow-400" />
+                                                    )}
+                                                    {month}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2 text-green-400 font-mono">
+                                                ${income.toLocaleString()}
+                                            </td>
+                                            <td className="px-4 py-2 text-red-400 font-mono">
+                                                ${expense.toLocaleString()}
+                                            </td>
+                                            <td className="px-4 py-2 text-white font-mono">
+                                                ${balance.toLocaleString()}
                                             </td>
                                         </tr>
-                                    )}
-                                </React.Fragment>
-                            );
-                        })}
+
+                                        {/* 📂 Income + Expense dòng con */}
+                                        {expandedMonth === month &&
+                                            ["income", "expense"].map((type) => (
+                                                <React.Fragment key={`${month}-${type}`}>
+                                                    <tr
+                                                        className="bg-[#101d33] border-t border-gray-800 text-sm cursor-pointer"
+                                                        onClick={() =>
+                                                            setExpandedCategory((prev) => ({
+                                                                ...prev,
+                                                                [`${month}-${type}`]: !prev[`${month}-${type}`],
+                                                            }))
+                                                        }
+                                                    >
+                                                        <td className="px-8 py-2" colSpan={5}>
+                                                            <div className="flex items-center gap-2">
+                                                                {expandedCategory[`${month}-${type}`] ? (
+                                                                    <FaMinusCircle className="text-yellow-400" />
+                                                                ) : (
+                                                                    <FaPlusCircle className="text-yellow-400" />
+                                                                )}
+                                                                <span className={`font-bold ${type === "income" ? "text-green-400" : "text-red-400"}`}>
+                                                                    {type === "income" ? "Income" : "Expenses"}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+
+                                                    {/* 📅 Chi tiết từng ngày */}
+                                                    {expandedCategory[`${month}-${type}`] &&
+                                                        monthData
+                                                            .filter((e) => e.type === type)
+                                                            .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
+                                                            .map((e, idx) => (
+                                                                <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-sm">
+                                                                    <td className="px-12 py-1" colSpan={5}>
+                                                                        📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
+                                                                        {e.description && ` | 📝 ${e.description}`}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                </React.Fragment>
+                                            ))}
+                                    </React.Fragment>
+                                );
+                            })}
                     </tbody>
                 </table>
             </div>
+
 
 
             {/* Form thêm thu/chi */}
