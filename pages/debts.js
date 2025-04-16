@@ -182,7 +182,36 @@ function Debts() {
             setPayStatus("❌ Something went wrong.");
         }
     };
-
+    const handleDeleteItem = async (item) => {
+        const isBorrow = item.type === "borrow";
+        const confirmText = isBorrow
+          ? "Do you want to delete this borrow entry?"
+          : "Do you want to delete this payment entry?";
+      
+        if (!confirm(confirmText)) return;
+      
+        try {
+          const idToken = await currentUser.getIdToken();
+          const res = await fetch(`https://crypto-manager-backend.onrender.com/api/${isBorrow ? "debts" : "debt-payments"}/${item.id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+            },
+          });
+      
+          if (res.ok) {
+            await fetchDebts(currentUser);
+            await fetchDebtPayments(currentUser);
+          } else {
+            const err = await res.json();
+            alert("❌ Failed to delete: " + err.error);
+          }
+        } catch (err) {
+          console.error("❌ Delete error:", err.message);
+          alert("❌ Something went wrong.");
+        }
+      };
+      
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
@@ -376,6 +405,12 @@ function Debts() {
                                                     <> ✅ Paid ${item.amount.toLocaleString()} </>
                                                 )}
                                                 {item.note && <> | 📝 {item.note}</>}
+                                                <button
+                                                    className="ml-4 text-red-400 hover:text-red-600 text-xs underline"
+                                                    onClick={() => handleDeleteItem(item)}
+                                                >
+                                                    🗑️ Delete
+                                                </button>
                                             </td>
                                         </tr>
                                     ));
