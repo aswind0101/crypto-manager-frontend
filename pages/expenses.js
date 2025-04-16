@@ -19,6 +19,7 @@ function Expenses() {
         const today = new Date();
         return today.toISOString().split("T")[0]; // định dạng yyyy-mm-dd
     });
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
 
 
@@ -86,6 +87,9 @@ function Expenses() {
     const totalIncome = expenses.filter(e => e.type === "income").reduce((sum, e) => sum + parseFloat(e.amount), 0);
     const totalExpense = expenses.filter(e => e.type === "expense").reduce((sum, e) => sum + parseFloat(e.amount), 0);
     const balance = totalIncome - totalExpense;
+    const availableYears = Array.from(
+        new Set(expenses.map(e => new Date(e.expense_date).getFullYear()))
+    ).sort((a, b) => b - a); // Sắp xếp giảm dần (mới trước)
 
     // 🟩 TẠO DỮ LIỆU CHO BIỂU ĐỒ
     const chartData = (() => {
@@ -109,10 +113,19 @@ function Expenses() {
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
-
             {/* Biểu đồ dòng tiền */}
             <div className="bg-[#1f2937] rounded-xl shadow-lg p-4 mb-6">
                 <h2 className="text-lg font-bold text-yellow-400 mb-4 text-center">📊 Cash Flow Overview</h2>
+                <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none text-sm"
+                >
+                    {availableYears.map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                    ))}
+                </select>
+                
                 {chartData.length === 0 ? (
                     <p className="text-yellow-300 text-center">No data to display</p>
                 ) : (
