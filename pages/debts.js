@@ -226,9 +226,6 @@ function Debts() {
 
             {/* Biểu đồ cột nợ theo người cho vay */}
             <div className="mt-8 flex flex-col items-center justify-center text-white p-4">
-                <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
-                    <span>📊</span> <span>Debts by Lender</span>
-                </h2>
 
                 {barChartData.length === 0 ? (
                     <p className="text-yellow-300">✅ No active debts</p>
@@ -300,14 +297,14 @@ function Debts() {
 
 
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
-                <table className="min-w-full text-sm text-white">
+                <table className="min-w-full text-[11px] text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Lender</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Total Borrowed</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Total Paid</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Remaining</th>
-                            <th className="px-4 py-2 text-center align-middle whitespace-nowrap">Action</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Lender</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Total Borrowed</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Total Paid</th>
+                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Remaining</th>
+                            <th className="px-4 py-2 text-center text-[11px] align-middle whitespace-nowrap">Action</th>
                         </tr>
                     </thead>
 
@@ -428,8 +425,8 @@ function Debts() {
                                     combinedItems.sort((a, b) => new Date(a.date) - new Date(b.date));
 
                                     return combinedItems.map((item, idx) => (
-                                        <tr key={idx} className={`text-sm ${item.type === "borrow" ? "bg-[#101d33] text-white" : "bg-[#0d1a2b] text-green-300"}`}>
-                                            <td className="px-8 py-2" colSpan={5}>
+                                        <tr key={idx} className={`text-[11px] ${item.type === "borrow" ? "bg-[#101d33] text-white" : "bg-[#0d1a2b] text-green-300"}`}>
+                                            <td className="px-8 py-2 text-[11px]" colSpan={5}>
                                                 📅 {new Date(item.date).toLocaleDateString()} |
                                                 {item.type === "borrow" ? (
                                                     <> 💵 Borrowed ${item.amount.toLocaleString()} </>
@@ -438,7 +435,7 @@ function Debts() {
                                                 )}
                                                 {item.note && <> | 📝 {item.note}</>}
                                                 <button
-                                                    className="ml-4 text-red-400 hover:text-red-600 text-xs underline"
+                                                    className="ml-4 text-red-400 hover:text-red-600 text-[11px] underline"
                                                     onClick={() => handleDeleteItem(item)}
                                                 >
                                                     🗑️ Delete
