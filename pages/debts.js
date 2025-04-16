@@ -279,21 +279,22 @@ function Debts() {
                     </>
                 )}
             </div>
-            {/* 🆕 Legend mini gọn */}
-            <div className="mt-4 flex justify-center items-center gap-6 text-xs font-mono text-white flex-wrap">
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded bg-yellow-300" />
-                    <span>Borrowed: ${totalBorrowed.toLocaleString()}</span>
+            {/* 🟡 Legend dạng dọc, căn giữa toàn block, trái đều từng dòng */}
+            <div className="mt-6 flex flex-col items-center justify-center text-sm font-mono text-white space-y-2">
+                <div className="flex items-center gap-2 w-64">
+                    <div className="w-3 h-3 rounded-full bg-yellow-300" />
+                    <span className="text-left w-full">💵 Borrowed: ${totalBorrowed.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded bg-green-400" />
-                    <span>Paid: ${totalPaid.toLocaleString()}</span>
+                <div className="flex items-center gap-2 w-64">
+                    <div className="w-3 h-3 rounded-full bg-green-400" />
+                    <span className="text-left w-full">✅ Paid: ${totalPaid.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded bg-red-400" />
-                    <span>Remaining: ${totalRemaining.toLocaleString()}</span>
+                <div className="flex items-center gap-2 w-64">
+                    <div className="w-3 h-3 rounded-full bg-red-400" />
+                    <span className="text-left w-full">❗ Remaining: ${totalRemaining.toLocaleString()}</span>
                 </div>
             </div>
+
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-sm text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
