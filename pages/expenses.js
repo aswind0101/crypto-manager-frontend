@@ -223,7 +223,7 @@ function Expenses() {
                                             ["income", "expense"].map((type) => (
                                                 <React.Fragment key={`${month}-${type}`}>
                                                     <tr
-                                                        className="bg-[#101d33] border-t border-gray-800 text-sm cursor-pointer"
+                                                        className="bg-[#101d33] border-t border-gray-800 text-[11px] cursor-pointer"
                                                         onClick={() =>
                                                             setExpandedCategory((prev) => ({
                                                                 ...prev,
@@ -238,7 +238,7 @@ function Expenses() {
                                                                 ) : (
                                                                     <FaPlusCircle className="text-yellow-400" />
                                                                 )}
-                                                                <span className={`font-bold ${type === "income" ? "text-green-400" : "text-red-400"}`}>
+                                                                <span className={`font-bold text-[11px] ${type === "income" ? "text-green-400" : "text-red-400"}`}>
                                                                     {type === "income" ? "Income" : "Expenses"}
                                                                 </span>
                                                             </div>
@@ -251,7 +251,7 @@ function Expenses() {
                                                             .filter((e) => e.type === type)
                                                             .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
                                                             .map((e, idx) => (
-                                                                <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-sm">
+                                                                <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-[11px]">
                                                                     <td className="px-12 py-1" colSpan={5}>
                                                                         📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
                                                                         {e.description && ` | 📝 ${e.description}`}
