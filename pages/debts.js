@@ -276,6 +276,11 @@ function Debts() {
                     </>
                 )}
             </div>
+            <div className="max-w-4xl mx-auto mt-4 text-sm text-white flex justify-end gap-6 font-mono">
+                <div><span className="text-yellow-300 font-bold">💵 Borrowed:</span> ${totalBorrowed.toLocaleString()}</div>
+                <div><span className="text-green-400 font-bold">✅ Paid:</span> ${totalPaid.toLocaleString()}</div>
+                <div><span className="text-red-400 font-bold">❗ Remaining:</span> ${totalRemaining.toLocaleString()}</div>
+            </div>
 
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-sm text-white">
@@ -432,11 +437,7 @@ function Debts() {
                     </tbody>
 
                 </table>
-                <div className="max-w-4xl mx-auto mt-4 text-right text-sm text-white space-y-1 font-mono">
-                    <div><span className="font-semibold text-yellow-300">💵 Total Borrowed:</span> ${totalBorrowed.toLocaleString()}</div>
-                    <div><span className="font-semibold text-green-400">✅ Total Paid:</span> ${totalPaid.toLocaleString()}</div>
-                    <div><span className="font-semibold text-red-400">❗ Total Remaining:</span> ${totalRemaining.toLocaleString()}</div>
-                </div>
+                
             </div>
             <div className="text-center mt-6">
                 <Link
