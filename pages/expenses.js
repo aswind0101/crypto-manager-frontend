@@ -196,45 +196,56 @@ function Expenses() {
 
                             return (
                                 <div className="flex items-end justify-center gap-2 w-full max-w-5xl min-h-[260px] h-[260px] overflow-x-auto pt-6">
-                                    {barChartData.map((item, index) => {
-                                        const total = item.income + item.expense;
-                                        const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
-                                        const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
-                                        const incomeHeight = totalHeight - expenseHeight;
+                                    <div className="w-full overflow-x-auto">
+                                        <div
+                                            className="flex items-end gap-4 px-2"
+                                            style={{
+                                                width: `${barChartData.length * 60}px`, // mỗi tháng ~60px
+                                                minWidth: "100%",
+                                                height: "260px",
+                                            }}
+                                        >
+                                            {barChartData.map((item, index) => {
+                                                const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
+                                                const maxHeight = 160;
+                                                const total = item.income + item.expense;
+                                                const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
+                                                const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
+                                                const incomeHeight = totalHeight - expenseHeight;
 
-                                        const incomeColor = colors[index % colors.length];
+                                                const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899", "#a3e635"];
+                                                const incomeColor = colors[index % colors.length];
 
-                                        return (
-                                            <div key={index} className="flex flex-col items-center w-16 min-w-[60px]">
-                                                {/* Hiển thị số chi tiêu */}
-                                                <span className="mb-1 text-[11px] font-mono text-white">
-                                                    ${item.expense.toLocaleString()}
-                                                </span>
+                                                return (
+                                                    <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px]">
+                                                        {/* Số tiền chi tiêu (ở trên) */}
+                                                        <span className="mb-1 text-[11px] font-mono text-white">
+                                                            ${item.expense.toLocaleString()}
+                                                        </span>
 
-                                                {/* Cột tổng */}
-                                                <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px`, minHeight: "8px" }}>
-                                                    {/* Phần expense màu đen ở trên */}
-                                                    <div
-                                                        style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
-                                                        className="w-full rounded-t"
-                                                    />
-                                                    {/* Phần income màu nổi ở dưới */}
-                                                    <div
-                                                        style={{ height: `${incomeHeight}px`, backgroundColor: incomeColor }}
-                                                        className="w-full"
-                                                    />
-                                                </div>
+                                                        {/* Cột dọc gồm income + expense */}
+                                                        <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
+                                                            <div
+                                                                style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
+                                                                className="w-full rounded-t"
+                                                            />
+                                                            <div
+                                                                style={{ height: `${incomeHeight}px`, backgroundColor: incomeColor }}
+                                                                className="w-full"
+                                                            />
+                                                        </div>
 
-                                                {/* Nhãn tháng + income */}
-                                                <span className="mt-1 text-[11px] text-white text-center leading-tight break-words">
-                                                    {item.name}
-                                                </span>
-                                                <span className="text-[11px] text-green-300 font-semibold">
-                                                    ${item.income.toLocaleString()}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
+                                                        {/* Tháng và income bên dưới */}
+                                                        <span className="mt-1 text-[11px] text-white text-center">{item.name}</span>
+                                                        <span className="text-[11px] text-green-300 font-semibold">
+                                                            ${item.income.toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
                                 </div>
                             );
                         })()}
