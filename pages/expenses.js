@@ -4,6 +4,8 @@ import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import React from "react";
+import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
 
 
 function Expenses() {
