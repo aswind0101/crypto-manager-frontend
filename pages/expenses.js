@@ -276,22 +276,19 @@ function Expenses() {
                                                             .filter((e) => e.type === type)
                                                             .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
                                                             .map((e, idx) => (
-                                                                <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-[11px] font-mono">
-                                                                    <td className="px-12 py-1 whitespace-nowrap flex flex-wrap justify-between items-center gap-2" colSpan={5}>
-                                                                        <div>
-                                                                            📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
-                                                                            {e.description && ` | 📝 ${e.description}`}
-                                                                        </div>
-                                                                        <button
-                                                                            onClick={() => handleDeleteExpense(e.id)}
-                                                                            className="text-red-400 hover:text-red-600 text-xs underline"
-                                                                        >
-                                                                            🗑️ Delete
-                                                                        </button>
+                                                                <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-[11px]">
+                                                                    <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
+                                                                        📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
+                                                                        {e.description && ` | 📝 ${e.description}`}
                                                                     </td>
+                                                                    <button
+                                                                        onClick={() => handleDeleteExpense(e.id)}
+                                                                        className="text-red-400 hover:text-red-600 text-xs underline"
+                                                                    >
+                                                                        🗑️ Delete
+                                                                    </button>
                                                                 </tr>
                                                             ))}
-
                                                 </React.Fragment>
                                             ))}
                                     </React.Fragment>
