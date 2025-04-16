@@ -100,7 +100,7 @@ function Debts() {
 
     const groupDebtsByLender = (debts) => {
         const grouped = {};
-
+    
         debts.forEach((d) => {
             const lenderId = d.lender_id;
             if (!grouped[lenderId]) {
@@ -112,17 +112,20 @@ function Debts() {
                     details: [],
                 };
             }
-
+    
             grouped[lenderId].total_amount += parseFloat(d.total_amount || 0);
             grouped[lenderId].total_paid += parseFloat(d.total_paid || 0);
             grouped[lenderId].details.push(d);
         });
-
-        return Object.values(grouped).map((item) => ({
-            ...item,
-            remaining: item.total_amount - item.total_paid,
-        }));
+    
+        return Object.values(grouped)
+            .map((item) => ({
+                ...item,
+                remaining: item.total_amount - item.total_paid,
+            }))
+            .filter((item) => item.total_amount > 0); // 🟡 Ẩn lender nếu đã xoá hết nợ
     };
+    
     const handleLenderPayment = async (e, lenderId) => {
         e.preventDefault();
 
