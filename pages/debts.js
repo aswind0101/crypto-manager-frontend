@@ -160,6 +160,7 @@ function Debts() {
                 setPayAmount("");
                 setPayNote("");
                 fetchDebts(currentUser); // 🔄 reload danh sách
+                fetchDebtPayments(currentUser);    // 🔄 reload debt payments
             } else {
                 const err = await res.json();
                 setPayStatus("❌ " + err.error);
