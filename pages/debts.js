@@ -276,7 +276,7 @@ function Debts() {
                     </>
                 )}
             </div>
-            <div className="max-w-4xl mx-auto mt-4 text-sm text-white text-left whitespace-nowrap flex justify-end gap-6 font-mono">
+            <div className="max-w-4xl mx-auto mt-4 text-sm text-white text-left whitespace-nowrap flex justify-start gap-6 font-mono">
                 <div><span className="text-yellow-300 font-bold">💵 Borrowed:</span> ${totalBorrowed.toLocaleString()}</div>
                 <div><span className="text-green-400 font-bold">✅ Paid:</span> ${totalPaid.toLocaleString()}</div>
                 <div><span className="text-red-400 font-bold">❗ Remaining:</span> ${totalRemaining.toLocaleString()}</div>
