@@ -10,17 +10,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Toolti
 
 
 function Debts() {
-    const [debts, setDebts] = useState([]);
-    const [amount, setAmount] = useState("");
-    const [note, setNote] = useState("");
-    const [status, setStatus] = useState("");
     const [currentUser, setCurrentUser] = useState(null);
-    const [createdDate, setCreatedDate] = useState(() => {
-        const today = new Date();
-        return today.toISOString().split("T")[0];
-    });
-    const [lenders, setLenders] = useState([]);
-    const [selectedLenderId, setSelectedLenderId] = useState("");
+    
     const [groupedDebts, setGroupedDebts] = useState([]);
     const [expandedLender, setExpandedLender] = useState(null);
 
@@ -30,9 +21,6 @@ function Debts() {
     const [payStatus, setPayStatus] = useState("");
     const [debtPayments, setDebtPayments] = useState([]);
 
-
-    const [totalPaid, setTotalPaid] = useState(0);
-    const [totalRemaining, setTotalRemaining] = useState(0);
     const [barChartData, setBarChartData] = useState([]);
 
 
@@ -179,40 +167,6 @@ function Debts() {
         } catch (error) {
             console.error("Payment error:", error);
             setPayStatus("❌ Something went wrong.");
-        }
-    };
-
-
-    const handleAdd = async (e) => {
-        e.preventDefault();
-        if (!selectedLenderId || !amount) {
-            setStatus("❗ Please select lender and enter amount.");
-            return;
-        }
-
-        const idToken = await currentUser.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/debts", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({
-                lender_id: selectedLenderId,
-                total_amount: parseFloat(amount),
-                note,
-                created_at: createdDate,
-            }),
-        });
-
-        if (res.ok) {
-            setAmount("");
-            setNote("");
-            setStatus("✅ Debt added!");
-            fetchDebts(currentUser);
-        } else {
-            const err = await res.json();
-            setStatus("❌ " + err.error);
         }
     };
 
