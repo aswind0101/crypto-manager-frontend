@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { ResponsiveContainer, CartesianGrid, LabelList, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import React from "react";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
 
@@ -151,25 +151,52 @@ function Expenses() {
             groupedByMonth[month].push(e);
         }
     });
+    const monthlyChartData = Array.from({ length: 12 }, (_, i) => {
+        const month = i + 1;
+        const monthExpenses = expenses.filter((e) => {
+            const date = new Date(e.expense_date);
+            return date.getFullYear() === selectedYear && date.getMonth() + 1 === month;
+        });
+
+        const income = monthExpenses
+            .filter((e) => e.type === "income")
+            .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+        const expense = monthExpenses
+            .filter((e) => e.type === "expense")
+            .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+
+        return {
+            month: new Date(2023, i).toLocaleString("default", { month: "short" }),
+            income,
+            expense,
+        };
+    });
 
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
             {/* Biểu đồ dòng tiền */}
-            <div className="bg-[#1f2937] rounded-xl shadow-lg p-4 mb-6">
+            <div className="w-full max-w-5xl mx-auto mt-6">
                 <h2 className="text-lg font-bold text-yellow-400 mb-4 text-center">📊 Cash Flow Overview</h2>
-                {chartData.length === 0 ? (
+                {monthlyChartData.length === 0 ? (
                     <p className="text-yellow-300 text-center">No data to display</p>
                 ) : (
                     <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={chartData}>
-                            <XAxis dataKey="date" stroke="#ccc" />
+                        <BarChart
+                            data={monthlyChartData}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="month" stroke="#ccc" />
                             <YAxis stroke="#ccc" />
                             <Tooltip />
-                            <Legend />
-                            <Bar dataKey="income" fill="#10b981" name="Income" />
-                            <Bar dataKey="expense" fill="#ef4444" name="Expense" />
+                            {/* Chi tiêu luôn đen */}
+                            <Bar dataKey="expense" stackId="a" fill="#111111" name="Expenses">
+                                <LabelList dataKey="expense" position="top" fill="#facc15" fontSize={10} />
+                            </Bar>
+                            {/* Thu nhập dùng màu cố định hoặc tuỳ chọn mỗi tháng nếu muốn */}
+                            <Bar dataKey="income" stackId="a" fill="#3b82f6" name="Income" />
                         </BarChart>
                     </ResponsiveContainer>
                 )}
