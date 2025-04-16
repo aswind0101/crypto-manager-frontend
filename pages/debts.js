@@ -28,6 +28,8 @@ function Debts() {
     const [payAmount, setPayAmount] = useState("");
     const [payNote, setPayNote] = useState("");
     const [payStatus, setPayStatus] = useState("");
+    const [debtPayments, setDebtPayments] = useState([]);
+
 
     const [totalPaid, setTotalPaid] = useState(0);
     const [totalRemaining, setTotalRemaining] = useState(0);
@@ -42,6 +44,7 @@ function Debts() {
                 setCurrentUser(user);
                 fetchDebts(user);
                 fetchLenders(user);
+                fetchDebtPayments(user);
             }
         });
         return () => unsub();
@@ -54,6 +57,15 @@ function Debts() {
         });
         const data = await res.json();
         setLenders(data);
+    };
+
+    const fetchDebtPayments = async (user) => {
+        const idToken = await user.getIdToken();
+        const res = await fetch("https://crypto-manager-backend.onrender.com/api/debt-payments", {
+            headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await res.json();
+        setDebtPayments(data);
     };
 
     const fetchDebts = async (user) => {
@@ -366,15 +378,28 @@ function Debts() {
 
                                 {/* Dòng chi tiết khoản nợ */}
                                 {expandedLender === d.lender_id &&
-                                    d.details.map((detail) => (
-                                        <tr key={detail.id} className="bg-[#101d33] border-t border-gray-800 text-sm">
-                                            <td className="px-8 py-2" colSpan={5}>
-                                                📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 $
-                                                {parseFloat(detail.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} | 🧾{" "}
-                                                {detail.note || "No note"}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    d.details.map((detail) => {
+                                        const paymentsForDebt = debtPayments.filter(p => p.debt_id === detail.id);
+
+                                        return (
+                                            <React.Fragment key={detail.id}>
+                                                <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                                    <td className="px-8 py-2" colSpan={5}>
+                                                        📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 ${parseFloat(detail.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} | 🧾 {detail.note || "No note"}
+                                                    </td>
+                                                </tr>
+
+                                                {paymentsForDebt.map((p) => (
+                                                    <tr key={p.id} className="bg-[#0d1a2b] border-t border-gray-900 text-sm text-green-300">
+                                                        <td className="px-12 py-1" colSpan={5}>
+                                                            ↳ ✅ Paid ${parseFloat(p.amount_paid).toLocaleString()} on {new Date(p.created_at).toLocaleDateString()} {p.note && `| 📝 ${p.note}`}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </React.Fragment>
+                                        );
+                                    })}
+
                             </React.Fragment>
                         ))}
                     </tbody>
