@@ -284,15 +284,15 @@ function Debts() {
                 <div className="flex flex-col items-start text-[11px] font-mono text-white space-y-2">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-yellow-300" />
-                        <span className="text-left">💵 Borrowed: ${totalBorrowed.toLocaleString()}</span>
+                        <span className="text-left">Borrowed: ${totalBorrowed.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-green-400" />
-                        <span className="text-left">✅ Paid: ${totalPaid.toLocaleString()}</span>
+                        <span className="text-left">Paid: ${totalPaid.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-red-400" />
-                        <span className="text-left">❗ Remaining: ${totalRemaining.toLocaleString()}</span>
+                        <span className="text-left">Remaining: ${totalRemaining.toLocaleString()}</span>
                     </div>
                 </div>
             </div>
