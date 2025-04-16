@@ -435,7 +435,7 @@ function Debts() {
                                                 )}
                                                 {item.note && <> | 📝 {item.note}</>}
                                                 <button
-                                                    className="ml-4 text-red-400 hover:text-red-600 text-[11px] underline"
+                                                    className="ml-4 text-red-400 hover:text-red-600 text-[11px]"
                                                     onClick={() => handleDeleteItem(item)}
                                                 >
                                                     🗑️ Delete

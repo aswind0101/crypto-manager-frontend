@@ -133,7 +133,7 @@ function Lenders() {
                 <td className="px-4 py-2 text-center align-middle whitespace-nowrap">{l.note || "-"}</td>
                 <td className="px-4 py-2 text-center align-middle whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</td>
                 <button
-                  className="text-red-400 hover:text-red-600 text-xs underline ml-4"
+                  className="text-red-400 hover:text-red-600 text-xs ml-4"
                   onClick={() => handleDeleteLender(l.id)}
                 >
                   🗑️ Delete
