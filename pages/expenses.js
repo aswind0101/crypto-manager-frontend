@@ -113,40 +113,20 @@ function Expenses() {
         return Object.values(grouped).sort((a, b) => new Date(a.date) - new Date(b.date));
     })();
 
-    const groupedByMonth = (() => {
-        const grouped = {};
+    const groupedByMonth = {};
 
-        expenses.forEach((e) => {
-            const dateObj = new Date(e.expense_date);
-            const year = dateObj.getFullYear();
-            if (year !== selectedYear) return; // ✅ chỉ lấy năm được chọn
+    expenses.forEach((e) => {
+        const date = new Date(e.expense_date);
+        const year = date.getFullYear();
+        const month = date.toLocaleString("default", { month: "long" });
 
-            const month = dateObj.getMonth() + 1;
-            const date = dateObj.toLocaleDateString(); // ví dụ "4/5/2025"
-
-            if (!grouped[month]) {
-                grouped[month] = {
-                    income: 0,
-                    expense: 0,
-                    days: {}
-                };
+        if (year === selectedYear) {
+            if (!groupedByMonth[month]) {
+                groupedByMonth[month] = [];
             }
-
-            if (e.type === "income") {
-                grouped[month].income += parseFloat(e.amount);
-            } else {
-                grouped[month].expense += parseFloat(e.amount);
-            }
-
-            if (!grouped[month].days[date]) {
-                grouped[month].days[date] = [];
-            }
-
-            grouped[month].days[date].push(e);
-        });
-
-        return grouped;
-    })();
+            groupedByMonth[month].push(e);
+        }
+    });
 
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
