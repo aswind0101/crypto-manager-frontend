@@ -281,7 +281,7 @@ function Debts() {
                             <th className="px-4 py-2 text-left whitespace-nowrap">Total Borrowed</th>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Total Paid</th>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Remaining</th>
-                            <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
+                            <th className="px-4 py-2 text-center align-middle whitespace-nowrap">Action</th>
                         </tr>
                     </thead>
 
