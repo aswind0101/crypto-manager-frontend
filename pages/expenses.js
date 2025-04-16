@@ -3,6 +3,8 @@ import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+
 
 function Expenses() {
     const [expenses, setExpenses] = useState([]);
@@ -85,30 +87,47 @@ function Expenses() {
     const totalExpense = expenses.filter(e => e.type === "expense").reduce((sum, e) => sum + parseFloat(e.amount), 0);
     const balance = totalIncome - totalExpense;
 
+    // 🟩 TẠO DỮ LIỆU CHO BIỂU ĐỒ
+    const chartData = (() => {
+        const grouped = {};
+
+        expenses.forEach((e) => {
+            const date = new Date(e.expense_date).toLocaleDateString(); // nhóm theo ngày
+            if (!grouped[date]) {
+                grouped[date] = { date, income: 0, expense: 0 };
+            }
+            if (e.type === "income") {
+                grouped[date].income += parseFloat(e.amount);
+            } else {
+                grouped[date].expense += parseFloat(e.amount);
+            }
+        });
+
+        return Object.values(grouped).sort((a, b) => new Date(a.date) - new Date(b.date));
+    })();
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
 
-            {/* Tổng kết */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
-                <div className="bg-[#1f2937] p-4 rounded-xl shadow-lg">
-                    <h2 className="text-gray-400">Income</h2>
-                    <p className="text-green-400 text-xl font-bold">${totalIncome.toFixed(2)}</p>
-                </div>
-                <div className="bg-[#1f2937] p-4 rounded-xl shadow-lg">
-                    <h2 className="text-gray-400">Expenses</h2>
-                    <p className="text-red-400 text-xl font-bold">${totalExpense.toFixed(2)}</p>
-                </div>
-                <div className="bg-[#1f2937] p-4 rounded-xl shadow-lg">
-                    <h2 className="text-gray-400">Balance</h2>
-                    <p className={`text-xl font-bold ${balance >= 0 ? "text-yellow-300" : "text-red-500"}`}>
-                        ${balance.toFixed(2)}
-                    </p>
-                </div>
+            {/* Biểu đồ dòng tiền */}
+            <div className="bg-[#1f2937] rounded-xl shadow-lg p-4 mb-6">
+                <h2 className="text-lg font-bold text-yellow-400 mb-4 text-center">📊 Cash Flow Overview</h2>
+                {chartData.length === 0 ? (
+                    <p className="text-yellow-300 text-center">No data to display</p>
+                ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={chartData}>
+                            <XAxis dataKey="date" stroke="#ccc" />
+                            <YAxis stroke="#ccc" />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="income" fill="#10b981" name="Income" />
+                            <Bar dataKey="expense" fill="#ef4444" name="Expense" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                )}
             </div>
-
-
 
             {/* Bảng hiển thị lịch sử */}
             <div className="mb-6 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
