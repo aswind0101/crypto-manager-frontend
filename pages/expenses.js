@@ -253,7 +253,7 @@ function Expenses() {
                                                             .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
                                                             .map((e, idx) => (
                                                                 <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-[11px]">
-                                                                    <td className="px-12 py-1" colSpan={5}>
+                                                                    <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
                                                                         📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
                                                                         {e.description && ` | 📝 ${e.description}`}
                                                                     </td>
