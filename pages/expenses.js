@@ -20,7 +20,7 @@ function Expenses() {
         return today.toISOString().split("T")[0]; // định dạng yyyy-mm-dd
     });
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-
+    const [expandedMonth, setExpandedMonth] = useState(null);
 
 
     useEffect(() => {
@@ -109,6 +109,42 @@ function Expenses() {
 
         return Object.values(grouped).sort((a, b) => new Date(a.date) - new Date(b.date));
     })();
+
+    const groupedByMonth = (() => {
+        const grouped = {};
+      
+        expenses.forEach((e) => {
+          const dateObj = new Date(e.expense_date);
+          const year = dateObj.getFullYear();
+          if (year !== selectedYear) return; // ✅ chỉ lấy năm được chọn
+      
+          const month = dateObj.getMonth() + 1;
+          const date = dateObj.toLocaleDateString(); // ví dụ "4/5/2025"
+      
+          if (!grouped[month]) {
+            grouped[month] = {
+              income: 0,
+              expense: 0,
+              days: {}
+            };
+          }
+      
+          if (e.type === "income") {
+            grouped[month].income += parseFloat(e.amount);
+          } else {
+            grouped[month].expense += parseFloat(e.amount);
+          }
+      
+          if (!grouped[month].days[date]) {
+            grouped[month].days[date] = [];
+          }
+      
+          grouped[month].days[date].push(e);
+        });
+      
+        return grouped;
+      })();
+      
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
@@ -143,36 +179,66 @@ function Expenses() {
                     ))}
                 </select>
             </div>
-            {/* Bảng hiển thị lịch sử */}
-            <div className="mb-6 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
+            {/* 🧾 Bảng tổng hợp theo tháng */}
+            <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg mb-6">
                 <table className="min-w-full text-[11px] text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Date</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Type</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Category</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Amount</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Description</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Month</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Income</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Expense</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Balance</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {expenses
-                            .filter((e) => new Date(e.expense_date).getFullYear() === selectedYear)
-                            .map((e) => (
-                                <tr key={e.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                                    <td className="px-4 py-2 text-[11px] whitespace-nowrap">{new Date(e.expense_date).toLocaleDateString()}</td>
-                                    <td className={`px-4 py-2 text-[11px] whitespace-nowrap font-bold ${e.type === "income" ? "text-green-400" : "text-red-400"}`}>
-                                        {e.type.toUpperCase()}
-                                    </td>
-                                    <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.category}</td>
-                                    <td className="px-4 py-2 text-[11px] whitespace-nowrap">${parseFloat(e.amount).toFixed(2)}</td>
-                                    <td className="px-4 py-2 text-[11px] whitespace-nowrap">{e.description}</td>
-                                </tr>
-                            ))}
-                    </tbody>
+                        {Object.entries(groupedByMonth).map(([month, data]) => {
+                            const isExpanded = expandedMonth === month;
+                            const balance = data.income - data.expense;
 
+                            return (
+                                <React.Fragment key={month}>
+                                    <tr className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer">
+                                        <td
+                                            className="px-4 py-2 font-bold text-yellow-300"
+                                            onClick={() => setExpandedMonth(isExpanded ? null : month)}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {isExpanded ? (
+                                                    <FaMinusCircle className="text-yellow-400" />
+                                                ) : (
+                                                    <FaPlusCircle className="text-yellow-400" />
+                                                )}
+                                                <span>Month {month}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2 text-green-400 font-mono">
+                                            ${data.income.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2 text-red-400 font-mono">
+                                            ${data.expense.toLocaleString()}
+                                        </td>
+                                        <td className={`px-4 py-2 font-mono ${balance >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                            ${balance.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2 text-right">–</td>
+                                    </tr>
+
+                                    {/* 🧩 Bước 4 sẽ thêm dòng con tại đây */}
+                                    {isExpanded && (
+                                        <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                            <td colSpan={5} className="px-6 py-2 text-white font-mono italic">
+                                                📂 Income & Expenses detail (sẽ xử lý tiếp ở bước 4...)
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
+                    </tbody>
                 </table>
             </div>
+
 
             {/* Form thêm thu/chi */}
             <form onSubmit={handleSubmit} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
