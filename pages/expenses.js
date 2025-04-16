@@ -197,8 +197,8 @@ function Expenses() {
                                                 setExpandedMonth((prev) => (prev === month ? null : month))
                                             }
                                         >
-                                            <td className="px-4 py-2 text-yellow-300 font-bold text-base text-center">
-                                                <div className="flex items-center justify-center gap-2">
+                                            <td className="px-4 py-2 font-bold text-yellow-300">
+                                                <div className="flex items-center gap-2">
                                                     {expandedMonth === month ? (
                                                         <FaMinusCircle className="text-yellow-400" />
                                                     ) : (
@@ -207,13 +207,13 @@ function Expenses() {
                                                     {month}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-2 text-green-400 font-bold font-mono text-center">
+                                            <td className="px-4 py-2 text-green-400 font-mono">
                                                 ${income.toLocaleString()}
                                             </td>
-                                            <td className="px-4 py-2 text-red-400 font-bold font-mono text-center">
+                                            <td className="px-4 py-2 text-red-400 font-mono">
                                                 ${expense.toLocaleString()}
                                             </td>
-                                            <td className="px-4 py-2 text-white font-bold font-mono text-center">
+                                            <td className="px-4 py-2 text-white font-mono">
                                                 ${balance.toLocaleString()}
                                             </td>
                                         </tr>
