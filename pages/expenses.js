@@ -282,7 +282,7 @@ function Expenses() {
                                                                         {e.description && ` | 📝 ${e.description}`} |
                                                                         <button
                                                                             onClick={() => handleDeleteExpense(e.id)}
-                                                                            className="text-red-400 hover:text-red-600 text-xs underline"
+                                                                            className="text-red-400 hover:text-red-600 text-xs"
                                                                         >
                                                                             🗑️ Delete
                                                                         </button>
