@@ -377,28 +377,43 @@ function Debts() {
                                 )}
 
                                 {/* Dòng chi tiết khoản nợ */}
-                                {expandedLender === d.lender_id &&
-                                    d.details.map((detail) => {
-                                        const paymentsForDebt = debtPayments.filter(p => p.debt_id === detail.id);
+                                {expandedLender === d.lender_id && (() => {
+                                    // Lấy tất cả khoản mượn & trả liên quan tới lender này
+                                    const combinedItems = [
+                                        ...d.details.map(debt => ({
+                                            type: "borrow",
+                                            date: debt.created_at,
+                                            amount: parseFloat(debt.total_amount || 0),
+                                            note: debt.note,
+                                        })),
+                                        ...debtPayments
+                                            .filter(p => d.details.some(debt => debt.id === p.debt_id))
+                                            .map(p => ({
+                                                type: "payment",
+                                                date: p.payment_date,
+                                                amount: parseFloat(p.amount_paid),
+                                                note: p.note,
+                                            }))
+                                    ];
 
-                                        return (
-                                            <React.Fragment key={detail.id}>
-                                                <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
-                                                    <td className="px-8 py-2" colSpan={5}>
-                                                        📅 {new Date(detail.created_at).toLocaleDateString()} | 💵 ${parseFloat(detail.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} | 🧾 {detail.note || "No note"}
-                                                    </td>
-                                                </tr>
+                                    // Sắp xếp theo thời gian tăng dần
+                                    combinedItems.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-                                                {paymentsForDebt.map((p) => (
-                                                    <tr key={p.id} className="bg-[#0d1a2b] border-t border-gray-900 text-sm text-green-300">
-                                                        <td className="px-12 py-1" colSpan={5}>
-                                                            ↳ ✅ Paid ${parseFloat(p.amount_paid).toLocaleString()} on {new Date(p.created_at).toLocaleDateString()} {p.note && `| 📝 ${p.note}`}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </React.Fragment>
-                                        );
-                                    })}
+                                    return combinedItems.map((item, idx) => (
+                                        <tr key={idx} className={`text-sm ${item.type === "borrow" ? "bg-[#101d33] text-white" : "bg-[#0d1a2b] text-green-300"}`}>
+                                            <td className="px-8 py-2" colSpan={5}>
+                                                📅 {new Date(item.date).toLocaleDateString()} |
+                                                {item.type === "borrow" ? (
+                                                    <> 💵 Borrowed ${item.amount.toLocaleString()} </>
+                                                ) : (
+                                                    <> ✅ Paid ${item.amount.toLocaleString()} </>
+                                                )}
+                                                {item.note && <> | 📝 {item.note}</>}
+                                            </td>
+                                        </tr>
+                                    ));
+                                })()}
+
 
                             </React.Fragment>
                         ))}
