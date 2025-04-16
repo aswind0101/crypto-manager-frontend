@@ -195,8 +195,10 @@ function Expenses() {
                     </thead>
                     <tbody>
                         {Object.keys(groupedByMonth)
-                            .filter((month) =>
-                                groupedByMonth[month].some((e) => new Date(e.expense_date).getFullYear() === selectedYear)
+                            .filter(
+                                (month) =>
+                                    Array.isArray(groupedByMonth[month]) &&
+                                    groupedByMonth[month].some((e) => new Date(e.expense_date).getFullYear() === selectedYear)
                             )
                             .map((month) => {
                                 const monthData = groupedByMonth[month].filter(
