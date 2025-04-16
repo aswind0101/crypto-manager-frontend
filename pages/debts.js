@@ -10,8 +10,17 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Toolti
 
 
 function Debts() {
+    const [debts, setDebts] = useState([]);
+    const [amount, setAmount] = useState("");
+    const [note, setNote] = useState("");
+    const [status, setStatus] = useState("");
     const [currentUser, setCurrentUser] = useState(null);
-    
+    const [createdDate, setCreatedDate] = useState(() => {
+        const today = new Date();
+        return today.toISOString().split("T")[0];
+    });
+    const [lenders, setLenders] = useState([]);
+    const [selectedLenderId, setSelectedLenderId] = useState("");
     const [groupedDebts, setGroupedDebts] = useState([]);
     const [expandedLender, setExpandedLender] = useState(null);
 
@@ -21,6 +30,9 @@ function Debts() {
     const [payStatus, setPayStatus] = useState("");
     const [debtPayments, setDebtPayments] = useState([]);
 
+
+    const [totalPaid, setTotalPaid] = useState(0);
+    const [totalRemaining, setTotalRemaining] = useState(0);
     const [barChartData, setBarChartData] = useState([]);
 
 
