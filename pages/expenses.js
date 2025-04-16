@@ -151,61 +151,97 @@ function Expenses() {
             groupedByMonth[month].push(e);
         }
     });
-    const monthlyChartData = Array.from({ length: 12 }, (_, i) => {
-        const month = i + 1;
-        const monthExpenses = expenses.filter((e) => {
-            const date = new Date(e.expense_date);
-            return date.getFullYear() === selectedYear && date.getMonth() + 1 === month;
+    const barChartData = (() => {
+        const grouped = Array.from({ length: 12 }, (_, i) => {
+            const monthExpenses = expenses.filter((e) => {
+                const date = new Date(e.expense_date);
+                return date.getFullYear() === selectedYear && date.getMonth() === i;
+            });
+
+            const income = monthExpenses
+                .filter((e) => e.type === "income")
+                .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+            const expense = monthExpenses
+                .filter((e) => e.type === "expense")
+                .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+
+            return {
+                name: new Date(2023, i).toLocaleString("default", { month: "short" }),
+                income,
+                expense,
+            };
         });
 
-        const income = monthExpenses
-            .filter((e) => e.type === "income")
-            .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-        const expense = monthExpenses
-            .filter((e) => e.type === "expense")
-            .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+        return grouped.filter((d) => d.income > 0 || d.expense > 0);
+    })();
 
-        return {
-            month: new Date(2023, i).toLocaleString("default", { month: "short" }),
-            income,
-            expense,
-        };
-    });
 
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
-            {/* Biểu đồ dòng tiền */}
-            <div className="w-full max-w-5xl mx-auto mt-6">
-                <h2 className="text-lg font-bold text-yellow-400 mb-4 text-center">📊 Cash Flow Overview</h2>
-                {monthlyChartData.length === 0 ? (
-                    <p className="text-yellow-300 text-center">No data to display</p>
+            <div className="mt-8 flex flex-col items-center justify-center text-white p-4">
+                <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
+                    <span>📊</span> <span>Monthly Cash Flow</span>
+                </h2>
+
+                {barChartData.length === 0 ? (
+                    <p className="text-yellow-300">✅ No data for this year</p>
                 ) : (
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart
-                            data={monthlyChartData}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                        >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="month" stroke="#ccc" />
-                            <YAxis stroke="#ccc" />
-                            <Tooltip />
-                            {/* 🟥 Expenses luôn màu đen */}
-                            <Bar dataKey="expense" stackId="a" fill="#111111" name="Expenses">
-                                <LabelList dataKey="expense" position="top" fill="#facc15" fontSize={10} />
-                            </Bar>
-                            {/* 🟦 Income có màu theo từng tháng */}
-                            <Bar
-                                dataKey="income"
-                                stackId="a"
-                                name="Income"
-                                fill="#3b82f6"
-                            />
-                        </BarChart>
-                    </ResponsiveContainer>
+                    <>
+                        {(() => {
+                            const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
+                            const maxHeight = 160;
+                            const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899"];
+
+                            return (
+                                <div className="flex items-end justify-center gap-2 w-full max-w-5xl min-h-[260px] h-[260px] overflow-x-auto pt-6">
+                                    {barChartData.map((item, index) => {
+                                        const total = item.income + item.expense;
+                                        const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
+                                        const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
+                                        const incomeHeight = totalHeight - expenseHeight;
+
+                                        const incomeColor = colors[index % colors.length];
+
+                                        return (
+                                            <div key={index} className="flex flex-col items-center w-16 min-w-[60px]">
+                                                {/* Hiển thị số chi tiêu */}
+                                                <span className="mb-1 text-[11px] font-mono text-white">
+                                                    ${item.expense.toLocaleString()}
+                                                </span>
+
+                                                {/* Cột tổng */}
+                                                <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px`, minHeight: "8px" }}>
+                                                    {/* Phần expense màu đen ở trên */}
+                                                    <div
+                                                        style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
+                                                        className="w-full rounded-t"
+                                                    />
+                                                    {/* Phần income màu nổi ở dưới */}
+                                                    <div
+                                                        style={{ height: `${incomeHeight}px`, backgroundColor: incomeColor }}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+
+                                                {/* Nhãn tháng + income */}
+                                                <span className="mt-1 text-[11px] text-white text-center leading-tight break-words">
+                                                    {item.name}
+                                                </span>
+                                                <span className="text-[11px] text-green-300 font-semibold">
+                                                    ${item.income.toLocaleString()}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
+                    </>
                 )}
             </div>
+
             {/* Dropdown chọn năm */}
             <div className="flex justify-start items-center mb-4">
                 <select
