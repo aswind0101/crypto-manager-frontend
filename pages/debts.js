@@ -100,7 +100,7 @@ function Debts() {
 
     const groupDebtsByLender = (debts) => {
         const grouped = {};
-    
+
         debts.forEach((d) => {
             const lenderId = d.lender_id;
             if (!grouped[lenderId]) {
@@ -112,12 +112,12 @@ function Debts() {
                     details: [],
                 };
             }
-    
+
             grouped[lenderId].total_amount += parseFloat(d.total_amount || 0);
             grouped[lenderId].total_paid += parseFloat(d.total_paid || 0);
             grouped[lenderId].details.push(d);
         });
-    
+
         return Object.values(grouped)
             .map((item) => ({
                 ...item,
@@ -125,7 +125,7 @@ function Debts() {
             }))
             .filter((item) => item.total_amount > 0); // 🟡 Ẩn lender nếu đã xoá hết nợ
     };
-    
+
     const handleLenderPayment = async (e, lenderId) => {
         e.preventDefault();
 
@@ -277,13 +277,14 @@ function Debts() {
                 <table className="min-w-full text-sm text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
-                            <th className="px-4 py-2 text-left">Lender</th>
-                            <th className="px-4 py-2 text-left">Total Borrowed</th>
-                            <th className="px-4 py-2 text-left">Total Paid</th>
-                            <th className="px-4 py-2 text-left">Remaining</th>
-                            <th className="px-4 py-2 text-left">Action</th> {/* ✅ THÊM DÒNG NÀY */}
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Lender</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Total Borrowed</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Total Paid</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Remaining</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
                         </tr>
                     </thead>
+
                     <tbody>
                         {groupedDebts.map((d) => (
                             <React.Fragment key={d.lender_id}>
@@ -293,7 +294,7 @@ function Debts() {
                                         setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)
                                     }
                                 >
-                                    <td className="px-4 py-2 font-bold text-yellow-300 align-middle">
+                                    <td className="px-4 py-2 font-bold text-yellow-300 align-middle whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             {expandedLender === d.lender_id ? (
                                                 <FaMinusCircle className="text-yellow-400" />
@@ -304,16 +305,16 @@ function Debts() {
                                         </div>
                                     </td>
 
-                                    <td className="px-4 py-2">
+                                    <td className="px-4 py-2 whitespace-nowrap">
                                         ${parseFloat(d.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td className="px-4 py-2 text-green-400">
+                                    <td className="px-4 py-2 text-green-400 whitespace-nowrap">
                                         ${parseFloat(d.total_paid || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td className="px-4 py-2 text-red-400">
+                                    <td className="px-4 py-2 text-red-400 whitespace-nowrap">
                                         ${parseFloat(d.remaining || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td className="px-4 py-2 text-right">
+                                    <td className="px-4 py-2 text-right whitespace-nowrap">
                                         {parseFloat(d.remaining) > 0 && (
                                             <button
                                                 onClick={(e) => {
