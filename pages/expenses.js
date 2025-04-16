@@ -56,6 +56,30 @@ function Expenses() {
         const data = await res.json();
         setCategories(data);
     };
+    const handleDeleteExpense = async (id) => {
+        if (!confirm("Are you sure you want to delete this transaction?")) return;
+
+        try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch(`https://crypto-manager-backend.onrender.com/api/expenses/${id}`, {
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (res.ok) {
+                // Sau khi xoá thì reload lại dữ liệu
+                fetchExpenses(currentUser);
+            } else {
+                const err = await res.json();
+                alert("❌ Failed to delete: " + err.error);
+            }
+        } catch (err) {
+            console.error("❌ Delete error:", err.message);
+            alert("❌ Something went wrong.");
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -252,13 +276,22 @@ function Expenses() {
                                                             .filter((e) => e.type === type)
                                                             .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
                                                             .map((e, idx) => (
-                                                                <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-[11px]">
-                                                                    <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
-                                                                        📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
-                                                                        {e.description && ` | 📝 ${e.description}`}
+                                                                <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-[11px] font-mono">
+                                                                    <td className="px-12 py-1 whitespace-nowrap flex flex-wrap justify-between items-center gap-2" colSpan={5}>
+                                                                        <div>
+                                                                            📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
+                                                                            {e.description && ` | 📝 ${e.description}`}
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => handleDeleteExpense(e.id)}
+                                                                            className="text-red-400 hover:text-red-600 text-xs underline"
+                                                                        >
+                                                                            🗑️ Delete
+                                                                        </button>
                                                                     </td>
                                                                 </tr>
                                                             ))}
+
                                                 </React.Fragment>
                                             ))}
                                     </React.Fragment>
