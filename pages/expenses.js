@@ -279,14 +279,15 @@ function Expenses() {
                                                                 <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-[11px]">
                                                                     <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
                                                                         📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
-                                                                        {e.description && ` | 📝 ${e.description}`}
+                                                                        {e.description && ` | 📝 ${e.description}`} |
+                                                                        <button
+                                                                            onClick={() => handleDeleteExpense(e.id)}
+                                                                            className="text-red-400 hover:text-red-600 text-xs underline"
+                                                                        >
+                                                                            🗑️ Delete
+                                                                        </button>
                                                                     </td>
-                                                                    <button
-                                                                        onClick={() => handleDeleteExpense(e.id)}
-                                                                        className="text-red-400 hover:text-red-600 text-xs underline"
-                                                                    >
-                                                                        🗑️ Delete
-                                                                    </button>
+
                                                                 </tr>
                                                             ))}
                                                 </React.Fragment>
