@@ -314,7 +314,7 @@ function Debts() {
                                     <td className="px-4 py-2 text-red-400 whitespace-nowrap">
                                         ${parseFloat(d.remaining || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                                    <td className="px-4 py-2 text-center align-middle whitespace-nowrap">
                                         {parseFloat(d.remaining) > 0 && (
                                             <button
                                                 onClick={(e) => {
