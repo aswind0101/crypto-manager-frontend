@@ -297,14 +297,14 @@ function Debts() {
 
 
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
-                <table className="min-w-full text-[11px] text-white">
+                <table className="min-w-full text-xs text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Lender</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Total Borrowed</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Total Paid</th>
-                            <th className="px-4 py-2 text-left text-[11px] whitespace-nowrap">Remaining</th>
-                            <th className="px-4 py-2 text-center text-[11px] align-middle whitespace-nowrap">Action</th>
+                            <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Lender</th>
+                            <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Total Borrowed</th>
+                            <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Total Paid</th>
+                            <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Remaining</th>
+                            <th className="px-4 py-2 text-center text-xs align-middle whitespace-nowrap">Action</th>
                         </tr>
                     </thead>
 

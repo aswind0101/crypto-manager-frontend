@@ -111,7 +111,7 @@ function Expenses() {
 
 
             {/* Bảng hiển thị lịch sử */}
-            <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
+            <div className="mb-6 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
                 <table className="min-w-full text-[11px] text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
