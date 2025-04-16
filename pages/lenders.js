@@ -123,6 +123,7 @@ function Lenders() {
               <th className="px-4 py-2 text-left">Name</th>
               <th className="px-4 py-2 text-left">Note</th>
               <th className="px-4 py-2 text-left">Date</th>
+              <th className="px-4 py-2 text-left">Action</th>
             </tr>
           </thead>
           <tbody>
