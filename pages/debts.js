@@ -33,6 +33,7 @@ function Debts() {
 
     const [totalPaid, setTotalPaid] = useState(0);
     const [totalRemaining, setTotalRemaining] = useState(0);
+    const [totalBorrowed, setTotalBorrowed] = useState(0); // 
     const [barChartData, setBarChartData] = useState([]);
 
 
@@ -95,6 +96,9 @@ function Debts() {
         const remaining = grouped.reduce((sum, d) => sum + parseFloat(d.remaining || 0), 0);
         setTotalPaid(paid);
         setTotalRemaining(remaining);
+        const borrowed = grouped.reduce((sum, d) => sum + parseFloat(d.total_amount || 0), 0);
+        setTotalBorrowed(borrowed); // 🆕 Thêm state này ở bước 2
+
     };
 
 
@@ -428,7 +432,11 @@ function Debts() {
                     </tbody>
 
                 </table>
-
+                <div className="max-w-4xl mx-auto mt-4 text-right text-sm text-white space-y-1 font-mono">
+                    <div><span className="font-semibold text-yellow-300">💵 Total Borrowed:</span> ${totalBorrowed.toLocaleString()}</div>
+                    <div><span className="font-semibold text-green-400">✅ Total Paid:</span> ${totalPaid.toLocaleString()}</div>
+                    <div><span className="font-semibold text-red-400">❗ Total Remaining:</span> ${totalRemaining.toLocaleString()}</div>
+                </div>
             </div>
             <div className="text-center mt-6">
                 <Link

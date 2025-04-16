@@ -129,9 +129,9 @@ function Lenders() {
           <tbody>
             {lenders.map((l) => (
               <tr key={l.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                <td className="px-4 py-2 font-bold text-yellow-300">{l.name}</td>
-                <td className="px-4 py-2">{l.note || "-"}</td>
-                <td className="px-4 py-2">{new Date(l.created_at).toLocaleDateString()}</td>
+                <td className="px-4 py-2 font-bold text-yellow-300 text-center align-middle">{l.name}</td>
+                <td className="px-4 py-2 text-center align-middle">{l.note || "-"}</td>
+                <td className="px-4 py-2 text-center align-middle">{new Date(l.created_at).toLocaleDateString()}</td>
                 <button
                   className="text-red-400 hover:text-red-600 text-xs underline ml-4"
                   onClick={() => handleDeleteLender(l.id)}
