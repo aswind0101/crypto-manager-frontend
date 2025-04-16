@@ -237,6 +237,9 @@ function Debts() {
                         {(() => {
                             const maxRemaining = Math.max(...barChartData.map((d) => d.remaining));
                             const maxHeight = 160;
+                            const totalBorrowed = barChartData.reduce((sum, item) => sum + item.borrowed, 0);
+                            const totalPaid = barChartData.reduce((sum, item) => sum + item.paid, 0);
+                            const totalRemaining = barChartData.reduce((sum, item) => sum + item.remaining, 0);
 
                             return (
                                 <div className="flex items-end justify-center gap-2 w-full max-w-5xl min-h-[260px] h-[260px] overflow-x-auto pt-6">
@@ -276,12 +279,12 @@ function Debts() {
                     </>
                 )}
             </div>
-            <div className="max-w-4xl mx-auto mt-4 text-sm text-white text-left whitespace-nowrap flex justify-start gap-6 font-mono">
+            {/* 🟡 Tổng số dưới biểu đồ */}
+            <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm font-mono text-white">
                 <div><span className="text-yellow-300 font-bold">💵 Borrowed:</span> ${totalBorrowed.toLocaleString()}</div>
                 <div><span className="text-green-400 font-bold">✅ Paid:</span> ${totalPaid.toLocaleString()}</div>
                 <div><span className="text-red-400 font-bold">❗ Remaining:</span> ${totalRemaining.toLocaleString()}</div>
             </div>
-
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-sm text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
@@ -437,7 +440,7 @@ function Debts() {
                     </tbody>
 
                 </table>
-                
+
             </div>
             <div className="text-center mt-6">
                 <Link
