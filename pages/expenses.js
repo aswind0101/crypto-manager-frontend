@@ -127,11 +127,11 @@ function Expenses() {
                     <p className="text-yellow-300">✅ No data for this year</p>
                 ) : (
                     <div className="w-full overflow-x-auto">
-                        <div className="min-w-fit mx-auto">
+                        <div className="relative min-w-[768px] mx-auto">
                             <div
-                                className="relative flex items-end gap-4 px-2"
+                                className="relative flex items-end justify-center gap-4 px-2"
                                 style={{
-                                    minWidth: barChartData.length < 8 ? "100%" : `${barChartData.length * 60}px`,
+                                    width: `${Math.max(barChartData.length * 60, 768)}px`, // tối thiểu 768px hoặc theo số tháng
                                     height: "260px",
                                 }}
                             >
@@ -142,11 +142,7 @@ function Expenses() {
                                     const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
                                     const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
                                     const incomeHeight = totalHeight - expenseHeight;
-                                    const colors = [
-                                        "#3b82f6", "#8b5cf6", "#10b981",
-                                        "#f59e0b", "#ef4444", "#ec4899",
-                                        "#0ea5e9", "#facc15"
-                                    ];
+                                    const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9", "#facc15"];
                                     const incomeColor = colors[index % colors.length];
 
                                     return (
@@ -178,9 +174,6 @@ function Expenses() {
                     </div>
                 )}
             </div>
-
-
-
 
 
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
