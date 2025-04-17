@@ -190,10 +190,6 @@ function Expenses() {
                 ) : (
                     <>
                         {(() => {
-                            const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
-                            const maxHeight = 160;
-                            const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899"];
-
                             return (
                                 <div className="w-full flex justify-center">
                                     <div className="overflow-x-auto">
@@ -206,14 +202,11 @@ function Expenses() {
                                             }}
                                         >
                                             {barChartData.map((item, index) => {
-                                                const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
-                                                const maxHeight = 160;
                                                 const total = item.income + item.expense;
                                                 const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
                                                 const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
                                                 const incomeHeight = totalHeight - expenseHeight;
 
-                                                const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899", "#a3e635"];
                                                 const incomeColor = colors[index % colors.length];
 
                                                 return (
@@ -243,6 +236,7 @@ function Expenses() {
                                                     </div>
                                                 );
                                             })}
+
                                         </div>
                                     </div>
 
