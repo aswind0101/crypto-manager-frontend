@@ -180,7 +180,7 @@ function Expenses() {
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
-            <div className="mt-8 flex flex-col items-center justify-center text-white p-4">
+            <div className="w-full mt-8 flex flex-col items-center justify-center text-white p-4">
                 <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
                     <span>📊</span> <span>Monthly Cash Flow</span>
                 </h2>
