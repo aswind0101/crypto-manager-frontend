@@ -199,7 +199,7 @@ function Expenses() {
                                     <div
                                         className="mx-auto flex items-end gap-4 px-2"
                                         style={{
-                                            width: barChartData.length > 0 ? "100%" : `${barChartData.length * 60}px`,
+                                            width: barChartData.length > 8 ? "100%" : `${barChartData.length * 60}px`,
                                             maxWidth: "100%",
                                             height: "260px",
                                         }}
