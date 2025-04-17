@@ -127,7 +127,7 @@ function Expenses() {
                     <p className="text-yellow-300">✅ No data for this year</p>
                 ) : (
                     <div className="w-full overflow-x-auto">
-                        <div className="flex justify-center-safe items-end min-w-full gap-4 px-4">
+                        <div className="min-w-full flex justify-center">
                             <div
                                 className="flex items-end gap-4 px-2"
                                 style={{
@@ -146,12 +146,12 @@ function Expenses() {
                                     const incomeColor = colors[index % colors.length];
 
                                     return (
-                                        <div key={index} className="flex flex-col items-center">
+                                        <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px]">
                                             <span className="mb-1 text-[11px] font-mono text-white">
                                                 ${item.expense.toLocaleString()}
                                             </span>
 
-                                            <div className="flex items-end gap-1" style={{ height: `${totalHeight}px` }}>
+                                            <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
                                                 <div
                                                     style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
                                                     className="w-full rounded-t"
