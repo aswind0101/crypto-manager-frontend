@@ -157,7 +157,7 @@ function Categories() {
                 <td className="px-4 py-2 text-right">
                   <button
                     onClick={() => handleDeleteCategory(cat.id)}
-                    className="text-red-400 hover:text-red-600 text-xs"
+                    className="text-red-400 hover:text-red-600 text-xs whitespace-nowrap"
                   >
                     🗑️ Delete
                   </button>
