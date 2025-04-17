@@ -4,6 +4,8 @@ import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
+import { useNavigate } from 'react-router-dom';
+
 
 function AddExpense() {
     const [amount, setAmount] = useState("");
@@ -17,6 +19,7 @@ function AddExpense() {
         const today = new Date();
         return today.toISOString().split("T")[0];
     });
+    const navigate = useNavigate();
 
     useEffect(() => {
         const auth = getAuth();
@@ -134,6 +137,13 @@ function AddExpense() {
                     Add
                 </button>
                 {status && <p className="text-sm text-center text-yellow-300">{status}</p>}
+                <button
+                    onClick={() => window.location.href = '/expenses'}
+                    className="bg-red-500 text-white px-4 py-2 rounded-full shadow hover:bg-red-600 transition"
+                >
+                    Close
+                </button>
+
             </form>
         </div>
     );
