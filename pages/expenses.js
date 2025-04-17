@@ -151,7 +151,7 @@ function Expenses() {
                                                 ${item.expense.toLocaleString()}
                                             </span>
 
-                                            <div className="w-4 flex flex-col" style={{ height: `${totalHeight}px` }}>
+                                            <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
                                                 <div
                                                     style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
                                                     className="w-full rounded-t"
