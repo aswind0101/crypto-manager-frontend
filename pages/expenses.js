@@ -118,21 +118,20 @@ function Expenses() {
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
-            <div className="w-full mt-8 text-white p-4">
-                <div className="w-full mt-8 text-white p-4 justify-center items-center ">
-                    <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2 justify-center">
-                        <span>📊</span> <span>Monthly Cash Flow</span>
-                    </h2>
+            <div className="w-full mt-8 flex flex-col items-center justify-center text-white p-4">
+                <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
+                    <span>📊</span> <span>Monthly Cash Flow</span>
+                </h2>
 
-                    {barChartData.length === 0 ? (
-                        <p className="text-yellow-300 text-center">✅ No data for this year</p>
-                    ) : (
-                        <div className="w-full overflow-x-auto">
-                            {/* Không dùng mx-auto ở đây nữa */}
+                {barChartData.length === 0 ? (
+                    <p className="text-yellow-300">✅ No data for this year</p>
+                ) : (
+                    <div className="w-full overflow-x-auto">
+                        <div className="min-w-full flex justify-center">
                             <div
-                                className="inline-flex items-end gap-4 px-4"
+                                className="flex items-end gap-4 px-2"
                                 style={{
-                                    minWidth: `${Math.max(barChartData.length * 60, 768)}px`, // luôn đủ lớn
+                                    width: `${barChartData.length * 60}px`,
                                     height: "260px",
                                 }}
                             >
@@ -172,10 +171,12 @@ function Expenses() {
                                 })}
                             </div>
                         </div>
-                    )}
-                </div>
-
+                    </div>
+                )}
             </div>
+
+
+
 
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                 {/* Dropdown chọn năm */}
