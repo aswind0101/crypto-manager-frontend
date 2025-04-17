@@ -127,12 +127,12 @@ function Expenses() {
                     <p className="text-yellow-300">✅ No data for this year</p>
                 ) : (
                     <div className="w-full overflow-x-auto">
-                        <div className="w-full overflow-auto relative">
+                        <div className="min-w-max mx-auto">
                             <div
-                                className="inline-flex items-end gap-4 px-2"
+                                className="relative inline-flex items-end gap-4 px-2"
                                 style={{
-                                    minWidth: "640px", // tuỳ số tháng
                                     width: `${barChartData.length * 60}px`,
+                                    minWidth: "100%",
                                     height: "260px",
                                 }}
                             >
