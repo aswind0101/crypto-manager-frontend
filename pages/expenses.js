@@ -118,58 +118,57 @@ function Expenses() {
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
-            <div className="w-full mt-8 flex flex-col items-center text-white p-4">
-                <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
+            <div className="w-full mt-8 text-white p-4">
+                <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2 justify-center">
                     <span>📊</span> <span>Monthly Cash Flow</span>
                 </h2>
 
                 {barChartData.length === 0 ? (
-                    <p className="text-yellow-300">✅ No data for this year</p>
+                    <p className="text-yellow-300 text-center">✅ No data for this year</p>
                 ) : (
                     <div className="w-full overflow-x-auto">
-                        <div className="relative min-w-[768px] mx-auto">
-                            <div
-                                className="relative flex items-end justify-center gap-4 px-2"
-                                style={{
-                                    width: `${Math.max(barChartData.length * 60, 768)}px`, // tối thiểu 768px hoặc theo số tháng
-                                    height: "260px",
-                                }}
-                            >
-                                {barChartData.map((item, index) => {
-                                    const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
-                                    const maxHeight = 160;
-                                    const total = item.income + item.expense;
-                                    const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
-                                    const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
-                                    const incomeHeight = totalHeight - expenseHeight;
-                                    const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9", "#facc15"];
-                                    const incomeColor = colors[index % colors.length];
+                        {/* Không dùng mx-auto ở đây nữa */}
+                        <div
+                            className="inline-flex items-end gap-4 px-4"
+                            style={{
+                                minWidth: `${Math.max(barChartData.length * 60, 768)}px`, // luôn đủ lớn
+                                height: "260px",
+                            }}
+                        >
+                            {barChartData.map((item, index) => {
+                                const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
+                                const maxHeight = 160;
+                                const total = item.income + item.expense;
+                                const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
+                                const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
+                                const incomeHeight = totalHeight - expenseHeight;
+                                const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9", "#facc15"];
+                                const incomeColor = colors[index % colors.length];
 
-                                    return (
-                                        <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px]">
-                                            <span className="mb-1 text-[11px] font-mono text-white">
-                                                ${item.expense.toLocaleString()}
-                                            </span>
+                                return (
+                                    <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px]">
+                                        <span className="mb-1 text-[11px] font-mono text-white">
+                                            ${item.expense.toLocaleString()}
+                                        </span>
 
-                                            <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
-                                                <div
-                                                    style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
-                                                    className="w-full rounded-t"
-                                                />
-                                                <div
-                                                    style={{ height: `${incomeHeight}px`, backgroundColor: incomeColor }}
-                                                    className="w-full"
-                                                />
-                                            </div>
-
-                                            <span className="mt-1 text-[11px] text-white text-center">{item.name}</span>
-                                            <span className="text-[11px] text-green-300 font-semibold">
-                                                ${item.income.toLocaleString()}
-                                            </span>
+                                        <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
+                                            <div
+                                                style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
+                                                className="w-full rounded-t"
+                                            />
+                                            <div
+                                                style={{ height: `${incomeHeight}px`, backgroundColor: incomeColor }}
+                                                className="w-full"
+                                            />
                                         </div>
-                                    );
-                                })}
-                            </div>
+
+                                        <span className="mt-1 text-[11px] text-white text-center">{item.name}</span>
+                                        <span className="text-[11px] text-green-300 font-semibold">
+                                            ${item.income.toLocaleString()}
+                                        </span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
