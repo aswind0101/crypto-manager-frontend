@@ -13,6 +13,8 @@ function Expenses() {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [expandedMonth, setExpandedMonth] = useState(null);
     const [expandedCategory, setExpandedCategory] = useState({});
+    const [categories, setCategories] = useState([]);
+
 
 
     useEffect(() => {
