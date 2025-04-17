@@ -453,14 +453,17 @@ function Debts() {
                 </table>
 
             </div>
-            <div className="text-center mt-6">
+            {/* FAB chỉ hiển thị trên mobile và khi không mở modal */}
+            <div className="fixed bottom-6 right-6 z-50 md:hidden">
                 <Link
                     href="/add-debt"
-                    className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-full shadow-md transition"
+                    className="bg-yellow-400 hover:bg-yellow-500 hover:scale-105 active:scale-95 text-black text-3xl rounded-full shadow-lg w-14 h-14 flex items-center justify-center transition-all duration-300"
+                    title="Add Debt"
                 >
-                    ➕ Add Debt
+                    ➕
                 </Link>
             </div>
+
         </div>
     );
 }
