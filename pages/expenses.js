@@ -178,27 +178,29 @@ function Expenses() {
 
 
 
-            {/* Dropdown chọn năm */}
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                 {/* Dropdown chọn năm */}
-                <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none text-sm w-full sm:w-auto"
-                >
-                    {availableYears.map((year) => (
-                        <option key={year} value={year}>{year}</option>
-                    ))}
-                </select>
+                <div className="w-full sm:w-auto">
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                        className="bg-[#facc15] text-black font-semibold px-6 py-[10px] rounded-full shadow-md outline-none text-sm w-full sm:w-auto transition hover:bg-[#fde047]"
+                    >
+                        {availableYears.map((year) => (
+                            <option key={year} value={year}>{year}</option>
+                        ))}
+                    </select>
+                </div>
 
-                {/* Nút chuyển trang thêm thu/chi */}
+                {/* Nút Add Income/Expense */}
                 <Link
                     href="/add-expense"
-                    className="inline-block bg-yellow-400 hover:bg-yellow-500 text-black font-semibold px-6 py-2 rounded-full shadow-md transition text-sm w-full sm:w-auto text-center"
+                    className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-[10px] rounded-full shadow-md transition text-sm w-full sm:w-auto text-center"
                 >
                     ➕ Add Income/Expense
                 </Link>
             </div>
+
 
             {/* Bảng tổng hợp theo tháng */}
             <div className="mb-8 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
