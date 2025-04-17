@@ -3,24 +3,13 @@ import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
-import { ResponsiveContainer, CartesianGrid, LabelList, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import React from "react";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
 
 
 function Expenses() {
     const [expenses, setExpenses] = useState([]);
-    const [amount, setAmount] = useState("");
-    const [category, setCategory] = useState("");
-    const [type, setType] = useState("expense");
-    const [description, setDescription] = useState("");
-    const [status, setStatus] = useState("");
     const [currentUser, setCurrentUser] = useState(null);
-    const [categories, setCategories] = useState([]);
-    const [date, setDate] = useState(() => {
-        const today = new Date();
-        return today.toISOString().split("T")[0]; // định dạng yyyy-mm-dd
-    });
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [expandedMonth, setExpandedMonth] = useState(null);
     const [expandedCategory, setExpandedCategory] = useState({});
@@ -81,61 +70,11 @@ function Expenses() {
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!amount || !category || !type) {
-            setStatus("❗ Please fill in all fields.");
-            return;
-        }
 
-        const idToken = await currentUser.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/expenses", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({ amount: parseFloat(amount), category, type, description, expense_date: date, }),
-        });
-
-        if (res.ok) {
-            setAmount("");
-            setCategory("");
-            setDescription("");
-            setType("expense");
-            setStatus("✅ Added successfully!");
-            fetchExpenses(currentUser);
-        } else {
-            const err = await res.json();
-            setStatus("❌ Error: " + err.error);
-        }
-    };
-
-    const totalIncome = expenses.filter(e => e.type === "income").reduce((sum, e) => sum + parseFloat(e.amount), 0);
-    const totalExpense = expenses.filter(e => e.type === "expense").reduce((sum, e) => sum + parseFloat(e.amount), 0);
-    const balance = totalIncome - totalExpense;
     const availableYears = Array.from(
         new Set(expenses.map(e => new Date(e.expense_date).getFullYear()))
     ).sort((a, b) => b - a); // Sắp xếp giảm dần (mới trước)
 
-    // 🟩 TẠO DỮ LIỆU CHO BIỂU ĐỒ
-    const chartData = (() => {
-        const grouped = {};
-
-        expenses.forEach((e) => {
-            const date = new Date(e.expense_date).toLocaleDateString(); // nhóm theo ngày
-            if (!grouped[date]) {
-                grouped[date] = { date, income: 0, expense: 0 };
-            }
-            if (e.type === "income") {
-                grouped[date].income += parseFloat(e.amount);
-            } else {
-                grouped[date].expense += parseFloat(e.amount);
-            }
-        });
-
-        return Object.values(grouped).sort((a, b) => new Date(a.date) - new Date(b.date));
-    })();
 
     const groupedByMonth = {};
 
