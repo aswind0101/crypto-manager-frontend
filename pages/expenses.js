@@ -177,18 +177,25 @@ function Expenses() {
 
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                 {/* Dropdown chọn năm */}
-                <div className="w-full sm:w-auto">
+                <div className="relative w-full sm:w-auto">
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="appearance-none bg-[#facc15] text-black font-semibold px-6 py-2 h-[42px] rounded-full shadow-md outline-none text-sm w-full sm:w-auto transition hover:bg-[#fde047]"
+                        className="appearance-none bg-[#facc15] text-black font-semibold px-6 py-2 h-[42px] rounded-full shadow-md outline-none text-sm w-full sm:w-auto pr-10"
                     >
-
                         {availableYears.map((year) => (
                             <option key={year} value={year}>{year}</option>
                         ))}
                     </select>
+
+                    {/* Dấu tam giác */}
+                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
+                        <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
                 </div>
+
 
                 {/* Nút Add Income/Expense */}
                 <Link
