@@ -57,6 +57,35 @@ function Categories() {
       setStatus("❌ " + err.error);
     }
   };
+  const handleDeleteCategory = async (id) => {
+    if (!confirm("Are you sure you want to delete this category?")) return;
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(`https://crypto-manager-backend.onrender.com/api/categories/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      if (res.ok) {
+        setStatus("✅ Category deleted!");
+        fetchCategories(currentUser); // reload danh sách
+      } else {
+        const err = await res.json();
+        if (err.error.includes("in use")) {
+          setStatus("❌ Cannot delete: this category is in use.");
+        } else {
+          setStatus("❌ Failed to delete: " + err.error);
+        }
+
+      }
+    } catch (err) {
+      console.error("❌ Delete error:", err.message);
+      alert("❌ Something went wrong.");
+    }
+  };
 
   const filtered = categories.filter((cat) =>
     filterType === "all" ? true : cat.type === filterType
@@ -91,7 +120,7 @@ function Categories() {
         >
           Add Category
         </button>
-        {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
+        {status && <p className="text-sm text-yellow-300 text-center mt-4">{status}</p>}
       </form>
 
       {/* Bộ lọc */}
@@ -100,11 +129,10 @@ function Categories() {
           <button
             key={val}
             onClick={() => setFilterType(val)}
-            className={`px-4 py-1 rounded-full text-sm border ${
-              filterType === val
-                ? "bg-yellow-400 text-black font-bold"
-                : "border-yellow-400 text-yellow-300"
-            }`}
+            className={`px-4 py-1 rounded-full text-sm border ${filterType === val
+              ? "bg-yellow-400 text-black font-bold"
+              : "border-yellow-400 text-yellow-300"
+              }`}
           >
             {val.toUpperCase()}
           </button>
@@ -118,6 +146,7 @@ function Categories() {
             <tr>
               <th className="px-4 py-2 text-left">Name</th>
               <th className="px-4 py-2 text-left">Type</th>
+              <th className="px-4 py-2 text-right">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -125,9 +154,18 @@ function Categories() {
               <tr key={cat.id} className="border-t border-gray-700 hover:bg-[#162330]">
                 <td className="px-4 py-2">{cat.name}</td>
                 <td className="px-4 py-2 text-yellow-200">{cat.type.toUpperCase()}</td>
+                <td className="px-4 py-2 text-right">
+                  <button
+                    onClick={() => handleDeleteCategory(cat.id)}
+                    className="text-red-400 hover:text-red-600 text-xs"
+                  >
+                    🗑️ Delete
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
+
         </table>
       </div>
     </div>
