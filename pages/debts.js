@@ -457,7 +457,7 @@ function Debts() {
             <div className="fixed bottom-6 right-6 z-50 md:hidden">
                 <Link
                     href="/add-debt"
-                    className="bg-yellow-400 hover:bg-yellow-500 hover:scale-105 active:scale-95 text-black text-3xl rounded-full shadow-lg w-14 h-14 flex items-center justify-center transition-all duration-300"
+                    className="bg-yellow-300 bg-opacity-80 hover:bg-yellow-400 hover:bg-opacity-100 hover:scale-105 active:scale-95 text-black text-3xl rounded-full shadow-lg w-14 h-14 flex items-center justify-center transition-all duration-300"
                     title="Add Debt"
                 >
                     ➕
