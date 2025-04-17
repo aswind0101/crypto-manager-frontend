@@ -119,7 +119,7 @@ function Expenses() {
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
             <div className="w-full mt-8 text-white p-4">
-                <div className="w-full mt-8 text-white p-4">
+                <div className="w-full mt-8 text-white p-4 justify-center items-center ">
                     <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2 justify-center">
                         <span>📊</span> <span>Monthly Cash Flow</span>
                     </h2>
