@@ -192,64 +192,56 @@ function Expenses() {
                         {(() => {
                             const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
                             const maxHeight = 160;
-                            const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899"];
+                            const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9", "#facc15"];
 
                             return (
-                                <div className="w-full overflow-x-auto flex justify-center">
-                                    <div className="overflow-x-auto">
-                                        <div
-                                            className="flex items-end gap-4 px-2"
-                                            style={{
-                                                width: `${barChartData.length * 60}px`, // mỗi tháng ~60px
-                                                minWidth: "100%",
-                                                height: "260px",
-                                            }}
-                                        >
-                                            {barChartData.map((item, index) => {
-                                                const total = item.income + item.expense;
-                                                const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
-                                                const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
-                                                const incomeHeight = totalHeight - expenseHeight;
+                                <div className="w-full overflow-x-auto">
+                                    <div
+                                        className="mx-auto flex items-end gap-4 px-2"
+                                        style={{
+                                            width: barChartData.length <= 8 ? "100%" : `${barChartData.length * 60}px`,
+                                            maxWidth: "100%",
+                                            height: "260px",
+                                        }}
+                                    >
+                                        {barChartData.map((item, index) => {
+                                            const total = item.income + item.expense;
+                                            const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
+                                            const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
+                                            const incomeHeight = totalHeight - expenseHeight;
 
-                                                const incomeColor = colors[index % colors.length];
+                                            const incomeColor = colors[index % colors.length];
 
-                                                return (
-                                                    <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px]">
-                                                        {/* Số tiền chi tiêu (ở trên) */}
-                                                        <span className="mb-1 text-[11px] font-mono text-white">
-                                                            ${item.expense.toLocaleString()}
-                                                        </span>
-
-                                                        {/* Cột dọc gồm income + expense */}
-                                                        <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
-                                                            <div
-                                                                style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
-                                                                className="w-full rounded-t"
-                                                            />
-                                                            <div
-                                                                style={{ height: `${incomeHeight}px`, backgroundColor: incomeColor }}
-                                                                className="w-full"
-                                                            />
-                                                        </div>
-
-                                                        {/* Tháng và income bên dưới */}
-                                                        <span className="mt-1 text-[11px] text-white text-center">{item.name}</span>
-                                                        <span className="text-[11px] text-green-300 font-semibold">
-                                                            ${item.income.toLocaleString()}
-                                                        </span>
+                                            return (
+                                                <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px]">
+                                                    <span className="mb-1 text-[11px] font-mono text-white">
+                                                        ${item.expense.toLocaleString()}
+                                                    </span>
+                                                    <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
+                                                        <div
+                                                            style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
+                                                            className="w-full rounded-t"
+                                                        />
+                                                        <div
+                                                            style={{ height: `${incomeHeight}px`, backgroundColor: incomeColor }}
+                                                            className="w-full"
+                                                        />
                                                     </div>
-                                                );
-                                            })}
-
-                                        </div>
+                                                    <span className="mt-1 text-[11px] text-white text-center">{item.name}</span>
+                                                    <span className="text-[11px] text-green-300 font-semibold">
+                                                        ${item.income.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
-
                                 </div>
                             );
                         })()}
                     </>
                 )}
             </div>
+
 
             {/* Dropdown chọn năm */}
             <div className="flex justify-start items-center mb-4">
