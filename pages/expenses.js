@@ -174,29 +174,6 @@ function Expenses() {
 
         return grouped.filter((d) => d.income > 0 || d.expense > 0);
     })();
-    const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
-    const maxHeight = 160;
-
-    // Tính tọa độ từng điểm (centerX, y) theo thu nhập và chi tiêu
-    const getPoints = (type) => {
-        return barChartData.map((item, index) => {
-            const total = item.income + item.expense;
-            const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
-            const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
-            const incomeHeight = totalHeight - expenseHeight;
-
-            const x = 60 * index + 25; // giữa mỗi cột
-            const y =
-                type === "income"
-                    ? 260 - incomeHeight // income ở dưới
-                    : 260 - totalHeight;  // expense ở trên
-
-            return `${x},${y}`;
-        }).join(" ");
-    };
-
-    const pointsIncome = getPoints("income");
-    const pointsExpense = getPoints("expense");
 
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
@@ -213,27 +190,12 @@ function Expenses() {
                     <div className="w-full overflow-x-auto">
                         <div className="min-w-full flex justify-center">
                             <div
-                                className="relative flex items-end gap-4 px-2"
+                                className="flex items-end gap-4 px-2"
                                 style={{
                                     width: `${barChartData.length * 60}px`,
                                     height: "260px",
                                 }}
                             >
-                                <svg className="absolute top-0 left-0 w-full h-full z-0 pointer-events-none">
-                                    <polyline
-                                        points={pointsIncome}
-                                        fill="none"
-                                        stroke="#3b82f6"
-                                        strokeWidth="2"
-                                    />
-                                    <polyline
-                                        points={pointsExpense}
-                                        fill="none"
-                                        stroke="#ef4444"
-                                        strokeWidth="2"
-                                    />
-                                </svg>
-
                                 {barChartData.map((item, index) => {
                                     const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
                                     const maxHeight = 160;
