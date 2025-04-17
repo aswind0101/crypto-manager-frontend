@@ -119,10 +119,6 @@ function Expenses() {
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
             <div className="w-full mt-8 flex flex-col items-center justify-center text-white p-4">
-                <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
-                    <span>📊</span> <span>Monthly Cash Flow</span>
-                </h2>
-
                 {barChartData.length === 0 ? (
                     <p className="text-yellow-300 text-center">✅ No data for this year</p>
                 ) : (
@@ -168,6 +164,9 @@ function Expenses() {
                                     );
                                 })}
                             </div>
+                        </div>
+                        <div className="mt-4 text-sm text-yellow-300 font-bold flex items-center justify-center gap-2">
+                            <span>📊</span> <span>Monthly Cash Flow</span>
                         </div>
                     </div>
 
