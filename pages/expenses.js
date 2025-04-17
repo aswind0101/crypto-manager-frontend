@@ -127,9 +127,9 @@ function Expenses() {
                     <p className="text-yellow-300 text-center">✅ No data for this year</p>
                 ) : (
                     <div className="w-full overflow-x-auto">
-                        <div className="flex justify-center min-w-[500px]">
+                        <div className="min-w-fit pl-4">
                             <div
-                                className="flex items-end gap-4 px-4 w-fit mx-auto"
+                                className="flex items-end gap-4 w-fit mx-auto pr-4"
                                 style={{
                                     minWidth: `${barChartData.length * 60}px`,
                                     height: "260px",
@@ -146,11 +146,10 @@ function Expenses() {
                                     const incomeColor = colors[index % colors.length];
 
                                     return (
-                                        <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px]">
+                                        <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px] scroll-mx-4">
                                             <span className="mb-1 text-[11px] font-mono text-white">
                                                 ${item.expense.toLocaleString()}
                                             </span>
-
                                             <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
                                                 <div
                                                     style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
@@ -161,7 +160,6 @@ function Expenses() {
                                                     className="w-full"
                                                 />
                                             </div>
-
                                             <span className="mt-1 text-[11px] text-white text-center">{item.name}</span>
                                             <span className="text-[11px] text-green-300 font-semibold">
                                                 ${item.income.toLocaleString()}
@@ -172,6 +170,7 @@ function Expenses() {
                             </div>
                         </div>
                     </div>
+
                 )}
             </div>
 
