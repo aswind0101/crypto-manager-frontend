@@ -196,7 +196,7 @@ function Expenses() {
 
                             return (
                                 <div className="w-full flex justify-center">
-                                    <div className="overflow-x-auto">
+                                    <div className="w-full overflow-x-auto">
                                         <div
                                             className="flex items-end gap-4 px-2"
                                             style={{
