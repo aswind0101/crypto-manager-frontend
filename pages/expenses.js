@@ -129,8 +129,9 @@ function Expenses() {
                     <div className="w-full overflow-x-auto">
                         <div className="w-full overflow-auto relative">
                             <div
-                                className="min-w-[640px] mx-auto flex items-end gap-4 px-2"
+                                className="inline-flex items-end gap-4 px-2"
                                 style={{
+                                    minWidth: "640px", // tuỳ số tháng
                                     width: `${barChartData.length * 60}px`,
                                     height: "260px",
                                 }}
