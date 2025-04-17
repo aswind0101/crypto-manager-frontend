@@ -174,29 +174,29 @@ function Expenses() {
 
         return grouped.filter((d) => d.income > 0 || d.expense > 0);
     })();
-    const pointsIncome = barChartData.map((item, i) => {
-        const x = i * 60 + 25; // 50px column + 10px gap → center point
-        const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
-        const maxHeight = 160;
-        const total = item.income + item.expense;
-        const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
-        const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
-        const incomeHeight = totalHeight - expenseHeight;
-        const y = 260 - (expenseHeight + incomeHeight);
-        return `${x},${y}`;
-    }).join(" ");
+    const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
+    const maxHeight = 160;
 
-    const pointsExpense = barChartData.map((item, i) => {
-        const x = i * 60 + 25;
-        const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
-        const maxHeight = 160;
-        const total = item.income + item.expense;
-        const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
-        const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
-        const y = 260 - expenseHeight;
-        return `${x},${y}`;
-    }).join(" ");
+    // Tính tọa độ từng điểm (centerX, y) theo thu nhập và chi tiêu
+    const getPoints = (type) => {
+        return barChartData.map((item, index) => {
+            const total = item.income + item.expense;
+            const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
+            const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
+            const incomeHeight = totalHeight - expenseHeight;
 
+            const x = 60 * index + 25; // giữa mỗi cột
+            const y =
+                type === "income"
+                    ? 260 - incomeHeight // income ở dưới
+                    : 260 - totalHeight;  // expense ở trên
+
+            return `${x},${y}`;
+        }).join(" ");
+    };
+
+    const pointsIncome = getPoints("income");
+    const pointsExpense = getPoints("expense");
 
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
