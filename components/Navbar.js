@@ -84,7 +84,7 @@ export default function Navbar() {
                 )}
 
                 {/* Desktop Menu */}
-                <div className="hidden md:flex items-center gap-6 font-medium">
+                <div className="hidden items-center gap-6 font-medium">
                     <Link href="/home" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiHome /> Home
                     </Link>
@@ -134,9 +134,10 @@ export default function Navbar() {
                 </div>
 
                 {/* Mobile Toggle */}
-                <button className="md:hidden text-2xl" onClick={() => setMenuOpen(!menuOpen)}>
+                <button className="text-2xl" onClick={() => setMenuOpen(!menuOpen)}>
                     {menuOpen ? <FaTimes /> : <FaBars />}
                 </button>
+
             </nav>
 
             {/* Mobile Menu */}
@@ -148,7 +149,7 @@ export default function Navbar() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] text-white px-6 py-4 rounded-b-2xl shadow-lg flex flex-col gap-4 text-sm md:hidden z-40"
+                        className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] text-white px-6 py-4 rounded-b-2xl shadow-lg flex flex-col gap-4 text-sm z-40 max-w-sm mx-auto w-full"
                     >
                         {user && (
                             <div className="text-sm text-blue-200">
