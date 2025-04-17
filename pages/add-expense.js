@@ -128,19 +128,25 @@ function AddExpense() {
                     className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
                 />
 
-                <button
-                    type="submit"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-full transition"
-                >
-                    Add
-                </button>
-                {status && <p className="text-sm text-center text-yellow-300">{status}</p>}
-                <button
-                    onClick={() => window.location.href = '/expenses'}
-                    className="bg-red-500 text-white px-4 py-2 rounded-full shadow hover:bg-red-600 transition"
-                >
-                    Close
-                </button>
+                <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4 w-full max-w-md mx-auto">
+                    <button
+                        type="submit"
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-full transition"
+                    >
+                        Add
+                    </button>
+                    <button
+                        onClick={() => window.location.href = '/expenses'}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-full transition"
+                    >
+                        Close
+                    </button>
+                </div>
+
+                {status && (
+                    <p className="text-sm text-center text-yellow-300 mt-2">{status}</p>
+                )}
+
 
             </form>
         </div>
