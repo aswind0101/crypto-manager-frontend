@@ -174,6 +174,28 @@ function Expenses() {
 
         return grouped.filter((d) => d.income > 0 || d.expense > 0);
     })();
+    const pointsIncome = barChartData.map((item, i) => {
+        const x = i * 60 + 25; // 50px column + 10px gap → center point
+        const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
+        const maxHeight = 160;
+        const total = item.income + item.expense;
+        const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
+        const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
+        const incomeHeight = totalHeight - expenseHeight;
+        const y = 260 - (expenseHeight + incomeHeight);
+        return `${x},${y}`;
+    }).join(" ");
+
+    const pointsExpense = barChartData.map((item, i) => {
+        const x = i * 60 + 25;
+        const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
+        const maxHeight = 160;
+        const total = item.income + item.expense;
+        const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
+        const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
+        const y = 260 - expenseHeight;
+        return `${x},${y}`;
+    }).join(" ");
 
 
     return (
@@ -197,6 +219,21 @@ function Expenses() {
                                     height: "260px",
                                 }}
                             >
+                                <svg className="absolute top-0 left-0 w-full h-full z-0 pointer-events-none">
+                                    <polyline
+                                        points={pointsIncome}
+                                        fill="none"
+                                        stroke="#3b82f6"
+                                        strokeWidth="2"
+                                    />
+                                    <polyline
+                                        points={pointsExpense}
+                                        fill="none"
+                                        stroke="#ef4444"
+                                        strokeWidth="2"
+                                    />
+                                </svg>
+
                                 {barChartData.map((item, index) => {
                                     const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
                                     const maxHeight = 160;
