@@ -195,10 +195,11 @@ function Expenses() {
                             const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9", "#facc15"];
 
                             return (
-                                <div className="w-full flex justify-center">
-                                    <div className={`flex items-end gap-4 px-2 ${barChartData.length > 8 ? 'overflow-x-auto' : 'justify-center'}`}
+                                <div className="w-full overflow-x-auto">
+                                    <div
+                                        className="mx-auto flex items-end gap-4 px-2"
                                         style={{
-                                            width: barChartData.length > 8 ? `${barChartData.length * 60}px` : "100%",
+                                            width: barChartData.length > 0 ? "100%" : `${barChartData.length * 60}px`,
                                             maxWidth: "100%",
                                             height: "260px",
                                         }}
