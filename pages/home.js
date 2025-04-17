@@ -40,6 +40,21 @@ function Dashboard() {
 
         return `${num < 0 ? "-" : ""}${options.prefix}${formatted}`;
     };
+    const formatLastUpdatedDuration = (timestamp) => {
+        const now = Date.now();
+        const diffMs = now - timestamp;
+        const diffMin = Math.floor(diffMs / 60000);
+
+        if (diffMin >= 1440) { // > 24 giờ
+            const days = Math.floor(diffMin / 1440);
+            return `${days} day${days > 1 ? "s" : ""} ago`;
+        } else if (diffMin >= 60) {
+            const hours = Math.floor(diffMin / 60);
+            return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+        } else {
+            return `${diffMin} min ago`;
+        }
+    };
 
     const [portfolio, setPortfolio] = useState([]);
     const [totalNetInvested, settotalNetInvested] = useState(0);
@@ -695,7 +710,7 @@ function Dashboard() {
                                         Math.abs(coin.current_price - parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase()))) < 0.000001 &&
                                         Math.round((Date.now() - coin.price_last_updated) / 60000) >= 1 && (
                                             <p className="text-xs text-gray-400 mt-1">
-                                                ⚠️ Last price from {Math.round((Date.now() - coin.price_last_updated) / 60000)} min ago
+                                                ⚠️ Last price from {formatLastUpdatedDuration(coin.price_last_updated)}
                                             </p>
                                         )}
 
