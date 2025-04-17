@@ -12,8 +12,12 @@ export default function Navbar() {
     const router = useRouter();
     const [user, setUser] = useState(null);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [debtsOpen, setDebtsOpen] = useState(false);
+    const [expensesOpen, setExpensesOpen] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const menuRef = useRef();
+
+
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -166,34 +170,58 @@ export default function Navbar() {
                         >
                             <FiList /> Transactions
                         </Link>
-                        <Link
-                            href="/debts"
-                            onClick={() => setMenuOpen(false)}
+                        {/* Debts menu */}
+                        <button
+                            onClick={() => setDebtsOpen(!debtsOpen)}
                             className="hover:text-cyan-300 flex items-center gap-2"
                         >
-                            💳 View Debts
-                        </Link>
-                        <Link
-                            href="/lenders"
-                            onClick={() => setMenuOpen(false)}
-                            className="hover:text-cyan-300 flex items-center gap-2 pl-6"
-                        >
-                            ↳ 👥 Manage Lenders
-                        </Link>
-                        <Link
-                            href="/expenses"
-                            onClick={() => setMenuOpen(false)}
+                            💳 Debts {debtsOpen ? "▾" : "▸"}
+                        </button>
+                        <AnimatePresence>
+                            {debtsOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="pl-4 flex flex-col gap-2 text-sm"
+                                >
+                                    <Link href="/debts" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
+                                        👁️ View Debts
+                                    </Link>
+                                    <Link href="/lenders" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
+                                        👥 Manage Lenders
+                                    </Link>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Expenses menu */}
+                        <button
+                            onClick={() => setExpensesOpen(!expensesOpen)}
                             className="hover:text-cyan-300 flex items-center gap-2"
                         >
-                            💸 View Expenses
-                        </Link>
-                        <Link
-                            href="/categories"
-                            onClick={() => setMenuOpen(false)}
-                            className="hover:text-cyan-300 flex items-center gap-2 pl-6"
-                        >
-                            ↳ Manage Categories
-                        </Link>
+                            💸 Expenses {expensesOpen ? "▾" : "▸"}
+                        </button>
+                        <AnimatePresence>
+                            {expensesOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="pl-4 flex flex-col gap-2 text-sm"
+                                >
+                                    <Link href="/expenses" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
+                                        👁️ View Expenses
+                                    </Link>
+                                    <Link href="/categories" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
+                                        🗂 Manage Categories
+                                    </Link>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
 
                         <Link href="/settings" className="hover:text-cyan-300 flex items-center gap-2">
                             ⚙️ Settings
