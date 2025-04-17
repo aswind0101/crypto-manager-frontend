@@ -4,7 +4,6 @@ import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
-import { useNavigate } from 'react-router-dom';
 
 
 function AddExpense() {
@@ -19,7 +18,6 @@ function AddExpense() {
         const today = new Date();
         return today.toISOString().split("T")[0];
     });
-    const navigate = useNavigate();
 
     useEffect(() => {
         const auth = getAuth();
