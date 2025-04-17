@@ -195,8 +195,8 @@ function Expenses() {
                             const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899"];
 
                             return (
-                                <div className="flex items-end justify-center gap-2 w-full max-w-5xl min-h-[260px] h-[260px] overflow-x-auto pt-6">
-                                    <div className="w-full overflow-x-auto">
+                                <div className="w-full flex justify-center">
+                                    <div className="overflow-x-auto">
                                         <div
                                             className="flex items-end gap-4 px-2"
                                             style={{
