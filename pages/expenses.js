@@ -127,7 +127,7 @@ function Expenses() {
                     <p className="text-yellow-300">✅ No data for this year</p>
                 ) : (
                     <div className="w-full overflow-x-auto">
-                        <div className="min-w-full flex justify-center">
+                        <div className="w-full overflow-auto relative">
                             <div
                                 className="flex items-end gap-4 px-2"
                                 style={{
@@ -184,7 +184,7 @@ function Expenses() {
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="appearance-none bg-[#facc15] text-black font-semibold px-6 py-2 h-[42px] rounded-full shadow-md outline-none text-sm text-center w-full sm:w-auto transition hover:bg-[#fde047]"
+                        className="appearance-none bg-[#facc15] text-black font-semibold px-6 py-2 h-[42px] rounded-full shadow-md outline-none text-sm w-full sm:w-auto transition hover:bg-[#fde047]"
                     >
 
                         {availableYears.map((year) => (
