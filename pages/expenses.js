@@ -169,7 +169,7 @@ function Expenses() {
                 )}
             </div>
 
-            <div className="mt-4 text-sm text-yellow-300 font-bold flex items-center justify-center gap-2">
+            <div className="mb-6 mt-4 text-sm text-yellow-300 font-bold flex items-center justify-center gap-2">
                 <span>📊</span> <span>Monthly Cash Flow</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
