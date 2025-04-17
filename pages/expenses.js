@@ -184,7 +184,7 @@ function Expenses() {
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="appearance-none bg-[#facc15] text-black font-semibold px-6 py-2 h-[42px] rounded-full shadow-md outline-none text-sm w-full sm:w-auto transition hover:bg-[#fde047]"
+                        className="appearance-none bg-[#facc15] text-black font-semibold px-6 py-2 h-[42px] rounded-full shadow-md outline-none text-sm text-center w-full sm:w-auto transition hover:bg-[#fde047]"
                     >
 
                         {availableYears.map((year) => (
