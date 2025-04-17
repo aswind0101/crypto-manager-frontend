@@ -127,12 +127,11 @@ function Expenses() {
                     <p className="text-yellow-300">✅ No data for this year</p>
                 ) : (
                     <div className="w-full overflow-x-auto">
-                        <div className="min-w-max mx-auto">
+                        <div className="min-w-fit mx-auto">
                             <div
-                                className="relative inline-flex items-end gap-4 px-2"
+                                className="relative flex items-end gap-4 px-2"
                                 style={{
-                                    width: `${barChartData.length * 60}px`,
-                                    minWidth: "100%",
+                                    minWidth: barChartData.length < 8 ? "100%" : `${barChartData.length * 60}px`,
                                     height: "260px",
                                 }}
                             >
@@ -143,7 +142,11 @@ function Expenses() {
                                     const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
                                     const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
                                     const incomeHeight = totalHeight - expenseHeight;
-                                    const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9", "#facc15"];
+                                    const colors = [
+                                        "#3b82f6", "#8b5cf6", "#10b981",
+                                        "#f59e0b", "#ef4444", "#ec4899",
+                                        "#0ea5e9", "#facc15"
+                                    ];
                                     const incomeColor = colors[index % colors.length];
 
                                     return (
@@ -175,6 +178,7 @@ function Expenses() {
                     </div>
                 )}
             </div>
+
 
 
 
