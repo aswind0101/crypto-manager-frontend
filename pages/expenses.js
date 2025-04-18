@@ -5,9 +5,6 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
 import React from "react";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
 
 // Kích hoạt plugin
 dayjs.extend(utc);

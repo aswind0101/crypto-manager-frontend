@@ -435,7 +435,7 @@ function Debts() {
                                     return combinedItems.map((item, idx) => (
                                         <tr key={idx} className={`text-[11px] ${item.type === "borrow" ? "bg-[#101d33] text-white" : "bg-[#0d1a2b] text-green-300"}`}>
                                             <td className="px-8 py-2 text-[11px]" colSpan={5}>
-                                                📅 {new Date(item.date).toLocaleDateString()} |
+                                                📅 {item.date.slice(5, 7) + "/" + item.date.slice(8, 10) + "/" + item.date.slice(0, 4)} |
                                                 {item.type === "borrow" ? (
                                                     <> 💵 Borrowed ${item.amount.toLocaleString()} </>
                                                 ) : (
