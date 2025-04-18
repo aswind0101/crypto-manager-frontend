@@ -126,20 +126,23 @@ function Lenders() {
               <th className="px-4 py-2 text-right whitespace-nowrap">Action</th>
             </tr>
           </thead>
-          <tr key={l.id} className="border-t border-gray-700 hover:bg-[#162330]">
-            <td className="px-4 py-2 font-bold text-yellow-300 text-left align-middle whitespace-nowrap">{l.name}</td>
-            <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.note || "-"}</td>
-            <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</td>
-            <td className="px-4 py-2 text-right align-middle whitespace-nowrap">
-              <button
-                className="text-red-400 hover:text-red-600 text-xs whitespace-nowrap"
-                onClick={() => handleDeleteLender(l.id)}
-              >
-                🗑️ Delete
-              </button>
-            </td>
-          </tr>
-
+          <tbody>
+            {lenders.map((l) => (
+              <tr key={l.id} className="border-t border-gray-700 hover:bg-[#162330]">
+              <td className="px-4 py-2 font-bold text-yellow-300 text-left align-middle whitespace-nowrap">{l.name}</td>
+              <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.note || "-"}</td>
+              <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</td>
+              <td className="px-4 py-2 text-right align-middle whitespace-nowrap">
+                <button
+                  className="text-red-400 hover:text-red-600 text-xs"
+                  onClick={() => handleDeleteLender(l.id)}
+                >
+                  🗑️ Delete
+                </button>
+              </td>
+            </tr>            
+            ))}
+          </tbody>
         </table>
       </div>
     </div>
