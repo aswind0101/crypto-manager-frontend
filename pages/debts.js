@@ -462,7 +462,7 @@ function Debts() {
 
             </div>
             {/* FAB chỉ hiển thị trên mobile và khi không mở modal */}
-            <div className="fixed bottom-6 right-6 z-50 md:hidden">
+            <div className="fixed bottom-6 right-6 z-50">
                 <Link
                     href="/add-debt"
                     className="bg-yellow-300 bg-opacity-80 hover:bg-yellow-400 hover:bg-opacity-100 hover:scale-105 active:scale-95 text-black text-3xl rounded-full shadow-lg w-14 h-14 flex items-center justify-center transition-all duration-300"
