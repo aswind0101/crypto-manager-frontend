@@ -6,7 +6,12 @@ import Link from "next/link";
 import React from "react";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 
+// Kích hoạt plugin
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 function Expenses() {
     const [expenses, setExpenses] = useState([]);
@@ -401,7 +406,7 @@ function Expenses() {
                                                                                         className="px-16 py-1 whitespace-nowrap"
                                                                                         colSpan={5}
                                                                                     >
-                                                                                        📅 {dayjs(e.expense_date).format("MM/DD/YYYY")}
+                                                                                        📅 {dayjs(e.expense_date).tz(dayjs.tz.guess()).format("MM/DD/YYYY")}
                                                                                         | 💵 $
                                                                                         {parseFloat(e.amount).toLocaleString()} | 📝{" "}
                                                                                         {e.description || "-"} |
