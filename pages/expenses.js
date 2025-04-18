@@ -14,7 +14,7 @@ function Expenses() {
     const [expandedMonth, setExpandedMonth] = useState(null);
     const [expandedCategory, setExpandedCategory] = useState({});
     const [categories, setCategories] = useState([]);
-
+    const [loading, setLoading] = useState(true);
 
 
     useEffect(() => {
@@ -22,8 +22,10 @@ function Expenses() {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             if (user) {
                 setCurrentUser(user);
-                fetchExpenses(user);
-                fetchCategories(user);
+                setLoading(true); // 🔍 Bắt đầu loading
+                Promise.all([fetchExpenses(user), fetchCategories(user)]).finally(() => {
+                    setLoading(false); // ✅ Kết thúc loading
+                });
             }
         });
         return () => unsubscribe();
@@ -115,7 +117,13 @@ function Expenses() {
 
         return grouped.filter((d) => d.income > 0 || d.expense > 0);
     })();
-
+    if (loading) {
+        return (
+          <div className="flex items-center justify-center min-h-screen text-yellow-300 text-sm font-mono">
+            ⏳ Loading...
+          </div>
+        );
+      }      
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
@@ -153,8 +161,8 @@ function Expenses() {
                                         "#a855f7", // Violet
                                         "#22d3ee", // Cyan
                                         "#4ade80", // Light Green
-                                      ];
-                                      
+                                    ];
+
                                     const incomeColor = colors[index % colors.length];
 
                                     return (

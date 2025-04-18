@@ -35,6 +35,7 @@ function Debts() {
     const [totalRemaining, setTotalRemaining] = useState(0);
     const [totalBorrowed, setTotalBorrowed] = useState(0); // 
     const [barChartData, setBarChartData] = useState([]);
+    const [loading, setLoading] = useState(true);
 
 
 
@@ -43,9 +44,10 @@ function Debts() {
         const unsub = onAuthStateChanged(auth, (user) => {
             if (user) {
                 setCurrentUser(user);
-                fetchDebts(user);
-                fetchLenders(user);
-                fetchDebtPayments(user);
+                setLoading(true);
+                Promise.all([fetchDebts(user),fetchLenders(user),fetchDebtPayments(user)]).finally(() => {
+                    setLoading(false); // ✅ Kết thúc loading
+                  });
             }
         });
         return () => unsub();
@@ -218,7 +220,13 @@ function Debts() {
             alert("❌ Something went wrong.");
         }
     };
-
+    if (loading) {
+        return (
+          <div className="flex items-center justify-center min-h-screen text-yellow-300 text-sm font-mono">
+            ⏳ Loading...
+          </div>
+        );
+      }      
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
