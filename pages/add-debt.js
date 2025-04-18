@@ -111,7 +111,7 @@ function AddDebt() {
         />
 
         <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full">
-          Add Debt
+          Add
         </button>
         {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
         <button
