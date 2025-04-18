@@ -406,7 +406,7 @@ function Expenses() {
                                                                                         className="px-16 py-1 whitespace-nowrap"
                                                                                         colSpan={5}
                                                                                     >
-                                                                                        📅 {dayjs(e.expense_date).tz(dayjs.tz.guess()).format("MM/DD/YYYY")}
+                                                                                        📅 e.expense_date
                                                                                         | 💵 $
                                                                                         {parseFloat(e.amount).toLocaleString()} | 📝{" "}
                                                                                         {e.description || "-"} |
