@@ -116,10 +116,8 @@ function AddDebt() {
         {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
         <button
           type="button"
-          onClick={() => {
-            navigate("/debts");
-          }}
-          className="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-full"
+          onClick={() => window.location.href = '/debts'}
+          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-full"
         >
           ❌ Close
         </button>
