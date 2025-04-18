@@ -117,6 +117,7 @@ function Categories() {
         >
           <option value="expense">Expense</option>
           <option value="income">Income</option>
+          <option value="credit-spending">Credit Spending</option>
         </select>
         <button
           type="submit"
