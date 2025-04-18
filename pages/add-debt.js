@@ -119,7 +119,7 @@ function AddDebt() {
           onClick={() => window.location.href = '/debts'}
           className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-full"
         >
-          ❌ Close
+          Close
         </button>
       </form>
     </div>
