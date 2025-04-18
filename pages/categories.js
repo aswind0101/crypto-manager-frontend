@@ -54,7 +54,11 @@ function Categories() {
       fetchCategories(currentUser);
     } else {
       const err = await res.json();
-      setStatus("❌ " + err.error);
+      if (err.error.includes("exists")) {
+        setStatus("❌ Category name already exists.");
+      } else {
+        setStatus("❌ Failed to add: " + err.error);
+      }
     }
   };
   const handleDeleteCategory = async (id) => {
