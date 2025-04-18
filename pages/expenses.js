@@ -406,7 +406,7 @@ function Expenses() {
                                                                                         className="px-16 py-1 whitespace-nowrap"
                                                                                         colSpan={5}
                                                                                     >
-                                                                                        📅 e.expense_date
+                                                                                        📅 {e.expense_date.slice(5, 7) + "/" + e.expense_date.slice(8, 10) + "/" + e.expense_date.slice(0, 4)}
                                                                                         | 💵 $
                                                                                         {parseFloat(e.amount).toLocaleString()} | 📝{" "}
                                                                                         {e.description || "-"} |
