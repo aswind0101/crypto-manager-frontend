@@ -134,7 +134,7 @@ function Categories() {
           <button
             key={val}
             onClick={() => setFilterType(val)}
-            className={`px-4 py-1 rounded-full text-sm border ${filterType === val
+            className={`px-3 py-1 rounded-full text-xs border ${filterType === val
               ? "bg-yellow-400 text-black font-bold"
               : "border-yellow-400 text-yellow-300"
               }`}
