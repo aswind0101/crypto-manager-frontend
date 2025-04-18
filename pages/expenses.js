@@ -137,33 +137,48 @@ function Expenses() {
                                     const maxValue = Math.max(...barChartData.map(d => d.income + d.expense));
                                     const maxHeight = 160;
                                     const total = item.income + item.expense;
-                                    const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
-                                    const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
-                                    const incomeHeight = totalHeight - expenseHeight;
+
+                                    // Tính chiều cao độc lập (không phụ thuộc total)
+                                    const expenseHeight = maxValue > 0 ? (item.expense / maxValue) * maxHeight : 0;
+                                    const incomeHeight = maxValue > 0 ? (item.income / maxValue) * maxHeight : 0;
+                                    const totalHeight = expenseHeight + incomeHeight;
+
                                     const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9", "#facc15"];
                                     const incomeColor = colors[index % colors.length];
 
                                     return (
                                         <div key={index} className="flex flex-col items-center w-[50px] min-w-[50px] scroll-mx-4">
+                                            {/* Expense amount */}
                                             <span className="mb-1 text-[11px] font-mono text-white">
                                                 ${item.expense.toLocaleString()}
                                             </span>
-                                            <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
-                                                <div
-                                                    style={{ height: `${expenseHeight}px`, backgroundColor: "#ef4444", opacity: 0.8 }}
-                                                    className="w-full rounded-t"
-                                                />
+
+                                            {/* Biểu đồ cột */}
+                                            <div
+                                                className={`w-4 flex flex-col justify-end overflow-hidden ${expenseHeight === 0 ? "rounded-t" : ""
+                                                    }`}
+                                                style={{ height: `${totalHeight}px` }}
+                                            >
+                                                {expenseHeight > 0 && (
+                                                    <div
+                                                        style={{
+                                                            height: `${expenseHeight}px`,
+                                                            backgroundColor: "#ef4444",
+                                                            opacity: 0.8,
+                                                        }}
+                                                        className="w-full"
+                                                    />
+                                                )}
                                                 <div
                                                     style={{
                                                         height: `${incomeHeight}px`,
                                                         backgroundColor: incomeColor,
-                                                        borderTopLeftRadius: expenseHeight === 0 ? "4px" : "0",
-                                                        borderTopRightRadius: expenseHeight === 0 ? "4px" : "0",
                                                     }}
                                                     className="w-full"
                                                 />
-
                                             </div>
+
+                                            {/* Tên tháng + income */}
                                             <span className="mt-1 text-[11px] text-white text-center">{item.name}</span>
                                             <span className="text-[11px] text-green-300 font-semibold">
                                                 ${item.income.toLocaleString()}
@@ -171,6 +186,7 @@ function Expenses() {
                                         </div>
                                     );
                                 })}
+
                             </div>
                         </div>
                     </div>
