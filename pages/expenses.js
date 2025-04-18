@@ -263,6 +263,13 @@ function Expenses() {
                                     .filter((e) => e.type === "expense")
                                     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
                                 const balance = income - expense;
+                                const countUniqueCategories = (arr) =>
+                                    Object.keys(
+                                        arr.reduce((acc, e) => {
+                                            acc[e.category] = true;
+                                            return acc;
+                                        }, {})
+                                    ).length;
 
                                 return (
                                     <React.Fragment key={month}>
@@ -338,10 +345,9 @@ function Expenses() {
                                                                     )}
                                                                     <span className={`font-bold text-[11px] ${color}`}>
                                                                         {label} (
-                                                                        {
-                                                                            monthData.filter((e) => e.type === type).length
-                                                                        })
+                                                                        {countUniqueCategories(monthData.filter((e) => e.type === type))})
                                                                     </span>
+
                                                                 </div>
                                                             </td>
                                                         </tr>
