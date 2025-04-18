@@ -459,7 +459,6 @@ function Debts() {
                     </tbody>
 
                 </table>
-
             </div>
             {/* FAB chỉ hiển thị trên mobile và khi không mở modal */}
             <div className="fixed bottom-6 right-6 z-50">

@@ -11,6 +11,7 @@ function Expenses() {
     const [expenses, setExpenses] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [availableYears, setAvailableYears] = useState([]);
     const [expandedMonth, setExpandedMonth] = useState(null);
     const [expandedCategory, setExpandedCategory] = useState({});
     const [categories, setCategories] = useState([]);
@@ -30,7 +31,25 @@ function Expenses() {
         });
         return () => unsubscribe();
     }, []);
-
+   
+    useEffect(() => {
+        if (expenses.length > 0) {
+          const allYears = Array.from(
+            new Set(expenses.map((e) => new Date(e.expense_date).getFullYear()))
+          ).sort((a, b) => b - a);
+      
+          setAvailableYears(allYears);
+      
+          // Nếu selectedYear không còn tồn tại nữa → chọn lại năm mới nhất
+          if (!allYears.includes(selectedYear)) {
+            setSelectedYear(allYears[0]);
+          }
+        } else {
+          setAvailableYears([]);
+          setSelectedYear(new Date().getFullYear());
+        }
+      }, [expenses]);
+      
     const fetchExpenses = async (user) => {
         const idToken = await user.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/expenses", {
@@ -73,11 +92,6 @@ function Expenses() {
             alert("❌ Something went wrong.");
         }
     };
-
-
-    const availableYears = Array.from(
-        new Set(expenses.map(e => new Date(e.expense_date).getFullYear()))
-    ).sort((a, b) => b - a); // Sắp xếp giảm dần (mới trước)
 
 
     const groupedByMonth = {};
