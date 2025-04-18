@@ -140,7 +140,21 @@ function Expenses() {
                                     const totalHeight = total > 0 ? (total / maxValue) * maxHeight : 0;
                                     const expenseHeight = total > 0 ? (item.expense / total) * totalHeight : 0;
                                     const incomeHeight = totalHeight - expenseHeight;
-                                    const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9", "#facc15"];
+                                    const colors = [
+                                        "#3b82f6", // Blue
+                                        "#8b5cf6", // Purple
+                                        "#10b981", // Emerald
+                                        "#f59e0b", // Amber
+                                        "#ec4899", // Pink
+                                        "#0ea5e9", // Sky
+                                        "#facc15", // Yellow
+                                        "#14b8a6", // Teal
+                                        "#eab308", // Mustard
+                                        "#a855f7", // Violet
+                                        "#22d3ee", // Cyan
+                                        "#4ade80", // Light Green
+                                      ];
+                                      
                                     const incomeColor = colors[index % colors.length];
 
                                     return (
