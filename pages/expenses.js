@@ -5,6 +5,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
 import React from "react";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
+import dayjs from "dayjs";
 
 
 function Expenses() {
@@ -400,7 +401,7 @@ function Expenses() {
                                                                                         className="px-16 py-1 whitespace-nowrap"
                                                                                         colSpan={5}
                                                                                     >
-                                                                                        📅 {e.expense_date.split("-").slice(1).join("/")}
+                                                                                        📅 {dayjs(e.expense_date).format("MM/DD/YYYY")}
                                                                                         | 💵 $
                                                                                         {parseFloat(e.amount).toLocaleString()} | 📝{" "}
                                                                                         {e.description || "-"} |
