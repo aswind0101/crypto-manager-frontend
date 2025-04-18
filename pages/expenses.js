@@ -348,52 +348,59 @@ function Expenses() {
                                             ))}
 
                                         {/* 💳 Credit Spending */}
-                                        <tr
-                                            className="bg-[#101d33] border-t border-gray-800 text-[11px] cursor-pointer"
-                                            onClick={() =>
-                                                setExpandedCategory((prev) => ({
-                                                    ...prev,
-                                                    [`${month}-credit-spending`]: !prev[`${month}-credit-spending`],
-                                                }))
-                                            }
-                                        >
-                                            <td className="px-8 py-2" colSpan={5}>
-                                                <div className="flex items-center gap-2">
-                                                    {expandedCategory[`${month}-credit-spending`] ? (
-                                                        <FaMinusCircle className="text-yellow-400" />
-                                                    ) : (
-                                                        <FaPlusCircle className="text-yellow-400" />
-                                                    )}
-                                                    <span className="font-bold text-purple-300">
-                                                        Credit Spending (
-                                                        {monthData.filter((e) => e.type === "credit-spending").length})
-                                                    </span>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                        {expandedMonth === month && (
+                                            <>
+                                                {/* 💳 Credit Spending dòng con */}
+                                                <tr
+                                                    className="bg-[#101d33] border-t border-gray-800 text-[11px] cursor-pointer"
+                                                    onClick={() =>
+                                                        setExpandedCategory((prev) => ({
+                                                            ...prev,
+                                                            [`${month}-credit-spending`]: !prev[`${month}-credit-spending`],
+                                                        }))
+                                                    }
+                                                >
+                                                    <td className="px-8 py-2" colSpan={5}>
+                                                        <div className="flex items-center gap-2">
+                                                            {expandedCategory[`${month}-credit-spending`] ? (
+                                                                <FaMinusCircle className="text-yellow-400" />
+                                                            ) : (
+                                                                <FaPlusCircle className="text-yellow-400" />
+                                                            )}
+                                                            <span className="font-bold text-purple-300">
+                                                                Credit Spending (
+                                                                {monthData.filter((e) => e.type === "credit-spending").length})
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
 
-                                        {expandedCategory[`${month}-credit-spending`] &&
-                                            monthData
-                                                .filter((e) => e.type === "credit-spending")
-                                                .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
-                                                .map((e, idx) => (
-                                                    <tr
-                                                        key={`cs-${idx}`}
-                                                        className="bg-[#0d1a2b] border-t border-gray-800 text-[11px] text-purple-300"
-                                                    >
-                                                        <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
-                                                            📅 {new Date(e.expense_date).toLocaleDateString()} | 💳 $
-                                                            {parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
-                                                            {e.description && ` | 📝 ${e.description}`} |
-                                                            <button
-                                                                onClick={() => handleDeleteExpense(e.id)}
-                                                                className="text-red-400 hover:text-red-600 text-[11px] ml-2"
+                                                {/* 💳 Chi tiết credit-spending */}
+                                                {expandedCategory[`${month}-credit-spending`] &&
+                                                    monthData
+                                                        .filter((e) => e.type === "credit-spending")
+                                                        .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
+                                                        .map((e, idx) => (
+                                                            <tr
+                                                                key={`cs-${idx}`}
+                                                                className="bg-[#0d1a2b] border-t border-gray-800 text-[11px] text-purple-300"
                                                             >
-                                                                🗑️ Delete
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                                <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
+                                                                    📅 {new Date(e.expense_date).toLocaleDateString()} | 💳 $
+                                                                    {parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
+                                                                    {e.description && ` | 📝 ${e.description}`} |
+                                                                    <button
+                                                                        onClick={() => handleDeleteExpense(e.id)}
+                                                                        className="text-red-400 hover:text-red-600 text-[11px] ml-2"
+                                                                    >
+                                                                        🗑️ Delete
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                            </>
+                                        )}
+
                                     </React.Fragment>
                                 );
 
