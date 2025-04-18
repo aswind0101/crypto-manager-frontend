@@ -150,13 +150,19 @@ function Expenses() {
                                             </span>
                                             <div className="w-4 flex flex-col justify-end" style={{ height: `${totalHeight}px` }}>
                                                 <div
-                                                    style={{ height: `${expenseHeight}px`, backgroundColor: "#111111" }}
+                                                    style={{ height: `${expenseHeight}px`, backgroundColor: "#ef4444", opacity: 0.8 }}
                                                     className="w-full rounded-t"
                                                 />
                                                 <div
-                                                    style={{ height: `${incomeHeight}px`, backgroundColor: incomeColor }}
+                                                    style={{
+                                                        height: `${incomeHeight}px`,
+                                                        backgroundColor: incomeColor,
+                                                        borderTopLeftRadius: expenseHeight === 0 ? "4px" : "0",
+                                                        borderTopRightRadius: expenseHeight === 0 ? "4px" : "0",
+                                                    }}
                                                     className="w-full"
                                                 />
+
                                             </div>
                                             <span className="mt-1 text-[11px] text-white text-center">{item.name}</span>
                                             <span className="text-[11px] text-green-300 font-semibold">
