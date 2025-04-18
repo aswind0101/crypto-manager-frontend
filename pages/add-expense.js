@@ -16,8 +16,12 @@ function AddExpense() {
     const [categories, setCategories] = useState([]);
     const [date, setDate] = useState(() => {
         const today = new Date();
-        return today.toISOString().split("T")[0];
-    });
+        const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+          .toISOString()
+          .split("T")[0];
+        return localDate;
+      });
+      
 
     useEffect(() => {
         const auth = getAuth();
