@@ -130,7 +130,7 @@ function Categories() {
 
       {/* Bộ lọc */}
       <div className="max-w-lg mx-auto mt-6 flex justify-center gap-4">
-        {["all", "expense", "income"].map((val) => (
+        {["all", "expense", "income",  "credit-spending"].map((val) => (
           <button
             key={val}
             onClick={() => setFilterType(val)}
