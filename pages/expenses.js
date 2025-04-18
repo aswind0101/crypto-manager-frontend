@@ -6,9 +6,6 @@ import Link from "next/link";
 import React from "react";
 import { FaPlusCircle, FaMinusCircle } from "react-icons/fa";
 
-// Kích hoạt plugin
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 function Expenses() {
     const [expenses, setExpenses] = useState([]);
