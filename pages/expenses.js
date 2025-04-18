@@ -256,8 +256,12 @@ function Expenses() {
                                 const monthData = groupedByMonth[month].filter(
                                     (e) => new Date(e.expense_date).getFullYear() === selectedYear
                                 );
-                                const income = monthData.filter((e) => e.type === "income").reduce((sum, e) => sum + parseFloat(e.amount), 0);
-                                const expense = monthData.filter((e) => e.type === "expense").reduce((sum, e) => sum + parseFloat(e.amount), 0);
+                                const income = monthData
+                                    .filter((e) => e.type === "income")
+                                    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+                                const expense = monthData
+                                    .filter((e) => e.type === "expense")
+                                    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
                                 const balance = income - expense;
 
                                 return (
@@ -290,120 +294,134 @@ function Expenses() {
                                             </td>
                                         </tr>
 
-                                        {/* 📂 Income + Expense dòng con */}
                                         {expandedMonth === month &&
-                                            ["income", "expense"].map((type) => (
-                                                <React.Fragment key={`${month}-${type}`}>
-                                                    <tr
-                                                        className="bg-[#101d33] border-t border-gray-800 text-[11px] cursor-pointer"
-                                                        onClick={() =>
-                                                            setExpandedCategory((prev) => ({
-                                                                ...prev,
-                                                                [`${month}-${type}`]: !prev[`${month}-${type}`],
-                                                            }))
-                                                        }
-                                                    >
-                                                        <td className="px-8 py-2" colSpan={5}>
-                                                            <div className="flex items-center gap-2">
-                                                                {expandedCategory[`${month}-${type}`] ? (
-                                                                    <FaMinusCircle className="text-yellow-400" />
-                                                                ) : (
-                                                                    <FaPlusCircle className="text-yellow-400" />
-                                                                )}
-                                                                <span
-                                                                    className={`font-bold text-[11px] ${type === "income" ? "text-green-400" : "text-red-400"
-                                                                        }`}
-                                                                >
-                                                                    {type === "income" ? "Income" : "Expenses"} (
-                                                                    {monthData.filter((e) => e.type === type).length})
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                            ["income", "expense", "credit-spending"].map((type) => {
+                                                const color =
+                                                    type === "income"
+                                                        ? "text-green-400"
+                                                        : type === "expense"
+                                                            ? "text-red-400"
+                                                            : "text-purple-300";
+                                                const label =
+                                                    type === "income"
+                                                        ? "Income"
+                                                        : type === "expense"
+                                                            ? "Expenses"
+                                                            : "Credit Spending";
 
-                                                    {/* 📅 Chi tiết từng ngày */}
-                                                    {expandedCategory[`${month}-${type}`] &&
-                                                        monthData
-                                                            .filter((e) => e.type === type)
-                                                            .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
-                                                            .map((e, idx) => (
-                                                                <tr
-                                                                    key={idx}
-                                                                    className="bg-[#0d1a2b] border-t border-gray-800 text-[11px]"
-                                                                >
-                                                                    <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
-                                                                        📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 $
-                                                                        {parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
-                                                                        {e.description && ` | 📝 ${e.description}`} |
-                                                                        <button
-                                                                            onClick={() => handleDeleteExpense(e.id)}
-                                                                            className="text-red-400 hover:text-red-600 text-[11px] ml-2"
-                                                                        >
-                                                                            🗑️ Delete
-                                                                        </button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                </React.Fragment>
-                                            ))}
+                                                const grouped = {};
+                                                monthData
+                                                    .filter((e) => e.type === type)
+                                                    .forEach((e) => {
+                                                        if (!grouped[e.category]) grouped[e.category] = [];
+                                                        grouped[e.category].push(e);
+                                                    });
 
-                                        {/* 💳 Credit Spending */}
-                                        {expandedMonth === month && (
-                                            <>
-                                                {/* 💳 Credit Spending dòng con */}
-                                                <tr
-                                                    className="bg-[#101d33] border-t border-gray-800 text-[11px] cursor-pointer"
-                                                    onClick={() =>
-                                                        setExpandedCategory((prev) => ({
-                                                            ...prev,
-                                                            [`${month}-credit-spending`]: !prev[`${month}-credit-spending`],
-                                                        }))
-                                                    }
-                                                >
-                                                    <td className="px-8 py-2" colSpan={5}>
-                                                        <div className="flex items-center gap-2">
-                                                            {expandedCategory[`${month}-credit-spending`] ? (
-                                                                <FaMinusCircle className="text-yellow-400" />
-                                                            ) : (
-                                                                <FaPlusCircle className="text-yellow-400" />
-                                                            )}
-                                                            <span className="font-bold text-purple-300">
-                                                                Credit Spending (
-                                                                {monthData.filter((e) => e.type === "credit-spending").length})
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                return (
+                                                    <React.Fragment key={`${month}-${type}`}>
+                                                        {/* 🔘 Nhóm chính: Income / Expenses / Credit Spending */}
+                                                        <tr
+                                                            className="bg-[#101d33] border-t border-gray-800 text-[11px] cursor-pointer"
+                                                            onClick={() =>
+                                                                setExpandedCategory((prev) => ({
+                                                                    ...prev,
+                                                                    [`${month}-${type}`]: !prev[`${month}-${type}`],
+                                                                }))
+                                                            }
+                                                        >
+                                                            <td className="px-8 py-2" colSpan={5}>
+                                                                <div className="flex items-center gap-2">
+                                                                    {expandedCategory[`${month}-${type}`] ? (
+                                                                        <FaMinusCircle className="text-yellow-400" />
+                                                                    ) : (
+                                                                        <FaPlusCircle className="text-yellow-400" />
+                                                                    )}
+                                                                    <span className={`font-bold text-[11px] ${color}`}>
+                                                                        {label} (
+                                                                        {
+                                                                            monthData.filter((e) => e.type === type).length
+                                                                        })
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
 
-                                                {/* 💳 Chi tiết credit-spending */}
-                                                {expandedCategory[`${month}-credit-spending`] &&
-                                                    monthData
-                                                        .filter((e) => e.type === "credit-spending")
-                                                        .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
-                                                        .map((e, idx) => (
-                                                            <tr
-                                                                key={`cs-${idx}`}
-                                                                className="bg-[#0d1a2b] border-t border-gray-800 text-[11px] text-purple-300"
-                                                            >
-                                                                <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
-                                                                    📅 {new Date(e.expense_date).toLocaleDateString()} | 💳 $
-                                                                    {parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
-                                                                    {e.description && ` | 📝 ${e.description}`} |
-                                                                    <button
-                                                                        onClick={() => handleDeleteExpense(e.id)}
-                                                                        className="text-red-400 hover:text-red-600 text-[11px] ml-2"
+                                                        {/* 🗂 Gom theo từng category con */}
+                                                        {expandedCategory[`${month}-${type}`] &&
+                                                            Object.entries(grouped).map(([category, items]) => (
+                                                                <React.Fragment key={`${month}-${type}-${category}`}>
+                                                                    <tr
+                                                                        className="bg-[#0f1d30] border-t border-gray-800 text-[11px] cursor-pointer"
+                                                                        onClick={() =>
+                                                                            setExpandedCategory((prev) => ({
+                                                                                ...prev,
+                                                                                [`${month}-${type}-${category}`]: !prev[
+                                                                                    `${month}-${type}-${category}`
+                                                                                ],
+                                                                            }))
+                                                                        }
                                                                     >
-                                                                        🗑️ Delete
-                                                                    </button>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                            </>
-                                        )}
+                                                                        <td className="px-12 py-1 font-semibold text-white" colSpan={5}>
+                                                                            {expandedCategory[`${month}-${type}-${category}`]
+                                                                                ? "➖"
+                                                                                : "➕"}{" "}
+                                                                            {category} (
+                                                                            {items
+                                                                                .reduce(
+                                                                                    (sum, e) => sum + parseFloat(e.amount),
+                                                                                    0
+                                                                                )
+                                                                                .toLocaleString()}
+                                                                            )
+                                                                        </td>
+                                                                    </tr>
 
+                                                                    {expandedCategory[`${month}-${type}-${category}`] &&
+                                                                        items
+                                                                            .sort(
+                                                                                (a, b) =>
+                                                                                    new Date(a.expense_date) -
+                                                                                    new Date(b.expense_date)
+                                                                            )
+                                                                            .map((e, idx) => (
+                                                                                <tr
+                                                                                    key={idx}
+                                                                                    className={`bg-[#0d1a2b] border-t border-gray-800 text-[11px] ${type === "income"
+                                                                                            ? "text-green-300"
+                                                                                            : type === "expense"
+                                                                                                ? "text-red-300"
+                                                                                                : "text-purple-300"
+                                                                                        }`}
+                                                                                >
+                                                                                    <td
+                                                                                        className="px-16 py-1 whitespace-nowrap"
+                                                                                        colSpan={5}
+                                                                                    >
+                                                                                        📅{" "}
+                                                                                        {new Date(
+                                                                                            e.expense_date
+                                                                                        ).toLocaleDateString()}{" "}
+                                                                                        | 💵 $
+                                                                                        {parseFloat(e.amount).toLocaleString()} | 📝{" "}
+                                                                                        {e.description || "-"} |
+                                                                                        <button
+                                                                                            onClick={() =>
+                                                                                                handleDeleteExpense(e.id)
+                                                                                            }
+                                                                                            className="text-red-400 hover:text-red-600 text-[11px] ml-2"
+                                                                                        >
+                                                                                            🗑️ Delete
+                                                                                        </button>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                </React.Fragment>
+                                                            ))}
+                                                    </React.Fragment>
+                                                );
+                                            })}
                                     </React.Fragment>
                                 );
-
                             })}
                     </tbody>
                 </table>
