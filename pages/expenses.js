@@ -367,12 +367,8 @@ function Expenses() {
                                                                                 : "➕"}{" "}
                                                                             {category} (
                                                                             {items
-                                                                                .reduce(
-                                                                                    (sum, e) => sum + parseFloat(e.amount),
-                                                                                    0
-                                                                                )
-                                                                                .toLocaleString()}
-                                                                            )
+                                                                                .reduce((sum, e) => sum + parseFloat(e.amount), 0)
+                                                                                .toLocaleString("en-US", { style: "currency", currency: "USD" })})
                                                                         </td>
                                                                     </tr>
 
@@ -387,10 +383,10 @@ function Expenses() {
                                                                                 <tr
                                                                                     key={idx}
                                                                                     className={`bg-[#0d1a2b] border-t border-gray-800 text-[11px] ${type === "income"
-                                                                                            ? "text-green-300"
-                                                                                            : type === "expense"
-                                                                                                ? "text-red-300"
-                                                                                                : "text-purple-300"
+                                                                                        ? "text-green-300"
+                                                                                        : type === "expense"
+                                                                                            ? "text-red-300"
+                                                                                            : "text-purple-300"
                                                                                         }`}
                                                                                 >
                                                                                     <td
