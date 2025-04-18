@@ -371,10 +371,11 @@ function Expenses() {
                                                                             {expandedCategory[`${month}-${type}-${category}`]
                                                                                 ? "➖"
                                                                                 : "➕"}{" "}
-                                                                            {category} (
+                                                                            {category} :{" "}
                                                                             {items
                                                                                 .reduce((sum, e) => sum + parseFloat(e.amount), 0)
-                                                                                .toLocaleString("en-US", { style: "currency", currency: "USD" })})
+                                                                                .toLocaleString("en-US", { style: "currency", currency: "USD" })}
+
                                                                         </td>
                                                                     </tr>
 
