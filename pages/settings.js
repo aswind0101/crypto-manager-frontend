@@ -53,7 +53,7 @@ function Settings() {
     };
 
     return (
-        <div className="min-h-screen min-w-[440px] bg-[#0b1e3d] text-white">
+        <div className="min-h-screen bg-[#0b1e3d] text-white">
             <Navbar />
             <div className="max-w-xl mx-auto p-6">
                 <h1 className="text-2xl font-bold text-yellow-400 mb-4">⚙️ Email Alert Settings</h1>

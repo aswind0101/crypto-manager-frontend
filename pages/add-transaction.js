@@ -96,7 +96,7 @@ function AddTransaction() {
   };
 
   return (
-    <div className="w-full p-4 bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen min-w-[440px] text-white">
+    <div className="w-full p-4 bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white">
       <Navbar />
       <h1 className="text-2xl font-bold text-yellow-400 my-6">➕ Add New Transaction</h1>
 

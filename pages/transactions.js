@@ -98,7 +98,7 @@ function Transactions() {
     const coinOptions = [...new Set(transactions.map((tx) => tx.coin_symbol.toUpperCase()))];
 
     return (
-        <div className="w-full p-4 bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen min-w-[440px] text-white">
+        <div className="w-full p-4 bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white">
             <Navbar />
 
             <div className="flex justify-between items-center my-6">

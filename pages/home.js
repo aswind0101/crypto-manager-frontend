@@ -458,7 +458,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-0 max-w-[1400px] mx-auto min-h-screen min-w-[440px] text-white ">
+        <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">

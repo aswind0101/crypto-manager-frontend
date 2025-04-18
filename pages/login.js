@@ -96,7 +96,7 @@ export default function Login() {
     }, []);
 
     return (
-        <div className="flex items-center justify-center h-screen min-w-[440px] bg-black text-white">
+        <div className="flex items-center justify-center h-screen bg-black text-white">
             <div className="bg-[#0e1628] p-8 rounded-lg shadow-lg text-center w-full max-w-md">
                 <h1 className="text-3xl font-bold mb-6 text-yellow-400">Crypto Manager</h1>
                 <button
