@@ -119,11 +119,11 @@ function Expenses() {
     })();
     if (loading) {
         return (
-          <div className="flex items-center justify-center min-h-screen text-yellow-300 text-sm font-mono">
-            ⏳ Loading...
-          </div>
+            <div className="flex items-center justify-center min-h-screen text-yellow-300 text-sm font-mono">
+                ⏳ Loading...
+            </div>
         );
-      }      
+    }
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
@@ -310,10 +310,13 @@ function Expenses() {
                                                                 ) : (
                                                                     <FaPlusCircle className="text-yellow-400" />
                                                                 )}
-                                                                <span className={`font-bold text-[11px] ${type === "income" ? "text-green-400" : "text-red-400"}`}>
-                                                                    {type === "income" ? "Income" : "Expenses"} ({monthData.filter((e) => e.type === type).length})
+                                                                <span
+                                                                    className={`font-bold text-[11px] ${type === "income" ? "text-green-400" : "text-red-400"
+                                                                        }`}
+                                                                >
+                                                                    {type === "income" ? "Income" : "Expenses"} (
+                                                                    {monthData.filter((e) => e.type === type).length})
                                                                 </span>
-
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -324,24 +327,76 @@ function Expenses() {
                                                             .filter((e) => e.type === type)
                                                             .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
                                                             .map((e, idx) => (
-                                                                <tr key={idx} className="bg-[#0d1a2b] border-t border-gray-800 text-[11px]">
+                                                                <tr
+                                                                    key={idx}
+                                                                    className="bg-[#0d1a2b] border-t border-gray-800 text-[11px]"
+                                                                >
                                                                     <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
-                                                                        📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 ${parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
+                                                                        📅 {new Date(e.expense_date).toLocaleDateString()} | 💵 $
+                                                                        {parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
                                                                         {e.description && ` | 📝 ${e.description}`} |
                                                                         <button
                                                                             onClick={() => handleDeleteExpense(e.id)}
-                                                                            className="text-red-400 hover:text-red-600 text-[11px]"
+                                                                            className="text-red-400 hover:text-red-600 text-[11px] ml-2"
                                                                         >
                                                                             🗑️ Delete
                                                                         </button>
                                                                     </td>
-
                                                                 </tr>
                                                             ))}
                                                 </React.Fragment>
                                             ))}
+
+                                        {/* 💳 Credit Spending */}
+                                        <tr
+                                            className="bg-[#101d33] border-t border-gray-800 text-[11px] cursor-pointer"
+                                            onClick={() =>
+                                                setExpandedCategory((prev) => ({
+                                                    ...prev,
+                                                    [`${month}-credit-spending`]: !prev[`${month}-credit-spending`],
+                                                }))
+                                            }
+                                        >
+                                            <td className="px-8 py-2" colSpan={5}>
+                                                <div className="flex items-center gap-2">
+                                                    {expandedCategory[`${month}-credit-spending`] ? (
+                                                        <FaMinusCircle className="text-yellow-400" />
+                                                    ) : (
+                                                        <FaPlusCircle className="text-yellow-400" />
+                                                    )}
+                                                    <span className="font-bold text-purple-300">
+                                                        Credit Spending (
+                                                        {monthData.filter((e) => e.type === "credit-spending").length})
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        {expandedCategory[`${month}-credit-spending`] &&
+                                            monthData
+                                                .filter((e) => e.type === "credit-spending")
+                                                .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
+                                                .map((e, idx) => (
+                                                    <tr
+                                                        key={`cs-${idx}`}
+                                                        className="bg-[#0d1a2b] border-t border-gray-800 text-[11px] text-purple-300"
+                                                    >
+                                                        <td className="px-12 py-1 whitespace-nowrap" colSpan={5}>
+                                                            📅 {new Date(e.expense_date).toLocaleDateString()} | 💳 $
+                                                            {parseFloat(e.amount).toLocaleString()} | 🗂 {e.category}
+                                                            {e.description && ` | 📝 ${e.description}`} |
+                                                            <button
+                                                                onClick={() => handleDeleteExpense(e.id)}
+                                                                className="text-red-400 hover:text-red-600 text-[11px] ml-2"
+                                                            >
+                                                                🗑️ Delete
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
                                     </React.Fragment>
                                 );
+
                             })}
                     </tbody>
                 </table>
