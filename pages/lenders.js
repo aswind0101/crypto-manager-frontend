@@ -131,7 +131,7 @@ function Lenders() {
               <tr key={l.id} className="border-t border-gray-700 hover:bg-[#162330]">
               <td className="px-4 py-2 font-bold text-yellow-300 text-left align-middle whitespace-nowrap">{l.name}</td>
               <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.note || "-"}</td>
-              <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</td>
+              <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.created_at.slice(5, 7) + "/" + l.created_at.slice(8, 10) + "/" + l.created_at.slice(0, 4)}</td>
               <td className="px-4 py-2 text-right align-middle whitespace-nowrap">
                 <button
                   className="text-red-400 hover:text-red-600 text-xs"
