@@ -117,7 +117,7 @@ function AddExpense() {
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none custom-date"
                     required
                 />
 
