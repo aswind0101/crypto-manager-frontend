@@ -303,168 +303,175 @@ function Debts() {
             </div>
 
 
-            
-            <div className="mt-6 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
-            <Link
-                href="/add-debt"
-                className="mb-6 inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-[10px] rounded-full shadow-md transition text-sm w-full sm:w-auto text-center"
-            >
-                ➕ Add Debt
-            </Link>
-                <table className="min-w-full text-xs text-white">
-                    <thead className="bg-[#183b69] text-yellow-300">
-                        <tr>
-                            <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Lender</th>
-                            <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Total Borrowed</th>
-                            <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Total Paid</th>
-                            <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Remaining</th>
-                            <th className="px-4 py-2 text-center text-xs align-middle whitespace-nowrap">Action</th>
-                        </tr>
-                    </thead>
+            {/* Wrapper cho Add Debt + Bảng */}
+            <div className="max-w-4xl mx-auto mt-8">
+                {/* Nút Add Debt */}
+                <div className="mb-4">
+                    <Link
+                        href="/add-debt"
+                        className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-full shadow-md transition inline-block"
+                    >
+                        ➕ Add Debt
+                    </Link>
+                </div>
 
-                    <tbody>
-                        {groupedDebts.map((d) => (
-                            <React.Fragment key={d.lender_id}>
-                                <tr
-                                    className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
-                                    onClick={() =>
-                                        setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)
-                                    }
-                                >
-                                    <td className="px-4 py-2 font-bold text-yellow-300 align-middle whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            {expandedLender === d.lender_id ? (
-                                                <FaMinusCircle className="text-yellow-400" />
-                                            ) : (
-                                                <FaPlusCircle className="text-yellow-400" />
-                                            )}
-                                            <span className="whitespace-nowrap">{d.lender_name}</span>
-                                        </div>
-                                    </td>
+                {/* Bảng chi tiết */}
+                <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
+                    <table className="min-w-full text-xs text-white">
+                        <thead className="bg-[#183b69] text-yellow-300">
+                            <tr>
+                                <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Lender</th>
+                                <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Total Borrowed</th>
+                                <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Total Paid</th>
+                                <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Remaining</th>
+                                <th className="px-4 py-2 text-center text-xs align-middle whitespace-nowrap">Action</th>
+                            </tr>
+                        </thead>
 
-                                    <td className="px-4 py-2 whitespace-nowrap">
-                                        ${parseFloat(d.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="px-4 py-2 text-green-400 whitespace-nowrap">
-                                        ${parseFloat(d.total_paid || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="px-4 py-2 text-red-400 whitespace-nowrap">
-                                        ${parseFloat(d.remaining || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="px-4 py-2 text-center align-middle whitespace-nowrap">
-                                        {parseFloat(d.remaining) > 0 && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setPayingLenderId(payingLenderId === d.lender_id ? null : d.lender_id);
-                                                    setPayStatus("");
-                                                    setPayAmount("");
-                                                    setPayNote("");
-                                                }}
-                                                className="text-xs px-2 py-1 min-w-[60px] bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm"
-                                            >
-                                                💸 Pay
-                                            </button>
-
-                                        )}
-                                    </td>
-
-                                </tr>
-
-                                {/* ✅ Form trả tiền tổng theo lender */}
-                                {payingLenderId === d.lender_id && (
-                                    <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
-                                        <td colSpan={5} className="px-6 py-3">
-                                            <form onSubmit={(e) => handleLenderPayment(e, d.lender_id)} className="flex flex-col md:flex-row items-center gap-2">
-                                                <input
-                                                    type="number"
-                                                    value={payAmount}
-                                                    onChange={(e) => setPayAmount(e.target.value)}
-                                                    placeholder="Amount to pay"
-                                                    step="any"
-                                                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-40"
-                                                    required
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={payNote}
-                                                    onChange={(e) => setPayNote(e.target.value)}
-                                                    placeholder="Note (optional)"
-                                                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-60"
-                                                />
-                                                <button
-                                                    type="submit"
-                                                    className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-full text-white font-medium text-sm"
-                                                >
-                                                    Submit
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPayingLenderId(null)} // ✅ Đóng form
-                                                    className="bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-full text-white font-medium text-sm"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                {payStatus && (
-                                                    <p className="text-yellow-300 text-xs">{payStatus}</p>
-                                                )}
-                                            </form>
-                                        </td>
-                                    </tr>
-                                )}
-
-                                {/* Dòng chi tiết khoản nợ */}
-                                {expandedLender === d.lender_id && (() => {
-                                    // Lấy tất cả khoản mượn & trả liên quan tới lender này
-                                    const combinedItems = [
-                                        ...d.details.map(debt => ({
-                                            id: debt.id, // 🆕 để xoá được khoản mượn
-                                            type: "borrow",
-                                            date: debt.created_at,
-                                            amount: parseFloat(debt.total_amount || 0),
-                                            note: debt.note,
-                                        })),
-                                        ...debtPayments
-                                            .filter(p => d.details.some(debt => debt.id === p.debt_id))
-                                            .map(p => ({
-                                                id: p.id, // 🆕 để xoá được khoản trả nợ
-                                                type: "payment",
-                                                date: p.payment_date,
-                                                amount: parseFloat(p.amount_paid),
-                                                note: p.note,
-                                            }))
-                                    ];
-
-                                    // Sắp xếp theo thời gian tăng dần
-                                    combinedItems.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-                                    return combinedItems.map((item, idx) => (
-                                        <tr key={idx} className={`text-[11px] ${item.type === "borrow" ? "bg-[#101d33] text-white" : "bg-[#0d1a2b] text-green-300"}`}>
-                                            <td className="px-8 py-2 text-[11px]" colSpan={5}>
-                                                📅 {item.date.slice(5, 7) + "/" + item.date.slice(8, 10) + "/" + item.date.slice(0, 4)} |
-                                                {item.type === "borrow" ? (
-                                                    <> 💵 Borrowed ${item.amount.toLocaleString()} </>
+                        <tbody>
+                            {groupedDebts.map((d) => (
+                                <React.Fragment key={d.lender_id}>
+                                    <tr
+                                        className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
+                                        onClick={() =>
+                                            setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)
+                                        }
+                                    >
+                                        <td className="px-4 py-2 font-bold text-yellow-300 align-middle whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                {expandedLender === d.lender_id ? (
+                                                    <FaMinusCircle className="text-yellow-400" />
                                                 ) : (
-                                                    <> ✅ Paid ${item.amount.toLocaleString()} </>
+                                                    <FaPlusCircle className="text-yellow-400" />
                                                 )}
-                                                {item.note && <> | 📝 {item.note}</>}
+                                                <span className="whitespace-nowrap">{d.lender_name}</span>
+                                            </div>
+                                        </td>
+
+                                        <td className="px-4 py-2 whitespace-nowrap">
+                                            ${parseFloat(d.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-4 py-2 text-green-400 whitespace-nowrap">
+                                            ${parseFloat(d.total_paid || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-4 py-2 text-red-400 whitespace-nowrap">
+                                            ${parseFloat(d.remaining || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-4 py-2 text-center align-middle whitespace-nowrap">
+                                            {parseFloat(d.remaining) > 0 && (
                                                 <button
-                                                    className="ml-4 text-red-400 hover:text-red-600 text-[11px]"
-                                                    onClick={() => handleDeleteItem(item)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPayingLenderId(payingLenderId === d.lender_id ? null : d.lender_id);
+                                                        setPayStatus("");
+                                                        setPayAmount("");
+                                                        setPayNote("");
+                                                    }}
+                                                    className="text-xs px-2 py-1 min-w-[60px] bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm"
                                                 >
-                                                    🗑️ Delete
+                                                    💸 Pay
                                                 </button>
+
+                                            )}
+                                        </td>
+
+                                    </tr>
+
+                                    {/* ✅ Form trả tiền tổng theo lender */}
+                                    {payingLenderId === d.lender_id && (
+                                        <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                            <td colSpan={5} className="px-6 py-3">
+                                                <form onSubmit={(e) => handleLenderPayment(e, d.lender_id)} className="flex flex-col md:flex-row items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        value={payAmount}
+                                                        onChange={(e) => setPayAmount(e.target.value)}
+                                                        placeholder="Amount to pay"
+                                                        step="any"
+                                                        className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-40"
+                                                        required
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={payNote}
+                                                        onChange={(e) => setPayNote(e.target.value)}
+                                                        placeholder="Note (optional)"
+                                                        className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-60"
+                                                    />
+                                                    <button
+                                                        type="submit"
+                                                        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-full text-white font-medium text-sm"
+                                                    >
+                                                        Submit
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPayingLenderId(null)} // ✅ Đóng form
+                                                        className="bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-full text-white font-medium text-sm"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    {payStatus && (
+                                                        <p className="text-yellow-300 text-xs">{payStatus}</p>
+                                                    )}
+                                                </form>
                                             </td>
                                         </tr>
-                                    ));
-                                })()}
+                                    )}
+
+                                    {/* Dòng chi tiết khoản nợ */}
+                                    {expandedLender === d.lender_id && (() => {
+                                        // Lấy tất cả khoản mượn & trả liên quan tới lender này
+                                        const combinedItems = [
+                                            ...d.details.map(debt => ({
+                                                id: debt.id, // 🆕 để xoá được khoản mượn
+                                                type: "borrow",
+                                                date: debt.created_at,
+                                                amount: parseFloat(debt.total_amount || 0),
+                                                note: debt.note,
+                                            })),
+                                            ...debtPayments
+                                                .filter(p => d.details.some(debt => debt.id === p.debt_id))
+                                                .map(p => ({
+                                                    id: p.id, // 🆕 để xoá được khoản trả nợ
+                                                    type: "payment",
+                                                    date: p.payment_date,
+                                                    amount: parseFloat(p.amount_paid),
+                                                    note: p.note,
+                                                }))
+                                        ];
+
+                                        // Sắp xếp theo thời gian tăng dần
+                                        combinedItems.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                                        return combinedItems.map((item, idx) => (
+                                            <tr key={idx} className={`text-[11px] ${item.type === "borrow" ? "bg-[#101d33] text-white" : "bg-[#0d1a2b] text-green-300"}`}>
+                                                <td className="px-8 py-2 text-[11px]" colSpan={5}>
+                                                    📅 {item.date.slice(5, 7) + "/" + item.date.slice(8, 10) + "/" + item.date.slice(0, 4)} |
+                                                    {item.type === "borrow" ? (
+                                                        <> 💵 Borrowed ${item.amount.toLocaleString()} </>
+                                                    ) : (
+                                                        <> ✅ Paid ${item.amount.toLocaleString()} </>
+                                                    )}
+                                                    {item.note && <> | 📝 {item.note}</>}
+                                                    <button
+                                                        className="ml-4 text-red-400 hover:text-red-600 text-[11px]"
+                                                        onClick={() => handleDeleteItem(item)}
+                                                    >
+                                                        🗑️ Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ));
+                                    })()}
 
 
-                            </React.Fragment>
-                        ))}
-                    </tbody>
+                                </React.Fragment>
+                            ))}
+                        </tbody>
 
-                </table>
+                    </table>
+                </div>
             </div>
 
         </div>
