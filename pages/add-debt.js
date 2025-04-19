@@ -102,13 +102,20 @@ function AddDebt() {
           onChange={(e) => setNote(e.target.value)}
           className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
         />
-        <input
-          type="date"
-          value={createdDate}
-          onChange={(e) => setCreatedDate(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none custom-date"
-          required
-        />
+        <div className="relative w-full">
+          <input
+            type="date"
+            value={createdDate}
+            onChange={(e) => setCreatedDate(e.target.value)}
+            className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none pr-10"
+            required
+          />
+          {/* 📅 Icon lịch tùy chỉnh */}
+          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white pointer-events-none">
+            📅
+          </div>
+        </div>
+
 
         <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full">
           Add
