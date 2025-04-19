@@ -303,13 +303,14 @@ function Debts() {
             </div>
 
 
+            
+            <div className="mt-6 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
             <Link
                 href="/add-debt"
-                className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-[10px] rounded-full shadow-md transition text-sm w-full sm:w-auto text-center"
+                className="mb-6 inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-[10px] rounded-full shadow-md transition text-sm w-full sm:w-auto text-center"
             >
                 ➕ Add Debt
             </Link>
-            <div className="mt-6 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-xs text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
