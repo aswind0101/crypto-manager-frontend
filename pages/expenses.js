@@ -220,12 +220,12 @@ function Expenses() {
             {/* Select year + Add button */}
             <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-sm font-semibold">
                 {/* Hiển thị "Year:" và dropdown chọn năm bên trái */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 relative">
                     <span>Year:</span>
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="bg-yellow-400 text-black text-sm font-semibold outline-none appearance-none cursor-pointer"
+                        className="bg-yellow-400 text-black font-semibold outline-none appearance-none cursor-pointer pr-6"
                     >
                         {availableYears.map((year) => (
                             <option key={year} value={year}>
@@ -233,6 +233,7 @@ function Expenses() {
                             </option>
                         ))}
                     </select>
+
                     {/* Mũi tên chỉ dropdown */}
                     <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
                         <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
