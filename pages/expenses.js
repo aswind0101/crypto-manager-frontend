@@ -16,6 +16,7 @@ function Expenses() {
     const [expandedCategory, setExpandedCategory] = useState({});
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState(null); // 🆕 ID của expense đang được xoá
 
 
     useEffect(() => {
@@ -51,25 +52,43 @@ function Expenses() {
     }, [expenses]);
 
     const fetchExpenses = async (user) => {
-        const idToken = await user.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/expenses", {
-            headers: {
-                Authorization: `Bearer ${idToken}`,
-            },
-        });
-        const data = await res.json();
-        setExpenses(data);
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/expenses", {
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
+            const data = await res.json();
+            setExpenses(data);
+        } catch (err) {
+            console.error("❌ Error fetching expenses:", err.message);
+        }
     };
+
     const fetchCategories = async (user) => {
-        const idToken = await user.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/categories", {
-            headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        setCategories(data);
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/categories", {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Failed to fetch categories");
+            }
+
+            const data = await res.json();
+            setCategories(data);
+        } catch (error) {
+            console.error("❌ Error fetching categories:", error.message);
+        }
     };
+
     const handleDeleteExpense = async (id) => {
         if (!confirm("Are you sure you want to delete this transaction?")) return;
+
+        setDeletingId(id); // ✅ bắt đầu loading
 
         try {
             const token = await currentUser.getIdToken();
@@ -81,8 +100,7 @@ function Expenses() {
             });
 
             if (res.ok) {
-                // Sau khi xoá thì reload lại dữ liệu
-                fetchExpenses(currentUser);
+                await fetchExpenses(currentUser);
             } else {
                 const err = await res.json();
                 alert("❌ Failed to delete: " + err.error);
@@ -90,9 +108,10 @@ function Expenses() {
         } catch (err) {
             console.error("❌ Delete error:", err.message);
             alert("❌ Something went wrong.");
+        } finally {
+            setDeletingId(null); // ✅ kết thúc loading
         }
     };
-
 
     const groupedByMonth = {};
 
@@ -123,7 +142,7 @@ function Expenses() {
                 .reduce((sum, e) => sum + parseFloat(e.amount), 0);
 
             return {
-                name: new Date(2023, i).toLocaleString("default", { month: "short" }),
+                name: new Date(0, i).toLocaleString("default", { month: "short" }),
                 income,
                 expense,
             };
@@ -422,13 +441,15 @@ function Expenses() {
                                                                                         {parseFloat(e.amount).toLocaleString()} | 📝{" "}
                                                                                         {e.description || "-"} |
                                                                                         <button
-                                                                                            onClick={() =>
-                                                                                                handleDeleteExpense(e.id)
-                                                                                            }
-                                                                                            className="text-red-400 hover:text-red-600 text-[11px] ml-2"
+                                                                                            onClick={() => handleDeleteExpense(e.id)}
+                                                                                            disabled={deletingId === e.id}
+                                                                                            className={`ml-2 text-[11px] ${deletingId === e.id
+                                                                                                ? "text-gray-400 cursor-not-allowed"
+                                                                                                : "text-red-400 hover:text-red-600"}`}
                                                                                         >
-                                                                                            🗑️ Delete
+                                                                                            {deletingId === e.id ? "⏳ Deleting..." : "🗑️ Delete"}
                                                                                         </button>
+
                                                                                     </td>
                                                                                 </tr>
                                                                             ))}
