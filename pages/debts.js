@@ -309,7 +309,7 @@ function Debts() {
             >
                 ➕ Add Debt
             </Link>
-            <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
+            <div className="mt-6 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-xs text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
@@ -464,16 +464,6 @@ function Debts() {
                     </tbody>
 
                 </table>
-            </div>
-            {/* FAB chỉ hiển thị trên mobile và khi không mở modal */}
-            <div className="fixed bottom-6 right-6 z-50">
-                <Link
-                    href="/add-debt"
-                    className="bg-yellow-300 bg-opacity-80 hover:bg-yellow-400 hover:bg-opacity-100 hover:scale-105 active:scale-95 text-black text-3xl rounded-full shadow-lg w-14 h-14 flex items-center justify-center transition-all duration-300"
-                    title="Add Debt"
-                >
-                    ➕
-                </Link>
             </div>
 
         </div>
