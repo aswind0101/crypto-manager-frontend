@@ -45,9 +45,9 @@ function Debts() {
             if (user) {
                 setCurrentUser(user);
                 setLoading(true);
-                Promise.all([fetchDebts(user),fetchLenders(user),fetchDebtPayments(user)]).finally(() => {
+                Promise.all([fetchDebts(user), fetchLenders(user), fetchDebtPayments(user)]).finally(() => {
                     setLoading(false); // ✅ Kết thúc loading
-                  });
+                });
             }
         });
         return () => unsub();
@@ -222,11 +222,11 @@ function Debts() {
     };
     if (loading) {
         return (
-          <div className="flex items-center justify-center min-h-screen text-yellow-300 text-sm font-mono">
-            ⏳ Loading...
-          </div>
+            <div className="flex items-center justify-center min-h-screen text-yellow-300 text-sm font-mono">
+                ⏳ Loading...
+            </div>
         );
-      }      
+    }
     return (
         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
             <Navbar />
@@ -303,7 +303,12 @@ function Debts() {
             </div>
 
 
-
+            <Link
+                href="/add-debt"
+                className="bg-yellow-400 hover:bg-yellow-500 text-black text-sm font-semibold px-5 py-2 rounded-full shadow-md transition"
+            >
+                ➕ Add Debt
+            </Link>
             <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
                 <table className="min-w-full text-xs text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
