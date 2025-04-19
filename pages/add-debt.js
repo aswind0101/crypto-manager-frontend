@@ -106,7 +106,7 @@ function AddDebt() {
           type="date"
           value={createdDate}
           onChange={(e) => setCreatedDate(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none custom-date"
           required
         />
 

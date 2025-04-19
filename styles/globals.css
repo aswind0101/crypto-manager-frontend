@@ -12,9 +12,11 @@
   }
 }
 /* 📅 Đổi màu icon date picker */
-.custom-date::-webkit-calendar-picker-indicator {
-  filter: invert(1); /* trắng rõ trên nền tối */
-  cursor: pointer;
+@layer utilities {
+  .custom-date::-webkit-calendar-picker-indicator {
+    filter: invert(1); /* biến icon thành màu trắng */
+    cursor: pointer;
+  }
 }
 /* Hide scrollbar but allow scrolling */
 .scrollbar-hide::-webkit-scrollbar {
