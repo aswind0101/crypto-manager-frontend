@@ -278,6 +278,7 @@ function Expenses() {
                             <th className="px-4 py-2 text-left whitespace-nowrap">Month</th>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Income</th>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Expenses</th>
+                            <th className="px-4 py-2 text-left whitespace-nowrap">Credit Spending</th>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Balance</th>
                         </tr>
                     </thead>
@@ -299,6 +300,10 @@ function Expenses() {
                                     .filter((e) => e.type === "expense")
                                     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
                                 const balance = income - expense;
+                                const creditSpending = monthData
+                                    .filter((e) => e.type === "credit-spending")
+                                    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+
                                 const countUniqueCategories = (arr) =>
                                     Object.keys(
                                         arr.reduce((acc, e) => {
@@ -331,6 +336,9 @@ function Expenses() {
                                             </td>
                                             <td className="px-4 py-2 text-red-400 font-mono">
                                                 ${expense.toLocaleString()}
+                                            </td>
+                                            <td className="px-4 py-2 text-purple-300 font-mono">
+                                                ${creditSpending.toLocaleString()}
                                             </td>
                                             <td className="px-4 py-2 text-white font-mono">
                                                 ${balance.toLocaleString()}
