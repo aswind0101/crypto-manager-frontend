@@ -216,28 +216,34 @@ function Expenses() {
             <div className="mb-6 mt-4 text-sm text-yellow-300 font-bold flex items-center justify-center gap-2">
                 <span>📊</span> <span>Monthly Cash Flow</span>
             </div>
-            
-            {/* Select year block */}
+
+            {/* Select year + Add button */}
             <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-base font-bold">
-                <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                    className="bg-yellow-400 text-black font-bold outline-none appearance-none cursor-pointer"
-                >
-                    {availableYears.map((year) => (
-                        <option key={year} value={year}>
-                            {year}
-                        </option>
-                    ))}
-                </select>
-                {/* Nút Add Income/Expense */}
+                {/* Hiển thị "Year:" và dropdown chọn năm bên trái */}
+                <div className="flex items-center gap-2">
+                    <span>Year:</span>
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                        className="bg-yellow-400 text-black font-bold outline-none appearance-none cursor-pointer"
+                    >
+                        {availableYears.map((year) => (
+                            <option key={year} value={year}>
+                                {year}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Nút Add nằm bên phải */}
                 <Link
                     href="/add-expense"
-                    className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-1.5 rounded-full shadow-md transition"
+                    className="text-green-600 hover:text-green-700 text-sm font-semibold flex items-center gap-1 transition"
                 >
-                    ➕ Add Income/Expense
+                    <span className="text-lg">➕</span> Add Income/Expense
                 </Link>
             </div>
+
             {/* Bảng tổng hợp theo tháng */}
             <div className="overflow-x-auto border border-[#2c4069] shadow-lg rounded-b-xl max-w-4xl mx-auto">
                 <table className="min-w-full text-[11px] text-white">
