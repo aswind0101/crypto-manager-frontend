@@ -216,21 +216,9 @@ function Expenses() {
             <div className="mb-6 mt-4 text-sm text-yellow-300 font-bold flex items-center justify-center gap-2">
                 <span>📊</span> <span>Monthly Cash Flow</span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-
-                {/* Nút Add Income/Expense */}
-                <Link
-                    href="/add-expense"
-                    className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-[10px] rounded-full shadow-md transition text-sm w-full sm:w-auto text-center"
-                >
-                    ➕ Add Income/Expense
-                </Link>
-            </div>
-
-
+            
             {/* Select year block */}
-            <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex justify-between items-center shadow-md text-black text-base font-bold">
-                <span>{selectedYear}</span>
+            <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-base font-bold">
                 <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(parseInt(e.target.value))}
@@ -242,6 +230,13 @@ function Expenses() {
                         </option>
                     ))}
                 </select>
+                {/* Nút Add Income/Expense */}
+                <Link
+                    href="/add-expense"
+                    className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-1.5 rounded-full shadow-md transition"
+                >
+                    ➕ Add Income/Expense
+                </Link>
             </div>
             {/* Bảng tổng hợp theo tháng */}
             <div className="overflow-x-auto border border-[#2c4069] shadow-lg rounded-b-xl max-w-4xl mx-auto">
