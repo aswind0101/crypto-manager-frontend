@@ -218,14 +218,14 @@ function Expenses() {
             </div>
 
             {/* Select year + Add button */}
-            <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-base font-bold">
+            <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-sm font-semibold">
                 {/* Hiển thị "Year:" và dropdown chọn năm bên trái */}
                 <div className="flex items-center gap-2">
                     <span>Year:</span>
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="bg-yellow-400 text-black font-bold outline-none appearance-none cursor-pointer"
+                        className="bg-yellow-400 text-black text-sm font-semibold outline-none appearance-none cursor-pointer"
                     >
                         {availableYears.map((year) => (
                             <option key={year} value={year}>
