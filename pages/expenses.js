@@ -31,25 +31,25 @@ function Expenses() {
         });
         return () => unsubscribe();
     }, []);
-   
+
     useEffect(() => {
         if (expenses.length > 0) {
-          const allYears = Array.from(
-            new Set(expenses.map((e) => new Date(e.expense_date).getFullYear()))
-          ).sort((a, b) => b - a);
-      
-          setAvailableYears(allYears);
-      
-          // Nếu selectedYear không còn tồn tại nữa → chọn lại năm mới nhất
-          if (!allYears.includes(selectedYear)) {
-            setSelectedYear(allYears[0]);
-          }
+            const allYears = Array.from(
+                new Set(expenses.map((e) => new Date(e.expense_date).getFullYear()))
+            ).sort((a, b) => b - a);
+
+            setAvailableYears(allYears);
+
+            // Nếu selectedYear không còn tồn tại nữa → chọn lại năm mới nhất
+            if (!allYears.includes(selectedYear)) {
+                setSelectedYear(allYears[0]);
+            }
         } else {
-          setAvailableYears([]);
-          setSelectedYear(new Date().getFullYear());
+            setAvailableYears([]);
+            setSelectedYear(new Date().getFullYear());
         }
-      }, [expenses]);
-      
+    }, [expenses]);
+
     const fetchExpenses = async (user) => {
         const idToken = await user.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/expenses", {
@@ -217,26 +217,6 @@ function Expenses() {
                 <span>📊</span> <span>Monthly Cash Flow</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-                {/* Dropdown chọn năm */}
-                <div className="relative w-full sm:w-auto">
-                    <select
-                        value={selectedYear}
-                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="appearance-none bg-[#facc15] text-black font-semibold px-6 py-2 h-[42px] rounded-full shadow-md outline-none text-sm w-full sm:w-auto pr-10"
-                    >
-                        {availableYears.map((year) => (
-                            <option key={year} value={year}>{year}</option>
-                        ))}
-                    </select>
-
-                    {/* Dấu tam giác */}
-                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
-                        <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                </div>
-
 
                 {/* Nút Add Income/Expense */}
                 <Link
@@ -248,8 +228,23 @@ function Expenses() {
             </div>
 
 
+            {/* Select year block */}
+            <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex justify-between items-center shadow-md text-black text-base font-bold">
+                <span>{selectedYear}</span>
+                <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className="bg-yellow-400 text-black font-bold outline-none appearance-none cursor-pointer"
+                >
+                    {availableYears.map((year) => (
+                        <option key={year} value={year}>
+                            {year}
+                        </option>
+                    ))}
+                </select>
+            </div>
             {/* Bảng tổng hợp theo tháng */}
-            <div className="mb-8 overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
+            <div className="overflow-x-auto border border-[#2c4069] shadow-lg rounded-b-xl max-w-4xl mx-auto">
                 <table className="min-w-full text-[11px] text-white">
                     <thead className="bg-[#183b69] text-yellow-300">
                         <tr>
