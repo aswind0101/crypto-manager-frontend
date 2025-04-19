@@ -68,7 +68,7 @@ export default function Navbar() {
             <nav className="w-full whote== shadow-lg px-6 py-3 flex justify-between items-center rounded-b-2xl text-white z-50">
                 {/* Logo + App name */}
                 <div className="flex items-center gap-2 font-bold text-xl">
-                    💰 <span className="tracking-wide">Crypto Manager</span>
+                    💰 <span className="tracking-wide">PFMS</span>
                 </div>
 
                 {/* Desktop User Info */}

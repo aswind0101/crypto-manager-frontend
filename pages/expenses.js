@@ -245,7 +245,7 @@ function Expenses() {
                 {/* Nút Add nằm bên phải */}
                 <Link
                     href="/add-expense"
-                    className="text-green-600 hover:text-green-700 text-sm font-semibold flex items-center gap-1 transition"
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-full shadow-md transition"
                 >
                     <span className="text-lg">➕</span> Add Income/Expense
                 </Link>
