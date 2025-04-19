@@ -305,7 +305,7 @@ function Debts() {
 
             <Link
                 href="/add-debt"
-                className="bg-yellow-400 hover:bg-yellow-500 text-black text-sm font-semibold px-5 py-2 rounded-full shadow-md transition"
+                className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-[10px] rounded-full shadow-md transition text-sm w-full sm:w-auto text-center"
             >
                 ➕ Add Debt
             </Link>
