@@ -247,7 +247,7 @@ function Expenses() {
                     href="/add-expense"
                     className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-full shadow-md transition"
                 >
-                    <span className="text-lg">➕</span> Add Income/Expense
+                    ➕ Add Income/Expense
                 </Link>
             </div>
 
