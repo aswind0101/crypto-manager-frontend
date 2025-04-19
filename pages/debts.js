@@ -306,14 +306,16 @@ function Debts() {
             {/* Wrapper cho Add Debt + Bảng */}
             <div className="max-w-4xl mx-auto mt-8">
                 {/* Nút Add Debt */}
-                <div className="mb-4">
+                <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-sm font-bold">
+                    <span className="text-base">Debts</span>
                     <Link
                         href="/add-debt"
-                        className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-full shadow-md transition inline-block"
+                        className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-full shadow-md transition"
                     >
                         ➕ Add Debt
                     </Link>
                 </div>
+
 
                 {/* Bảng chi tiết */}
                 <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg">
