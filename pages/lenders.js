@@ -158,6 +158,10 @@ function Lenders() {
           </tbody>
         </table>
       </div>
+      <div className="bg-[#10192b] border border-cyan-400/30 shadow-lg shadow-cyan-400/10 rounded-xl p-4">
+        {/* Chart here */}
+      </div>
+
     </div>
   );
 }
