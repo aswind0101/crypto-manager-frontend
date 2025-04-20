@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/router";
 
 function AddDebt() {
   const [amount, setAmount] = useState("");
@@ -15,6 +16,7 @@ function AddDebt() {
   const [selectedLenderId, setSelectedLenderId] = useState("");
   const [status, setStatus] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
     const auth = getAuth();
@@ -81,12 +83,20 @@ function AddDebt() {
           className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
           required
         >
-          <option value="">-- Select Lender --</option>
+          <option value="">👤 Select lender</option>
           {lenders.map((lender) => (
             <option key={lender.id} value={lender.id}>{lender.name}</option>
           ))}
         </select>
-
+        <div className="w-full mt-1 text-left">
+          <button
+            type="button"
+            onClick={() => router.push("/lenders")}
+            className="text-sm text-blue-400 hover:text-blue-300 hover:underline transition"
+          >
+            ➕ Add New Lender
+          </button>
+        </div>
         <input
           type="number"
           placeholder="Total amount borrowed"
@@ -117,7 +127,7 @@ function AddDebt() {
         {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
         <button
           type="button"
-          onClick={() => window.location.href = '/debts'}
+          onClick={() => router.push("/debts")}
           className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-full"
         >
           Close
