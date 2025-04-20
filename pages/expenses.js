@@ -283,7 +283,7 @@ function Expenses() {
                     ➕ Income/Expense
                 </Link>
             </div>
-            <div className="max-w-4xl mx-auto bg-[#1a2f46] text-white px-4 py-3 shadow-md grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-center">
+            <div className="max-w-4xl mx-auto bg-[#1a2f46] text-white px-4 py-3 shadow-md grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-center">
                 <div>
                     <p className="text-green-400 font-bold">💰 Total Income</p>
                     <p className="font-mono">${totalIncome.toLocaleString()}</p>
