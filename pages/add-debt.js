@@ -62,6 +62,7 @@ function AddDebt() {
       setAmount("");
       setNote("");
       setStatus("✅ Debt added!");
+      setTimeout(() => setStatus(""), 3000);
     } else {
       const err = await res.json();
       setStatus("❌ " + err.error);

@@ -97,6 +97,7 @@ function AddExpense() {
             setDescription("");
             setType("expense");
             setStatus("✅ Added successfully!");
+            setTimeout(() => setStatus(""), 3000);
         } else {
             const err = await res.json();
             setStatus("❌ Error: " + err.error);
