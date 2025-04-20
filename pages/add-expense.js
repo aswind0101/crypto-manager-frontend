@@ -21,9 +21,6 @@ function AddExpense() {
     });
     const [isSubmitting, setIsSubmitting] = useState(false); // 🆕 trạng thái loading khi submit
 
-    const CATEGORY_CACHE_KEY = "categories_cache";
-    const CATEGORY_CACHE_EXPIRY_KEY = "categories_cache_expiry";
-    const CATEGORY_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 giờ (ms)
     const router = useRouter();
 
 
@@ -145,12 +142,15 @@ function AddExpense() {
                         <option key={cat.id} value={cat.name}>{cat.name}</option>
                     ))}
                 </select>
-                {categories.filter(c => c.type === type).length === 0 && (
-                    <p className="text-sm text-yellow-400 mt-2">
-                        ⚠️ You have no categories yet. Please add some in{' '}
-                        <Link href="/categories" className="underline hover:text-yellow-300">Category</Link>.
-                    </p>
-                )}
+                <div className="w-full mt-1 text-left">
+                    <button
+                        type="button"
+                        onClick={() => router.push("/categories")}
+                        className="text-sm text-blue-400 hover:underline hover:text-blue-300 transition"
+                    >
+                        ➕ Add New Category
+                    </button>
+                </div>
 
                 <input
                     type="date"
