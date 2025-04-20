@@ -70,6 +70,7 @@ function Categories() {
       setName("");
       setStatus("✅ Category added!");
       fetchCategories(currentUser);
+      setTimeout(() => setStatus(""), 3000);
     } else {
       const err = await res.json();
       if (err.error.includes("exists")) {
@@ -94,6 +95,7 @@ function Categories() {
       if (res.ok) {
         setStatus("✅ Category deleted!");
         fetchCategories(currentUser); // reload danh sách
+        setTimeout(() => setStatus(""), 3000);
       } else {
         const err = await res.json();
         if (err.error.includes("in use")) {
