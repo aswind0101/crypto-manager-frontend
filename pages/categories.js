@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/router";
+
 
 function Categories() {
   const [categories, setCategories] = useState([]);
@@ -10,6 +12,8 @@ function Categories() {
   const [status, setStatus] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [currentUser, setCurrentUser] = useState(null);
+  const router = useRouter();
+
 
   useEffect(() => {
     const auth = getAuth();
@@ -140,6 +144,14 @@ function Categories() {
           Add Category
         </button>
         {status && <p className="text-sm text-yellow-300 text-center mt-4">{status}</p>}
+        <button
+          type="button"
+          onClick={() => router.push("/add-expense")}
+          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-full transition mt-2"
+        >
+          🔙 Back to Add Expense
+        </button>
+
       </form>
 
       {/* Bộ lọc */}
