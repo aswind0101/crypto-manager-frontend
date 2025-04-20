@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/router";
+
 
 function Lenders() {
   const [lenders, setLenders] = useState([]);
@@ -9,6 +11,8 @@ function Lenders() {
   const [note, setNote] = useState("");
   const [status, setStatus] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  const router = useRouter();
+
 
   useEffect(() => {
     const auth = getAuth();
@@ -52,6 +56,7 @@ function Lenders() {
       setNote("");
       setStatus("✅ Lender added!");
       fetchLenders(currentUser);
+      setTimeout(() => setStatus(""), 3000);
     } else {
       const err = await res.json();
       setStatus("❌ " + err.error);
@@ -76,6 +81,7 @@ function Lenders() {
       } else {
         alert("✅ Lender deleted.");
         fetchLenders(currentUser); // reload danh sách
+        setTimeout(() => setStatus(""), 3000);
       }
     } catch (err) {
       console.error("❌ Delete lender error:", err.message);
@@ -113,6 +119,13 @@ function Lenders() {
           Add Lender
         </button>
         {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
+        <button
+          type="button"
+          onClick={() => router.push("/add-debt")}
+          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-full mt-2"
+        >
+          🔙 Back to Add Debt
+        </button>
       </form>
 
       {/* Danh sách người cho vay */}
@@ -129,18 +142,18 @@ function Lenders() {
           <tbody>
             {lenders.map((l) => (
               <tr key={l.id} className="border-t border-gray-700 hover:bg-[#162330]">
-              <td className="px-4 py-2 font-bold text-yellow-300 text-left align-middle whitespace-nowrap">{l.name}</td>
-              <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.note || "-"}</td>
-              <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.created_at.slice(5, 7) + "/" + l.created_at.slice(8, 10) + "/" + l.created_at.slice(0, 4)}</td>
-              <td className="px-4 py-2 text-right align-middle whitespace-nowrap">
-                <button
-                  className="text-red-400 hover:text-red-600 text-xs"
-                  onClick={() => handleDeleteLender(l.id)}
-                >
-                  🗑️ Delete
-                </button>
-              </td>
-            </tr>            
+                <td className="px-4 py-2 font-bold text-yellow-300 text-left align-middle whitespace-nowrap">{l.name}</td>
+                <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.note || "-"}</td>
+                <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.created_at.slice(5, 7) + "/" + l.created_at.slice(8, 10) + "/" + l.created_at.slice(0, 4)}</td>
+                <td className="px-4 py-2 text-right align-middle whitespace-nowrap">
+                  <button
+                    className="text-red-400 hover:text-red-600 text-xs"
+                    onClick={() => handleDeleteLender(l.id)}
+                  >
+                    🗑️ Delete
+                  </button>
+                </td>
+              </tr>
             ))}
           </tbody>
         </table>

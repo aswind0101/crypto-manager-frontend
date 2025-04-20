@@ -138,7 +138,7 @@ function AddExpense() {
                     className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
                     required
                 >
-                    <option value="">-- Select Category --</option>
+                    <option value="">👤 Select category --</option>
                     {categories.filter(c => c.type === type).map(cat => (
                         <option key={cat.id} value={cat.name}>{cat.name}</option>
                     ))}

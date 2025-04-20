@@ -36,6 +36,7 @@ function Debts() {
     const [totalBorrowed, setTotalBorrowed] = useState(0); // 
     const [barChartData, setBarChartData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [deletingItemId, setDeletingItemId] = useState(null); // 🆕 ID đang xoá
 
 
 
@@ -198,7 +199,7 @@ function Debts() {
             : "Do you want to delete this payment entry?";
 
         if (!confirm(confirmText)) return;
-
+        setDeletingItemId(item.id); // ✅ Bắt đầu xoá
         try {
             const idToken = await currentUser.getIdToken();
             const res = await fetch(`https://crypto-manager-backend.onrender.com/api/${isBorrow ? "debts" : "debt-payments"}/${item.id}`, {
@@ -218,6 +219,8 @@ function Debts() {
         } catch (err) {
             console.error("❌ Delete error:", err.message);
             alert("❌ Something went wrong.");
+        } finally {
+            setDeletingItemId(null); // ✅ Kết thúc xoá
         }
     };
     if (loading) {
@@ -457,11 +460,16 @@ function Debts() {
                                                     )}
                                                     {item.note && <> | 📝 {item.note}</>}
                                                     <button
-                                                        className="ml-4 text-red-400 hover:text-red-600 text-[11px]"
                                                         onClick={() => handleDeleteItem(item)}
+                                                        disabled={deletingItemId === item.id}
+                                                        className={`ml-4 text-[11px] transition ${deletingItemId === item.id
+                                                                ? "text-gray-400 cursor-not-allowed"
+                                                                : "text-red-400 hover:text-red-600"
+                                                            }`}
                                                     >
-                                                        🗑️ Delete
+                                                        {deletingItemId === item.id ? "⏳ Deleting..." : "🗑️ Delete"}
                                                     </button>
+
                                                 </td>
                                             </tr>
                                         ));
