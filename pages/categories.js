@@ -23,13 +23,27 @@ function Categories() {
   }, []);
 
   const fetchCategories = async (user) => {
-    const idToken = await user.getIdToken();
-    const res = await fetch("https://crypto-manager-backend.onrender.com/api/categories", {
-      headers: { Authorization: `Bearer ${idToken}` },
-    });
-    const data = await res.json();
-    setCategories(data);
+    const uid = user.uid;
+    const CACHE_KEY = `categories_cache_${uid}`;
+    const CACHE_EXPIRY_KEY = `categories_cache_expiry_${uid}`;
+    const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 giờ
+
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("https://crypto-manager-backend.onrender.com/api/categories", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json();
+      setCategories(data);
+
+      // ✅ Ghi đè lại cache sau khi thêm mới
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      localStorage.setItem(CACHE_EXPIRY_KEY, (Date.now() + CACHE_TTL).toString());
+    } catch (err) {
+      console.error("❌ Error fetching categories:", err.message);
+    }
   };
+
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -130,7 +144,7 @@ function Categories() {
 
       {/* Bộ lọc */}
       <div className="max-w-lg mx-auto mt-6 flex justify-center gap-4">
-        {["all", "expense", "income",  "credit-spending"].map((val) => (
+        {["all", "expense", "income", "credit-spending"].map((val) => (
           <button
             key={val}
             onClick={() => setFilterType(val)}
