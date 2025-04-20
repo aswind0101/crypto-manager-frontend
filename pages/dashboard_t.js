@@ -12,6 +12,10 @@ const sampleBarData = [
   { name: "Jan", income: 5000, expense: 3000 },
   { name: "Feb", income: 6000, expense: 2500 },
   { name: "Mar", income: 4000, expense: 3200 },
+  { name: "Apr", income: 8000, expense: 200 },
+  { name: "May", income: 5000, expense: 100 },
+  { name: "Jun", income: 10000, expense: 1000 },
+  { name: "Jul", income: 9000, expense: 3200 },
 ];
 
 export default function TVDashboard() {
