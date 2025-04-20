@@ -37,34 +37,38 @@ function AddExpense() {
     }, []);
 
     const fetchCategories = async (user) => {
+        const uid = user.uid;
         const now = Date.now();
 
-        // 1. Kiểm tra cache trong localStorage
-        const cachedData = localStorage.getItem(CATEGORY_CACHE_KEY);
-        const cachedExpiry = localStorage.getItem(CATEGORY_CACHE_EXPIRY_KEY);
+        const CACHE_KEY = `categories_cache_${uid}`;
+        const CACHE_EXPIRY_KEY = `categories_cache_expiry_${uid}`;
+        const CACHE_TTL = 12 * 60 * 60 * 1000; // 12h
+
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        const cachedExpiry = localStorage.getItem(CACHE_EXPIRY_KEY);
 
         if (cachedData && cachedExpiry && now < parseInt(cachedExpiry)) {
             try {
                 const parsed = JSON.parse(cachedData);
                 setCategories(parsed);
-                return; // ✅ dùng cache luôn
+                return;
             } catch (err) {
-                console.warn("⚠️ Lỗi parse cache categories:", err.message);
+                console.warn("⚠️ Error parsing category cache:", err.message);
             }
         }
 
-        // 2. Nếu không có cache hoặc đã hết hạn → gọi API
         try {
             const idToken = await user.getIdToken();
             const res = await fetch("https://crypto-manager-backend.onrender.com/api/categories", {
                 headers: { Authorization: `Bearer ${idToken}` },
             });
+
             const data = await res.json();
             setCategories(data);
 
-            // 3. Cập nhật cache
-            localStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(data));
-            localStorage.setItem(CATEGORY_CACHE_EXPIRY_KEY, (now + CATEGORY_CACHE_TTL).toString());
+            // Cập nhật cache theo uid
+            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(CACHE_EXPIRY_KEY, (now + CACHE_TTL).toString());
         } catch (err) {
             console.error("❌ Error fetching categories:", err.message);
         }

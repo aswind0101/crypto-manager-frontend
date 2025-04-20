@@ -52,6 +52,8 @@ export default function Navbar() {
             const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
             localStorage.removeItem(`portfolio_${storedUser.uid}`);
             localStorage.removeItem(`lastUpdated_${storedUser.uid}`);
+            localStorage.removeItem(`categories_cache_${storedUser.uid}`);
+            localStorage.removeItem(`categories_cache_expiry_${storedUser.uid}`);
 
             setShowToast(true);
             setTimeout(() => {
