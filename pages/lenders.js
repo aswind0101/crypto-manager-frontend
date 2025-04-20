@@ -129,7 +129,7 @@ function Lenders() {
       </form>
 
       {/* Danh sách người cho vay */}
-      <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
+      <div className="overflow-x-auto rounded-xl border border-cyan-400/30 shadow-lg shadow-cyan-400/10 max-w-4xl mx-auto">
         <table className="min-w-full text-sm text-white">
           <thead className="bg-[#183b69] text-yellow-300">
             <tr>
@@ -158,10 +158,6 @@ function Lenders() {
           </tbody>
         </table>
       </div>
-      <div className="bg-[#10192b] border border-cyan-400/30 shadow-lg shadow-cyan-400/10 rounded-xl p-4">
-        {/* Chart here */}
-      </div>
-
     </div>
   );
 }
