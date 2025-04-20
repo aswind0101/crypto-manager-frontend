@@ -274,8 +274,16 @@ function Expenses() {
                         </svg>
                     </div>
                 </div>
+
+                {/* Nút Add nằm bên phải */}
+                <Link
+                    href="/add-expense"
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-full shadow-md transition"
+                >
+                    ➕ Income/Expense
+                </Link>
             </div>
-            <div className="max-w-4xl mb-6 mx-auto bg-[#1a2f46] text-white px-4 py-3 shadow-md grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-center">
+            <div className="max-w-4xl mx-auto bg-[#1a2f46] text-white px-4 py-3 shadow-md grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-center">
                 <div>
                     <p className="text-green-400 font-bold">💰 Total Income</p>
                     <p className="font-mono">${totalIncome.toLocaleString()}</p>
@@ -296,15 +304,6 @@ function Expenses() {
                 </div>
             </div>
 
-            <div className="max-w-4xl mx-auto rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-sm font-semibold">
-                {/* Nút Add nằm bên phải */}
-                <Link
-                    href="/add-expense"
-                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-full shadow-md transition"
-                >
-                    ➕ Income/Expense
-                </Link>
-            </div>
             {/* Bảng tổng hợp theo tháng */}
             <div className="overflow-x-auto border border-[#2c4069] shadow-lg rounded-b-xl max-w-4xl mx-auto">
                 <table className="min-w-full text-[11px] text-white">
