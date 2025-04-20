@@ -150,6 +150,20 @@ function Expenses() {
 
         return grouped.filter((d) => d.income > 0 || d.expense > 0);
     })();
+    const totalIncome = expenses
+        .filter(e => new Date(e.expense_date).getFullYear() === selectedYear && e.type === "income")
+        .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+
+    const totalExpense = expenses
+        .filter(e => new Date(e.expense_date).getFullYear() === selectedYear && e.type === "expense")
+        .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+
+    const totalCredit = expenses
+        .filter(e => new Date(e.expense_date).getFullYear() === selectedYear && e.type === "credit-spending")
+        .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+
+    const totalBalance = totalIncome - totalExpense; // tuỳ chọn: không trừ credit nếu xem là "chi tiêu sau"
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen text-yellow-300 text-sm font-mono">
@@ -268,6 +282,26 @@ function Expenses() {
                 >
                     ➕ Income/Expense
                 </Link>
+            </div>
+            <div className="max-w-4xl mx-auto mt-2 mb-4 rounded-xl bg-[#1a2f46] text-white px-4 py-3 shadow-md grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-center">
+                <div>
+                    <p className="text-green-400 font-bold">💰 Total Income</p>
+                    <p className="font-mono">${totalIncome.toLocaleString()}</p>
+                </div>
+                <div>
+                    <p className="text-red-400 font-bold">💸 Total Expenses</p>
+                    <p className="font-mono">${totalExpense.toLocaleString()}</p>
+                </div>
+                <div>
+                    <p className="text-purple-300 font-bold">💳 Credit Spending</p>
+                    <p className="font-mono">${totalCredit.toLocaleString()}</p>
+                </div>
+                <div>
+                    <p className="text-white font-bold">📊 Balance</p>
+                    <p className={`font-mono ${totalBalance >= 0 ? "text-green-300" : "text-red-300"}`}>
+                        ${totalBalance.toLocaleString()}
+                    </p>
+                </div>
             </div>
 
             {/* Bảng tổng hợp theo tháng */}
