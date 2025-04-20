@@ -20,6 +20,11 @@ function AddExpense() {
     });
     const [isSubmitting, setIsSubmitting] = useState(false); // 🆕 trạng thái loading khi submit
 
+    const CATEGORY_CACHE_KEY = "categories_cache";
+    const CATEGORY_CACHE_EXPIRY_KEY = "categories_cache_expiry";
+    const CATEGORY_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 giờ (ms)
+
+
     useEffect(() => {
         const auth = getAuth();
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -32,13 +37,39 @@ function AddExpense() {
     }, []);
 
     const fetchCategories = async (user) => {
-        const idToken = await user.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/categories", {
-            headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        setCategories(data);
+        const now = Date.now();
+
+        // 1. Kiểm tra cache trong localStorage
+        const cachedData = localStorage.getItem(CATEGORY_CACHE_KEY);
+        const cachedExpiry = localStorage.getItem(CATEGORY_CACHE_EXPIRY_KEY);
+
+        if (cachedData && cachedExpiry && now < parseInt(cachedExpiry)) {
+            try {
+                const parsed = JSON.parse(cachedData);
+                setCategories(parsed);
+                return; // ✅ dùng cache luôn
+            } catch (err) {
+                console.warn("⚠️ Lỗi parse cache categories:", err.message);
+            }
+        }
+
+        // 2. Nếu không có cache hoặc đã hết hạn → gọi API
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/categories", {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            const data = await res.json();
+            setCategories(data);
+
+            // 3. Cập nhật cache
+            localStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(CATEGORY_CACHE_EXPIRY_KEY, (now + CATEGORY_CACHE_TTL).toString());
+        } catch (err) {
+            console.error("❌ Error fetching categories:", err.message);
+        }
     };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
