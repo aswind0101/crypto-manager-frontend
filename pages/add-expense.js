@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
+import { useRouter } from "next/router";
 
 
 function AddExpense() {
@@ -23,6 +24,7 @@ function AddExpense() {
     const CATEGORY_CACHE_KEY = "categories_cache";
     const CATEGORY_CACHE_EXPIRY_KEY = "categories_cache_expiry";
     const CATEGORY_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 giờ (ms)
+    const router = useRouter();
 
 
     useEffect(() => {
@@ -179,7 +181,8 @@ function AddExpense() {
                     </button>
 
                     <button
-                        onClick={() => window.location.href = '/expenses'}
+                        type="button"
+                        onClick={() => router.push('/expenses')}
                         className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-full transition"
                     >
                         Close
