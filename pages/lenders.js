@@ -93,6 +93,11 @@ function Lenders() {
     <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
       <Navbar />
       <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">👥 Lenders</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+        <div className="...">💹 Biểu đồ bán nguyệt</div>
+        <div className="...">📈 Biểu đồ cột</div>
+        <div className="col-span-full">💼 Tổng đầu tư / lời lỗ</div>
+      </div>
 
       {/* Form thêm người cho vay */}
       <form onSubmit={handleAdd} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
@@ -129,7 +134,7 @@ function Lenders() {
       </form>
 
       {/* Danh sách người cho vay */}
-      <div className="overflow-x-auto rounded-xl border border-cyan-400/30 shadow-2xl shadow-cyan-400/10 max-w-4xl mx-auto">
+      <div className="overflow-x-auto rounded-xl border border-cyan-400/30 shadow-lg shadow-cyan-400/10 max-w-4xl mx-auto">
         <table className="min-w-full text-sm text-white">
           <thead className="bg-[#183b69] text-yellow-300">
             <tr>
