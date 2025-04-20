@@ -18,6 +18,7 @@ function AddExpense() {
         const today = new Date();
         return today.toISOString().split("T")[0];
     });
+    const [isSubmitting, setIsSubmitting] = useState(false); // 🆕 trạng thái loading khi submit
 
     useEffect(() => {
         const auth = getAuth();
@@ -45,7 +46,7 @@ function AddExpense() {
             setStatus("❗ Please fill in all fields.");
             return;
         }
-
+        setIsSubmitting(true); // ✅ bắt đầu loading
         const idToken = await currentUser.getIdToken();
         const res = await fetch("https://crypto-manager-backend.onrender.com/api/expenses", {
             method: "POST",
@@ -66,6 +67,7 @@ function AddExpense() {
             const err = await res.json();
             setStatus("❌ Error: " + err.error);
         }
+        setIsSubmitting(false); // ✅ kết thúc loading
     };
 
     return (
@@ -132,10 +134,15 @@ function AddExpense() {
                 <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4 w-full max-w-md mx-auto">
                     <button
                         type="submit"
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-full transition"
+                        disabled={isSubmitting}
+                        className={`flex-1 font-semibold py-2 rounded-full transition
+                            ${isSubmitting
+                                ? "bg-green-400 cursor-not-allowed"
+                                : "bg-green-600 hover:bg-green-700 text-white"}`}
                     >
-                        Add
+                        {isSubmitting ? "Processing..." : "Add"}
                     </button>
+
                     <button
                         onClick={() => window.location.href = '/expenses'}
                         className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-full transition"
