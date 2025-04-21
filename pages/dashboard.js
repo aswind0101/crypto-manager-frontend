@@ -458,7 +458,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
+        <div className="p-0 max-w-[1400px] mx-auto min-h-screen bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.03)_0%,transparent_30%),radial-gradient(circle_at_80%_80%,rgba(255,255,255,0.02)_0%,transparent_30%),linear-gradient(135deg,#0a1a2f,#10233d,#1a2f4d)] text-white ">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
