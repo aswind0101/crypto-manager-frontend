@@ -458,7 +458,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] min-h-screen text-white font-mono p-4">
+        <div className="p-0 bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] min-h-screen text-white">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510]">
