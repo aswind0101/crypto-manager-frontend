@@ -643,7 +643,7 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
+                                className="w-full bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] 
         text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
         focus:outline-none appearance-none"
                             >
