@@ -462,8 +462,10 @@ function Dashboard() {
     return (
         <div className="p-0  max-w-[1400px] mx-auto min-h-screen text-white">
             <Navbar />
+{/* Nền viễn tưởng phía sau, giúp glassmorphism hoạt động */}
+<div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-cyan-900 via-indigo-900 to-black opacity-60 backdrop-blur-sm" />
 
-            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#090e1a] via-[#0a0e1c] to-[#0e1526]">
+            <div className="relative z-10 mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#090e1a] via-[#0a0e1c] to-[#0e1526]">
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -672,10 +674,6 @@ function Dashboard() {
 
 
                 )}
-                <div className="fixed inset-0 bg-[url('/your-background.jpg')] bg-cover bg-center z-0 opacity-30" />
-                <div className="relative z-10 p-10 bg-white/10 backdrop-blur-md rounded-xl text-white">
-                    This box is glass!
-                </div>
 
                 {/* phần còn lại giữ nguyên */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
