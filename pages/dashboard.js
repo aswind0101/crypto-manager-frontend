@@ -607,7 +607,7 @@ function Dashboard() {
 
                         {/* Danh sách top coin */}
                         <div className="p-4">
-                            <div className="max-h-96 overflow-y-auto divide-y divide-gray-300 px-2 py-2 text-sm scrollbar-hide">
+                            <div className="max-h-96 overflow-y-auto divide-y divide-gray-700 px-2 py-2 text-sm scrollbar-hide">
                                 {topCoins.slice(0, 10).map((coin) => (
                                     <div
                                         key={coin.id}
@@ -645,9 +645,7 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
-        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
-        focus:outline-none appearance-none"
+                                className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
                             >
                                 <option className="text-black" value="all">All</option>
                                 <option className="text-black" value="profit">🟢 Profit</option>
