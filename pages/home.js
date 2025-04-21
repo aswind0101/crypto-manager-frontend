@@ -593,25 +593,33 @@ function Dashboard() {
                     <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
 
                         {/* Header trắng nằm trên cùng */}
-                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-3">
-                            <h2 className="text-xl text-center font-semibold text-white font-bold ">🌐 Market Overview</h2>
-                            <p className="text-sm text-gray-400 text-center">
-                                Total Market Cap: <span className="text-lg text-yellow-300 font-mono font-bold">${formatNumber(globalMarketCap)}</span>
+                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-4 text-center">
+                            <h2 className="text-xl font-semibold text-white">🌐 Market Overview</h2>
+                            <p className="text-sm text-gray-400">
+                                Total Market Cap:{" "}
+                                <span className="text-lg text-yellow-300 font-mono font-bold">
+                                    ${formatNumber(globalMarketCap)}
+                                </span>
                             </p>
                         </div>
-                        {/* Nội dung bên trong card như cũ */}
-                        <div className="p-6">
-                            <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-4 py-3 text-sm scrollbar-hide">
+
+                        {/* Danh sách top coin */}
+                        <div className="p-4">
+                            <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-2 py-2 text-sm scrollbar-hide">
                                 {topCoins.slice(0, 10).map((coin) => (
                                     <div
                                         key={coin.id}
-                                        className="rounded-lg py-2 px-2 flex justify-between items-center text-sm"
+                                        className="flex justify-between items-center py-3 hover:bg-[#1f2f4a] rounded-lg px-3 transition-all"
                                     >
-                                        <div className="flex items-center gap-2">
-                                            <img src={coin.image} alt={coin.name} className="w-5 h-5" />
+                                        <div className="flex items-center gap-3">
+                                            <img src={coin.image} alt={coin.name} className="w-6 h-6" />
                                             <div>
-                                                <p className="font-medium text-white">{coin.name} ({coin.symbol.toUpperCase()})</p>
-                                                <p className="text-xs text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
+                                                <p className="font-semibold text-white">
+                                                    {coin.name} ({coin.symbol.toUpperCase()})
+                                                </p>
+                                                <p className="text-xs text-gray-400">
+                                                    Market Cap: ${formatNumber(coin.market_cap)}
+                                                </p>
                                             </div>
                                         </div>
                                         <div className="text-right">
@@ -622,10 +630,10 @@ function Dashboard() {
                                     </div>
                                 ))}
                             </div>
-
                         </div>
                     </div>
                 )}
+
 
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
