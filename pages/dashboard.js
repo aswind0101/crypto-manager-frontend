@@ -12,6 +12,8 @@ import { getAuth } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingScreen from "../components/LoadingScreen";
 import EmptyPortfolioView from "../components/EmptyPortfolioView";
+import GlassCard from "../components/GlassCard";
+
 
 function Dashboard() {
     const formatNumber = (num) => {
@@ -683,108 +685,89 @@ function Dashboard() {
                             ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
-                            <div key={index}
-                                className="w-full bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 rounded-2xl p-4 scale-[1.02] transition duration-300 hover:shadow-cyan-500/20"
+                            <GlassCard
+                                key={index}
+                                title={coin.coin_symbol.toUpperCase()}
+                                value={`$${formatCurrency(coin.current_price)} - $${avgPrice > 0 ? formatCurrency(avgPrice) : "–"}`}
+                                icon={getCoinIcon(coin.coin_symbol)}
+                                className="w-full"
                             >
                                 {/* Hint for mobile users */}
-                                <div className="text-center text-xs text-gray-500 italic mb-2">
-                                    (Tap any coin to view transaction details)
-                                </div>
-                                <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-gray-400 text-sm">👉</span>
-                                        {getCoinIcon(coin.coin_symbol)}
-                                        <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
-                                    </div>
-                                    <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
+                                <div className="text-center text-[11px] italic text-gray-400 mb-1">
+                                    (Tap to view details)
                                 </div>
 
-                                <div className="w-full text-center mb-4">
-                                    <p className="text-sm text-blue-200 font-medium">Current Price - Avg. Buy Price</p>
-                                    <p className="text-lg font-mono text-yellow-300">
-                                        ${formatCurrency(coin.current_price)} <span className="text-white">-</span> ${avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
-                                    </p>
-
+                                <div className="text-center mb-2">
                                     {coin.is_fallback_price && (
-                                        <p className="text-xs text-yellow-400 mt-1">
-                                            ⚠️ Using fallback price (buy price).
-                                        </p>
+                                        <p className="text-xs text-yellow-400">⚠️ Using fallback price (buy price)</p>
                                     )}
-
                                     {!coin.is_fallback_price &&
                                         coin.price_last_updated &&
                                         Math.abs(coin.current_price - parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase()))) < 0.000001 &&
                                         Math.round((Date.now() - coin.price_last_updated) / 60000) >= 1 && (
-                                            <p className="text-xs text-gray-400 mt-1">
+                                            <p className="text-xs text-gray-400">
                                                 ⚠️ Last price from {formatLastUpdatedDuration(coin.price_last_updated)}
                                             </p>
                                         )}
-
-
                                 </div>
 
-
-                                <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
+                                <div className="grid grid-cols-2 gap-3 text-xs text-white text-center">
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
-                                        <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
+                                        <p className="text-gray-400">Total Qty</p>
+                                        <p className="font-mono">{coin.total_quantity.toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
-                                        <p className="text-lg font-mono text-orange-400">${formatCurrency(coin.total_invested)}</p>
+                                        <p className="text-gray-400">Invested</p>
+                                        <p className="text-orange-400 font-mono">${formatCurrency(coin.total_invested)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                        <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
+                                        <p className="text-gray-400">Net</p>
+                                        <p className={`font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
-                                        <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
-                                    </div>
-                                    <div className="col-span-2 border-t border-gray-700 pt-2">
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
-                                            {(() => {
-                                                const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
-                                                if (ratio > 0.5) return "🤑";
-                                                if (ratio > 0.1) return "😎";
-                                                if (ratio > 0) return "🙂";
-                                                if (ratio > -0.1) return "😕";
-                                                if (ratio > -0.5) return "😢";
-                                                return "😭";
-                                            })()} Profit / Loss
-                                        </p>
-                                        <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                            ${Math.round(coin.profit_loss).toLocaleString()}<span className="text-xs">({profitLossPercentage})</span>
-                                        </p>
+                                        <p className="text-gray-400">Value</p>
+                                        <p className="text-blue-400 font-mono">${Math.round(coin.current_value).toLocaleString()}</p>
                                     </div>
                                 </div>
 
-                                <div className="mt-4 flex justify-center gap-4">
+                                <div className="mt-3 border-t border-white/10 pt-2 text-center">
+                                    <p className="text-sm text-gray-400">
+                                        {(() => {
+                                            const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
+                                            if (ratio > 0.5) return "🤑";
+                                            if (ratio > 0.1) return "😎";
+                                            if (ratio > 0) return "🙂";
+                                            if (ratio > -0.1) return "😕";
+                                            if (ratio > -0.5) return "😢";
+                                            return "😭";
+                                        })()} Profit / Loss
+                                    </p>
+                                    <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                        ${Math.round(coin.profit_loss).toLocaleString()}
+                                        <span className="text-xs"> ({profitLossPercentage})</span>
+                                    </p>
+                                </div>
+
+                                <div className="mt-4 flex justify-center gap-3">
                                     <button
                                         onClick={() => handleOpenTradeModal(coin, "buy")}
-                                        className="px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm shadow transition-all duration-200"
+                                        className="px-4 py-1.5 rounded-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-xs shadow"
                                     >
                                         Buy
                                     </button>
-
-
                                     <button
                                         onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
                                         disabled={coin.total_quantity === 0}
-                                        className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200
-        ${coin.total_quantity === 0
+                                        className={`px-4 py-1.5 rounded-full text-white text-xs shadow ${coin.total_quantity === 0
                                                 ? "bg-gray-600 cursor-not-allowed"
-                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
-    `}
+                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"
+                                            }`}
                                     >
                                         Sell
                                     </button>
-
-
-
                                 </div>
+                            </GlassCard>
 
-                            </div>
                         );
                     })}
                 </div>
