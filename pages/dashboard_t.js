@@ -12,7 +12,7 @@ import { getAuth } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingScreen from "../components/LoadingScreen";
 import EmptyPortfolioView from "../components/EmptyPortfolioView";
-
+//Home_Backup
 function Dashboard() {
     const formatNumber = (num) => {
         if (!num || isNaN(num)) return '–';
