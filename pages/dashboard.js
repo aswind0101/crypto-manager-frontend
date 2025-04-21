@@ -465,7 +465,7 @@ function Dashboard() {
 {/* Nền viễn tưởng phía sau, giúp glassmorphism hoạt động */}
 <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-cyan-900 via-indigo-900 to-black opacity-60 backdrop-blur-sm" />
 
-            <div className="relative z-10 mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#090e1a] via-[#0a0e1c] to-[#0e1526]">
+            <div className="relative z-10 mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg">
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
