@@ -590,7 +590,7 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
+                    <div className="mt-4 rounded-2xl overflow-hidden text-white bg-[#10192b] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 transition duration-300 hover:shadow-cyan-500/20">
 
                         {/* Header trắng nằm trên cùng */}
                         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-4 text-center">
@@ -684,7 +684,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="w-full bg-[#10192b] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 rounded-2xl rounded-2xl p-6 scale-[1.02] transition duration-300 hover:shadow-cyan-500/20"
+                                className="w-full bg-[#10192b] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 rounded-2xl p-4 scale-[1.02] transition duration-300 hover:shadow-cyan-500/20"
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
