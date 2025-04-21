@@ -591,7 +591,7 @@ function Dashboard() {
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
                     <div className="mt-4 rounded-3xl overflow-hidden text-white 
-                    bg-white/4 backdrop-blur-lg border border-white/10 
+                    bg-white/10 backdrop-blur-md border border-white/20 
                     shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300">                
 
                         {/* Header trắng nằm trên cùng */}
@@ -607,7 +607,7 @@ function Dashboard() {
 
                         {/* Danh sách top coin */}
                         <div className="p-4">
-                            <div className="max-h-96 overflow-y-auto divide-y divide-gray-700 px-2 py-2 text-sm scrollbar-hide">
+                            <div className="max-h-96 overflow-y-auto divide-y divide-gray-800 px-2 py-2 text-sm scrollbar-hide">
                                 {topCoins.slice(0, 10).map((coin) => (
                                     <div
                                         key={coin.id}
@@ -645,7 +645,7 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full backdrop-blur-md bg-white/4 border border-white/10 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
+                                className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
                             >
                                 <option className="text-black" value="all">All</option>
                                 <option className="text-black" value="profit">🟢 Profit</option>
@@ -684,7 +684,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                            className="w-full backdrop-blur-md bg-white/4 border border-white/10 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
+                            className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
                             hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.1)]"
                             >
                                 {/* Hint for mobile users */}
@@ -742,7 +742,7 @@ function Dashboard() {
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
                                         <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
                                     </div>
-                                    <div className="col-span-2 border-t border-white/8 pt-2">
+                                    <div className="col-span-2 border-t border-white/10 pt-2">
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
                                             {(() => {
                                                 const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;

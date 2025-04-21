@@ -456,252 +456,353 @@ function Dashboard() {
     if (isEmptyPortfolioView) {
         return <EmptyPortfolioView />;
     }
+
     return (
-        <div className="bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] min-h-screen text-white font-mono p-4">
+        <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
 
-            <h1 className="text-2xl font-bold text-cyan-300 text-center mt-4 mb-6 uppercase tracking-widest">📊 Crypto Portfolio Dashboard</h1>
+            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
+                {/* Modal */}
+                {showModal && selectedCoin && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-[#0e1628] max-w-md w-full mx-4 p-6 rounded-xl shadow-2xl text-white space-y-4 relative z-50">
+                            <h2 className="text-xl font-bold text-yellow-400 text-center">
+                                {tradeType === "buy" ? "➕ Buy" : "➖ Sell"} {selectedCoin.coin_symbol.toUpperCase()}
+                            </h2>
 
-            {/* giữ nguyên phần SwipeDashboard, Modal, Market Overview, v.v. */}
-            {/* chỉ cập nhật thêm lớp nền và style biểu đồ */}
-            {/* Modal */}
-            {showModal && selectedCoin && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-[#0e1628] max-w-md w-full mx-4 p-6 rounded-xl shadow-2xl text-white space-y-4 relative z-50">
-                        <h2 className="text-xl font-bold text-yellow-400 text-center">
-                            {tradeType === "buy" ? "➕ Buy" : "➖ Sell"} {selectedCoin.coin_symbol.toUpperCase()}
-                        </h2>
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
+                                <select
+                                    value={tradeType}
+                                    onChange={(e) => setTradeType(e.target.value)}
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                >
+                                    <option value="buy">Buy</option>
+                                    <option value="sell">Sell</option>
+                                </select>
+                            </div>
 
-                        <div>
-                            <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
-                            <select
-                                value={tradeType}
-                                onChange={(e) => setTradeType(e.target.value)}
-                                className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
-                            >
-                                <option value="buy">Buy</option>
-                                <option value="sell">Sell</option>
-                            </select>
-                        </div>
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Quantity</label>
+                                <input
+                                    type="number"
+                                    value={quantity}
+                                    onChange={(e) => setQuantity(e.target.value)}
+                                    placeholder="e.g., 100"
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    step="any"
+                                />
+                            </div>
 
-                        <div>
-                            <label className="block text-sm text-gray-300 mb-1">Quantity</label>
-                            <input
-                                type="number"
-                                value={quantity}
-                                onChange={(e) => setQuantity(e.target.value)}
-                                placeholder="e.g., 100"
-                                className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
-                                step="any"
-                            />
-                        </div>
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
+                                <input
+                                    type="number"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                    placeholder="e.g., 2.5"
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    step="any"
+                                />
+                            </div>
 
-                        <div>
-                            <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
-                            <input
-                                type="number"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                                placeholder="e.g., 2.5"
-                                className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
-                                step="any"
-                            />
-                        </div>
+                            {formError && <p className="text-red-400 text-sm text-center">{formError}</p>}
 
-                        {formError && <p className="text-red-400 text-sm text-center">{formError}</p>}
+                            <div className="flex justify-between gap-4 mt-2">
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    className="w-1/2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
+                                    disabled={isSubmitting}
+                                >
+                                    Cancel
+                                </button>
 
-                        <div className="flex justify-between gap-4 mt-2">
-                            <button
-                                onClick={() => setShowModal(false)}
-                                className="w-1/2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
-                                disabled={isSubmitting}
-                            >
-                                Cancel
-                            </button>
-
-                            <button
-                                onClick={handleConfirmTrade}
-                                disabled={isSubmitting}
-                                className={`w-1/2 px-4 py-2 rounded text-white text-sm shadow transition
+                                <button
+                                    onClick={handleConfirmTrade}
+                                    disabled={isSubmitting}
+                                    className={`w-1/2 px-4 py-2 rounded text-white text-sm shadow transition
             ${tradeType === "buy"
-                                        ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
-                                        : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
+                                            ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
+                                            : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
             ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
           `}
-                            >
-                                {isSubmitting ? "Processing..." : "Confirm"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div className="relative w-full">
-                {!hasCache && priceFetchFailed && portfolio.length > 0 ? (
-                    <div className="flex flex-col items-center justify-center h-80 space-y-4">
-                        <div className="w-56 h-2 bg-gray-700 rounded-full overflow-hidden">
-                            <div className="h-full bg-yellow-400 animate-pulse w-full"></div>
-                        </div>
-                        <p className="text-yellow-400 text-sm text-center animate-pulse">
-                            ⚠️ Unable to fetch the latest prices. Please wait while we try again...
-                        </p>
-                    </div>
-                ) : (
-                    <>
-                        <SwipeDashboard
-                            portfolio={portfolio}
-                            totalCurrentValue={totalCurrentValue}
-                            totalProfitLoss={totalProfitLoss}
-                            totalNetInvested={totalNetInvested}
-                            coinIcons={coinIcons}
-                            lastUpdated={lastUpdated}
-                            onSlideChange={(slideIndex) => setShowLastUpdate(slideIndex === 0)}
-                        />
-
-                        {lastUpdated && showLastUpdate && (
-                            <div className="absolute bottom-2 w-full flex justify-center items-center gap-6 text-xs text-gray-300 z-10">
-                                <span>🕒 Last update: {lastUpdated}</span>
-                                <button
-                                    onClick={async () => {
-                                        const storedUser = localStorage.getItem("user");
-                                        if (storedUser) {
-                                            const user = JSON.parse(storedUser);
-                                            setRefreshing(true);
-                                            await fetchPortfolioWithRetry(user.uid);
-                                            setRefreshing(false);
-                                        }
-                                    }}
-                                    className="flex items-center gap-1 px-4 py-1 text-xs rounded-full 
-    bg-[#1a2f46] text-yellow-300 hover:bg-yellow-400 hover:text-black 
-    transition duration-200 shadow-inner border border-[#2c4069]"
                                 >
-                                    <span
-                                        className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
-                                            }`}
-                                    >
-                                        🔄
-                                    </span>
-                                    {refreshing ? "Refreshing..." : "Refresh"}
+                                    {isSubmitting ? "Processing..." : "Confirm"}
                                 </button>
                             </div>
-                        )}
-
-                    </>
-                )}
-            </div>
-
-            {/* Market Overview */}
-            {portfolio.length > 0 && (
-                <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
-
-                    {/* Header trắng nằm trên cùng */}
-                    <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-3">
-                        <h2 className="text-xl text-center font-semibold text-white font-bold ">🌐 Market Overview</h2>
-                        <p className="text-sm text-gray-400 text-center">
-                            Total Market Cap: <span className="text-lg text-yellow-300 font-mono font-bold">${formatNumber(globalMarketCap)}</span>
-                        </p>
+                        </div>
                     </div>
-                    {/* Nội dung bên trong card như cũ */}
-                    <div className="p-6">
-                        <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-4 py-3 text-sm scrollbar-hide">
-                            {topCoins.slice(0, 10).map((coin) => (
-                                <div
-                                    key={coin.id}
-                                    className="rounded-lg py-2 px-2 flex justify-between items-center text-sm"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <img src={coin.image} alt={coin.name} className="w-5 h-5" />
-                                        <div>
-                                            <p className="font-medium text-white">{coin.name} ({coin.symbol.toUpperCase()})</p>
-                                            <p className="text-xs text-gray-400">Market Cap: ${formatNumber(coin.market_cap)}</p>
+                )}
+
+                <div className="relative w-full">
+                    {!hasCache && priceFetchFailed && portfolio.length > 0 ? (
+                        <div className="flex flex-col items-center justify-center h-80 space-y-4">
+                            <div className="w-56 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div className="h-full bg-yellow-400 animate-pulse w-full"></div>
+                            </div>
+                            <p className="text-yellow-400 text-sm text-center animate-pulse">
+                                ⚠️ Unable to fetch the latest prices. Please wait while we try again...
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <SwipeDashboard
+                                portfolio={portfolio}
+                                totalCurrentValue={totalCurrentValue}
+                                totalProfitLoss={totalProfitLoss}
+                                totalNetInvested={totalNetInvested}
+                                coinIcons={coinIcons}
+                                lastUpdated={lastUpdated}
+                                onSlideChange={(slideIndex) => setShowLastUpdate(slideIndex === 0)}
+                            />
+
+                            {lastUpdated && showLastUpdate && (
+                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-6 text-xs text-gray-300 z-10">
+                                    <span>🕒 Last update: {lastUpdated}</span>
+                                    <button
+                                        onClick={async () => {
+                                            const storedUser = localStorage.getItem("user");
+                                            if (storedUser) {
+                                                const user = JSON.parse(storedUser);
+                                                setRefreshing(true);
+                                                await fetchPortfolioWithRetry(user.uid);
+                                                setRefreshing(false);
+                                            }
+                                        }}
+                                        className="flex items-center gap-1 px-4 py-1 text-xs rounded-full 
+    bg-[#1a2f46] text-yellow-300 hover:bg-yellow-400 hover:text-black 
+    transition duration-200 shadow-inner border border-[#2c4069]"
+                                    >
+                                        <span
+                                            className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
+                                                }`}
+                                        >
+                                            🔄
+                                        </span>
+                                        {refreshing ? "Refreshing..." : "Refresh"}
+                                    </button>
+                                </div>
+                            )}
+
+                        </>
+                    )}
+                </div>
+
+                {/* Market Overview */}
+                {portfolio.length > 0 && (
+                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
+
+                        {/* Header trắng nằm trên cùng */}
+                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-4 text-center">
+                            <h2 className="text-xl font-semibold text-white">🌐 Market Overview</h2>
+                            <p className="text-sm text-gray-400">
+                                Total Market Cap:{" "}
+                                <span className="text-lg text-yellow-300 font-mono font-bold">
+                                    ${formatNumber(globalMarketCap)}
+                                </span>
+                            </p>
+                        </div>
+
+                        {/* Danh sách top coin */}
+                        <div className="p-4">
+                            <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-2 py-2 text-sm scrollbar-hide">
+                                {topCoins.slice(0, 10).map((coin) => (
+                                    <div
+                                        key={coin.id}
+                                        className="flex justify-between items-center py-3 hover:bg-[#1f2f4a] rounded-lg px-3 transition-all"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <img src={coin.image} alt={coin.name} className="w-6 h-6" />
+                                            <div>
+                                                <p className="font-semibold text-white">
+                                                    {coin.name} ({coin.symbol.toUpperCase()})
+                                                </p>
+                                                <p className="text-xs text-gray-400">
+                                                    Market Cap: ${formatNumber(coin.market_cap)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm text-yellow-300 font-mono">
+                                                ${formatCurrency(coin.current_price)}
+                                            </p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-sm text-yellow-300 font-mono">
-                                            ${formatCurrency(coin.current_price)}
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
+                {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
+                {portfolio.length > 0 && (
+                    <div className="w-full flex items-center gap-3 mt-2">
+                        {/* Select */}
+                        <div className="relative w-1/2">
+                            <select
+                                value={filterByProfit}
+                                onChange={(e) => setFilterByProfit(e.target.value)}
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
+        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
+        focus:outline-none appearance-none"
+                            >
+                                <option className="text-black" value="all">All</option>
+                                <option className="text-black" value="profit">🟢 Profit</option>
+                                <option className="text-black" value="loss">🔴 Loss</option>
+                            </select>
+                            <div className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-xs leading-none">
+                                ▲<br />▼
+                            </div>
+                        </div>
+
+                        {/* Checkbox */}
+                        <label className="w-1/2 flex items-center gap-2 text-sm text-white h-9 px-4">
+                            <input
+                                type="checkbox"
+                                checked={includeSoldCoins}
+                                onChange={(e) => setIncludeSoldCoins(e.target.checked)}
+                                className="accent-yellow-400 w-4 h-4"
+                            />
+                            Include sold
+                        </label>
+                    </div>
+
+
+                )}
+
+
+                {/* phần còn lại giữ nguyên */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                    {filteredPortfolio.map((coin, index) => {
+                        const netInvested = coin.total_invested - coin.total_sold;
+                        const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
+                            ? (netInvested / coin.total_quantity)
+                            : 0;
+                        const profitLossPercentage = netInvested > 0
+                            ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
+                            : coin.profit_loss > 0 ? "∞%" : "0%";
+                        return (
+                            <div key={index}
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
+  shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
+  transition-all duration-300"
+                            >
+                                {/* Hint for mobile users */}
+                                <div className="text-center text-xs text-gray-500 italic mb-2">
+                                    (Tap any coin to view transaction details)
+                                </div>
+                                <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-gray-400 text-sm">👉</span>
+                                        {getCoinIcon(coin.coin_symbol)}
+                                        <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
+                                    </div>
+                                    <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
+                                </div>
+
+                                <div className="w-full text-center mb-4">
+                                    <p className="text-sm text-blue-200 font-medium">Current Price - Avg. Buy Price</p>
+                                    <p className="text-lg font-mono text-yellow-300">
+                                        ${formatCurrency(coin.current_price)} <span className="text-white">-</span> ${avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
+                                    </p>
+
+                                    {coin.is_fallback_price && (
+                                        <p className="text-xs text-yellow-400 mt-1">
+                                            ⚠️ Using fallback price (buy price).
+                                        </p>
+                                    )}
+
+                                    {!coin.is_fallback_price &&
+                                        coin.price_last_updated &&
+                                        Math.abs(coin.current_price - parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase()))) < 0.000001 &&
+                                        Math.round((Date.now() - coin.price_last_updated) / 60000) >= 1 && (
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                ⚠️ Last price from {formatLastUpdatedDuration(coin.price_last_updated)}
+                                            </p>
+                                        )}
+
+
+                                </div>
+
+
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
+                                        <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
+                                        <p className="text-lg font-mono text-orange-400">${formatCurrency(coin.total_invested)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
+                                        <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
+                                        <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
+                                    </div>
+                                    <div className="col-span-2 border-t border-gray-700 pt-2">
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                            {(() => {
+                                                const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
+                                                if (ratio > 0.5) return "🤑";
+                                                if (ratio > 0.1) return "😎";
+                                                if (ratio > 0) return "🙂";
+                                                if (ratio > -0.1) return "😕";
+                                                if (ratio > -0.5) return "😢";
+                                                return "😭";
+                                            })()} Profit / Loss
+                                        </p>
+                                        <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                            ${Math.round(coin.profit_loss).toLocaleString()}<span className="text-xs">({profitLossPercentage})</span>
                                         </p>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
 
-                    </div>
-                </div>
-            )}
-
-            {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
-            {portfolio.length > 0 && (
-                <div className="w-full flex items-center gap-3 mt-2">
-                    {/* Select */}
-                    <div className="relative w-1/2">
-                        <select
-                            value={filterByProfit}
-                            onChange={(e) => setFilterByProfit(e.target.value)}
-                            className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
-        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
-        focus:outline-none appearance-none"
-                        >
-                            <option className="text-black" value="all">All</option>
-                            <option className="text-black" value="profit">🟢 Profit</option>
-                            <option className="text-black" value="loss">🔴 Loss</option>
-                        </select>
-                        <div className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-xs leading-none">
-                            ▲<br />▼
-                        </div>
-                    </div>
-
-                    {/* Checkbox */}
-                    <label className="w-1/2 flex items-center gap-2 text-sm text-white h-9 px-4">
-                        <input
-                            type="checkbox"
-                            checked={includeSoldCoins}
-                            onChange={(e) => setIncludeSoldCoins(e.target.checked)}
-                            className="accent-yellow-400 w-4 h-4"
-                        />
-                        Include sold
-                    </label>
-                </div>
+                                <div className="mt-4 flex justify-center gap-4">
+                                    <button
+                                        onClick={() => handleOpenTradeModal(coin, "buy")}
+                                        className="px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm shadow transition-all duration-200"
+                                    >
+                                        Buy
+                                    </button>
 
 
-            )}
-            {/* Card Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-                {filteredPortfolio.map((coin, index) => {
-                    const netInvested = coin.total_invested - coin.total_sold;
-                    const avgPrice = netInvested > 0 && coin.total_quantity > 0 ? netInvested / coin.total_quantity : 0;
-                    const profitLossPercentage = netInvested > 0 ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%" : "0%";
-                    return (
-                        <div
-                            key={index}
-                            className="bg-[#10192b] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 rounded-2xl p-6 transition duration-300 hover:shadow-cyan-500/20"
-                        >
-                            <div className="flex justify-between items-center mb-4">
-                                <div className="text-lg font-bold text-yellow-300">{coin.coin_symbol}</div>
-                                <div className="text-xs text-gray-400">{coin.coin_name}</div>
+                                    <button
+                                        onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
+                                        disabled={coin.total_quantity === 0}
+                                        className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200
+        ${coin.total_quantity === 0
+                                                ? "bg-gray-600 cursor-not-allowed"
+                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
+    `}
+                                    >
+                                        Sell
+                                    </button>
+
+
+
+                                </div>
+
                             </div>
-                            <div className="text-sm text-white mb-2">💰 Current: ${coin.current_price.toFixed(2)}</div>
-                            <div className="text-sm text-white mb-2">📦 Quantity: {coin.total_quantity}</div>
-                            <div className="text-sm text-white mb-2">💵 Invested: ${coin.total_invested.toLocaleString()}</div>
-                            <div className="text-sm text-white mb-2">📈 Profit/Loss: <span className={coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}>${coin.profit_loss.toLocaleString()} ({profitLossPercentage})</span></div>
-                            <div className="mt-4 flex gap-2">
-                                <button
-                                    onClick={() => handleOpenTradeModal(coin, "buy")}
-                                    className="w-full bg-green-600 hover:bg-green-700 text-white py-1 rounded-full"
-                                >
-                                    ➕ Buy
-                                </button>
-                                <button
-                                    onClick={() => handleOpenTradeModal(coin, "sell")}
-                                    disabled={coin.total_quantity === 0}
-                                    className={`w-full py-1 rounded-full ${coin.total_quantity > 0 ? "bg-red-600 hover:bg-red-700 text-white" : "bg-gray-500 text-gray-300 cursor-not-allowed"}`}
-                                >
-                                    ➖ Sell
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
+            {/* FAB chỉ hiển thị khi không mở modal và chỉ trên mobile */}
+            {!showModal && (
+                <div className="fixed bottom-6 right-6 z-50 md:hidden">
+                    <button
+                        onClick={() => router.push("/add-transaction")}
+                        className="bg-yellow-400 hover:bg-yellow-500 hover:scale-105 active:scale-95 text-black text-3xl rounded-full shadow-lg w-14 h-14 flex items-center justify-center transition-all duration-300"
+                        title="Add Transaction"
+                    >
+                        +
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
