@@ -67,7 +67,8 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="w-full whote== shadow-lg px-6 py-3 flex justify-between items-center rounded-b-2xl text-white z-50">
+            <nav className="w-full whote== shadow-lg px-6 py-3 flex justify-between items-center rounded-b-2xl text-white z-50 
+            bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
                 {/* Logo + App name */}
                 <div className="flex items-center gap-2 font-bold text-xl">
                     💰 <span className="tracking-wide">PFMS</span>
