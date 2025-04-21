@@ -592,10 +592,10 @@ function Dashboard() {
                 {portfolio.length > 0 && (
                     <div className="mt-4 rounded-3xl overflow-hidden text-white 
                     bg-white/10 backdrop-blur-md border border-white/20 
-                    shadow-[0_8px_24px_rgba(255,255,255,0.05)] hover:bg-white/20 hover:shadow-[0_12px_32px_rgba(255,255,255,0.08)] transition-all duration-300">                
+                    shadow-[0_8px_24px_rgba(255,255,255,0.05)] hover:bg-white/20 transition-all duration-300">                
 
                         {/* Header trắng nằm trên cùng */}
-                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-4 text-center">
+                        <div className="bg-yellow-600 px-6 py-4 text-center">
                             <h2 className="text-xl font-semibold text-white">🌐 Market Overview</h2>
                             <p className="text-sm text-gray-400">
                                 Total Market Cap:{" "}
@@ -611,7 +611,7 @@ function Dashboard() {
                                 {topCoins.slice(0, 10).map((coin) => (
                                     <div
                                         key={coin.id}
-                                        className="flex justify-between items-center py-3 hover:bg-[#1f2f4a] rounded-lg px-3 transition-all"
+                                        className="flex justify-between items-center py-3 rounded-lg px-3 transition-all"
                                     >
                                         <div className="flex items-center gap-3">
                                             <img src={coin.image} alt={coin.name} className="w-6 h-6" />
