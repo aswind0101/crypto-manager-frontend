@@ -591,15 +591,15 @@ function Dashboard() {
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
                     <div className="mt-4 rounded-3xl overflow-hidden text-white 
-                    bg-white/6 backdrop-blur-md border border-white/10 
+                    bg-white/4 backdrop-blur-md border border-white/10 
                     shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300">                
 
                         {/* Header trắng nằm trên cùng */}
                         <div className="bg-yellow-600 px-6 py-4 text-center">
-                            <h2 className="text-xl font-semibold text-white">🌐 Market Overview</h2>
-                            <p className="text-sm text-gray-100">
+                            <h2 className="text-lg font-semibold text-white">🌐 Market Overview</h2>
+                            <p className="text-xs text-gray-700">
                                 Total Market Cap:{" "}
-                                <span className="text-lg text-gray-100 font-mono font-bold">
+                                <span className="text-sm text-gray-700 font-mono font-bold">
                                     ${formatNumber(globalMarketCap)}
                                 </span>
                             </p>
@@ -645,7 +645,7 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
+                                className="w-full backdrop-blur-md bg-white/4 border border-white/10 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
                             >
                                 <option className="text-black" value="all">All</option>
                                 <option className="text-black" value="profit">🟢 Profit</option>
@@ -684,7 +684,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                            className="w-full backdrop-blur-md bg-white/6 border border-white/10 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
+                            className="w-full backdrop-blur-md bg-white/4 border border-white/10 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
                             hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.1)]"
                             >
                                 {/* Hint for mobile users */}
