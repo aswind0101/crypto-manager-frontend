@@ -12,8 +12,6 @@ import { getAuth } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingScreen from "../components/LoadingScreen";
 import EmptyPortfolioView from "../components/EmptyPortfolioView";
-import GlassCard from "../components/GlassCard";
-
 
 function Dashboard() {
     const formatNumber = (num) => {
@@ -460,12 +458,10 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-0  max-w-[1400px] mx-auto min-h-screen text-white">
+        <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
-{/* Nền viễn tưởng phía sau, giúp glassmorphism hoạt động */}
-<div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-cyan-900 via-indigo-900 to-black opacity-60 backdrop-blur-sm" />
 
-            <div className="relative z-10 mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg">
+            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -594,10 +590,10 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="rounded-2xl overflow-hidden text-white bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] 
-                    border border-cyan-400/20 shadow-lg shadow-cyan-400/10 transition duration-300 hover:shadow-cyan-500/20">
+                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
+
                         {/* Header trắng nằm trên cùng */}
-                        <div className="bg-[#10192b] px-6 py-4 text-center">
+                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-4 text-center">
                             <h2 className="text-xl font-semibold text-white">🌐 Market Overview</h2>
                             <p className="text-sm text-gray-400">
                                 Total Market Cap:{" "}
@@ -647,13 +643,13 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] 
-        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-cyan-400/20 shadow-lg shadow-cyan-400/10 pr-8 
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
+        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
         focus:outline-none appearance-none"
                             >
-                                <option className="text-white" value="all">All</option>
-                                <option className="text-white" value="profit">🟢 Profit</option>
-                                <option className="text-white" value="loss">🔴 Loss</option>
+                                <option className="text-black" value="all">All</option>
+                                <option className="text-black" value="profit">🟢 Profit</option>
+                                <option className="text-black" value="loss">🔴 Loss</option>
                             </select>
                             <div className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-xs leading-none">
                                 ▲<br />▼
@@ -675,57 +671,39 @@ function Dashboard() {
 
                 )}
 
+
                 {/* phần còn lại giữ nguyên */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                     {filteredPortfolio.map((coin, index) => {
                         const netInvested = coin.total_invested - coin.total_sold;
-                        const avgPrice =
-                            netInvested > 0 && coin.total_quantity > 0
-                                ? netInvested / coin.total_quantity
-                                : 0;
-                        const profitLossPercentage =
-                            netInvested > 0
-                                ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
-                                : coin.profit_loss > 0
-                                    ? "∞%"
-                                    : "0%";
-
+                        const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
+                            ? (netInvested / coin.total_quantity)
+                            : 0;
+                        const profitLossPercentage = netInvested > 0
+                            ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
+                            : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
-                            <div
-                                key={index}
-                                className="w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 shadow-[0_8px_24px_rgba(0,0,0,0.3)] transition duration-300 hover:scale-[1.02]"
+                            <div key={index}
+                            className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
+                            hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.1)]"
                             >
-                                {/* Hint */}
-                                <div className="text-center text-xs text-gray-400 italic mb-2">
+                                {/* Hint for mobile users */}
+                                <div className="text-center text-xs text-gray-500 italic mb-2">
                                     (Tap any coin to view transaction details)
                                 </div>
-
-                                {/* Header */}
-                                <div
-                                    className="flex flex-col items-center justify-center mb-4 cursor-pointer"
-                                    onClick={() =>
-                                        router.push(`/transactions?coin=${coin.coin_symbol}`)
-                                    }
-                                >
+                                <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
                                     <div className="flex items-center gap-2">
                                         <span className="text-gray-400 text-sm">👉</span>
                                         {getCoinIcon(coin.coin_symbol)}
-                                        <h2 className="text-lg font-bold text-yellow-300">
-                                            {coin.coin_symbol.toUpperCase()}
-                                        </h2>
+                                        <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
                                     </div>
                                     <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
                                 </div>
 
-                                {/* Price info */}
                                 <div className="w-full text-center mb-4">
-                                    <p className="text-sm text-blue-200 font-medium">
-                                        Current Price - Avg. Buy Price
-                                    </p>
+                                    <p className="text-sm text-blue-200 font-medium">Current Price - Avg. Buy Price</p>
                                     <p className="text-lg font-mono text-yellow-300">
-                                        ${formatCurrency(coin.current_price)}{" "}
-                                        <span className="text-white">-</span>{" "}
-                                        {avgPrice > 0 ? `$${formatCurrency(avgPrice)}` : "–"}
+                                        ${formatCurrency(coin.current_price)} <span className="text-white">-</span> ${avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
                                     </p>
 
                                     {coin.is_fallback_price && (
@@ -736,79 +714,52 @@ function Dashboard() {
 
                                     {!coin.is_fallback_price &&
                                         coin.price_last_updated &&
-                                        Math.abs(
-                                            coin.current_price -
-                                            parseFloat(
-                                                localStorage.getItem(
-                                                    "price_" + coin.coin_symbol.toUpperCase()
-                                                )
-                                            )
-                                        ) < 0.000001 &&
-                                        Math.round((Date.now() - coin.price_last_updated) / 60000) >=
-                                        1 && (
+                                        Math.abs(coin.current_price - parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase()))) < 0.000001 &&
+                                        Math.round((Date.now() - coin.price_last_updated) / 60000) >= 1 && (
                                             <p className="text-xs text-gray-400 mt-1">
-                                                ⚠️ Last price from{" "}
-                                                {formatLastUpdatedDuration(coin.price_last_updated)}
+                                                ⚠️ Last price from {formatLastUpdatedDuration(coin.price_last_updated)}
                                             </p>
                                         )}
+
+
                                 </div>
 
-                                {/* Grid info */}
+
                                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
                                     <div>
-                                        <p className="text-sm text-gray-400">🔹 Total Quantity</p>
-                                        <p className="text-lg font-mono text-white">
-                                            {coin.total_quantity.toLocaleString()}
-                                        </p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
+                                        <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-400">🔹 Total Invested</p>
-                                        <p className="text-lg font-mono text-orange-400">
-                                            ${formatCurrency(coin.total_invested)}
-                                        </p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
+                                        <p className="text-lg font-mono text-orange-400">${formatCurrency(coin.total_invested)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-400">🔹 Net Invested</p>
-                                        <p
-                                            className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"
-                                                }`}
-                                        >
-                                            ${formatCurrency(netInvested)}
-                                        </p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
+                                        <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-400">🔹 Current Value</p>
-                                        <p className="text-lg font-mono text-blue-400">
-                                            ${Math.round(coin.current_value).toLocaleString()}
-                                        </p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
+                                        <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
                                     </div>
-                                    <div className="col-span-2 border-t border-white/10 pt-2">
-                                        <p className="text-sm text-gray-400">
+                                    <div className="col-span-2 border-t border-gray-700 pt-2">
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
                                             {(() => {
-                                                const ratio =
-                                                    Math.abs(netInvested) > 0
-                                                        ? coin.profit_loss / Math.abs(netInvested)
-                                                        : 0;
+                                                const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
                                                 if (ratio > 0.5) return "🤑";
                                                 if (ratio > 0.1) return "😎";
                                                 if (ratio > 0) return "🙂";
                                                 if (ratio > -0.1) return "😕";
                                                 if (ratio > -0.5) return "😢";
                                                 return "😭";
-                                            })()}{" "}
-                                            Profit / Loss
+                                            })()} Profit / Loss
                                         </p>
-                                        <p
-                                            className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"
-                                                }`}
-                                        >
-                                            ${Math.round(coin.profit_loss).toLocaleString()}{" "}
-                                            <span className="text-xs">({profitLossPercentage})</span>
+                                        <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                            ${Math.round(coin.profit_loss).toLocaleString()}<span className="text-xs">({profitLossPercentage})</span>
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* Buttons */}
                                 <div className="mt-4 flex justify-center gap-4">
                                     <button
                                         onClick={() => handleOpenTradeModal(coin, "buy")}
@@ -816,24 +767,28 @@ function Dashboard() {
                                     >
                                         Buy
                                     </button>
+
+
                                     <button
-                                        onClick={() =>
-                                            coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")
-                                        }
+                                        onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
                                         disabled={coin.total_quantity === 0}
-                                        className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200 ${coin.total_quantity === 0
-                                            ? "bg-gray-600 cursor-not-allowed"
-                                            : "bg-red-600 hover:bg-red-700 active:bg-red-800"
-                                            }`}
+                                        className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200
+        ${coin.total_quantity === 0
+                                                ? "bg-gray-600 cursor-not-allowed"
+                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
+    `}
                                     >
                                         Sell
                                     </button>
+
+
+
                                 </div>
+
                             </div>
                         );
                     })}
                 </div>
-
             </div>
             {/* FAB chỉ hiển thị khi không mở modal và chỉ trên mobile */}
             {!showModal && (
