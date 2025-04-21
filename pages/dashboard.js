@@ -458,7 +458,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-0 max-w-[1400px] mx-auto bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] min-h-screen text-white">
+        <div className="p-0 bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] min-h-screen text-white">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510]">
@@ -590,7 +590,7 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-4 rounded-2xl overflow-hidden text-white bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 transition duration-300 hover:shadow-cyan-500/20">
+                    <div className="max-w-4xl mx-auto mt-4 rounded-2xl overflow-hidden text-white bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 transition duration-300 hover:shadow-cyan-500/20">
 
                         {/* Header trắng nằm trên cùng */}
                         <div className="bg-[#10192b] px-6 py-4 text-center">
