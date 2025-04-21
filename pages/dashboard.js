@@ -643,7 +643,7 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full bg-[#10192b] 
+                                className="w-full bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] 
         text-white px-4 h-9 text-sm rounded-full shadow-inner border border-cyan-400/20 shadow-lg shadow-cyan-400/10 pr-8 
         focus:outline-none appearance-none"
                             >
@@ -684,7 +684,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="w-full bg-[#10192b] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 rounded-2xl p-4 scale-[1.02] transition duration-300 hover:shadow-cyan-500/20"
+                                className="w-full bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 rounded-2xl p-4 scale-[1.02] transition duration-300 hover:shadow-cyan-500/20"
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
