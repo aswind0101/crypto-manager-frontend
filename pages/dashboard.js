@@ -672,7 +672,10 @@ function Dashboard() {
 
 
                 )}
-
+                <div className="fixed inset-0 bg-[url('/your-background.jpg')] bg-cover bg-center z-0 opacity-30" />
+                <div className="relative z-10 p-10 bg-white/10 backdrop-blur-md rounded-xl text-white">
+                    This box is glass!
+                </div>
 
                 {/* phần còn lại giữ nguyên */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -821,8 +824,8 @@ function Dashboard() {
                                         }
                                         disabled={coin.total_quantity === 0}
                                         className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200 ${coin.total_quantity === 0
-                                                ? "bg-gray-600 cursor-not-allowed"
-                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"
+                                            ? "bg-gray-600 cursor-not-allowed"
+                                            : "bg-red-600 hover:bg-red-700 active:bg-red-800"
                                             }`}
                                     >
                                         Sell
