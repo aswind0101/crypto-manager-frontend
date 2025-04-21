@@ -591,15 +591,15 @@ function Dashboard() {
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
                     <div className="mt-4 rounded-3xl overflow-hidden text-white 
-                    bg-white/5 backdrop-blur-md border border-white/20 
+                    bg-white/8 backdrop-blur-md border border-white/20 
                     shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300">                
 
                         {/* Header trắng nằm trên cùng */}
                         <div className="bg-yellow-600 px-6 py-4 text-center">
                             <h2 className="text-xl font-semibold text-white">🌐 Market Overview</h2>
-                            <p className="text-sm text-gray-400">
+                            <p className="text-sm text-gray-100">
                                 Total Market Cap:{" "}
-                                <span className="text-lg text-yellow-300 font-mono font-bold">
+                                <span className="text-lg text-gray-100 font-mono font-bold">
                                     ${formatNumber(globalMarketCap)}
                                 </span>
                             </p>
@@ -684,7 +684,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                            className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
+                            className="w-full backdrop-blur-md bg-white/8 border border-white/20 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
                             hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.1)]"
                             >
                                 {/* Hint for mobile users */}
