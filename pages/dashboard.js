@@ -590,10 +590,10 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-4 rounded-2xl overflow-hidden text-white bg-[#10192b] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 transition duration-300 hover:shadow-cyan-500/20">
+                    <div className="mt-4 rounded-2xl overflow-hidden text-white bg-gradient-to-br from-[#0a0f1c] via-[#050b18] to-[#020510] border border-cyan-400/20 shadow-lg shadow-cyan-400/10 transition duration-300 hover:shadow-cyan-500/20">
 
                         {/* Header trắng nằm trên cùng */}
-                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-4 text-center">
+                        <div className="bg-[#10192b] px-6 py-4 text-center">
                             <h2 className="text-xl font-semibold text-white">🌐 Market Overview</h2>
                             <p className="text-sm text-gray-400">
                                 Total Market Cap:{" "}
@@ -647,9 +647,9 @@ function Dashboard() {
         text-white px-4 h-9 text-sm rounded-full shadow-inner border border-cyan-400/20 shadow-lg shadow-cyan-400/10 pr-8 
         focus:outline-none appearance-none"
                             >
-                                <option className="text-black" value="all">All</option>
-                                <option className="text-black" value="profit">🟢 Profit</option>
-                                <option className="text-black" value="loss">🔴 Loss</option>
+                                <option className="text-white" value="all">All</option>
+                                <option className="text-white" value="profit">🟢 Profit</option>
+                                <option className="text-white" value="loss">🔴 Loss</option>
                             </select>
                             <div className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-xs leading-none">
                                 ▲<br />▼
