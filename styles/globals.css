@@ -34,10 +34,7 @@
 }
 
 body {
-  background: radial-gradient(at 30% 30%, #202d4e, transparent),
-              radial-gradient(at 70% 70%, #b629ff, transparent),
-              linear-gradient(135deg, #0b1e3d, #132f51, #183b69);
-  background-blend-mode: overlay;
+  background: black;
   color: #ffffff;
   font-family: 'Poppins', sans-serif;
 }
