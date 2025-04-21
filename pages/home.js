@@ -593,8 +593,8 @@ function Dashboard() {
                     <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
 
                         {/* Header trắng nằm trên cùng */}
-                        <div className="bg-white px-6 py-4 text-center">
-                            <h2 className="text-xl font-semibold text-black">🌐 Market Overview</h2>
+                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-4 text-center">
+                            <h2 className="text-xl font-semibold text-white">🌐 Market Overview</h2>
                             <p className="text-sm text-gray-400">
                                 Total Market Cap:{" "}
                                 <span className="text-lg text-yellow-300 font-mono font-bold">
