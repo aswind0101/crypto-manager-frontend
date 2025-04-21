@@ -590,7 +590,9 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
+                    <div className="mt-4 rounded-3xl overflow-hidden text-white 
+                    bg-white/10 backdrop-blur-md border border-white/20 
+                    shadow-[0_8px_24px_rgba(255,255,255,0.05)] hover:bg-white/20 hover:shadow-[0_12px_32px_rgba(255,255,255,0.08)] transition-all duration-300">                
 
                         {/* Header trắng nằm trên cùng */}
                         <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-4 text-center">
