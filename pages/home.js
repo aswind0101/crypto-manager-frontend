@@ -461,7 +461,7 @@ function Dashboard() {
         <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
 
-            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
+            <div className="grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
