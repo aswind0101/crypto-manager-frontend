@@ -743,7 +743,7 @@ function Dashboard() {
                                         <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
                                     </div>
                                     <div className="col-span-2 border-t border-gray-500 pt-2">
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                        <p className="text-sm text-gray-800 flex items-center justify-center gap-1">
                                             {(() => {
                                                 const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
                                                 if (ratio > 0.5) return "🤑";
