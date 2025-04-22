@@ -11,37 +11,25 @@
     --foreground: #ededed;
   }
 }
-
 /* 📅 Đổi màu icon date picker */
 @layer utilities {
   .custom-date::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    /* biến icon thành màu trắng */
+    filter: invert(1); /* biến icon thành màu trắng */
     cursor: pointer;
   }
 }
-
 /* Hide scrollbar but allow scrolling */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
-
 .scrollbar-hide {
-  -ms-overflow-style: none;
-  /* IE + Edge */
-  scrollbar-width: none;
-  /* Firefox */
+  -ms-overflow-style: none; /* IE + Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 body {
-  background: linear-gradient(to bottom right, #0b1e3d, #132f51, #183b69);
+  background: linear-gradient(to bottom right, #0b1e3d, #183b69);
   color: #ffffff;
   font-family: 'Poppins', sans-serif;
-
-  /* Hiệu ứng mờ (nếu muốn glass) */
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-
-  /* Mượt hơn khi chuyển trang / hiệu ứng */
-  transition: background 0.3s ease;
 }
+
