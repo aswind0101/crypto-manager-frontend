@@ -684,8 +684,8 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                            className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
-                            hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.1)]"
+                            className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md shadow-[0_4px_24px_rgba(255,255,255,0.1)] 
+                            p-6 transition hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.15)]"
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
@@ -697,7 +697,7 @@ function Dashboard() {
                                         {getCoinIcon(coin.coin_symbol)}
                                         <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
                                     </div>
-                                    <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
+                                    <p className="text-sm text-gray-300">{coin.coin_name || ""}</p>
                                 </div>
 
                                 <div className="w-full text-center mb-4">
