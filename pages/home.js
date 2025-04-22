@@ -461,7 +461,7 @@ function Dashboard() {
         <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
 
-            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
+            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -626,6 +626,9 @@ function Dashboard() {
                                             <p className="text-sm text-yellow-300 font-mono">
                                                 ${formatCurrency(coin.current_price)}
                                             </p>
+                                            <p className={`text-xs font-mono ${coin.price_change_percentage_24h >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                                {coin.price_change_percentage_24h >= 0 ? "↑" : "↓"} {coin.price_change_percentage_24h.toFixed(2)}%
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
@@ -684,7 +687,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                            className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
                             shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
                             transition-all duration-300"
                             >
