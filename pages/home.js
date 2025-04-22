@@ -476,7 +476,7 @@ function Dashboard() {
                                     <select
                                         value={tradeType}
                                         onChange={(e) => setTradeType(e.target.value)}
-                                        className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                        className="w-full px-4 py-2 bg-black rounded text-white outline-none"
                                     >
                                         <option value="buy">Buy</option>
                                         <option value="sell">Sell</option>
@@ -490,7 +490,7 @@ function Dashboard() {
                                         value={quantity}
                                         onChange={(e) => setQuantity(e.target.value)}
                                         placeholder="e.g., 100"
-                                        className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                        className="w-full px-4 py-2 bg-black rounded text-white outline-none"
                                         step="any"
                                     />
                                 </div>
@@ -502,7 +502,7 @@ function Dashboard() {
                                         value={price}
                                         onChange={(e) => setPrice(e.target.value)}
                                         placeholder="e.g., 2.5"
-                                        className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                        className="w-full px-4 py-2 bg-black rounded text-white outline-none"
                                         step="any"
                                     />
                                 </div>
