@@ -606,7 +606,7 @@ function Dashboard() {
 
                         {/* Danh sách top coin */}
                         <div className="p-4">
-                            <div className="max-h-96 overflow-y-auto divide-y divide-gray-500 px-2 py-2 text-sm scrollbar-hide">
+                            <div className="max-h-96 overflow-y-auto divide-y divide-white/10 px-2 py-2 text-sm scrollbar-hide">
                                 {topCoins.slice(0, 10).map((coin) => (
                                     <div
                                         key={coin.id}
