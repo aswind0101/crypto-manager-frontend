@@ -595,7 +595,7 @@ function Dashboard() {
                     border border-white/20 shadow-[0_8px_24px_rgba(255,255,255,0.05)]">
                         {/* Header trắng nằm trên cùng */}
                         <div className="bg-gradient-to-br from-yellow-500 via-yellow-400 to-yellow-300 px-6 py-4 text-center shadow-sm border-b border-yellow-500">
-                        <h2 className="text-lg font-bold text-black drop-shadow-sm">🌐 Market Overview</h2>
+                            <h2 className="text-lg font-bold text-black drop-shadow-sm">🌐 Market Overview</h2>
                             <p className="text-xs text-black font-medium">
                                 Total Market Cap:{" "}
                                 <span className="font-mono font-bold text-black">
@@ -626,6 +626,9 @@ function Dashboard() {
                                         <div className="text-right">
                                             <p className="text-sm text-yellow-300 font-mono">
                                                 ${formatCurrency(coin.current_price)}
+                                            </p>
+                                            <p className={`text-xs font-mono ${coin.price_change_percentage_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {coin.price_change_percentage_24h >= 0 ? '📈' : '📉'} {coin.price_change_percentage_24h.toFixed(2)}%
                                             </p>
                                         </div>
                                     </div>
