@@ -686,8 +686,9 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="rounded-3xl border border-white/20 bg-[#0f111a]/50 backdrop-blur-2xl 
-                                shadow-[0_4px_30px_rgba(0,255,255,0.2)] p-6 transition hover:bg-[#1b1f2b]/60 hover:shadow-[0_8px_40px_rgba(0,255,255,0.25)]"
+                            className="rounded-[24px] border border-cyan-300/30 bg-[#0d111c]/60 backdrop-blur-[14px] 
+                            shadow-[0_0_30px_rgba(0,255,255,0.15)] p-6 transition hover:shadow-[0_0_40px_rgba(0,255,255,0.25)]"
+
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
