@@ -34,12 +34,14 @@
 }
 
 body {
-  background: rgba(0, 0, 0, 0.6); /* đen mờ trong suốt */
-  backdrop-filter: blur(16px);   /* hiệu ứng mờ nền */
+  background: linear-gradient(to bottom right, #0b1e3d, #132f51, #183b69);
   color: #ffffff;
   font-family: 'Poppins', sans-serif;
 
-  /* Hiệu ứng mượt hơn */
-  -webkit-backdrop-filter: blur(16px); 
+  /* Hiệu ứng mờ (nếu muốn glass) */
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+
+  /* Mượt hơn khi chuyển trang / hiệu ứng */
   transition: background 0.3s ease;
 }
