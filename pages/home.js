@@ -686,9 +686,10 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="rounded-3xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_4px_24px_rgba(255,255,255,0.05)] 
-                            p-6 transition hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.15)]"
+                                className="relative rounded-2xl bg-[#0d111c]/60 backdrop-blur-lg border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_10px_20px_rgba(0,0,0,0.3)] p-6 transition hover:shadow-[0_0_30px_rgba(0,255,255,0.15)] hover:scale-[1.01]"
+
                             >
+                                <div className="absolute -top-1 -left-1 w-full h-full rounded-2xl border border-cyan-400/20 blur-md opacity-20" />
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
                                     (Tap any coin to view transaction details)
