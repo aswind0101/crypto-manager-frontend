@@ -591,16 +591,14 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-4 rounded-3xl overflow-hidden text-white 
-                    bg-white/10 backdrop-blur-md border border-white/20 
-                    shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300">
-
+                    <div className="mt-8 rounded-3xl overflow-hidden text-white bg-white/10 backdrop-blur-md 
+                    border border-white/20 shadow-[0_8px_24px_rgba(255,255,255,0.05)]">
                         {/* Header trắng nằm trên cùng */}
-                        <div className="bg-yellow-600 px-6 py-4 text-center">
-                            <h2 className="text-lg font-semibold text-white">🌐 Market Overview</h2>
-                            <p className="text-xs text-gray-700">
+                        <div className="bg-gradient-to-br from-yellow-500 via-yellow-400 to-yellow-300 px-6 py-4 text-center shadow-sm border-b border-yellow-500">
+                        <h2 className="text-lg font-bold text-black drop-shadow-sm">🌐 Market Overview</h2>
+                            <p className="text-xs text-black font-medium">
                                 Total Market Cap:{" "}
-                                <span className="text-sm text-gray-700 font-mono font-bold">
+                                <span className="font-mono font-bold text-black">
                                     ${formatNumber(globalMarketCap)}
                                 </span>
                             </p>
