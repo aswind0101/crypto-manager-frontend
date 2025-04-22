@@ -592,7 +592,7 @@ function Dashboard() {
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
                     <div className="mt-8 rounded-3xl overflow-hidden text-white bg-white/10 backdrop-blur-md 
-                    border border-white/20 shadow-[0_8px_24px_rgba(255,255,255,0.05)]">
+                    border border-white/15 shadow-[0_8px_24px_rgba(255,255,255,0.05)]">
                         {/* Header trắng nằm trên cùng */}
                         <div className="bg-gradient-to-br from-yellow-500 via-yellow-400 to-yellow-300 px-6 py-4 text-center shadow-sm border-b border-yellow-500">
                             <h2 className="text-lg font-bold text-black drop-shadow-sm">🌐 Market Overview</h2>
@@ -647,7 +647,7 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
+                                className="w-full backdrop-blur-md bg-white/10 border border-white/15 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
                             >
                                 <option className="text-black" value="all">All</option>
                                 <option className="text-black" value="profit">🟢 Profit</option>
@@ -686,7 +686,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md shadow-[0_4px_24px_rgba(255,255,255,0.05)] 
+                                className="rounded-3xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_4px_24px_rgba(255,255,255,0.05)] 
                             p-6 transition hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.15)]"
                             >
                                 {/* Hint for mobile users */}
