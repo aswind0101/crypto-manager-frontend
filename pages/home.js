@@ -628,7 +628,7 @@ function Dashboard() {
                                                 ${formatCurrency(coin.current_price)}
                                             </p>
                                             <p className={`text-xs font-mono ${coin.price_change_percentage_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                {coin.price_change_percentage_24h >= 0 ? '📈' : '📉'} {coin.price_change_percentage_24h.toFixed(2)}%
+                                                {coin.price_change_percentage_24h >= 0 ? '↑' : '↓'} {coin.price_change_percentage_24h.toFixed(2)}%
                                             </p>
                                         </div>
                                     </div>
