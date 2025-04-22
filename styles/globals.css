@@ -34,7 +34,12 @@
 }
 
 body {
-  background: black;
+  background: rgba(0, 0, 0, 0.6); /* đen mờ trong suốt */
+  backdrop-filter: blur(16px);   /* hiệu ứng mờ nền */
   color: #ffffff;
   font-family: 'Poppins', sans-serif;
+
+  /* Hiệu ứng mượt hơn */
+  -webkit-backdrop-filter: blur(16px); 
+  transition: background 0.3s ease;
 }
