@@ -461,75 +461,74 @@ function Dashboard() {
         <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
             <Navbar />
 
-            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
+            <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl shadow-lg bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69]">
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white/10 backdrop-blur-xl border border-yellow-400/40 shadow-[0_0_40px_rgba(255,255,255,0.1)] rounded-3xl p-6 w-full max-w-md mx-4 relative z-50">
-                            <h2 className="text-xl font-bold text-yellow-400 text-center mb-4">
+                        <div className="bg-[#0e1628] max-w-md w-full mx-4 p-6 rounded-xl shadow-2xl text-white space-y-4 relative z-50">
+                            <h2 className="text-xl font-bold text-yellow-400 text-center">
                                 {tradeType === "buy" ? "➕ Buy" : "➖ Sell"} {selectedCoin.coin_symbol.toUpperCase()}
                             </h2>
 
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
-                                    <select
-                                        value={tradeType}
-                                        onChange={(e) => setTradeType(e.target.value)}
-                                        className="w-full px-4 py-2 bg-black rounded text-white outline-none"
-                                    >
-                                        <option value="buy">Buy</option>
-                                        <option value="sell">Sell</option>
-                                    </select>
-                                </div>
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
+                                <select
+                                    value={tradeType}
+                                    onChange={(e) => setTradeType(e.target.value)}
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                >
+                                    <option value="buy">Buy</option>
+                                    <option value="sell">Sell</option>
+                                </select>
+                            </div>
 
-                                <div>
-                                    <label className="block text-sm text-gray-300 mb-1">Quantity</label>
-                                    <input
-                                        type="number"
-                                        value={quantity}
-                                        onChange={(e) => setQuantity(e.target.value)}
-                                        placeholder="e.g., 100"
-                                        className="w-full px-4 py-2 bg-black rounded text-white outline-none"
-                                        step="any"
-                                    />
-                                </div>
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Quantity</label>
+                                <input
+                                    type="number"
+                                    value={quantity}
+                                    onChange={(e) => setQuantity(e.target.value)}
+                                    placeholder="e.g., 100"
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    step="any"
+                                />
+                            </div>
 
-                                <div>
-                                    <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
-                                    <input
-                                        type="number"
-                                        value={price}
-                                        onChange={(e) => setPrice(e.target.value)}
-                                        placeholder="e.g., 2.5"
-                                        className="w-full px-4 py-2 bg-black rounded text-white outline-none"
-                                        step="any"
-                                    />
-                                </div>
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
+                                <input
+                                    type="number"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                    placeholder="e.g., 2.5"
+                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    step="any"
+                                />
+                            </div>
 
-                                {formError && <p className="text-red-400 text-sm text-center">{formError}</p>}
+                            {formError && <p className="text-red-400 text-sm text-center">{formError}</p>}
 
-                                <div className="flex justify-between gap-4 mt-4">
-                                    <button
-                                        onClick={() => setShowModal(false)}
-                                        className="w-1/2 px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
-                                        disabled={isSubmitting}
-                                    >
-                                        Cancel
-                                    </button>
+                            <div className="flex justify-between gap-4 mt-2">
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    className="w-1/2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
+                                    disabled={isSubmitting}
+                                >
+                                    Cancel
+                                </button>
 
-                                    <button
-                                        onClick={handleConfirmTrade}
-                                        disabled={isSubmitting}
-                                        className={`w-1/2 px-4 py-2 rounded-full text-white text-sm shadow transition
-                                            ${tradeType === "buy"
-                                                ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
-                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
-                                            ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
-                                    >
-                                        {isSubmitting ? "Processing..." : "Confirm"}
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={handleConfirmTrade}
+                                    disabled={isSubmitting}
+                                    className={`w-1/2 px-4 py-2 rounded text-white text-sm shadow transition
+            ${tradeType === "buy"
+                                            ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
+                                            : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
+            ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
+          `}
+                                >
+                                    {isSubmitting ? "Processing..." : "Confirm"}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -591,14 +590,14 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-8 rounded-3xl overflow-hidden text-white bg-white/10 backdrop-blur-md 
-                    border border-white/15 shadow-[0_8px_24px_rgba(255,255,255,0.05)]">
+                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
+
                         {/* Header trắng nằm trên cùng */}
-                        <div className="bg-gradient-to-br from-yellow-500 via-yellow-400 to-yellow-300 px-6 py-4 text-center shadow-sm border-b border-yellow-500">
-                            <h2 className="text-lg font-bold text-black drop-shadow-sm">🌐 Market Overview</h2>
-                            <p className="text-xs text-black font-medium">
+                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-3">
+                            <h2 className="text-xl text-center font-semibold text-white font-bold">🌐 Market Overview</h2>
+                            <p className="text-sm text-gray-400 text-center">
                                 Total Market Cap:{" "}
-                                <span className="font-mono font-bold text-black">
+                                <span className="text-lg text-yellow-300 font-mono font-bold">
                                     ${formatNumber(globalMarketCap)}
                                 </span>
                             </p>
@@ -606,7 +605,7 @@ function Dashboard() {
 
                         {/* Danh sách top coin */}
                         <div className="p-4">
-                            <div className="max-h-96 overflow-y-auto divide-y divide-white/10 px-2 py-2 text-sm scrollbar-hide">
+                            <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-2 py-2 text-sm scrollbar-hide">
                                 {topCoins.slice(0, 10).map((coin) => (
                                     <div
                                         key={coin.id}
@@ -627,9 +626,6 @@ function Dashboard() {
                                             <p className="text-sm text-yellow-300 font-mono">
                                                 ${formatCurrency(coin.current_price)}
                                             </p>
-                                            <p className={`text-xs font-mono ${coin.price_change_percentage_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                {coin.price_change_percentage_24h >= 0 ? '↑' : '↓'} {coin.price_change_percentage_24h.toFixed(2)}%
-                                            </p>
                                         </div>
                                     </div>
                                 ))}
@@ -647,7 +643,9 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full backdrop-blur-md bg-white/10 border border-white/15 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
+        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
+        focus:outline-none appearance-none"
                             >
                                 <option className="text-black" value="all">All</option>
                                 <option className="text-black" value="profit">🟢 Profit</option>
@@ -686,8 +684,9 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="rounded-3xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_4px_24px_rgba(255,255,255,0.05)] 
-                            p-6 transition hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.15)]"
+                            className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
+                            shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
+                            transition-all duration-300"
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
@@ -699,7 +698,7 @@ function Dashboard() {
                                         {getCoinIcon(coin.coin_symbol)}
                                         <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
                                     </div>
-                                    <p className="text-sm text-gray-300">{coin.coin_name || ""}</p>
+                                    <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
                                 </div>
 
                                 <div className="w-full text-center mb-4">
