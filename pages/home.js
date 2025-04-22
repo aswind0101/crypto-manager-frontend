@@ -465,70 +465,71 @@ function Dashboard() {
                 {/* Modal */}
                 {showModal && selectedCoin && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-[#0e1628] max-w-md w-full mx-4 p-6 rounded-xl shadow-2xl text-white space-y-4 relative z-50">
-                            <h2 className="text-xl font-bold text-yellow-400 text-center">
+                        <div className="bg-white/10 backdrop-blur-xl border border-yellow-400/40 shadow-[0_0_40px_rgba(255,255,255,0.1)] rounded-3xl p-6 w-full max-w-md mx-4 relative z-50">
+                            <h2 className="text-xl font-bold text-yellow-400 text-center mb-4">
                                 {tradeType === "buy" ? "➕ Buy" : "➖ Sell"} {selectedCoin.coin_symbol.toUpperCase()}
                             </h2>
 
-                            <div>
-                                <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
-                                <select
-                                    value={tradeType}
-                                    onChange={(e) => setTradeType(e.target.value)}
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
-                                >
-                                    <option value="buy">Buy</option>
-                                    <option value="sell">Sell</option>
-                                </select>
-                            </div>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
+                                    <select
+                                        value={tradeType}
+                                        onChange={(e) => setTradeType(e.target.value)}
+                                        className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    >
+                                        <option value="buy">Buy</option>
+                                        <option value="sell">Sell</option>
+                                    </select>
+                                </div>
 
-                            <div>
-                                <label className="block text-sm text-gray-300 mb-1">Quantity</label>
-                                <input
-                                    type="number"
-                                    value={quantity}
-                                    onChange={(e) => setQuantity(e.target.value)}
-                                    placeholder="e.g., 100"
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
-                                    step="any"
-                                />
-                            </div>
+                                <div>
+                                    <label className="block text-sm text-gray-300 mb-1">Quantity</label>
+                                    <input
+                                        type="number"
+                                        value={quantity}
+                                        onChange={(e) => setQuantity(e.target.value)}
+                                        placeholder="e.g., 100"
+                                        className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                        step="any"
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
-                                <input
-                                    type="number"
-                                    value={price}
-                                    onChange={(e) => setPrice(e.target.value)}
-                                    placeholder="e.g., 2.5"
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
-                                    step="any"
-                                />
-                            </div>
+                                <div>
+                                    <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
+                                    <input
+                                        type="number"
+                                        value={price}
+                                        onChange={(e) => setPrice(e.target.value)}
+                                        placeholder="e.g., 2.5"
+                                        className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                        step="any"
+                                    />
+                                </div>
 
-                            {formError && <p className="text-red-400 text-sm text-center">{formError}</p>}
+                                {formError && <p className="text-red-400 text-sm text-center">{formError}</p>}
 
-                            <div className="flex justify-between gap-4 mt-2">
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="w-1/2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
-                                    disabled={isSubmitting}
-                                >
-                                    Cancel
-                                </button>
+                                <div className="flex justify-between gap-4 mt-4">
+                                    <button
+                                        onClick={() => setShowModal(false)}
+                                        className="w-1/2 px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
+                                        disabled={isSubmitting}
+                                    >
+                                        Cancel
+                                    </button>
 
-                                <button
-                                    onClick={handleConfirmTrade}
-                                    disabled={isSubmitting}
-                                    className={`w-1/2 px-4 py-2 rounded text-white text-sm shadow transition
-            ${tradeType === "buy"
-                                            ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
-                                            : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
-            ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
-          `}
-                                >
-                                    {isSubmitting ? "Processing..." : "Confirm"}
-                                </button>
+                                    <button
+                                        onClick={handleConfirmTrade}
+                                        disabled={isSubmitting}
+                                        className={`w-1/2 px-4 py-2 rounded-full text-white text-sm shadow transition
+                                            ${tradeType === "buy"
+                                                ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
+                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
+                                            ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    >
+                                        {isSubmitting ? "Processing..." : "Confirm"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -592,7 +593,7 @@ function Dashboard() {
                 {portfolio.length > 0 && (
                     <div className="mt-4 rounded-3xl overflow-hidden text-white 
                     bg-white/10 backdrop-blur-md border border-white/20 
-                    shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300">                
+                    shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300">
 
                         {/* Header trắng nằm trên cùng */}
                         <div className="bg-yellow-600 px-6 py-4 text-center">
@@ -684,7 +685,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                            className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md shadow-[0_4px_24px_rgba(255,255,255,0.1)] 
+                                className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md shadow-[0_4px_24px_rgba(255,255,255,0.1)] 
                             p-6 transition hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.15)]"
                             >
                                 {/* Hint for mobile users */}
