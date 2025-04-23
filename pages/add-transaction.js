@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth } from "firebase/auth";
+import { useRouter } from "next/router";
+
 
 function AddTransaction() {
   const [coinSymbol, setCoinSymbol] = useState("");
@@ -13,6 +15,8 @@ function AddTransaction() {
   const [coinList, setCoinList] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const router = useRouter();
+
 
   useEffect(() => {
     const fetchCoinList = async () => {
@@ -98,7 +102,15 @@ function AddTransaction() {
   return (
     <div className="w-full p-4 bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white">
       <Navbar />
-      <h1 className="text-2xl font-bold text-yellow-400 my-6">➕ Add New Transaction</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-yellow-400">➕ Add New Transaction</h1>
+        <button
+          onClick={() => router.push("/transactions")}
+          className="text-sm bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full shadow transition"
+        >
+          ✖ Close
+        </button>
+      </div>
 
       <form onSubmit={handleSubmit} className="bg-[#1a2f46] max-w-md mx-auto p-6 rounded-2xl shadow-lg border border-[#2c4069] space-y-4">
         <div>
@@ -177,13 +189,22 @@ function AddTransaction() {
           />
         </div>
 
-        <button
-          type="submit"
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-full transition"
-        >
-          Add Transaction
-        </button>
+        <div className="flex flex-col md:flex-row gap-4 items-center mt-2 w-full">
+          <button
+            type="submit"
+            className="w-full md:w-auto flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-full transition text-center"
+          >
+            ➕ Add Transaction
+          </button>
 
+          <button
+            type="button"
+            onClick={() => router.push("/home")}
+            className="w-full md:w-auto flex-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-2 px-6 rounded-full transition text-center"
+          >
+            🏠 Go to Home
+          </button>
+        </div>
         {status && <p className="text-center mt-2 text-sm text-yellow-300">{status}</p>}
       </form>
     </div>
