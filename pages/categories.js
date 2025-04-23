@@ -177,33 +177,35 @@ function Categories() {
       </div>
 
       {/* Danh sách category */}
-      <div className="max-w-full overflow-x-auto mt-4 rounded-xl shadow-lg border border-[#2c4069] bg-[#1f2937]">
-        <table className="min-w-full text-sm">
-          <thead className="bg-[#183b69] text-yellow-300">
-            <tr>
-              <th className="px-4 py-2 text-left">Name</th>
-              <th className="px-4 py-2 text-left">Type</th>
-              <th className="px-4 py-2 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((cat) => (
-              <tr key={cat.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                <td className="px-4 py-2 whitespace-nowrap"><TitleCaseText text={cat.name} /></td>
-                <td className="px-4 py-2 text-yellow-200 whitespace-nowrap"><TitleCaseText text={cat.type} /></td>
-                <td className="px-4 py-2 text-right">
-                  <button
-                    onClick={() => handleDeleteCategory(cat.id)}
-                    className="text-red-400 hover:text-red-600 text-xs whitespace-nowrap"
-                  >
-                    🗑️ Delete
-                  </button>
-                </td>
+      <div className="w-full overflow-x-auto mt-4 flex justify-center">
+        <div className="min-w-[600px] max-w-3xl w-full bg-[#1f2937] rounded-xl shadow-lg border border-[#2c4069]">
+          <table className="min-w-full text-sm">
+            <thead className="bg-[#183b69] text-yellow-300">
+              <tr>
+                <th className="px-4 py-2 text-left">Name</th>
+                <th className="px-4 py-2 text-left">Type</th>
+                <th className="px-4 py-2 text-right">Action</th>
               </tr>
-            ))}
-          </tbody>
+            </thead>
+            <tbody>
+              {filtered.map((cat) => (
+                <tr key={cat.id} className="border-t border-gray-700 hover:bg-[#162330]">
+                  <td className="px-4 py-2 whitespace-nowrap"><TitleCaseText text={cat.name} /></td>
+                  <td className="px-4 py-2 text-yellow-200 whitespace-nowrap"><TitleCaseText text={cat.type} /></td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      onClick={() => handleDeleteCategory(cat.id)}
+                      className="text-red-400 hover:text-red-600 text-xs whitespace-nowrap"
+                    >
+                      🗑️ Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
 
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );
