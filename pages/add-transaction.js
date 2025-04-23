@@ -102,130 +102,102 @@ function AddTransaction() {
   return (
     <div className="w-full p-4 bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white">
       <Navbar />
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-yellow-400">➕ Add New Transaction</h1>
-        <button
-          onClick={() => router.push("/transactions")}
-          className="text-sm bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full shadow transition"
-        >
-          ✖ Close
-        </button>
-      </div>
+      <h1 className="text-2xl font-bold text-yellow-400 my-6">➕ Add New Transaction</h1>
 
-      <div className="relative bg-[#1a2f46] max-w-md mx-auto p-6 rounded-2xl shadow-lg border border-[#2c4069]">
-        {/* ✖ Close button */}
-        <button
-          type="button"
-          onClick={() => router.push("/transactions")}
-          className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white text-sm px-4 py-1 rounded-full shadow transition"
-        >
-          ✖ Close
-        </button>
+      <form onSubmit={handleSubmit} className="bg-[#1a2f46] max-w-md mx-auto p-6 rounded-2xl shadow-lg border border-[#2c4069] space-y-4">
+        <div>
+          <label className="block text-sm text-gray-300 mb-1">Coin Symbol</label>
+          <input
+            type="text"
+            value={coinSymbol}
+            onChange={(e) => {
+              const val = e.target.value.toUpperCase();
+              setCoinSymbol(val);
+              if (val.length >= 1) {
+                const filtered = coinList.filter(c => c.symbol.toUpperCase().startsWith(val)).slice(0, 10);
+                setSuggestions(filtered);
+                setShowSuggestions(true);
+              } else {
+                setSuggestions([]);
+                setShowSuggestions(false);
+              }
+            }}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            placeholder="e.g., NEAR"
+            className="w-full px-4 py-2 bg-[#1f2937] rounded-full text-white outline-none"
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <ul className="bg-gray-800 border border-gray-700 rounded mt-1 max-h-40 overflow-y-auto text-sm text-white z-10 relative">
+              {suggestions.map((coin) => (
+                <li
+                  key={coin.id}
+                  onClick={() => {
+                    setCoinSymbol(coin.symbol.toUpperCase());
+                    setShowSuggestions(false);
+                  }}
+                  className="px-4 py-2 hover:bg-yellow-500 hover:text-black cursor-pointer"
+                >
+                  {coin.symbol.toUpperCase()} – {coin.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Coin Symbol */}
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Coin Symbol</label>
-            <input
-              type="text"
-              value={coinSymbol}
-              onChange={(e) => {
-                const val = e.target.value.toUpperCase();
-                setCoinSymbol(val);
-                if (val.length >= 1) {
-                  const filtered = coinList.filter(c => c.symbol.toUpperCase().startsWith(val)).slice(0, 10);
-                  setSuggestions(filtered);
-                  setShowSuggestions(true);
-                } else {
-                  setSuggestions([]);
-                  setShowSuggestions(false);
-                }
-              }}
-              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-              placeholder="e.g., NEAR"
-              className="w-full px-4 py-2 bg-[#1f2937] rounded-full text-white outline-none"
-            />
-            {showSuggestions && suggestions.length > 0 && (
-              <ul className="bg-gray-800 border border-gray-700 rounded mt-1 max-h-40 overflow-y-auto text-sm text-white z-10 relative">
-                {suggestions.map((coin) => (
-                  <li
-                    key={coin.id}
-                    onClick={() => {
-                      setCoinSymbol(coin.symbol.toUpperCase());
-                      setShowSuggestions(false);
-                    }}
-                    className="px-4 py-2 hover:bg-yellow-500 hover:text-black cursor-pointer"
-                  >
-                    {coin.symbol.toUpperCase()} – {coin.name}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        <div>
+          <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="w-full px-4 py-2 bg-[#1f2937] rounded-full text-white outline-none"
+          >
+            <option value="buy">Buy</option>
+            <option value="sell">Sell</option>
+          </select>
+        </div>
 
-          {/* Transaction Type */}
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full px-4 py-2 bg-[#1f2937] rounded-full text-white outline-none"
-            >
-              <option value="buy">Buy</option>
-              <option value="sell">Sell</option>
-            </select>
-          </div>
+        <div>
+          <label className="block text-sm text-gray-300 mb-1">Quantity</label>
+          <input
+            type="number"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            placeholder="e.g., 100"
+            className="w-full px-4 py-2 bg-[#1f2937] rounded-full text-white outline-none"
+            step="any"
+          />
+        </div>
 
-          {/* Quantity */}
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Quantity</label>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="e.g., 100"
-              className="w-full px-4 py-2 bg-[#1f2937] rounded-full text-white outline-none"
-              step="any"
-            />
-          </div>
+        <div>
+          <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
+          <input
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="e.g., 2.5"
+            className="w-full px-4 py-2 bg-[#1f2937] rounded-full text-white outline-none"
+            step="any"
+          />
+        </div>
 
-          {/* Price */}
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Price per Coin (USD)</label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="e.g., 2.5"
-              className="w-full px-4 py-2 bg-[#1f2937] rounded-full text-white outline-none"
-              step="any"
-            />
-          </div>
-
-          {/* Submit + Home Buttons */}
-          <div className="flex flex-col md:flex-row gap-4 items-center mt-6">
-            <button
-              type="submit"
-              className="w-full md:w-auto flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full transition text-center text-base"
-            >
-              <span className="text-xl mr-2">➕</span> Add Transaction
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push("/home")}
-              className="w-full md:w-auto flex-1 bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-3 px-6 rounded-full transition text-center text-base"
-            >
-              <span className="text-xl mr-2">🏠</span> Go to Home
-            </button>
-          </div>
-
-          {/* Status message */}
-          {status && <p className="text-center mt-2 text-sm text-yellow-300">{status}</p>}
-        </form>
-      </div>
-
+        <div className="flex flex-col gap-3">
+          <button
+            type="submit"
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-full transition"
+          >
+            ➕ Add Transaction
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/transactions")}
+            className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-full transition"
+          >
+            ✖ Cancel
+          </button>
+        </div>
+        {status && <p className="text-center mt-2 text-sm text-yellow-300">{status}</p>}
+      </form>
     </div>
   );
 }
