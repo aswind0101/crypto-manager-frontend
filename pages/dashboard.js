@@ -458,7 +458,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-4 bg-[#1C1F26] text-white min-h-screen">
+        <div className="p-0 bg-[#1C1F26] text-white min-h-screen">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
@@ -569,9 +569,9 @@ function Dashboard() {
                                                 setRefreshing(false);
                                             }
                                         }}
-                                        className="flex items-center gap-1 px-4 py-1 text-xs rounded-full 
-    bg-[#1a2f46] text-yellow-300 hover:bg-yellow-400 hover:text-black 
-    transition duration-200 shadow-inner border border-[#2c4069]"
+                                        className="flex items-center gap-1 px-4 py-1 text-xs rounded-full bg-[#1C1F26] shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631]
+    text-yellow-300 hover:bg-yellow-700 hover:text-white 
+    transition duration-200 border border-[#1C1F26]"
                                     >
                                         <span
                                             className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
@@ -603,7 +603,7 @@ function Dashboard() {
                         </div>
 
                         {/* Danh sách top coin */}
-                        <div className="bg-[#1C1F26] divide-y divide-white/5 p-6">
+                        <div className="bg-[#1C1F26] divide-y divide-white/5 p-4">
                             {topCoins.slice(0, 10).map((coin) => (
                                 <div key={coin.id} className="flex items-center justify-between rounded-lg px-6 py-4 transition-all">
                                     <div className="flex items-center gap-3">
