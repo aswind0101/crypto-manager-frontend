@@ -640,7 +640,7 @@ function Dashboard() {
                         <select
                             value={filterByProfit}
                             onChange={(e) => setFilterByProfit(e.target.value)}
-                            className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[1px_1px_4px_#0b0f17,_-1px_-1px_4px_#262f3d] outline-none"
+                            className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
                         >
                             <option value="all">All</option>
                             <option value="profit">🟢 Profit</option>
