@@ -102,7 +102,16 @@ function Transactions() {
             <Navbar />
 
             <div className="flex justify-between items-center my-6">
-                <h1 className="text-2xl font-bold text-yellow-400">📜 Transaction History</h1>
+                <div className="flex items-center justify-between w-full">
+                    <button
+                        onClick={() => router.push("/home")}
+                        className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold px-4 py-1 rounded-full text-sm shadow transition"
+                    >
+                        🏠 Home
+                    </button>
+                    <h1 className="text-2xl font-bold text-yellow-400">📜 Transaction History</h1>
+                </div>
+
             </div>
 
             <div className="flex flex-col md:flex-row gap-4 mb-4">
