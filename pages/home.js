@@ -458,7 +458,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
+        <div className="p-4 bg-[#1C1F26] text-white min-h-screen">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
@@ -590,77 +590,64 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
-
-                        {/* Header trắng nằm trên cùng */}
-                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-3">
-                            <h2 className="text-xl text-center font-semibold text-white font-bold">🌐 Market Overview</h2>
-                            <p className="text-sm text-gray-400 text-center">
+                    <div className="mt-6 w-full max-w-[1200px] mx-auto rounded-2xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
+                        {/* Header */}
+                        <div className="bg-yellow-700 px-6 py-4 text-center">
+                            <div className="flex justify-center items-center gap-2 text-white font-bold text-xl">
+                                🌐 Market Overview
+                            </div>
+                            <p className="text-sm text-gray-300 mt-1">
                                 Total Market Cap:{" "}
-                                <span className="text-lg text-yellow-300 font-mono font-bold">
-                                    ${formatNumber(globalMarketCap)}
-                                </span>
+                                <span className="text-yellow-400 font-bold">${formatNumber(globalMarketCap)}</span>
                             </p>
                         </div>
 
                         {/* Danh sách top coin */}
-                        <div className="p-4">
-                            <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-2 py-2 text-sm scrollbar-hide">
-                                {topCoins.slice(0, 10).map((coin) => (
-                                    <div
-                                        key={coin.id}
-                                        className="flex justify-between items-center py-3 rounded-lg px-3 transition-all"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <img src={coin.image} alt={coin.name} className="w-6 h-6" />
-                                            <div>
-                                                <p className="font-semibold text-white">
-                                                    {coin.name} ({coin.symbol.toUpperCase()})
-                                                </p>
-                                                <p className="text-xs text-gray-400">
-                                                    Market Cap: ${formatNumber(coin.market_cap)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm text-yellow-300 font-mono">
-                                                ${formatCurrency(coin.current_price)}
+                        <div className="bg-[#1C1F26] divide-y divide-white/5 p-6">
+                            {topCoins.slice(0, 10).map((coin) => (
+                                <div key={coin.id} className="flex items-center justify-between rounded-lg px-6 py-4 transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <img src={coin.image} className="w-8 h-8 rounded-full" alt={coin.name} />
+                                        <div>
+                                            <p className="text-white font-bold">
+                                                {coin.name} <span className="font-normal">({coin.symbol.toUpperCase()})</span>
                                             </p>
-                                            <p className={`text-xs font-mono ${coin.price_change_percentage_24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                                {coin.price_change_percentage_24h >= 0 ? "↑" : "↓"} {coin.price_change_percentage_24h.toFixed(2)}%
+                                            <p className="text-xs text-gray-400">
+                                                Market Cap: ${formatNumber(coin.market_cap)}
                                             </p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="text-right">
+                                        <p className="text-yellow-300 font-mono font-semibold">
+                                            ${formatCurrency(coin.current_price)}
+                                        </p>
+                                        <p
+                                            className={`text-xs ${coin.price_change_percentage_24h >= 0 ? "text-green-400" : "text-red-400"
+                                                }`}
+                                        >
+                                            {coin.price_change_percentage_24h >= 0 ? "↑" : "↓"} {coin.price_change_percentage_24h.toFixed(2)}%
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
+
                 )}
-
-
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
-                    <div className="w-full flex items-center gap-3 mt-2">
-                        {/* Select */}
-                        <div className="relative w-1/2">
-                            <select
-                                value={filterByProfit}
-                                onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
-        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
-        focus:outline-none appearance-none"
-                            >
-                                <option className="text-black" value="all">All</option>
-                                <option className="text-black" value="profit">🟢 Profit</option>
-                                <option className="text-black" value="loss">🔴 Loss</option>
-                            </select>
-                            <div className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-xs leading-none">
-                                ▲<br />▼
-                            </div>
-                        </div>
+                    <div className="w-full max-w-[1200px] mx-auto mt-6 px-6 py-4 bg-[#1C1F26] rounded-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#262f3d] flex items-center gap-4">
+                        <select
+                            value={filterByProfit}
+                            onChange={(e) => setFilterByProfit(e.target.value)}
+                            className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[1px_1px_4px_#0b0f17,_-1px_-1px_4px_#262f3d] outline-none"
+                        >
+                            <option value="all">All</option>
+                            <option value="profit">🟢 Profit</option>
+                            <option value="loss">🔴 Loss</option>
+                        </select>
 
-                        {/* Checkbox */}
-                        <label className="w-1/2 flex items-center gap-2 text-sm text-white h-9 px-4">
+                        <label className="flex items-center gap-2 text-sm">
                             <input
                                 type="checkbox"
                                 checked={includeSoldCoins}
@@ -676,7 +663,7 @@ function Dashboard() {
 
 
                 {/* phần còn lại giữ nguyên */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                <div className="w-full max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                     {filteredPortfolio.map((coin, index) => {
                         const netInvested = coin.total_invested - coin.total_sold;
                         const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
@@ -687,9 +674,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
-                            shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
-                            transition-all duration-300"
+                                className="bg-[#1C1F26]  rounded-2xl p-4 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all hover:scale-[1.01]"
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
