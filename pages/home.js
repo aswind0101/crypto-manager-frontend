@@ -458,7 +458,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-4 bg-[#1C1F26] text-white min-h-screen">
+        <div className="p-0 bg-[#1C1F26] text-white min-h-screen">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
