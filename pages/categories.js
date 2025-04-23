@@ -156,20 +156,18 @@ function Categories() {
 
       </form>
 
-      {/* Bộ lọc */}
-      <div className="max-w-lg mx-auto mt-6 flex justify-center gap-4">
-        {["all", "expense", "income", "credit-spending"].map((val) => (
-          <button
-            key={val}
-            onClick={() => setFilterType(val)}
-            className={`px-3 py-1 rounded-full text-xs border ${filterType === val
-              ? "bg-yellow-400 text-black font-bold"
-              : "border-yellow-400 text-yellow-300"
-              }`}
-          >
-            {val.toUpperCase()}
-          </button>
-        ))}
+      {/* Bộ lọc dropdown */}
+      <div className="max-w-lg mx-auto mt-6 flex justify-center">
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="bg-[#1f2937] text-white px-4 py-2 rounded-full text-sm outline-none border border-yellow-400"
+        >
+          <option value="all">🗂 All</option>
+          <option value="expense">💸 Expense</option>
+          <option value="income">💰 Income</option>
+          <option value="credit-spending">💳 Credit Spending</option>
+        </select>
       </div>
 
       {/* Danh sách category */}

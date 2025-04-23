@@ -590,16 +590,14 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-4 rounded-3xl overflow-hidden text-white 
-                    bg-white/10 backdrop-blur-md border border-white/20 
-                    shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300">                
+                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
 
                         {/* Header trắng nằm trên cùng */}
-                        <div className="bg-yellow-600 px-6 py-4 text-center">
-                            <h2 className="text-lg font-semibold text-white">🌐 Market Overview</h2>
-                            <p className="text-xs text-gray-700">
+                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-3">
+                            <h2 className="text-xl text-center font-semibold text-white font-bold">🌐 Market Overview</h2>
+                            <p className="text-sm text-gray-400 text-center">
                                 Total Market Cap:{" "}
-                                <span className="text-sm text-gray-700 font-mono font-bold">
+                                <span className="text-lg text-yellow-300 font-mono font-bold">
                                     ${formatNumber(globalMarketCap)}
                                 </span>
                             </p>
@@ -607,7 +605,7 @@ function Dashboard() {
 
                         {/* Danh sách top coin */}
                         <div className="p-4">
-                            <div className="max-h-96 overflow-y-auto divide-y divide-gray-500 px-2 py-2 text-sm scrollbar-hide">
+                            <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-2 py-2 text-sm scrollbar-hide">
                                 {topCoins.slice(0, 10).map((coin) => (
                                     <div
                                         key={coin.id}
@@ -628,6 +626,9 @@ function Dashboard() {
                                             <p className="text-sm text-yellow-300 font-mono">
                                                 ${formatCurrency(coin.current_price)}
                                             </p>
+                                            <p className={`text-xs font-mono ${coin.price_change_percentage_24h >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                                {coin.price_change_percentage_24h >= 0 ? "↑" : "↓"} {coin.price_change_percentage_24h.toFixed(2)}%
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
@@ -645,7 +646,9 @@ function Dashboard() {
                             <select
                                 value={filterByProfit}
                                 onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 focus:outline-none appearance-none"
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
+        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
+        focus:outline-none appearance-none"
                             >
                                 <option className="text-black" value="all">All</option>
                                 <option className="text-black" value="profit">🟢 Profit</option>
@@ -684,8 +687,9 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                            className="w-full backdrop-blur-md bg-white/10 border border-white/20 text-white rounded-3xl p-6 scale-[1.02] shadow-[0_8px_24px_rgba(255,255,255,0.05)] transition-all duration-300
-                            hover:bg-white/20 hover:shadow-[0_8px_32px_rgba(255,255,255,0.1)]"
+                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
+                            shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
+                            transition-all duration-300"
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
