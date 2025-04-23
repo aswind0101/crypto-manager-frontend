@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import withAuthProtection from "../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/router";
+import TitleCaseText from "../components/TitleCaseText";
 
 
 function Categories() {
@@ -110,7 +111,12 @@ function Categories() {
       alert("❌ Something went wrong.");
     }
   };
-
+  const toTitleCase = (str) =>
+    str
+      .replace(/-/g, ' ') // thay dấu - bằng khoảng trắng
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   const filtered = categories.filter((cat) =>
     filterType === "all" ? true : cat.type === filterType
   );
@@ -171,7 +177,7 @@ function Categories() {
       </div>
 
       {/* Danh sách category */}
-      <div className="max-w-lg mx-auto mt-4 bg-[#1f2937] rounded-xl shadow-lg border border-[#2c4069] overflow-hidden">
+      <div className="max-w-full overflow-x-auto mt-4 rounded-xl shadow-lg border border-[#2c4069] bg-[#1f2937]">
         <table className="min-w-full text-sm">
           <thead className="bg-[#183b69] text-yellow-300">
             <tr>
@@ -183,8 +189,8 @@ function Categories() {
           <tbody>
             {filtered.map((cat) => (
               <tr key={cat.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                <td className="px-4 py-2 capitalize whitespace-nowrap">{cat.name}</td>
-                <td className="px-4 py-2 text-yellow-200 capitalize whitespace-nowrap">{cat.type.toUpperCase()}</td>
+                <td className="px-4 py-2 whitespace-nowrap"><TitleCaseText text={cat.name} /></td>
+                <td className="px-4 py-2 text-yellow-200 whitespace-nowrap"><TitleCaseText text={cat.type} /></td>
                 <td className="px-4 py-2 text-right">
                   <button
                     onClick={() => handleDeleteCategory(cat.id)}
