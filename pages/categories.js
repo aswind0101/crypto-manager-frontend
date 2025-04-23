@@ -183,8 +183,8 @@ function Categories() {
           <tbody>
             {filtered.map((cat) => (
               <tr key={cat.id} className="border-t border-gray-700 hover:bg-[#162330]">
-                <td className="px-4 py-2">{cat.name}</td>
-                <td className="px-4 py-2 text-yellow-200">{cat.type.toUpperCase()}</td>
+                <td className="px-4 py-2 capitalize whitespace-nowrap">{cat.name}</td>
+                <td className="px-4 py-2 text-yellow-200 capitalize whitespace-nowrap">{cat.type.toUpperCase()}</td>
                 <td className="px-4 py-2 text-right">
                   <button
                     onClick={() => handleDeleteCategory(cat.id)}
