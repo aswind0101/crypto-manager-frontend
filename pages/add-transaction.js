@@ -186,14 +186,14 @@ function AddTransaction() {
             type="submit"
             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-full transition"
           >
-            Add Transaction
+            Add
           </button>
           <button
             type="button"
             onClick={() => router.push("/transactions")}
             className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-full transition"
           >
-            Cancel
+            Close
           </button>
         </div>
         {status && <p className="text-center mt-2 text-sm text-yellow-300">{status}</p>}
