@@ -104,7 +104,7 @@ function AddTransaction() {
       <Navbar />
       <h1 className="text-2xl font-bold text-yellow-400 my-6">➕ Add New Transaction</h1>
 
-      <form onSubmit={handleSubmit} className="bg-[#1C1F26]  max-w-md mx-auto p-6 rounded-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all space-y-4">
+      <form onSubmit={handleSubmit} className="bg-[#1C1F26]  max-w-md mx-auto p-6 rounded-xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all space-y-4">
         <div>
           <label className="block text-sm text-gray-300 mb-1">Coin Symbol</label>
           <input
@@ -125,10 +125,10 @@ function AddTransaction() {
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder="e.g., NEAR"
-            className="w-full px-4 py-2 border border-gray-800 rounded-full text-white outline-none"
+            className="w-full px-4 py-2 border border-gray-800 rounded-xl text-white outline-none"
           />
           {showSuggestions && suggestions.length > 0 && (
-            <ul className="bg-gray-800 border border-gray-700 rounded mt-1 max-h-40 overflow-y-auto text-sm text-white z-10 relative">
+            <ul className="bg-gray-800 border border-gray-700 rounded-xl mt-1 max-h-40 overflow-y-auto text-sm text-white z-10 relative">
               {suggestions.map((coin) => (
                 <li
                   key={coin.id}
@@ -150,7 +150,7 @@ function AddTransaction() {
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="bg-[#1C1F26] border border-gray-800 text-white rounded-full px-4 py-2 w-full outline-none appearance-none
+            className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none
              transition"
           >
             <option value="buy">Buy</option>
@@ -165,7 +165,7 @@ function AddTransaction() {
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             placeholder="e.g., 100"
-            className="w-full px-4 py-2 border border-gray-800 rounded-full text-white outline-none"
+            className="w-full px-4 py-2 border border-gray-800 rounded-xl text-white outline-none"
             step="any"
           />
         </div>
@@ -177,7 +177,7 @@ function AddTransaction() {
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="e.g., 2.5"
-            className="w-full px-4 py-2 border border-gray-800 rounded-full text-white outline-none"
+            className="w-full px-4 py-2 border border-gray-800 rounded-xl text-white outline-none"
             step="any"
           />
         </div>
@@ -185,14 +185,14 @@ function AddTransaction() {
         <div className="flex flex-col gap-3">
           <button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] text-white font-semibold py-2 rounded-full transition"
+            className="w-full bg-green-600 hover:bg-green-700 shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] text-white font-semibold py-2 rounded-xl transition"
           >
             Add
           </button>
           <button
             type="button"
             onClick={() => router.push("/transactions")}
-            className="w-full bg-red-500 hover:bg-red-600 shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] text-white font-semibold py-2 rounded-full transition"
+            className="w-full bg-red-500 hover:bg-red-600 shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] text-white font-semibold py-2 rounded-xl transition"
           >
             Close
           </button>

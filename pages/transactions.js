@@ -121,7 +121,7 @@ function Transactions() {
                         <select
                             value={selectedCoin}
                             onChange={(e) => setSelectedCoin(e.target.value)}
-                            className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
                         >
                             <option value="All">All Coins</option>
                             {coinOptions.map((coin) => (
@@ -152,7 +152,7 @@ function Transactions() {
                 <div className="w-full max-w-[1200px] mx-auto flex justify-end mb-2">
                     <button
                         onClick={() => router.push("/transactions")}
-                        className="text-sm text-yellow-400 bg-gray-800 px-3 py-1 rounded hover:bg-gray-700 transition"
+                        className="text-sm text-yellow-400 bg-gray-800 px-3 py-1 rounded-xl hover:bg-gray-700 transition"
                     >
                         ❌ Clear Filter
                     </button>
@@ -205,7 +205,7 @@ function Transactions() {
                                     </td>
                                     <td className="px-4 py-2 text-center">
                                         <button
-                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-xl text-sm disabled:opacity-50"
                                             onClick={() => deleteTransaction(tx.id)}
                                             disabled={deletingId === tx.id}
                                         >

@@ -98,7 +98,7 @@ const SwipeDashboard = ({
                             if (info.offset.x > 100) handleSwipe("right");
                         }}
                     >
-                        <div className="h-full w-full flex flex-col items-center justify-center text-white rounded-xl shadow-lg">
+                        <div className="h-full w-full flex flex-col items-center justify-center text-white rounded-xl">
                             <div className="relative w-full h-80">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RadialBarChart

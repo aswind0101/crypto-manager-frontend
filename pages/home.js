@@ -511,7 +511,7 @@ function Dashboard() {
                             <div className="flex justify-between gap-4 mt-2">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="w-1/2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
+                                    className="w-1/2 px-4 py-2 rounded-xl bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
                                     disabled={isSubmitting}
                                 >
                                     Cancel
@@ -520,7 +520,7 @@ function Dashboard() {
                                 <button
                                     onClick={handleConfirmTrade}
                                     disabled={isSubmitting}
-                                    className={`w-1/2 px-4 py-2 rounded text-white text-sm shadow transition
+                                    className={`w-1/2 px-4 py-2 rounded-xl text-white text-sm shadow transition
             ${tradeType === "buy"
                                             ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
                                             : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
@@ -590,7 +590,7 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-10 w-full max-w-[1200px] mx-auto rounded-2xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
+                    <div className="mt-10 w-full max-w-[1200px] mx-auto rounded-xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
                         {/* Header */}
                         <div className="bg-yellow-700 px-6 py-4 text-center">
                             <div className="flex justify-center items-center gap-2 text-white font-bold text-xl">
@@ -636,11 +636,11 @@ function Dashboard() {
                 )}
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
-                    <div className="w-full max-w-[1200px] mx-auto mt-6 px-6 py-4 bg-[#1C1F26] rounded-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#262f3d] flex items-center gap-4">
+                    <div className="w-full max-w-[1200px] mx-auto mt-6 px-6 py-4 bg-[#1C1F26] rounded-xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#262f3d] flex items-center gap-4">
                         <select
                             value={filterByProfit}
                             onChange={(e) => setFilterByProfit(e.target.value)}
-                            className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
                         >
                             <option value="all">All</option>
                             <option value="profit">🟢 Profit</option>
@@ -674,7 +674,7 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="bg-[#1C1F26]  rounded-2xl p-4 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all hover:scale-[1.01]"
+                                className="bg-[#1C1F26]  rounded-xl p-4 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all hover:scale-[1.01]"
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-xs text-gray-500 italic mb-2">
@@ -752,7 +752,7 @@ function Dashboard() {
                                 <div className="mt-4 flex justify-center gap-4">
                                     <button
                                         onClick={() => handleOpenTradeModal(coin, "buy")}
-                                        className="px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm shadow transition-all duration-200"
+                                        className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm shadow transition-all duration-200"
                                     >
                                         Buy
                                     </button>
@@ -761,7 +761,7 @@ function Dashboard() {
                                     <button
                                         onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
                                         disabled={coin.total_quantity === 0}
-                                        className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200
+                                        className={`px-4 py-2 rounded-xl text-white text-sm shadow transition-all duration-200
         ${coin.total_quantity === 0
                                                 ? "bg-gray-600 cursor-not-allowed"
                                                 : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
