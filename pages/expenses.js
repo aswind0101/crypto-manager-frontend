@@ -172,7 +172,7 @@ function Expenses() {
         );
     }
     return (
-        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
+        <div className="bg-[#1C1F26] min-h-screen text-white p-4">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
             <div className="w-full mt-8 flex flex-col items-center justify-center text-white p-4">
@@ -249,41 +249,7 @@ function Expenses() {
             <div className="mb-6 mt-4 text-sm text-yellow-300 font-bold flex items-center justify-center gap-2">
                 <span>📊</span> <span>Monthly Cash Flow</span>
             </div>
-
-            {/* Select year + Add button */}
-            <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-sm font-semibold">
-                {/* Hiển thị "Year:" và dropdown chọn năm bên trái */}
-                <div className="flex items-center gap-2 relative">
-                    <span>Year:</span>
-                    <select
-                        value={selectedYear}
-                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                        className="bg-yellow-400 text-black font-semibold outline-none appearance-none cursor-pointer pr-6"
-                    >
-                        {availableYears.map((year) => (
-                            <option key={year} value={year}>
-                                {year}
-                            </option>
-                        ))}
-                    </select>
-
-                    {/* Mũi tên chỉ dropdown */}
-                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
-                        <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                </div>
-
-                {/* Nút Add nằm bên phải */}
-                <Link
-                    href="/add-expense"
-                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-full shadow-md transition"
-                >
-                    ➕ Income/Expense
-                </Link>
-            </div>
-            <div className="max-w-4xl mx-auto bg-[#1a2f46] text-white px-4 py-3 shadow-md grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-center">
+            <div className="max-w-4xl mx-auto text-white px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-center">
                 <div>
                     <p className="text-green-400 font-bold">💰 Total Income</p>
                     <p className="font-mono">${totalIncome.toLocaleString()}</p>
@@ -303,11 +269,46 @@ function Expenses() {
                     </p>
                 </div>
             </div>
+            {/* Select year + Add button */}
+            <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-700 px-6 py-3 flex items-center justify-between 
+            shadow-md text-black text-sm font-semibold">
+                {/* Hiển thị "Year:" và dropdown chọn năm bên trái */}
+                <div className="flex items-center gap-2 relative">
+                    <span>Year:</span>
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                        className="text-black font-semibold outline-none appearance-none cursor-pointer pr-6"
+                    >
+                        {availableYears.map((year) => (
+                            <option key={year} value={year}>
+                                {year}
+                            </option>
+                        ))}
+                    </select>
+
+                    {/* Mũi tên chỉ dropdown */}
+                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
+                        <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                </div>
+
+                {/* Nút Add nằm bên phải */}
+                <Link
+                    href="/add-expense"
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-xl shadow-md transition"
+                >
+                    ➕ Income/Expense
+                </Link>
+            </div>
+            
 
             {/* Bảng tổng hợp theo tháng */}
-            <div className="overflow-x-auto border border-[#2c4069] shadow-lg rounded-b-xl max-w-4xl mx-auto">
+            <div className="overflow-x-auto bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  max-w-4xl mx-auto">
                 <table className="min-w-full text-[11px] text-white">
-                    <thead className="bg-[#183b69] text-yellow-300">
+                    <thead className="text-yellow-300">
                         <tr>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Month</th>
                             <th className="px-4 py-2 text-left whitespace-nowrap">Income</th>
@@ -350,7 +351,7 @@ function Expenses() {
                                     <React.Fragment key={month}>
                                         {/* 📅 Dòng tổng tháng */}
                                         <tr
-                                            className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
+                                            className="border-t border-white/4 hover:bg-[#162330] cursor-pointer"
                                             onClick={() =>
                                                 setExpandedMonth((prev) => (prev === month ? null : month))
                                             }
@@ -406,7 +407,7 @@ function Expenses() {
                                                     <React.Fragment key={`${month}-${type}`}>
                                                         {/* 🔘 Nhóm chính: Income / Expenses / Credit Spending */}
                                                         <tr
-                                                            className="bg-[#101d33] border-t border-gray-800 text-[11px] cursor-pointer"
+                                                            className="bg-[#1C1F26] border-t border-gray-800 text-[11px] cursor-pointer"
                                                             onClick={() =>
                                                                 setExpandedCategory((prev) => ({
                                                                     ...prev,
@@ -435,7 +436,7 @@ function Expenses() {
                                                             Object.entries(grouped).map(([category, items]) => (
                                                                 <React.Fragment key={`${month}-${type}-${category}`}>
                                                                     <tr
-                                                                        className="bg-[#0f1d30] border-t border-gray-800 text-[11px] cursor-pointer"
+                                                                        className="bg-[#1C1F26] border-t border-gray-800 text-[11px] cursor-pointer"
                                                                         onClick={() =>
                                                                             setExpandedCategory((prev) => ({
                                                                                 ...prev,
@@ -467,7 +468,7 @@ function Expenses() {
                                                                             .map((e, idx) => (
                                                                                 <tr
                                                                                     key={idx}
-                                                                                    className={`bg-[#0d1a2b] border-t border-gray-800 text-[11px] ${type === "income"
+                                                                                    className={`bg-[#1C1F20] border-t border-gray-800 text-[11px] ${type === "income"
                                                                                         ? "text-green-300"
                                                                                         : type === "expense"
                                                                                             ? "text-red-300"
