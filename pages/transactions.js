@@ -105,7 +105,7 @@ function Transactions() {
                 <h1 className="text-2xl font-bold text-yellow-400">📜 Transaction History</h1>
             </div>
 
-            <div className="w-full max-w-[1200px]  mx-auto flex flex-col md:flex-row gap-4 mb-4 mt-10">
+            <div className="w-full max-w-[1200px]  mx-auto flex flex-col md:flex-row gap-4 mb-4 mt-10 overflow-visible">
                 {isFilteredByQueryCoin ?           
                 (
                     <select
