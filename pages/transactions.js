@@ -98,18 +98,18 @@ function Transactions() {
     const coinOptions = [...new Set(transactions.map((tx) => tx.coin_symbol.toUpperCase()))];
 
     return (
-        <div className="w-full p-4 bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white">
+        <div className="w-full p-4 bg-[#1C1F26] min-h-screen text-white font-mono">
             <Navbar />
 
-            <div className="flex justify-between items-center my-6">
+            <div className="w-full max-w-[1200px] mx-auto flex justify-between items-center my-6">
                 <h1 className="text-2xl font-bold text-yellow-400">📜 Transaction History</h1>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <div className="w-full max-w-[1200px] mx-auto flex flex-col md:flex-row gap-4 mb-4 mt-16">
                 {isFilteredByQueryCoin ? (
                     <select
                         value={selectedCoin}
-                        className="bg-[#1c304e] text-white px-4 py-2 rounded-full w-full md:w-1/3"
+                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
                         disabled
                     >
                         <option value={selectedCoin}>{selectedCoin}</option>
@@ -118,7 +118,7 @@ function Transactions() {
                     <select
                         value={selectedCoin}
                         onChange={(e) => setSelectedCoin(e.target.value)}
-                        className="bg-[#1c304e] text-white px-4 py-2 rounded-full w-full md:w-1/3"
+                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
                     >
                         <option value="All">All Coins</option>
                         {coinOptions.map((coin) => (
@@ -130,7 +130,7 @@ function Transactions() {
                 <select
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
-                    className="bg-[#1c304e] text-white px-4 py-2 rounded-full w-full md:w-1/3"
+                    className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
                 >
                     <option value="All">All Types</option>
                     <option value="buy">Buy</option>
@@ -138,14 +138,14 @@ function Transactions() {
                 </select>
                 <Link
                     href="/add-transaction"
-                    className="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-sm font-medium shadow transition"
+                    className="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-sm font-medium shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] transition"
                 >
                     ➕ Add Transaction
                 </Link>
             </div>
 
             {queryCoin && (
-                <div className="flex justify-end mb-2">
+                <div className="w-full max-w-[1200px] mx-auto flex justify-end mb-2">
                     <button
                         onClick={() => router.push("/transactions")}
                         className="text-sm text-yellow-400 bg-gray-800 px-3 py-1 rounded hover:bg-gray-700 transition"
@@ -160,10 +160,10 @@ function Transactions() {
             ) : filteredTransactions.length === 0 ? (
                 <p className="text-gray-400">No transactions found.</p>
             ) : (
-                <div className="overflow-x-auto bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] rounded-xl shadow-lg border border-[#2c4069]">
-                    <table className="min-w-full text-white text-sm">
+                <div className="w-full max-w-[1200px] mx-auto overflow-x-auto rounded-xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
+                    <table className="min-w-full text-white text-sm border-collapse">
                         <thead>
-                            <tr className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] text-gray-400 uppercase">
+                            <tr className="bg-yellow-700 text-white text-bold">
                                 <th className="px-4 py-3 text-left">#</th>
                                 <th className="px-4 py-3 text-left">Coin</th>
                                 <th className="px-4 py-3 text-left">Type</th>
@@ -174,11 +174,11 @@ function Transactions() {
                                 <th className="px-4 py-3 text-center">Action</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="bg-[#1C1F26] divide-y divide-white/2">
                             {filteredTransactions.map((tx, index) => (
                                 <tr
                                     key={tx.id}
-                                    className="border-t border-gray-700 hover:bg-[#162330] transition"
+                                    className="bg-[#1C1F26] transition"
                                 >
                                     <td className="px-4 py-2">{index + 1}</td>
                                     <td className="px-4 py-2 font-semibold text-yellow-300">
@@ -217,10 +217,11 @@ function Transactions() {
 
             <Link
                 href="/add-transaction"
-                className="fixed bottom-6 right-6 md:hidden bg-green-600 hover:bg-green-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg text-3xl transition z-50"
+                className="fixed bottom-6 right-6 md:hidden bg-yellow-400 hover:bg-yellow-500 hover:scale-105 active:scale-95 text-black rounded-full w-14 h-14 flex items-center justify-center shadow-lg text-3xl transition z-50"
             >
                 +
             </Link>
+
         </div>
     );
 }
