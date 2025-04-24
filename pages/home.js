@@ -590,7 +590,7 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-16 w-full max-w-[1200px] mx-auto rounded-2xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
+                    <div className="mt-10 w-full max-w-[1200px] mx-auto rounded-2xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
                         {/* Header */}
                         <div className="bg-yellow-700 px-6 py-4 text-center">
                             <div className="flex justify-center items-center gap-2 text-white font-bold text-xl">

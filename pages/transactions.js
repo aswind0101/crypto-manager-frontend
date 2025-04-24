@@ -105,11 +105,12 @@ function Transactions() {
                 <h1 className="text-2xl font-bold text-yellow-400">📜 Transaction History</h1>
             </div>
 
-            <div className="w-full max-w-[1200px] mx-auto flex flex-col md:flex-row gap-4 mb-4 mt-16">
-                {isFilteredByQueryCoin ? (
+            <div className="w-full max-w-[1200px]  mx-auto flex flex-col md:flex-row gap-4 mb-4 mt-10">
+                {isFilteredByQueryCoin ?           
+                (
                     <select
                         value={selectedCoin}
-                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
                         disabled
                     >
                         <option value={selectedCoin}>{selectedCoin}</option>
@@ -118,7 +119,7 @@ function Transactions() {
                     <select
                         value={selectedCoin}
                         onChange={(e) => setSelectedCoin(e.target.value)}
-                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
                     >
                         <option value="All">All Coins</option>
                         {coinOptions.map((coin) => (
@@ -130,7 +131,7 @@ function Transactions() {
                 <select
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
-                    className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                    className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
                 >
                     <option value="All">All Types</option>
                     <option value="buy">Buy</option>
