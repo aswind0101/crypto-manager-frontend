@@ -67,12 +67,13 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="w-full bg-[#1C1F26] text-white shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] px-4 py-3 flex justify-between items-center rounded-b-2xl z-50">
+            <nav className="w-full text-white px-4 py-3 flex justify-between items-center rounded-b-2xl z-50">
 
                 {/* Logo + App name */}
-                <div className="flex items-center gap-2 font-bold text-xl">
+                <Link href="/home" className="flex items-center gap-2 font-bold text-xl text-yellow-400 hover:text-yellow-300 transition cursor-pointer">
                     💰 <span className="tracking-wide">PFMS</span>
-                </div>
+                </Link>
+
 
                 {/* Desktop User Info */}
                 {user && (
@@ -152,7 +153,7 @@ export default function Navbar() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="bg-[#1C1F26] text-white px-6 py-4 rounded-b-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col gap-4 text-sm z-40 max-w-sm mx-auto w-full"
+                        className="text-white px-6 py-4 rounded-b-2xl flex flex-col gap-4 text-sm z-40 max-w-sm mx-auto w-full"
                     >
                         {user && (
                             <div className="text-sm text-blue-200">

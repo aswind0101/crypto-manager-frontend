@@ -6,7 +6,7 @@ const LoadingScreen = () => {
     return (
         <div className="p-4 max-w-3xl mx-auto text-center text-white">
             <Navbar />
-            <div className="mt-12 bg-[#0e1628] rounded-xl p-6 shadow-md flex flex-col items-center justify-center space-y-4">
+            <div className="mt-12 rounded-xl p-6 flex flex-col items-center justify-center space-y-4">
                 <svg
                     className="animate-spin h-6 w-6 text-yellow-400"
                     viewBox="0 0 24 24"
