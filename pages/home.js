@@ -464,8 +464,8 @@ function Dashboard() {
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
                 {/* Modal */}
                 {showModal && selectedCoin && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-[#0e1628] max-w-md w-full mx-4 p-6 rounded-xl shadow-2xl text-white space-y-4 relative z-50">
+                    <div className="fixed inset-0 bg-[#1C1F26] flex items-center justify-center z-50">
+                        <div className="bg-[#1C1F26] max-w-md w-full mx-4 p-6 rounded-xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] text-white space-y-4 relative z-50">
                             <h2 className="text-xl font-bold text-yellow-400 text-center">
                                 {tradeType === "buy" ? "➕ Buy" : "➖ Sell"} {selectedCoin.coin_symbol.toUpperCase()}
                             </h2>
@@ -475,7 +475,7 @@ function Dashboard() {
                                 <select
                                     value={tradeType}
                                     onChange={(e) => setTradeType(e.target.value)}
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    className="bg-[#1C1F26] border border-gray-800 text-white rounded-full px-4 py-2 w-full outline-none appearance-none transition"
                                 >
                                     <option value="buy">Buy</option>
                                     <option value="sell">Sell</option>
@@ -489,7 +489,7 @@ function Dashboard() {
                                     value={quantity}
                                     onChange={(e) => setQuantity(e.target.value)}
                                     placeholder="e.g., 100"
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    className="w-full px-4 py-2 border border-gray-800 rounded-full text-white outline-none transition"
                                     step="any"
                                 />
                             </div>
@@ -501,7 +501,7 @@ function Dashboard() {
                                     value={price}
                                     onChange={(e) => setPrice(e.target.value)}
                                     placeholder="e.g., 2.5"
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    className="w-full px-4 py-2 border border-gray-800 rounded-full text-white outline-none"
                                     step="any"
                                 />
                             </div>

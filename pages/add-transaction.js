@@ -150,7 +150,8 @@ function AddTransaction() {
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-800 rounded-full text-white outline-none"
+            className="bg-[#1C1F26] border border-gray-800 text-white rounded-full px-4 py-2 w-full outline-none appearance-none
+             transition"
           >
             <option value="buy">Buy</option>
             <option value="sell">Sell</option>
