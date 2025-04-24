@@ -111,8 +111,8 @@ function Transactions() {
 
                         <select
                             value={selectedCoin}
-                            className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm 
-                            shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none border border-white/10" 
+                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm 
+                            shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none" 
                             disabled
                         >
                             <option value={selectedCoin}>{selectedCoin}</option>
@@ -132,7 +132,8 @@ function Transactions() {
                 <select
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
-                    className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                    className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm 
+                            shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
                 >
                     <option value="All">All Types</option>
                     <option value="buy">Buy</option>
@@ -140,7 +141,7 @@ function Transactions() {
                 </select>
                 <Link
                     href="/add-transaction"
-                    className="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-sm font-medium shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] transition"
+                    className="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] transition"
                 >
                     ➕ Add Transaction
                 </Link>
@@ -177,7 +178,7 @@ function Transactions() {
                                 <th className="px-4 py-3 text-center">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-[#1C1F26] divide-y divide-white/2">
+                        <tbody className="bg-[#1C1F26] divide-y divide-white/4">
                             {filteredTransactions.map((tx, index) => (
                                 <tr
                                     key={tx.id}
