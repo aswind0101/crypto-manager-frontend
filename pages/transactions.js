@@ -105,44 +105,48 @@ function Transactions() {
                 <h1 className="text-2xl font-bold text-yellow-400">📜 Transaction History</h1>
             </div>
 
-            <div className="w-full max-w-[1200px]  mx-auto flex flex-col md:flex-row gap-4 mb-4 mt-10 overflow-visible">
-                {isFilteredByQueryCoin ?           
-                (
-                    <select
-                        value={selectedCoin}
-                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
-                        disabled
-                    >
-                        <option value={selectedCoin}>{selectedCoin}</option>
-                    </select>
-                ) : (
-                    <select
-                        value={selectedCoin}
-                        onChange={(e) => setSelectedCoin(e.target.value)}
-                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
-                    >
-                        <option value="All">All Coins</option>
-                        {coinOptions.map((coin) => (
-                            <option key={coin} value={coin}>{coin}</option>
-                        ))}
-                    </select>
-                )}
+            <div className="w-full max-w-[1200px] mx-auto flex flex-col md:flex-row gap-4 mb-4 mt-10 overflow-visible">
+                <div className="w-full max-w-[1200px] mx-auto mt-6 px-6 py-4 bg-[#1C1F26] rounded-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#262f3d] flex items-center gap-4">
 
-                <select
-                    value={selectedType}
-                    onChange={(e) => setSelectedType(e.target.value)}
-                    className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
-                >
-                    <option value="All">All Types</option>
-                    <option value="buy">Buy</option>
-                    <option value="sell">Sell</option>
-                </select>
-                <Link
-                    href="/add-transaction"
-                    className="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-sm font-medium shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] transition"
-                >
-                    ➕ Add Transaction
-                </Link>
+                    {isFilteredByQueryCoin ?
+                        (
+
+                            <select
+                                value={selectedCoin}
+                                className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
+                                disabled
+                            >
+                                <option value={selectedCoin}>{selectedCoin}</option>
+                            </select>
+                        ) : (
+                            <select
+                                value={selectedCoin}
+                                onChange={(e) => setSelectedCoin(e.target.value)}
+                                className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
+                            >
+                                <option value="All">All Coins</option>
+                                {coinOptions.map((coin) => (
+                                    <option key={coin} value={coin}>{coin}</option>
+                                ))}
+                            </select>
+                        )}
+                    <select
+                        value={selectedType}
+                        onChange={(e) => setSelectedType(e.target.value)}
+                        className="bg-[#1C1F26] text-white rounded-full px-4 py-2 text-sm shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] outline-none"
+                    >
+                        <option value="All">All Types</option>
+                        <option value="buy">Buy</option>
+                        <option value="sell">Sell</option>
+                    </select>
+                    <Link
+                        href="/add-transaction"
+                        className="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-sm font-medium shadow-[4px_4px_8px_#0b0f17,_-4px_-4px_8px_#1e2631] transition"
+                    >
+                        ➕ Add Transaction
+                    </Link>
+                </div>
+
             </div>
 
             {queryCoin && (
