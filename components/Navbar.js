@@ -67,7 +67,8 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="w-full whote== shadow-lg px-6 py-3 flex justify-between items-center rounded-b-2xl text-white z-50">
+            <nav className="w-full bg-[#1C1F26] text-white shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] px-4 py-3 flex justify-between items-center rounded-b-2xl z-50">
+
                 {/* Logo + App name */}
                 <div className="flex items-center gap-2 font-bold text-xl">
                     💰 <span className="tracking-wide">PFMS</span>
@@ -151,7 +152,7 @@ export default function Navbar() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] text-white px-6 py-4 rounded-b-2xl shadow-lg flex flex-col gap-4 text-sm z-40 max-w-sm mx-auto w-full"
+                        className="bg-[#1C1F26] text-white px-6 py-4 rounded-b-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col gap-4 text-sm z-40 max-w-sm mx-auto w-full"
                     >
                         {user && (
                             <div className="text-sm text-blue-200">
