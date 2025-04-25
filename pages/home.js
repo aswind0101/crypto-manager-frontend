@@ -764,7 +764,7 @@ function Dashboard() {
                                 <div className="mt-4 mb-4 flex justify-center gap-4">
                                     <button
                                         onClick={() => handleOpenTradeModal(coin, "buy")}
-                                        className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm transition-all duration-200"
+                                        className="px-4 py-2 min-w-[96px] rounded-3xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm transition-all duration-200"
                                     >
                                         Buy
                                     </button>
@@ -773,7 +773,7 @@ function Dashboard() {
                                     <button
                                         onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
                                         disabled={coin.total_quantity === 0}
-                                        className={`px-4 py-2 rounded-xl text-white text-sm transition-all duration-200
+                                        className={`px-4 py-2 min-w-[96px] rounded-3xl text-white text-sm transition-all duration-200
                                                 ${coin.total_quantity === 0
                                                 ? "bg-gray-600 cursor-not-allowed"
                                                 : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
