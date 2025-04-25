@@ -557,7 +557,7 @@ function Dashboard() {
                             />
 
                             {lastUpdated && showLastUpdate && (
-                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-300 z-10">
+                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
                                     <span>🕒 Last update: {lastUpdated}</span>
                                     <button
                                         onClick={async () => {

@@ -140,7 +140,7 @@ const SwipeDashboard = ({
                                             if (ratio > -0.1) return "😕";
                                             if (ratio > -0.5) return "😢";
                                             return "😭";
-                                        })()} Total Profit / Loss
+                                        })()} Profit / Loss
                                     </p>
                                 </div>
                             </div>
