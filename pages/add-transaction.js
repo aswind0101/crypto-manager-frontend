@@ -100,7 +100,7 @@ function AddTransaction() {
   };
 
   return (
-    <div className="w-full p-4 bg-[#1C1F26] min-h-screen text-white">
+    <div className="w-full p-4 bg-[#1C1F26] min-h-screen text-white font-mono">
       <Navbar />
       <h1 className="text-2xl font-bold text-yellow-400 my-6">➕ Add New Transaction</h1>
 
@@ -147,16 +147,23 @@ function AddTransaction() {
 
         <div>
           <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none
-             transition"
-          >
-            <option value="buy">Buy</option>
-            <option value="sell">Sell</option>
-          </select>
+          <div className="relative w-full">
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none transition pr-10"
+            >
+              <option value="buy">Buy</option>
+              <option value="sell">Sell</option>
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
         </div>
+
 
         <div>
           <label className="block text-sm text-gray-300 mb-1">Quantity</label>

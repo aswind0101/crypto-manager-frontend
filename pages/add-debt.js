@@ -72,22 +72,31 @@ function AddDebt() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
+    <div className="bg-[#1C1F26] min-h-screen text-white p-4 font-mono">
       <Navbar />
       <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">➕ Add New Debt</h1>
 
-      <form onSubmit={handleAddDebt} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
-        <select
-          value={selectedLenderId}
-          onChange={(e) => setSelectedLenderId(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
-          required
-        >
-          <option value="">👤 Select lender</option>
-          {lenders.map((lender) => (
-            <option key={lender.id} value={lender.id}>{lender.name}</option>
-          ))}
-        </select>
+      <form onSubmit={handleAddDebt} className="max-w-xl mx-auto p-6 rounded-2xl space-y-4 mb-6 
+      shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
+        <div className="relative w-full">
+          <select
+            value={selectedLenderId}
+            onChange={(e) => setSelectedLenderId(e.target.value)}
+            className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none transition pr-10"
+            required
+          >
+            <option value="">👤 Select lender</option>
+            {lenders.map((lender) => (
+              <option key={lender.id} value={lender.id}>{lender.name}</option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+
         <div className="w-full mt-1 text-left">
           <button
             type="button"
@@ -103,7 +112,7 @@ function AddDebt() {
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           step="any"
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+          className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
           required
         />
         <input
@@ -111,24 +120,24 @@ function AddDebt() {
           placeholder="Note (optional)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+          className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
         />
         <input
           type="date"
           value={createdDate}
           onChange={(e) => setCreatedDate(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none custom-date"
+          className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none custom-date"
           required
         />
 
-        <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full">
+        <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl">
           Add
         </button>
         {status && <p className="text-sm text-yellow-300 text-center">{status}</p>}
         <button
           type="button"
           onClick={() => router.push("/debts")}
-          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-full"
+          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl"
         >
           Close
         </button>

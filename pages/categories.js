@@ -122,32 +122,40 @@ function Categories() {
   );
 
   return (
-    <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
+    <div className="w-full p-4 bg-[#1C1F26] min-h-screen text-white font-mono">
       <Navbar />
       <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">🗂️ Manage Categories</h1>
 
-      <form onSubmit={handleAdd} className="bg-[#1a2f46] max-w-lg mx-auto p-6 rounded-xl border border-[#2c4069] shadow-lg space-y-4">
+      <form onSubmit={handleAdd} className="bg-[#1C1F26] max-w-lg mx-auto p-6 rounded-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all space-y-4">
         <h2 className="text-lg font-semibold text-yellow-400">➕ Add New Category</h2>
         <input
           type="text"
           placeholder="Category name (e.g., Food, Salary)"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+          className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
           required
         />
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
-        >
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-          <option value="credit-spending">Credit Spending</option>
-        </select>
+        <div className="relative w-full">
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none transition pr-10"
+          >
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+            <option value="credit-spending">Credit Spending</option>
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+
         <button
           type="submit"
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full"
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl"
         >
           Add Category
         </button>
@@ -155,7 +163,7 @@ function Categories() {
         <button
           type="button"
           onClick={() => router.push("/add-expense")}
-          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-full transition mt-2"
+          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl transition mt-2"
         >
           🔙 Back to Add Expense
         </button>
@@ -167,7 +175,7 @@ function Categories() {
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full text-sm outline-none border border-yellow-400"
+          className="bg-[#1C1F26] text-white px-4 py-2 rounded-full text-sm outline-none border border-yellow-400"
         >
           <option value="all">🗂 All</option>
           <option value="expense">💸 Expense</option>
@@ -178,9 +186,9 @@ function Categories() {
 
       {/* Danh sách category */}
       <div className="w-full overflow-x-auto mt-4 flex justify-center">
-        <div className="min-w-[600px] max-w-3xl w-full bg-[#1f2937] rounded-xl shadow-lg border border-[#2c4069] overflow-hidden">
+        <div className="w-full max-w-[1200px] mx-auto overflow-x-auto rounded-2xl bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
           <table className="min-w-full text-sm">
-            <thead className="bg-[#183b69] text-yellow-300">
+            <thead className="bg-yellow-700 text-white text-bold">
               <tr>
                 <th className="px-4 py-2 text-left">Name</th>
                 <th className="px-4 py-2 text-left">Type</th>
@@ -191,7 +199,7 @@ function Categories() {
               {filtered.map((cat, index) => (
                 <tr
                   key={cat.id}
-                  className={`border-t border-gray-700 hover:bg-[#162330] ${index === filtered.length - 1 ? "rounded-b-xl" : ""
+                  className={`border-t border-white/4 hover:bg-[#162330] ${index === filtered.length - 1 ? "rounded-b-xl" : ""
                     }`}
                 >
                   <td className="px-4 py-2 whitespace-nowrap">

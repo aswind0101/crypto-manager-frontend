@@ -172,7 +172,7 @@ function Expenses() {
         );
     }
     return (
-        <div className="bg-[#1C1F26] min-h-screen text-white p-4">
+        <div className="bg-[#1C1F26] min-h-screen text-white p-4 font-mono">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">📒 Expense Tracker</h1>
             <div className="w-full mt-8 flex flex-col items-center justify-center text-white p-4">

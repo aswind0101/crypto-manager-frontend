@@ -90,19 +90,19 @@ function Lenders() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
+    <div className="bg-[#1C1F26] min-h-screen text-white p-4 font-mono">
       <Navbar />
       <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">👥 Lenders</h1>
 
       {/* Form thêm người cho vay */}
-      <form onSubmit={handleAdd} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
+      <form onSubmit={handleAdd} className="bg-[#1C1F26] max-w-xl mx-auto p-6 rounded-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all space-y-4 mb-6">
         <h2 className="text-lg font-semibold text-yellow-400">➕ Add New Lender</h2>
         <input
           type="text"
           placeholder="Lender name (e.g., Dad, Bank)"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+          className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
           required
         />
         <input
@@ -110,11 +110,11 @@ function Lenders() {
           placeholder="Note (optional)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+          className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
         />
         <button
           type="submit"
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-full"
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl"
         >
           Add Lender
         </button>
@@ -122,16 +122,16 @@ function Lenders() {
         <button
           type="button"
           onClick={() => router.push("/add-debt")}
-          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-full mt-2"
+          className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl mt-2"
         >
           🔙 Back to Add Debt
         </button>
       </form>
 
       {/* Danh sách người cho vay */}
-      <div className="overflow-x-auto rounded-xl border border-[#2c4069] shadow-lg max-w-4xl mx-auto">
+      <div className="overflow-x-auto rounded-2xl bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] max-w-[1200px] mx-auto">
         <table className="min-w-full text-sm text-white">
-          <thead className="bg-[#183b69] text-yellow-300">
+          <thead className="bg-yellow-700 text-white">
             <tr>
               <th className="px-4 py-2 text-left whitespace-nowrap">Name</th>
               <th className="px-4 py-2 text-left whitespace-nowrap">Note</th>
@@ -141,7 +141,7 @@ function Lenders() {
           </thead>
           <tbody>
             {lenders.map((l) => (
-              <tr key={l.id} className="border-t border-gray-700 hover:bg-[#162330]">
+              <tr key={l.id} className="border-t border-white/4 hover:bg-[#162330]">
                 <td className="px-4 py-2 font-bold text-yellow-300 text-left align-middle whitespace-nowrap">{l.name}</td>
                 <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.note || "-"}</td>
                 <td className="px-4 py-2 text-left align-middle whitespace-nowrap">{l.created_at.slice(5, 7) + "/" + l.created_at.slice(8, 10) + "/" + l.created_at.slice(0, 4)}</td>

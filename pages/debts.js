@@ -231,7 +231,7 @@ function Debts() {
         );
     }
     return (
-        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
+        <div className="bg-[#1C1F26] min-h-screen text-white p-4 font-mono">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">💳 Debt Manager</h1>
 
@@ -307,23 +307,21 @@ function Debts() {
 
 
             {/* Wrapper cho Add Debt + Bảng */}
-            <div className="max-w-4xl mx-auto mt-8">
+            <div className="mt-10 w-full max-w-4xl mx-auto rounded-xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
                 {/* Nút Add Debt */}
-                <div className="max-w-4xl mx-auto mt-8 rounded-t-2xl bg-yellow-400 px-6 py-3 flex items-center justify-between shadow-md text-black text-sm font-bold">
+                <div className="max-w-4xl mx-auto rounded-t-2xl bg-yellow-700 px-6 py-3 flex items-center justify-between shadow-md text-white text-sm font-bold">
                     <span className="text-base">Debts</span>
                     <Link
                         href="/add-debt"
-                        className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-full shadow-md transition"
+                        className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-1.5 rounded-xl shadow-md transition"
                     >
                         ➕ Add Debt
                     </Link>
                 </div>
-
-
                 {/* Bảng chi tiết */}
-                <div className="overflow-x-auto border border-[#2c4069] shadow-lg">
+                <div className="overflow-x-auto bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] max-w-4xl mx-auto">
                     <table className="min-w-full text-xs text-white">
-                        <thead className="bg-[#183b69] text-yellow-300">
+                        <thead className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-yellow-300">
                             <tr>
                                 <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Lender</th>
                                 <th className="px-4 py-2 text-left text-xs whitespace-nowrap">Total Borrowed</th>
@@ -337,7 +335,7 @@ function Debts() {
                             {groupedDebts.map((d) => (
                                 <React.Fragment key={d.lender_id}>
                                     <tr
-                                        className="border-t border-gray-700 hover:bg-[#162330] cursor-pointer"
+                                        className="border-t border-white/4 hover:bg-[#162330] cursor-pointer"
                                         onClick={() =>
                                             setExpandedLender(expandedLender === d.lender_id ? null : d.lender_id)
                                         }
@@ -384,16 +382,19 @@ function Debts() {
 
                                     {/* ✅ Form trả tiền tổng theo lender */}
                                     {payingLenderId === d.lender_id && (
-                                        <tr className="bg-[#101d33] border-t border-gray-800 text-sm">
+                                        <tr className="bg-[#1C1F20] border-t border-gray-800 text-sm">
                                             <td colSpan={5} className="px-6 py-3">
-                                                <form onSubmit={(e) => handleLenderPayment(e, d.lender_id)} className="flex flex-col md:flex-row items-center gap-2">
+                                                <form
+                                                    onSubmit={(e) => handleLenderPayment(e, d.lender_id)}
+                                                    className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2"
+                                                >
                                                     <input
                                                         type="number"
                                                         value={payAmount}
                                                         onChange={(e) => setPayAmount(e.target.value)}
                                                         placeholder="Amount to pay"
                                                         step="any"
-                                                        className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-40"
+                                                        className="bg-[#1f2937] text-white px-4 py-2 rounded-xl outline-none w-full md:w-40"
                                                         required
                                                     />
                                                     <input
@@ -401,23 +402,25 @@ function Debts() {
                                                         value={payNote}
                                                         onChange={(e) => setPayNote(e.target.value)}
                                                         placeholder="Note (optional)"
-                                                        className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none w-full md:w-60"
+                                                        className="bg-[#1f2937] text-white px-4 py-2 rounded-xl outline-none w-full md:w-60"
                                                     />
-                                                    <button
-                                                        type="submit"
-                                                        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-full text-white font-medium text-sm"
-                                                    >
-                                                        Submit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setPayingLenderId(null)} // ✅ Đóng form
-                                                        className="bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-full text-white font-medium text-sm"
-                                                    >
-                                                        Cancel
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="submit"
+                                                            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl text-white font-medium text-sm"
+                                                        >
+                                                            Submit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPayingLenderId(null)}
+                                                            className="bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-xl text-white font-medium text-sm"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
                                                     {payStatus && (
-                                                        <p className="text-yellow-300 text-xs">{payStatus}</p>
+                                                        <p className="text-yellow-300 text-xs md:ml-4">{payStatus}</p>
                                                     )}
                                                 </form>
                                             </td>
@@ -450,7 +453,7 @@ function Debts() {
                                         combinedItems.sort((a, b) => new Date(a.date) - new Date(b.date));
 
                                         return combinedItems.map((item, idx) => (
-                                            <tr key={idx} className={`text-[11px] ${item.type === "borrow" ? "bg-[#101d33] text-white" : "bg-[#0d1a2b] text-green-300"}`}>
+                                            <tr key={idx} className={`text-[11px] ${item.type === "borrow" ? "bg-[#1C1F26] text-white" : "bg-[#0d1a2b] text-green-300"}`}>
                                                 <td className="px-8 py-2 text-[11px]" colSpan={5}>
                                                     📅 {item.date.slice(5, 7) + "/" + item.date.slice(8, 10) + "/" + item.date.slice(0, 4)} |
                                                     {item.type === "borrow" ? (
@@ -463,8 +466,8 @@ function Debts() {
                                                         onClick={() => handleDeleteItem(item)}
                                                         disabled={deletingItemId === item.id}
                                                         className={`ml-4 text-[11px] transition ${deletingItemId === item.id
-                                                                ? "text-gray-400 cursor-not-allowed"
-                                                                : "text-red-400 hover:text-red-600"
+                                                            ? "text-gray-400 cursor-not-allowed"
+                                                            : "text-red-400 hover:text-red-600"
                                                             }`}
                                                     >
                                                         {deletingItemId === item.id ? "⏳ Deleting..." : "🗑️ Delete"}

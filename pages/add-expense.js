@@ -106,43 +106,60 @@ function AddExpense() {
     };
 
     return (
-        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] min-h-screen text-white p-4">
+        <div className="bg-[#1C1F26] min-h-screen text-white p-4 font-mono">
             <Navbar />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">➕ Add Expense / Income</h1>
 
-            <form onSubmit={handleSubmit} className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6">
+            <form onSubmit={handleSubmit} className="max-w-xl mx-auto p-6 rounded-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] space-y-4 mb-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                         type="number"
                         placeholder="Amount"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none"
+                        className="border border-gray-800 text-white px-4 py-2 rounded-xl outline-none"
                         step="any"
                         required
                     />
-                    <select
-                        value={type}
-                        onChange={(e) => setType(e.target.value)}
-                        className="bg-[#1f2937] text-white px-4 py-2 rounded-full outline-none"
-                    >
-                        <option value="expense">Expense</option>
-                        <option value="income">Income</option>
-                        <option value="credit-spending">Credit Spending</option>
-                    </select>
+                    <div className="relative w-full">
+                        <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value)}
+                            className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none transition pr-10"
+                        >
+                            <option value="expense">Expense</option>
+                            <option value="income">Income</option>
+                            <option value="credit-spending">Credit Spending</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+
                 </div>
 
-                <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
-                    required
-                >
-                    <option value="">💼 Select category</option>
-                    {categories.filter(c => c.type === type).map(cat => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
-                    ))}
-                </select>
+                <div className="relative w-full">
+                    <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none transition pr-10"
+                        required
+                    >
+                        <option value="">💼 Select category</option>
+                        {categories.filter(c => c.type === type).map(cat => (
+                            <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                    </select>
+                    {/* Mũi tên chỉ xuống */}
+                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                </div>
+
                 <div className="w-full mt-1 text-left">
                     <button
                         type="button"
@@ -157,7 +174,7 @@ function AddExpense() {
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none custom-date"
+                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none custom-date"
                     required
                 />
 
@@ -166,14 +183,14 @@ function AddExpense() {
                     placeholder="Description (optional)"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="bg-[#1f2937] text-white px-4 py-2 rounded-full w-full outline-none"
+                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
                 />
 
                 <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4 w-full max-w-md mx-auto">
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className={`flex-1 font-semibold py-2 rounded-full transition
+                        className={`flex-1 font-semibold py-2 rounded-xl transition
                             ${isSubmitting
                                 ? "bg-green-400 cursor-not-allowed"
                                 : "bg-green-600 hover:bg-green-700 text-white"}`}
@@ -184,7 +201,7 @@ function AddExpense() {
                     <button
                         type="button"
                         onClick={() => router.push('/expenses')}
-                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-full transition"
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-xl transition"
                     >
                         Close
                     </button>

@@ -458,7 +458,7 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-0 bg-[#1C1F26] text-white min-h-screen">
+        <div className="p-0 bg-[#1C1F26] text-white min-h-screen font-mono">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
@@ -618,7 +618,7 @@ function Dashboard() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-yellow-300 font-mono font-semibold">
+                                        <p className="text-yellow-300 font-semibold">
                                             ${formatCurrency(coin.current_price)}
                                         </p>
                                         <p
@@ -691,7 +691,7 @@ function Dashboard() {
 
                                 <div className="w-full text-center mb-4">
                                     <p className="text-sm text-blue-200 font-medium">Current Price - Avg. Buy Price</p>
-                                    <p className="text-lg font-mono text-yellow-300">
+                                    <p className="text-lg text-yellow-300">
                                         ${formatCurrency(coin.current_price)} <span className="text-white">-</span> ${avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
                                     </p>
 
@@ -717,19 +717,19 @@ function Dashboard() {
                                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
                                     <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
-                                        <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
+                                        <p className="text-lg text-white">{coin.total_quantity.toLocaleString()}</p>
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
-                                        <p className="text-lg font-mono text-orange-400">${formatCurrency(coin.total_invested)}</p>
+                                        <p className="text-lg text-orange-400">${formatCurrency(coin.total_invested)}</p>
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                        <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
+                                        <p className={`text-lg ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
-                                        <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
+                                        <p className="text-lg text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
                                     </div>
                                     <div className="col-span-2 border-t border-white/10 pt-2">
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
@@ -743,7 +743,7 @@ function Dashboard() {
                                                 return "😭";
                                             })()} Profit / Loss
                                         </p>
-                                        <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                        <p className={`text-lg ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                             ${Math.round(coin.profit_loss).toLocaleString()}<span className="text-xs">({profitLossPercentage})</span>
                                         </p>
                                     </div>
