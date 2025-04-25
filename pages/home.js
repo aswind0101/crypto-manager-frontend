@@ -677,7 +677,7 @@ function Dashboard() {
                                 className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all hover:scale-[1.01]"
                             >
                                 {/* Hint for mobile users */}
-                                <div className="text-center text-xs text-gray-500 italic mb-2">
+                                <div className="text-center text-xs text-gray-500 italic mb-2 mt-2">
                                     (Tap any coin to view transaction details)
                                 </div>
                                 <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
@@ -715,24 +715,33 @@ function Dashboard() {
 
 
                                 <div className="grid grid-cols-2 gap-x-3 gap-y-4 w-full px-2 md:px-6 text-center">
+                                    {/* Hàng 1 */}
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Quantity</p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Total Quantity</p>
                                         <p className="text-lg text-white">{coin.total_quantity.toLocaleString()}</p>
                                     </div>
+
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Total Invested</p>
                                         <p className="text-lg text-orange-400">${formatCurrency(coin.total_invested)}</p>
                                     </div>
+
+                                    {/* Hàng 2 */}
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                        <p className={`text-lg ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Net Invested</p>
+                                        <p className={`text-lg ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>
+                                            ${formatCurrency(netInvested)}
+                                        </p>
                                     </div>
+
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Current Value</p>
                                         <p className="text-lg text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
                                     </div>
+
+                                    {/* Hàng 3 - Profit / Loss */}
                                     <div className="col-span-2 border-t border-white/10 pt-2">
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1 mt-2">
                                             {(() => {
                                                 const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
                                                 if (ratio > 0.5) return "🤑";
@@ -744,12 +753,15 @@ function Dashboard() {
                                             })()} Profit / Loss
                                         </p>
                                         <p className={`text-lg ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                            ${Math.round(coin.profit_loss).toLocaleString()}<span className="text-xs">({profitLossPercentage})</span>
+                                            ${Math.round(coin.profit_loss).toLocaleString()}
+                                            <span className="text-xs">({profitLossPercentage})</span>
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="mt-4 flex justify-center gap-4">
+
+
+                                <div className="mt-4 mb-4 flex justify-center gap-4">
                                     <button
                                         onClick={() => handleOpenTradeModal(coin, "buy")}
                                         className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm transition-all duration-200"
