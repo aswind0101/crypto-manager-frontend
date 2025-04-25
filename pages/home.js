@@ -593,10 +593,10 @@ function Dashboard() {
                     <div className="mt-10 w-full max-w-[1200px] mx-auto rounded-xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
                         {/* Header */}
                         <div className="bg-yellow-700 px-6 py-4 text-center">
-                            <div className="flex justify-center items-center gap-2 text-white font-bold text-xl">
+                            <div className="flex justify-center items-center gap-2 text-white font-bold text-lg">
                                 🌐 Market Overview
                             </div>
-                            <p className="text-sm text-gray-300 mt-1">
+                            <p className="text-xs text-gray-300 mt-1">
                                 Total Market Cap:{" "}
                                 <span className="text-yellow-400 font-bold">${formatNumber(globalMarketCap)}</span>
                             </p>
@@ -605,7 +605,7 @@ function Dashboard() {
                         {/* Danh sách top coin */}
                         <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] divide-y divide-white/5 p-4">
                             {topCoins.slice(0, 10).map((coin) => (
-                                <div key={coin.id} className="flex items-center justify-between rounded-lg px-6 py-4 transition-all">
+                                <div key={coin.id} className="flex items-center text-sm justify-between rounded-lg px-4 py-4 transition-all">
                                     <div className="flex items-center gap-3">
                                         <img src={coin.image} className="w-8 h-8 rounded-full" alt={coin.name} />
                                         <div>
@@ -640,7 +640,7 @@ function Dashboard() {
                         <select
                             value={filterByProfit}
                             onChange={(e) => setFilterByProfit(e.target.value)}
-                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm outline-none"
                         >
                             <option value="all">All</option>
                             <option value="profit">🟢 Profit</option>
@@ -677,7 +677,7 @@ function Dashboard() {
                                 className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all hover:scale-[1.01]"
                             >
                                 {/* Hint for mobile users */}
-                                <div className="text-center text-xs text-gray-500 italic mb-2 mt-2">
+                                <div className="text-center text-[11px] text-gray-500 italic mb-2 mt-2">
                                     (Tap any coin to view transaction details)
                                 </div>
                                 <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>

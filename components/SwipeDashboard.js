@@ -174,8 +174,8 @@ const SwipeDashboard = ({
                             if (info.offset.x > 100) handleSwipe("right");
                         }}
                     >
-                        <div className="h-full w-full flex flex-col items-center justify-center  text-white p-4">
-                            <h2 className="text-2xl font-bold text-yellow-400 mb-3">📈 Portfolio Allocation</h2>
+                        <div className="h-full w-full flex flex-col items-center justify-center text-white p-4 mt-2">
+                            <h2 className="text-xl font-bold text-yellow-400 mb-3">📈 Portfolio Allocation</h2>
 
                             {/* Vertical Bars */}
                             {/* Nếu chỉ có 1 coin → show đơn giản */}
