@@ -714,35 +714,24 @@ function Dashboard() {
                                 </div>
 
 
-                                <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 w-full px-2 md:px-6 text-center">
-                                    {/* Total Quantity */}
-                                    <div className="min-w-[140px]">
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-4 w-full px-2 md:px-6 text-center">
+                                    <div>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Quantity</p>
                                         <p className="text-lg text-white">{coin.total_quantity.toLocaleString()}</p>
                                     </div>
-
-                                    {/* Total Invested */}
-                                    <div className="min-w-[140px]">
+                                    <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
                                         <p className="text-lg text-orange-400">${formatCurrency(coin.total_invested)}</p>
                                     </div>
-
-                                    {/* Net Invested */}
-                                    <div className="min-w-[140px]">
+                                    <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                        <p className={`text-lg ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>
-                                            ${formatCurrency(netInvested)}
-                                        </p>
+                                        <p className={`text-lg ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
                                     </div>
-
-                                    {/* Current Value */}
-                                    <div className="min-w-[140px]">
+                                    <div>
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
                                         <p className="text-lg text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
                                     </div>
-
-                                    {/* Profit / Loss */}
-                                    <div className="w-full border-t border-white/10 pt-2">
+                                    <div className="col-span-2 border-t border-white/10 pt-2">
                                         <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
                                             {(() => {
                                                 const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
@@ -759,7 +748,6 @@ function Dashboard() {
                                         </p>
                                     </div>
                                 </div>
-
 
                                 <div className="mt-4 flex justify-center gap-4">
                                     <button
