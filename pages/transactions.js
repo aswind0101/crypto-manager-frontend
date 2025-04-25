@@ -105,7 +105,8 @@ function Transactions() {
                 <h1 className="text-2xl font-bold text-yellow-400">📜 Transaction History</h1>
             </div>
 
-            <div className="w-full max-w-[1200px] mx-auto flex flex-col md:flex-row gap-4 mb-4 mt-10 overflow-visible">
+            <div className="w-full max-w-[1200px] mx-auto mt-6 mb-6 px-6 py-4 bg-[#1C1F26] rounded-xl 
+            shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#262f3d] flex items-center gap-4">
                 {isFilteredByQueryCoin ?
                     (
 
@@ -121,7 +122,8 @@ function Transactions() {
                         <select
                             value={selectedCoin}
                             onChange={(e) => setSelectedCoin(e.target.value)}
-                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm 
+                             outline-none"
                         >
                             <option value="All">All Coins</option>
                             {coinOptions.map((coin) => (
@@ -133,7 +135,7 @@ function Transactions() {
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
                     className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm 
-                            shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                             outline-none"
                 >
                     <option value="All">All Types</option>
                     <option value="buy">Buy</option>
