@@ -60,6 +60,28 @@ function AddTransaction() {
       setStatus("❗ Please fill in all fields and make sure you're logged in.");
       return;
     }
+
+    // ✅ Kiểm tra không bán quá số lượng hiện có
+    if (type === "sell") {
+      const uid = user.uid;
+      const cached = localStorage.getItem(`portfolio_${uid}`);
+      if (cached) {
+        try {
+          const portfolio = JSON.parse(cached);
+          const coin = portfolio.find(c => c.coin_symbol.toUpperCase() === coinSymbol.toUpperCase());
+          if (!coin || coin.total_quantity <= 0) {
+            setStatus("❗ You don't own this coin.");
+            return;
+          }
+          if (parseFloat(quantity) > coin.total_quantity) {
+            setStatus(`❗ You only have ${coin.total_quantity.toLocaleString()} ${coinSymbol.toUpperCase()}.`);
+            return;
+          }
+        } catch (err) {
+          console.error("❌ Error checking portfolio:", err);
+        }
+      }
+    }
     try {
       const auth = getAuth();
       const firebaseUser = auth.currentUser;
