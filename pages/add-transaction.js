@@ -175,8 +175,8 @@ function AddTransaction() {
               onChange={(e) => setType(e.target.value)}
               className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none transition pr-10"
             >
-              <option value="buy">Buy</option>
-              <option value="sell">Sell</option>
+              <option value="buy">🟢 Buy</option>
+              <option value="sell">🔴 Sell</option>
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
               <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

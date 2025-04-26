@@ -478,8 +478,8 @@ function Dashboard() {
                                     onChange={(e) => setTradeType(e.target.value)}
                                     className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none pr-10 transition"
                                 >
-                                    <option value="buy">Buy</option>
-                                    <option value="sell">Sell</option>
+                                    <option value="buy">🟢 Buy</option>
+                                    <option value="sell">🔴 Sell</option>
                                 </select>
 
                                 {/* Mũi tên canh giữa tuyệt đối */}
@@ -650,7 +650,7 @@ function Dashboard() {
                             onChange={(e) => setFilterByProfit(e.target.value)}
                             className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm outline-none"
                         >
-                            <option value="all">All</option>
+                            <option value="all">📋 All</option>
                             <option value="profit">🟢 Profit</option>
                             <option value="loss">🔴 Loss</option>
                         </select>

@@ -107,39 +107,41 @@ function Transactions() {
 
             <div className="w-full max-w-[1200px] mx-auto mt-6 mb-6 px-6 py-4 bg-[#1C1F26] rounded-xl 
             shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#262f3d] flex items-center gap-4">
-                {isFilteredByQueryCoin ?
-                    (
+                {isFilteredByQueryCoin ? (
+                    <select
+                        value={selectedCoin}
+                        className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                        disabled
+                    >
+                        <option value={selectedCoin}>🪙 {selectedCoin}</option>
+                    </select>
+                ) : (
+                    <select
+                        value={selectedCoin}
+                        onChange={(e) => setSelectedCoin(e.target.value)}
+                        className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm outline-none"
+                    >
+                        {/* 🎯 All Coins với icon */}
+                        <option value="All">📋 All Coins</option>
 
-                        <select
-                            value={selectedCoin}
-                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm 
-                            shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none" 
-                            disabled
-                        >
-                            <option value={selectedCoin}>{selectedCoin}</option>
-                        </select>
-                    ) : (
-                        <select
-                            value={selectedCoin}
-                            onChange={(e) => setSelectedCoin(e.target.value)}
-                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm 
-                             outline-none"
-                        >
-                            <option value="All">All Coins</option>
-                            {coinOptions.map((coin) => (
-                                <option key={coin} value={coin}>{coin}</option>
-                            ))}
-                        </select>
-                    )}
+                        {/* 🎯 Các coin khác */}
+                        {coinOptions.map((coin) => (
+                            <option key={coin} value={coin}>
+                                🪙 {coin}
+                            </option>
+                        ))}
+                    </select>
+                )}
+
                 <select
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
                     className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm 
                              outline-none"
                 >
-                    <option value="All">All Types</option>
-                    <option value="buy">Buy</option>
-                    <option value="sell">Sell</option>
+                    <option value="All">📋 All Types</option>
+                    <option value="buy">🟢 Buy</option>
+                    <option value="sell">🔴 Sell</option>
                 </select>
                 <Link
                     href="/add-transaction"
