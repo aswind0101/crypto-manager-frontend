@@ -23,41 +23,47 @@ export default function Login() {
 
         try {
             await setPersistence(auth, browserLocalPersistence);
-            const result = await signInWithPopup(auth, provider);
-            const user = result.user;
 
-            const userData = {
-                uid: user.uid,
-                name: user.displayName,
-                email: user.email,
-                photo: user.photoURL
-            };
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
-            localStorage.setItem("user", JSON.stringify(userData));
+            if (isStandalone) {
+                // 👉 Nếu chạy PWA ➔ dùng Redirect
+                await signInWithRedirect(auth, provider);
+            } else {
+                // 👉 Nếu chạy trình duyệt thường ➔ dùng Popup
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
 
-            // ✅ Gọi API trước khi chuyển trang
-            try {
-                const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
+                const userData = {
+                    uid: user.uid,
+                    name: user.displayName,
+                    email: user.email,
+                    photo: user.photoURL
+                };
+                localStorage.setItem("user", JSON.stringify(userData));
+
+                // Gọi API
+                fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         user_id: user.uid,
                         email: user.email
                     })
-                });
+                })
+                    .then((res) => res.json())
+                    .then((result) => console.log("✅ API /user-alerts/init:", result))
+                    .catch((apiErr) => console.error("❌ Failed to call /api/user-alerts/init:", apiErr));
 
-                const result = await res.json();
-                console.log("✅ API /user-alerts/init:", result);
-            } catch (apiErr) {
-                console.error("❌ Failed to call /api/user-alerts/init:", apiErr);
+                // Redirect ngay
+                router.push("/home");
             }
 
-            // ✅ Chuyển trang sau khi gọi API
-            router.push("/home");
         } catch (error) {
             console.error("Login failed:", error);
         }
     };
+
 
 
     useEffect(() => {
