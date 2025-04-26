@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import {
+    getRedirectResult,
     getAuth,
     signInWithPopup,
     setPersistence,
@@ -9,6 +10,7 @@ import {
 } from "firebase/auth";
 import { useRouter } from "next/router";
 import { app } from "../firebase";
+
 
 export default function Login() {
     const router = useRouter();
@@ -64,11 +66,46 @@ export default function Login() {
         }
     };
 
-
-
     useEffect(() => {
+        const auth = getAuth(app);
+
+        getRedirectResult(auth)
+            .then(async (result) => {
+                if (result?.user) {
+                    const user = result.user;
+                    const userData = {
+                        uid: user.uid,
+                        name: user.displayName,
+                        email: user.email,
+                        photo: user.photoURL,
+                    };
+                    localStorage.setItem("user", JSON.stringify(userData));
+
+                    try {
+                        const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                user_id: user.uid,
+                                email: user.email
+                            })
+                        });
+
+                        const result = await res.json();
+                        console.log("✅ Redirect init /user-alerts/init:", result);
+                    } catch (err) {
+                        console.error("❌ Error calling /user-alerts/init (redirect):", err);
+                    }
+
+                    router.push("/home");
+                }
+            })
+            .catch((error) => {
+                console.error("❌ getRedirectResult error:", error);
+            });
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user && !loginClicked.current) {
+            if (user) {
                 const userData = {
                     uid: user.uid,
                     name: user.displayName,
@@ -77,7 +114,6 @@ export default function Login() {
                 };
                 localStorage.setItem("user", JSON.stringify(userData));
 
-                // ✅ Gửi API nếu login bằng session
                 try {
                     const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
                         method: "POST",
@@ -99,7 +135,8 @@ export default function Login() {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [router]);
+
 
     return (
         <div className="flex items-center justify-center h-screen bg-black text-white">
