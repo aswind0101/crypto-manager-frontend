@@ -470,16 +470,24 @@ function Dashboard() {
                                 {tradeType === "buy" ? "➕ Buy" : "➖ Sell"} {selectedCoin.coin_symbol.toUpperCase()}
                             </h2>
 
-                            <div>
+                            <div className="relative w-full">
                                 <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
+
                                 <select
                                     value={tradeType}
                                     onChange={(e) => setTradeType(e.target.value)}
-                                    className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none transition"
+                                    className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none pr-10 transition"
                                 >
                                     <option value="buy">Buy</option>
                                     <option value="sell">Sell</option>
                                 </select>
+
+                                {/* Mũi tên canh giữa tuyệt đối */}
+                                <div className="pointer-events-none absolute top-[2.4rem] right-4">
+                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
                             </div>
 
                             <div>
