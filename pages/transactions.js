@@ -110,7 +110,9 @@ function Transactions() {
                 {isFilteredByQueryCoin ? (
                     <select
                         value={selectedCoin}
-                        className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] outline-none"
+                        className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm 
+                        shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631] 
+                        outline-none appearance-none disabled:appearance-none"
                         disabled
                     >
                         <option value={selectedCoin}>🪙 {selectedCoin}</option>
