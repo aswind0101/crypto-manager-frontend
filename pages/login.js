@@ -1,7 +1,9 @@
+// 📁 pages/login.js
 import { useEffect, useRef } from "react";
 import {
     getAuth,
     signInWithPopup,
+    signInWithRedirect,
     setPersistence,
     browserLocalPersistence,
     GoogleAuthProvider,
@@ -17,61 +19,36 @@ export default function Login() {
 
     const handleLogin = async () => {
         loginClicked.current = true;
-
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
 
         try {
             await setPersistence(auth, browserLocalPersistence);
-            const result = await signInWithPopup(auth, provider);
-            const user = result.user;
 
-            const userData = {
-                uid: user.uid,
-                name: user.displayName,
-                email: user.email,
-                photo: user.photoURL
-            };
-
-            localStorage.setItem("user", JSON.stringify(userData));
-
-            // ✅ Gọi API trước khi chuyển trang
-            try {
-                const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        user_id: user.uid,
-                        email: user.email
-                    })
-                });
-
-                const result = await res.json();
-                console.log("✅ API /user-alerts/init:", result);
-            } catch (apiErr) {
-                console.error("❌ Failed to call /api/user-alerts/init:", apiErr);
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                // 📱 Nếu là PWA ➔ dùng redirect
+                await signInWithRedirect(auth, provider);
+            } else {
+                // 🖥️ Nếu web thường ➔ dùng popup
+                await signInWithPopup(auth, provider);
             }
-
-            // ✅ Chuyển trang sau khi gọi API
-            router.push("/home");
         } catch (error) {
             console.error("Login failed:", error);
         }
     };
 
-
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user && !loginClicked.current) {
+            if (user) {
                 const userData = {
                     uid: user.uid,
                     name: user.displayName,
                     email: user.email,
                     photo: user.photoURL
                 };
+
                 localStorage.setItem("user", JSON.stringify(userData));
 
-                // ✅ Gửi API nếu login bằng session
                 try {
                     const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
                         method: "POST",
@@ -85,9 +62,10 @@ export default function Login() {
                     const result = await res.json();
                     console.log("✅ Session init /user-alerts/init:", result);
                 } catch (err) {
-                    console.error("❌ Error calling /user-alerts/init (session):", err);
+                    console.error("❌ Error calling /api/user-alerts/init (session):", err);
                 }
 
+                // ✅ Đợi chắc chắn đã login ➔ chuyển trang
                 router.push("/home");
             }
         });
