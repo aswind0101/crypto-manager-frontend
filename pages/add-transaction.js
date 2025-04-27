@@ -65,23 +65,33 @@ function AddTransaction() {
     if (type === "sell") {
       const uid = user.uid;
       const cached = localStorage.getItem(`portfolio_${uid}`);
-      if (cached) {
-        try {
-          const portfolio = JSON.parse(cached);
-          const coin = portfolio.find(c => c.coin_symbol.toUpperCase() === coinSymbol.toUpperCase());
-          if (!coin || coin.total_quantity <= 0) {
-            setStatus("❗ You don't own this coin.");
-            return;
-          }
-          if (parseFloat(quantity) > coin.total_quantity) {
-            setStatus(`❗ You only have ${coin.total_quantity.toLocaleString()} ${coinSymbol.toUpperCase()}.`);
-            return;
-          }
-        } catch (err) {
-          console.error("❌ Error checking portfolio:", err);
+      if (!cached) {
+        setStatus("❗ You don't have any holdings. Please add a buy transaction first.");
+        return;
+      }
+
+      try {
+        const portfolio = JSON.parse(cached);
+        const coin = portfolio.find(c => c.coin_symbol.toUpperCase() === coinSymbol.toUpperCase());
+        if (!coin || coin.total_quantity <= 0) {
+          setStatus("❗ You don't own this coin. Please buy first.");
+          return;
         }
+        if (isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0) {
+          setStatus("❗ Quantity must be greater than 0.");
+          return;
+        }
+        if (parseFloat(quantity) > coin.total_quantity) {
+          setStatus(`❗ You only have ${coin.total_quantity.toLocaleString()} ${coinSymbol.toUpperCase()}.`);
+          return;
+        }
+      } catch (err) {
+        console.error("❌ Error checking portfolio:", err);
+        setStatus("❗ Unable to verify your holdings. Please try again later.");
+        return;
       }
     }
+
     try {
       const auth = getAuth();
       const firebaseUser = auth.currentUser;
