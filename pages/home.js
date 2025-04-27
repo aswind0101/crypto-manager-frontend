@@ -77,6 +77,7 @@ function Dashboard() {
     const [globalMarketCap, setGlobalMarketCap] = useState(null);
     const [topCoins, setTopCoins] = useState([]);
     const [showMarketOverview, setShowMarketOverview] = useState(false);
+    const [showAllCoins, setShowAllCoins] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [hasRawPortfolioData, setHasRawPortfolioData] = useState(false);
     const [isReadyToRender, setIsReadyToRender] = useState(false);
@@ -613,36 +614,55 @@ function Dashboard() {
 
                         {/* Danh sách top coin */}
                         <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] divide-y divide-white/5 p-4">
-                            {topCoins.slice(0, 10).map((coin) => (
-                                <div key={coin.id} className="flex items-center text-sm justify-between rounded-lg px-4 py-4 transition-all">
-                                    <div className="flex items-center gap-3">
-                                        <img src={coin.image} className="w-8 h-8 rounded-full" alt={coin.name} />
-                                        <div>
-                                            <p className="text-white font-bold">
-                                                {coin.name} <span className="font-normal">({coin.symbol.toUpperCase()})</span>
+                            <AnimatePresence initial={false}>
+                                {topCoins.slice(0, showAllCoins ? 10 : 5).map((coin) => (
+                                    <motion.div
+                                        key={coin.id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="flex items-center text-sm justify-between rounded-lg px-4 py-4"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <img src={coin.image} className="w-8 h-8 rounded-full" alt={coin.name} />
+                                            <div>
+                                                <p className="text-white font-bold">
+                                                    {coin.name} <span className="font-normal">({coin.symbol.toUpperCase()})</span>
+                                                </p>
+                                                <p className="text-xs text-gray-400">
+                                                    Market Cap: ${formatNumber(coin.market_cap)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-yellow-300 font-semibold">
+                                                ${formatCurrency(coin.current_price)}
                                             </p>
-                                            <p className="text-xs text-gray-400">
-                                                Market Cap: ${formatNumber(coin.market_cap)}
+                                            <p
+                                                className={`text-xs ${coin.price_change_percentage_24h >= 0 ? "text-green-400" : "text-red-400"
+                                                    }`}
+                                            >
+                                                {coin.price_change_percentage_24h >= 0 ? "↑" : "↓"} {coin.price_change_percentage_24h.toFixed(2)}%
                                             </p>
                                         </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-yellow-300 font-semibold">
-                                            ${formatCurrency(coin.current_price)}
-                                        </p>
-                                        <p
-                                            className={`text-xs ${coin.price_change_percentage_24h >= 0 ? "text-green-400" : "text-red-400"
-                                                }`}
-                                        >
-                                            {coin.price_change_percentage_24h >= 0 ? "↑" : "↓"} {coin.price_change_percentage_24h.toFixed(2)}%
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+
+                            {/* Nút Show More / Show Less */}
+                            <div className="text-center mt-4">
+                                <button
+                                    onClick={() => setShowAllCoins(!showAllCoins)}
+                                    className="text-yellow-300 hover:text-yellow-400 font-semibold text-sm transition"
+                                >
+                                    {showAllCoins ? "Show Less ▲" : "Show More ▼"}
+                                </button>
+                            </div>
                         </div>
                     </div>
-
                 )}
+
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
                     <div className="w-full max-w-[1200px] mx-auto mt-6 px-6 py-4 bg-[#1C1F26] rounded-xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#262f3d] flex items-center gap-4">
