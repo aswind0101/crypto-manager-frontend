@@ -458,28 +458,36 @@ function Dashboard() {
     }
 
     return (
-        <div className="p-0 max-w-[1400px] mx-auto min-h-screen text-white ">
+        <div className="p-0 bg-[#1C1F26] text-white min-h-screen font-mono overflow-y-scroll scrollbar-hide">
             <Navbar />
 
             <div className="mt-4 grid grid-cols-1 gap-2 p-4 rounded-xl">
                 {/* Modal */}
                 {showModal && selectedCoin && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-[#0e1628] max-w-md w-full mx-4 p-6 rounded-xl shadow-2xl text-white space-y-4 relative z-50">
+                    <div className="fixed inset-0 bg-[#1C1F26] flex items-center justify-center z-50">
+                        <div className="bg-[#1C1F26] max-w-md w-full mx-4 p-6 rounded-xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] text-white space-y-4 relative z-50">
                             <h2 className="text-xl font-bold text-yellow-400 text-center">
                                 {tradeType === "buy" ? "➕ Buy" : "➖ Sell"} {selectedCoin.coin_symbol.toUpperCase()}
                             </h2>
 
-                            <div>
+                            <div className="relative w-full">
                                 <label className="block text-sm text-gray-300 mb-1">Transaction Type</label>
+
                                 <select
                                     value={tradeType}
                                     onChange={(e) => setTradeType(e.target.value)}
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    className="bg-[#1C1F26] border border-gray-800 text-white rounded-xl px-4 py-2 w-full outline-none appearance-none pr-10 transition"
                                 >
-                                    <option value="buy">Buy</option>
-                                    <option value="sell">Sell</option>
+                                    <option value="buy">🟢 Buy</option>
+                                    <option value="sell">🔴 Sell</option>
                                 </select>
+
+                                {/* Mũi tên canh giữa tuyệt đối */}
+                                <div className="pointer-events-none absolute top-[2.4rem] right-4">
+                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
                             </div>
 
                             <div>
@@ -489,7 +497,7 @@ function Dashboard() {
                                     value={quantity}
                                     onChange={(e) => setQuantity(e.target.value)}
                                     placeholder="e.g., 100"
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    className="w-full px-4 py-2 border border-gray-800 rounded-xl text-white outline-none transition"
                                     step="any"
                                 />
                             </div>
@@ -501,7 +509,7 @@ function Dashboard() {
                                     value={price}
                                     onChange={(e) => setPrice(e.target.value)}
                                     placeholder="e.g., 2.5"
-                                    className="w-full px-4 py-2 bg-[#1f2937] rounded text-white outline-none"
+                                    className="w-full px-4 py-2 border border-gray-800 rounded-xl text-white outline-none"
                                     step="any"
                                 />
                             </div>
@@ -511,7 +519,7 @@ function Dashboard() {
                             <div className="flex justify-between gap-4 mt-2">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="w-1/2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
+                                    className="w-1/2 px-4 py-2 rounded-xl bg-gray-600 hover:bg-gray-700 text-white text-sm shadow transition"
                                     disabled={isSubmitting}
                                 >
                                     Cancel
@@ -520,7 +528,7 @@ function Dashboard() {
                                 <button
                                     onClick={handleConfirmTrade}
                                     disabled={isSubmitting}
-                                    className={`w-1/2 px-4 py-2 rounded text-white text-sm shadow transition
+                                    className={`w-1/2 px-4 py-2 rounded-xl text-white text-sm shadow transition
             ${tradeType === "buy"
                                             ? "bg-green-600 hover:bg-green-700 active:bg-green-800"
                                             : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
@@ -557,7 +565,7 @@ function Dashboard() {
                             />
 
                             {lastUpdated && showLastUpdate && (
-                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-6 text-xs text-gray-300 z-10">
+                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
                                     <span>🕒 Last update: {lastUpdated}</span>
                                     <button
                                         onClick={async () => {
@@ -569,9 +577,9 @@ function Dashboard() {
                                                 setRefreshing(false);
                                             }
                                         }}
-                                        className="flex items-center gap-1 px-4 py-1 text-xs rounded-full 
-    bg-[#1a2f46] text-yellow-300 hover:bg-yellow-400 hover:text-black 
-    transition duration-200 shadow-inner border border-[#2c4069]"
+                                        className="flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-[#1C1F26] shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631]
+    text-yellow-300 hover:bg-yellow-700 hover:text-white 
+    transition duration-200 border border-[#1C1F26]"
                                     >
                                         <span
                                             className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
@@ -590,77 +598,64 @@ function Dashboard() {
 
                 {/* Market Overview */}
                 {portfolio.length > 0 && (
-                    <div className="mt-4 rounded-3xl overflow-hidden text-white shadow-lg bg-[#162b4d] border border-[#1f3b66]">
-
-                        {/* Header trắng nằm trên cùng */}
-                        <div className="bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] px-6 py-3">
-                            <h2 className="text-xl text-center font-semibold text-white font-bold">🌐 Market Overview</h2>
-                            <p className="text-sm text-gray-400 text-center">
+                    <div className="mt-10 w-full max-w-[1200px] mx-auto rounded-xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
+                        {/* Header */}
+                        <div className="bg-yellow-700 px-6 py-4 text-center">
+                            <div className="flex justify-center items-center gap-2 text-white font-bold text-lg">
+                                🌐 Market Overview
+                            </div>
+                            <p className="text-xs text-gray-300 mt-1">
                                 Total Market Cap:{" "}
-                                <span className="text-lg text-yellow-300 font-mono font-bold">
-                                    ${formatNumber(globalMarketCap)}
-                                </span>
+                                <span className="text-yellow-400 font-bold">${formatNumber(globalMarketCap)}</span>
                             </p>
                         </div>
 
                         {/* Danh sách top coin */}
-                        <div className="p-4">
-                            <div className="max-h-96 overflow-y-auto divide-y divide-[#2c4069] px-2 py-2 text-sm scrollbar-hide">
-                                {topCoins.slice(0, 10).map((coin) => (
-                                    <div
-                                        key={coin.id}
-                                        className="flex justify-between items-center py-3 rounded-lg px-3 transition-all"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <img src={coin.image} alt={coin.name} className="w-6 h-6" />
-                                            <div>
-                                                <p className="font-semibold text-white">
-                                                    {coin.name} ({coin.symbol.toUpperCase()})
-                                                </p>
-                                                <p className="text-xs text-gray-400">
-                                                    Market Cap: ${formatNumber(coin.market_cap)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm text-yellow-300 font-mono">
-                                                ${formatCurrency(coin.current_price)}
+                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] divide-y divide-white/5 p-4">
+                            {topCoins.slice(0, 10).map((coin) => (
+                                <div key={coin.id} className="flex items-center text-sm justify-between rounded-lg px-4 py-4 transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <img src={coin.image} className="w-8 h-8 rounded-full" alt={coin.name} />
+                                        <div>
+                                            <p className="text-white font-bold">
+                                                {coin.name} <span className="font-normal">({coin.symbol.toUpperCase()})</span>
                                             </p>
-                                            <p className={`text-xs font-mono ${coin.price_change_percentage_24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                                {coin.price_change_percentage_24h >= 0 ? "↑" : "↓"} {coin.price_change_percentage_24h.toFixed(2)}%
+                                            <p className="text-xs text-gray-400">
+                                                Market Cap: ${formatNumber(coin.market_cap)}
                                             </p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="text-right">
+                                        <p className="text-yellow-300 font-semibold">
+                                            ${formatCurrency(coin.current_price)}
+                                        </p>
+                                        <p
+                                            className={`text-xs ${coin.price_change_percentage_24h >= 0 ? "text-green-400" : "text-red-400"
+                                                }`}
+                                        >
+                                            {coin.price_change_percentage_24h >= 0 ? "↑" : "↓"} {coin.price_change_percentage_24h.toFixed(2)}%
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
+
                 )}
-
-
                 {/* Luôn hiển thị bộ lọc nếu có dữ liệu */}
                 {portfolio.length > 0 && (
-                    <div className="w-full flex items-center gap-3 mt-2">
-                        {/* Select */}
-                        <div className="relative w-1/2">
-                            <select
-                                value={filterByProfit}
-                                onChange={(e) => setFilterByProfit(e.target.value)}
-                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] 
-        text-white px-4 h-9 text-sm rounded-full shadow-inner border border-[#2c4069] pr-8 
-        focus:outline-none appearance-none"
-                            >
-                                <option className="text-black" value="all">All</option>
-                                <option className="text-black" value="profit">🟢 Profit</option>
-                                <option className="text-black" value="loss">🔴 Loss</option>
-                            </select>
-                            <div className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-xs leading-none">
-                                ▲<br />▼
-                            </div>
-                        </div>
+                    <div className="w-full max-w-[1200px] mx-auto mt-6 px-6 py-4 bg-[#1C1F26] rounded-xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#262f3d] flex items-center gap-4">
+                        <select
+                            value={filterByProfit}
+                            onChange={(e) => setFilterByProfit(e.target.value)}
+                            className="bg-[#1C1F26] text-white rounded-xl px-4 py-2 text-sm outline-none"
+                        >
+                            <option value="all">📋 All</option>
+                            <option value="profit">🟢 Profit</option>
+                            <option value="loss">🔴 Loss</option>
+                        </select>
 
-                        {/* Checkbox */}
-                        <label className="w-1/2 flex items-center gap-2 text-sm text-white h-9 px-4">
+                        <label className="flex items-center gap-2 text-sm">
                             <input
                                 type="checkbox"
                                 checked={includeSoldCoins}
@@ -676,7 +671,7 @@ function Dashboard() {
 
 
                 {/* phần còn lại giữ nguyên */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                <div className="w-full max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                     {filteredPortfolio.map((coin, index) => {
                         const netInvested = coin.total_invested - coin.total_sold;
                         const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
@@ -687,12 +682,10 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="w-full bg-gradient-to-br from-[#0b1e3d] via-[#132f51] to-[#183b69] border border-[#1f3b66] text-white  rounded-3xl p-6 scale-[1.02] 
-                            shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.4)]
-                            transition-all duration-300"
+                                className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all hover:scale-[1.01]"
                             >
                                 {/* Hint for mobile users */}
-                                <div className="text-center text-xs text-gray-500 italic mb-2">
+                                <div className="text-center text-[11px] text-gray-500 italic mb-2 mt-2">
                                     (Tap any coin to view transaction details)
                                 </div>
                                 <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
@@ -706,7 +699,7 @@ function Dashboard() {
 
                                 <div className="w-full text-center mb-4">
                                     <p className="text-sm text-blue-200 font-medium">Current Price - Avg. Buy Price</p>
-                                    <p className="text-lg font-mono text-yellow-300">
+                                    <p className="text-lg text-yellow-300">
                                         ${formatCurrency(coin.current_price)} <span className="text-white">-</span> ${avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
                                     </p>
 
@@ -729,25 +722,34 @@ function Dashboard() {
                                 </div>
 
 
-                                <div className="grid grid-cols-2 gap-x-6 gap-y-4 w-full px-2 md:px-6 text-center">
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-4 w-full px-2 md:px-6 text-center">
+                                    {/* Hàng 1 */}
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Quantity</p>
-                                        <p className="text-lg font-mono text-white">{coin.total_quantity.toLocaleString()}</p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Total Quantity</p>
+                                        <p className="text-lg text-white">{coin.total_quantity.toLocaleString()}</p>
                                     </div>
+
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Total Invested</p>
-                                        <p className="text-lg font-mono text-orange-400">${formatCurrency(coin.total_invested)}</p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Total Invested</p>
+                                        <p className="text-lg text-orange-400">${formatCurrency(coin.total_invested)}</p>
                                     </div>
+
+                                    {/* Hàng 2 */}
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Net Invested</p>
-                                        <p className={`text-lg font-mono ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>${formatCurrency(netInvested)}</p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Net Invested</p>
+                                        <p className={`text-lg ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>
+                                            ${formatCurrency(netInvested)}
+                                        </p>
                                     </div>
+
                                     <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹 Current Value</p>
-                                        <p className="text-lg font-mono text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Current Value</p>
+                                        <p className="text-lg text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
                                     </div>
+
+                                    {/* Hàng 3 - Profit / Loss */}
                                     <div className="col-span-2 border-t border-white/10 pt-2">
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1 mt-2">
                                             {(() => {
                                                 const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
                                                 if (ratio > 0.5) return "🤑";
@@ -758,16 +760,19 @@ function Dashboard() {
                                                 return "😭";
                                             })()} Profit / Loss
                                         </p>
-                                        <p className={`text-lg font-mono ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                            ${Math.round(coin.profit_loss).toLocaleString()}<span className="text-xs">({profitLossPercentage})</span>
+                                        <p className={`text-lg ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                            ${Math.round(coin.profit_loss).toLocaleString()}
+                                            <span className="text-xs">({profitLossPercentage})</span>
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="mt-4 flex justify-center gap-4">
+
+
+                                <div className="mt-4 mb-4 flex justify-center gap-4">
                                     <button
                                         onClick={() => handleOpenTradeModal(coin, "buy")}
-                                        className="px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm shadow transition-all duration-200"
+                                        className="px-4 py-2 min-w-[96px] rounded-3xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm transition-all duration-200"
                                     >
                                         Buy
                                     </button>
@@ -776,8 +781,8 @@ function Dashboard() {
                                     <button
                                         onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
                                         disabled={coin.total_quantity === 0}
-                                        className={`px-4 py-2 rounded-full text-white text-sm shadow transition-all duration-200
-        ${coin.total_quantity === 0
+                                        className={`px-4 py-2 min-w-[96px] rounded-3xl text-white text-sm transition-all duration-200
+                                                ${coin.total_quantity === 0
                                                 ? "bg-gray-600 cursor-not-allowed"
                                                 : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
     `}

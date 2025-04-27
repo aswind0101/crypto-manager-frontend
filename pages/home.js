@@ -447,10 +447,11 @@ function Dashboard() {
     if (!isReadyToRender) {
         return <LoadingScreen />;
     }
+
     const isEmptyPortfolioView =
         isReadyToRender &&
         !loading &&
-        (!portfolio || portfolio.length === 0) &&
+        !hasRawPortfolioData && // 🔥 dùng đúng state xác định đã có giao dịch hay chưa
         firstLoaded;
 
     if (isEmptyPortfolioView) {
