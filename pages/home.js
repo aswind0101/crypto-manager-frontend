@@ -703,7 +703,9 @@ function Dashboard() {
                             : coin.profit_loss > 0 ? "∞%" : "0%";
                         return (
                             <div key={index}
-                                className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] transition-all hover:scale-[1.01]"
+                                className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  
+                                rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] 
+                                transition-all hover:scale-[1.01]"
                             >
                                 {/* Hint for mobile users */}
                                 <div className="text-center text-[11px] text-gray-500 italic mb-2 mt-2">
@@ -781,9 +783,9 @@ function Dashboard() {
                                                 return "😭";
                                             })()} Profit / Loss
                                         </p>
-                                        <p className={`text-lg ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                        <p className={`text-2xl font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                             ${Math.round(coin.profit_loss).toLocaleString()}
-                                            <span className="text-xs">({profitLossPercentage})</span>
+                                            <span className="text-sm ml-1">({profitLossPercentage})</span>
                                         </p>
                                     </div>
                                 </div>
