@@ -783,9 +783,9 @@ function Dashboard() {
                                                 return "😭";
                                             })()} Profit / Loss
                                         </p>
-                                        <p className={`text-2xl font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                        <p className={`text-lg font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                             ${Math.round(coin.profit_loss).toLocaleString()}
-                                            <span className="text-sm ml-1">({profitLossPercentage})</span>
+                                            <span className="text-xs ml-1">({profitLossPercentage})</span>
                                         </p>
                                     </div>
                                 </div>
