@@ -12,6 +12,10 @@ import { getAuth } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingScreen from "../components/LoadingScreen";
 import EmptyPortfolioView from "../components/EmptyPortfolioView";
+import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
+import 'react-circular-progressbar/dist/styles.css';
+
+
 
 function Dashboard() {
     const formatNumber = (num) => {
@@ -458,7 +462,83 @@ function Dashboard() {
     if (isEmptyPortfolioView) {
         return <EmptyPortfolioView />;
     }
+    const renderTargetStatus = (coin) => {
+        const targetPercent = parseFloat(localStorage.getItem(`target_${coin.coin_symbol.toUpperCase()}`)) || 0;
+        const netInvested = coin.total_invested - coin.total_sold;
+        const realProfitPercent = netInvested > 0 ? (coin.profit_loss / netInvested) * 100 : 0;
 
+        if (targetPercent === 0) {
+            return (
+                <button
+                    className="text-blue-300 hover:underline"
+                    onClick={() => setTargetForCoin(coin.coin_symbol)}
+                >
+                    🎯 Set Target
+                </button>
+            );
+        }
+
+        const reached = realProfitPercent >= targetPercent;
+        const emoji = reached ? "🎉" : realProfitPercent >= 0.8 * targetPercent ? "😎" : realProfitPercent >= 0.5 * targetPercent ? "📈" : "🥲";
+
+        return (
+            <div className="flex flex-col items-center text-xs">
+                <div className="flex items-center gap-1">
+                    {emoji} <span>Target: {targetPercent > 0 ? `+${targetPercent}%` : `${targetPercent}%`}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    📊 Progress: {realProfitPercent >= 0 ? `+${realProfitPercent.toFixed(1)}%` : `${realProfitPercent.toFixed(1)}%`}
+                </div>
+                <button
+                    className="text-yellow-400 hover:underline mt-1"
+                    onClick={() => setTargetForCoin(coin.coin_symbol)}
+                >
+                    ✏️ Edit
+                </button>
+            </div>
+        );
+    };
+    const setTargetForCoin = (coinSymbol) => {
+        const currentTarget = parseFloat(localStorage.getItem(`target_${coinSymbol.toUpperCase()}`)) || 0;
+        const input = prompt(`🎯 Set target profit (%) for ${coinSymbol.toUpperCase()}`, currentTarget);
+        if (input !== null && !isNaN(parseFloat(input))) {
+            localStorage.setItem(`target_${coinSymbol.toUpperCase()}`, parseFloat(input));
+            // Force re-render
+            setPortfolio([...portfolio]);
+        }
+    };
+    const getTargetPercent = (coin) => {
+        return parseFloat(localStorage.getItem(`target_${coin.coin_symbol.toUpperCase()}`)) || 50;
+    };
+
+    const getRealProfitPercent = (coin) => {
+        const netInvested = coin.total_invested - coin.total_sold;
+        if (netInvested <= 0) return 0;
+        return ((coin.profit_loss / netInvested) * 100).toFixed(1);
+    };
+
+    const getProgressPercent = (coin) => {
+        const target = getTargetPercent(coin);
+        const profit = getRealProfitPercent(coin);
+        return Math.min(Math.max(profit, 0), target); // clamp 0 -> target
+    };
+
+    const getProgressColor = (coin) => {
+        const progress = getRealProfitPercent(coin);
+        const target = getTargetPercent(coin);
+        if (progress >= target) return "#facc15"; // vàng rực 🎉
+        if (progress >= target * 0.8) return "#4ade80"; // xanh lá non
+        return "#60a5fa"; // xanh dương
+    };
+
+    const getProgressEmoji = (coin) => {
+        const progress = getRealProfitPercent(coin);
+        const target = getTargetPercent(coin);
+        if (progress >= target) return "🎉";
+        if (progress >= target * 0.8) return "😎";
+        if (progress >= target * 0.5) return "📈";
+        return "🥲";
+    };
     return (
         <div className="p-0 bg-[#1C1F26] text-white min-h-screen font-mono overflow-y-scroll scrollbar-hide">
             <Navbar />
@@ -712,12 +792,48 @@ function Dashboard() {
                                     (Tap any coin to view transaction details)
                                 </div>
                                 <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-gray-400 text-sm">👉</span>
-                                        {getCoinIcon(coin.coin_symbol)}
-                                        <h2 className="text-lg font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
+
+                                    <div className="flex flex-col items-center justify-center relative group">
+                                        {/* Vòng tròn progress */}
+                                        <div className="w-24 h-24 relative">
+                                            <CircularProgressbar
+                                                value={Math.abs(getRealProfitPercent(coin))} // lấy trị tuyệt đối % đang có
+                                                maxValue={getTargetPercent(coin)} // target % (mặc định 50%)
+                                                styles={buildStyles({
+                                                    pathColor: getRealProfitPercent(coin) >= 0 ? "#4ade80" : "#f87171", // ✅ xanh nếu lời, đỏ nếu lỗ
+                                                    textColor: "#facc15", // emoji màu vàng vàng
+                                                    trailColor: "#2f374a", // nền vòng tròn
+                                                    textSize: "24px", // to hơn một chút để emoji nổi bật
+                                                })}
+                                            />
+                                            {/* Avatar Coin nằm giữa vòng tròn */}
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                {getCoinIcon(coin.coin_symbol)}
+                                            </div>
+                                        </div>
+
+                                        {/* Target + Current Status */}
+                                        <div className="mt-2 text-center text-[11px]">
+                                            <button
+                                                className="text-yellow-300 hover:text-yellow-400 hover:underline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setTargetForCoin(coin.coin_symbol);
+                                                }}
+                                            >
+                                                🎯 Target: {getTargetPercent(coin) > 0 ? `+${getTargetPercent(coin)}%` : "Set"}
+                                            </button>
+                                            <div className="text-xs text-white mt-1">
+                                                📈 {getRealProfitPercent(coin)}%
+                                            </div>
+                                        </div>
+
+                                        {/* Tên Coin */}
+                                        <div className="flex items-center gap-2 mt-4">
+                                            <h2 className="text-4xl font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-gray-400">{coin.coin_name || ""}</p>
+
                                 </div>
 
                                 <div className="w-full text-center mb-4">
