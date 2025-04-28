@@ -96,7 +96,7 @@ function Dashboard() {
     const getCoinIcon = (symbol) => {
         const url = coinIcons[symbol.toUpperCase()];
         return url ? (
-            <img src={url} alt={symbol} className="w-8 h-8 object-contain rounded-full" />
+            <img src={url} alt={symbol} className="w-10 h-10 object-contain rounded-full" />
         ) : (
             <FaCoins className="text-gray-500 text-2xl" />
         );
