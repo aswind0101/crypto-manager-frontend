@@ -795,7 +795,7 @@ function Dashboard() {
 
                                     <div className="flex flex-col items-center justify-center relative group">
                                         {/* Vòng tròn progress */}
-                                        <div className="w-24 h-24 relative">
+                                        <div className="w-32 h-32 relative">
                                             <CircularProgressbar
                                                 value={Math.abs(getRealProfitPercent(coin))} // lấy trị tuyệt đối % đang có
                                                 maxValue={getTargetPercent(coin)} // target % (mặc định 50%)
@@ -899,7 +899,7 @@ function Dashboard() {
                                                 return "😭";
                                             })()} Profit / Loss
                                         </p>
-                                        <p className={`text-lg font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                        <p className={`text-2xl font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                             ${Math.round(coin.profit_loss).toLocaleString()}
                                             <span className="text-xs ml-1">({profitLossPercentage})</span>
                                         </p>
@@ -908,10 +908,10 @@ function Dashboard() {
 
 
 
-                                <div className="mt-4 mb-4 flex justify-center gap-4">
+                                <div className="mt-4 mb-6 flex justify-center gap-4">
                                     <button
                                         onClick={() => handleOpenTradeModal(coin, "buy")}
-                                        className="px-4 py-2 min-w-[96px] rounded-3xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm transition-all duration-200"
+                                        className="px-4 py-2 min-w-[96px] rounded-2xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm transition-all duration-200"
                                     >
                                         Buy
                                     </button>
@@ -920,7 +920,7 @@ function Dashboard() {
                                     <button
                                         onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
                                         disabled={coin.total_quantity === 0}
-                                        className={`px-4 py-2 min-w-[96px] rounded-3xl text-white text-sm transition-all duration-200
+                                        className={`px-4 py-2 min-w-[96px] rounded-2xl text-white text-sm transition-all duration-200
                                                 ${coin.total_quantity === 0
                                                 ? "bg-gray-600 cursor-not-allowed"
                                                 : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
