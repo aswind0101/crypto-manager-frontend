@@ -708,7 +708,7 @@ function Dashboard() {
                                 transition-all hover:scale-[1.01]"
                             >
                                 {/* Hint for mobile users */}
-                                <div className="text-center text-[11px] text-gray-500 italic mb-2 mt-2">
+                                <div className="text-center text-[11px] text-gray-500 italic mb-2 mt-4">
                                     (Tap any coin to view transaction details)
                                 </div>
                                 <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
