@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ResponsiveContainer, RadialBarChart, RadialBar } from "recharts";
 import CountUp from "react-countup";
 
@@ -15,6 +15,45 @@ const SwipeDashboard = ({
     onSlideChange }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [direction, setDirection] = useState('left');
+    const [animatedData, setAnimatedData] = useState([]);
+
+    useEffect(() => {
+        if (!portfolio || portfolio.length === 0) return;
+
+        const initialData = portfolio
+            .filter(coin => coin.total_quantity > 0)
+            .map(coin => ({
+                name: coin.coin_symbol,
+                value: 0,
+                fill: getProfitLossColor(coin),
+                targetValue: coin.current_value,
+            }));
+
+        setAnimatedData(initialData);
+
+        let progress = 0;
+        const duration = 1000; // tổng thời gian 1 giây
+        const steps = 30;
+        const interval = duration / steps;
+
+        const animate = setInterval(() => {
+            progress += 1 / steps;
+
+            const newData = initialData.map(d => ({
+                ...d,
+                value: d.targetValue * progress,
+                fill: d.fill,
+            }));
+
+            setAnimatedData(newData);
+
+            if (progress >= 1) {
+                clearInterval(animate);
+            }
+        }, interval);
+
+        return () => clearInterval(animate);
+    }, [portfolio]);
 
 
     const handleSwipe = (direction) => {
@@ -80,6 +119,7 @@ const SwipeDashboard = ({
             return `hsl(0, 70%, ${lightness}%)`;
         }
     };
+
     return (
         <div className="relative w-full h-80 overflow-hidden rounded-xl ">
             <AnimatePresence initial={false} mode="wait">
@@ -104,20 +144,21 @@ const SwipeDashboard = ({
                                     <RadialBarChart
                                         innerRadius="70%"
                                         outerRadius="100%"
-                                        data={portfolio
-                                            .filter(coin => coin.total_quantity > 0) // ✅ chỉ lấy coin đang giữ
-                                            .map(coin => ({
-                                                name: coin.coin_symbol,
-                                                value: coin.current_value,
-                                                fill: getProfitLossColor(coin)
-                                            }))
-                                        }
                                         startAngle={180}
                                         endAngle={0}
+                                        data={animatedData}
                                     >
-                                        <RadialBar minAngle={15} background clockWise dataKey="value" />
+                                        {/* Bo góc mềm mại + nền tối */}
+                                        <RadialBar
+                                            background={{ fill: "#2f374a" }}
+                                            clockWise
+                                            dataKey="value"
+                                            cornerRadius={50} // ✅ Bo tròn mượt như vòng coin
+                                        />
                                     </RadialBarChart>
                                 </ResponsiveContainer>
+
+                                {/* Nội dung giữa bán nguyệt */}
                                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
                                     <p className={`text-3xl font-bold font-mono flex items-center justify-center gap-1 ${totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                         $<CountUp key={totalProfitLoss} end={Math.round(totalProfitLoss)} duration={10} separator="," />
@@ -144,6 +185,7 @@ const SwipeDashboard = ({
                                     </p>
                                 </div>
                             </div>
+
                             <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-x-12 text-sm text-gray-300">
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-gray-400">💰 Invested</span>
