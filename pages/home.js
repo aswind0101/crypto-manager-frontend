@@ -98,7 +98,7 @@ function Dashboard() {
     const getCoinIcon = (symbol) => {
         const url = coinIcons[symbol.toUpperCase()];
         return url ? (
-            <img src={url} alt={symbol} className="w-10 h-10 object-contain rounded-full" />
+            <img src={url} alt={symbol} className="w-12 h-12 object-contain rounded-full" />
         ) : (
             <FaCoins className="text-gray-500 text-2xl" />
         );
@@ -464,42 +464,7 @@ function Dashboard() {
     if (isEmptyPortfolioView) {
         return <EmptyPortfolioView />;
     }
-    const renderTargetStatus = (coin) => {
-        const targetPercent = parseFloat(localStorage.getItem(`target_${coin.coin_symbol.toUpperCase()}`)) || 0;
-        const netInvested = coin.total_invested - coin.total_sold;
-        const realProfitPercent = netInvested > 0 ? (coin.profit_loss / netInvested) * 100 : 0;
 
-        if (targetPercent === 0) {
-            return (
-                <button
-                    className="text-blue-300 hover:underline"
-                    onClick={() => setTargetForCoin(coin.coin_symbol)}
-                >
-                    🎯 Set Target
-                </button>
-            );
-        }
-
-        const reached = realProfitPercent >= targetPercent;
-        const emoji = reached ? "🎉" : realProfitPercent >= 0.8 * targetPercent ? "😎" : realProfitPercent >= 0.5 * targetPercent ? "📈" : "🥲";
-
-        return (
-            <div className="flex flex-col items-center text-xs">
-                <div className="flex items-center gap-1">
-                    {emoji} <span>Target: {targetPercent > 0 ? `+${targetPercent}%` : `${targetPercent}%`}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    📊 Progress: {realProfitPercent >= 0 ? `+${realProfitPercent.toFixed(1)}%` : `${realProfitPercent.toFixed(1)}%`}
-                </div>
-                <button
-                    className="text-yellow-400 hover:underline mt-1"
-                    onClick={() => setTargetForCoin(coin.coin_symbol)}
-                >
-                    ✏️ Edit
-                </button>
-            </div>
-        );
-    };
     const setTargetForCoin = (coinSymbol) => {
         const currentTarget = parseFloat(localStorage.getItem(`target_${coinSymbol.toUpperCase()}`)) || 0;
         const input = prompt(`🎯 Set target profit (%) for ${coinSymbol.toUpperCase()}`, currentTarget);
@@ -793,11 +758,11 @@ function Dashboard() {
                                 <div className="text-center text-[11px] text-gray-500 italic mb-2 mt-4">
                                     (Tap any coin to view transaction details)
                                 </div>
-                                <div className="flex flex-col items-center justify-center mb-4" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
+                                <div className="flex flex-col items-center justify-center mb-4">
 
                                     <div className="flex flex-col items-center justify-center relative group">
                                         {/* Vòng tròn progress */}
-                                        <div className="w-40 h-40 relative">
+                                        <div className="w-40 h-40 relative" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
                                             <CircularProgressbar
                                                 value={Math.abs(getRealProfitPercent(coin))} // lấy trị tuyệt đối % đang có
                                                 maxValue={getTargetPercent(coin)} // target % (mặc định 50%)
@@ -815,7 +780,7 @@ function Dashboard() {
                                         </div>
 
                                         {/* Target + Current Status */}
-                                        <div className="mt-2 text-center text-xs">
+                                        <div className="mt-4 text-center text-xs">
                                             <button
                                                 className="text-yellow-300 hover:text-yellow-400 hover:underline"
                                                 onClick={(e) => {
