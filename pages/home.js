@@ -795,7 +795,7 @@ function Dashboard() {
 
                                     <div className="flex flex-col items-center justify-center relative group">
                                         {/* Vòng tròn progress */}
-                                        <div className="w-32 h-32 relative">
+                                        <div className="w-40 h-40 relative">
                                             <CircularProgressbar
                                                 value={Math.abs(getRealProfitPercent(coin))} // lấy trị tuyệt đối % đang có
                                                 maxValue={getTargetPercent(coin)} // target % (mặc định 50%)
