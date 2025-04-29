@@ -16,44 +16,41 @@ const SwipeDashboard = ({
     const [currentSlide, setCurrentSlide] = useState(0);
     const [direction, setDirection] = useState('left');
     const [animatedData, setAnimatedData] = useState([]);
+    const [animatedKey, setAnimatedKey] = useState(0);
+    const [ready, setReady] = useState(false); // 👈 thêm state này
+
 
     useEffect(() => {
         if (!portfolio || portfolio.length === 0) return;
 
-        const initialData = portfolio
+        const emptyData = portfolio
             .filter(coin => coin.total_quantity > 0)
             .map(coin => ({
                 name: coin.coin_symbol,
-                value: 0,
+                value: 0, // ✅ luôn là 0 ban đầu
                 fill: getProfitLossColor(coin),
-                targetValue: coin.current_value,
             }));
 
-        setAnimatedData(initialData);
+        setAnimatedData(emptyData);
+        setReady(false);
 
-        let progress = 0;
-        const duration = 1000; // tổng thời gian 1 giây
-        const steps = 30;
-        const interval = duration / steps;
+        // ⚡ Delay 50ms để đảm bảo React render 1 frame value 0 trước
+        const timer = setTimeout(() => {
+            const fullData = portfolio
+                .filter(coin => coin.total_quantity > 0)
+                .map(coin => ({
+                    name: coin.coin_symbol,
+                    value: coin.current_value, // ✅ sau 50ms set value thật
+                    fill: getProfitLossColor(coin),
+                }));
 
-        const animate = setInterval(() => {
-            progress += 1 / steps;
+            setAnimatedData(fullData);
+            setReady(true);
+        }, 50);
 
-            const newData = initialData.map(d => ({
-                ...d,
-                value: d.targetValue * progress,
-                fill: d.fill,
-            }));
-
-            setAnimatedData(newData);
-
-            if (progress >= 1) {
-                clearInterval(animate);
-            }
-        }, interval);
-
-        return () => clearInterval(animate);
+        return () => clearTimeout(timer);
     }, [portfolio]);
+
 
 
     const handleSwipe = (direction) => {
@@ -148,15 +145,18 @@ const SwipeDashboard = ({
                                         endAngle={0}
                                         data={animatedData}
                                     >
-                                        {/* Bo góc mềm mại + nền tối */}
                                         <RadialBar
                                             background={{ fill: "#2f374a" }}
-                                            clockWise
+                                            clockWise={true} 
                                             dataKey="value"
-                                            cornerRadius={50} // ✅ Bo tròn mượt như vòng coin
+                                            cornerRadius={50}
+                                            animationDuration={1500} // ✅
+                                            animationBegin={0} // ✅
+                                            isAnimationActive={ready} // ✅ chỉ animate khi ready
                                         />
                                     </RadialBarChart>
                                 </ResponsiveContainer>
+
 
                                 {/* Nội dung giữa bán nguyệt */}
                                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
