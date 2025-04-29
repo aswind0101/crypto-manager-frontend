@@ -14,10 +14,12 @@ import LoadingScreen from "../components/LoadingScreen";
 import EmptyPortfolioView from "../components/EmptyPortfolioView";
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
+import { useWakeLock } from "../hooks/useWakeLock";
 
 
 
 function Dashboard() {
+    useWakeLock();
     const formatNumber = (num) => {
         if (!num || isNaN(num)) return '–';
         if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
@@ -813,7 +815,7 @@ function Dashboard() {
                                         </div>
 
                                         {/* Target + Current Status */}
-                                        <div className="mt-2 text-center text-[11px]">
+                                        <div className="mt-2 text-center text-xs">
                                             <button
                                                 className="text-yellow-300 hover:text-yellow-400 hover:underline"
                                                 onClick={(e) => {
