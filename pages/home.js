@@ -765,7 +765,7 @@ function Dashboard() {
                                     {/* Mặt trước */}
                                     <div className="absolute inset-0 backface-hidden min-h-[700px] w-full rounded-xl overflow-hidden">
                                         <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]
-                                                rounded-xl p-4 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
+                                                rounded-xl p-3 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
                                                 transition-all h-full flex flex-col space-y-4 pb-8 md:pb-10">
                                             <div className="text-center text-[11px] text-gray-500 italic">
                                                 (Tap icon to view transaction detail)
@@ -871,7 +871,7 @@ function Dashboard() {
 
                                     {/* Mặt sau */}
                                     <div className="absolute inset-0 rotate-y-180 backface-hidden min-h-[700px] w-full flex flex-col rounded-xl overflow-hidden">
-                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-4 
+                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-3 
                                             shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col items-center justify-center min-h-[700px]">
                                             <button
                                                 onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}
