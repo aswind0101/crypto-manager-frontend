@@ -850,7 +850,7 @@ function Dashboard() {
 
                                             </div>
 
-                                            <div className="pt-2 flex justify-center gap-4">
+                                            <div className="mt-4 mb-6 flex justify-center gap-4">
                                                 <button
                                                     onClick={() => handleOpenTradeModal(coin, "buy")}
                                                     className="px-4 py-2 min-w-[96px] rounded-2xl bg-green-600 hover:bg-green-700 text-white text-sm"
