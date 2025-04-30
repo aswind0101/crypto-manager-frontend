@@ -756,20 +756,17 @@ function Dashboard() {
                 {/* phần còn lại giữ nguyên */}
                 <div className="w-full max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                     {filteredPortfolio.map((coin, index) => (
-                        <div key={index} className="w-full min-h-[640px]">
+                        <div key={index} className="w-full min-h-[700px]">
                             <div className="relative perspective-[1500px] w-full h-full">
                                 <div
-                                    className={`transition-transform duration-700 transform-style-preserve-3d w-full min-h-[640px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
+                                    className={`transition-transform duration-700 transform-style-preserve-3d w-full min-h-[700px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
                                         }`}
                                 >
                                     {/* Mặt trước */}
-                                    <div className="absolute inset-0 backface-hidden min-h-[640px] w-full flex flex-col justify-between rounded-xl overflow-hidden">
-                                        <div
-                                            className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  
-                                                rounded-xl p-4 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] 
-                                                transition-all h-full flex flex-col justify-between pb-[env(safe-area-inset-bottom)] md:pb-6"
-                                        >
-
+                                    <div className="absolute inset-0 backface-hidden min-h-[700px] w-full rounded-xl overflow-hidden">
+                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]
+                                                rounded-xl p-4 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
+                                                transition-all h-full flex flex-col space-y-4 pb-8 md:pb-10">
                                             <div className="text-center text-[11px] text-gray-500 italic">
                                                 (Tap icon to view transaction detail)
                                             </div>
@@ -839,7 +836,7 @@ function Dashboard() {
                                                 </div>
                                             </div>
 
-                                            <div className="mt-2 text-center border-t border-white/10 pt-2">
+                                            <div className="mt-2 mb-2 text-center border-t border-white/10 pt-2">
                                                 <p className="text-sm text-gray-400">Profit / Loss</p>
                                                 <p className={`flex items-baseline justify-center gap-2 font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                                     <span className="text-2xl">
@@ -853,7 +850,7 @@ function Dashboard() {
 
                                             </div>
 
-                                            <div className="mt-4 mb-2 flex justify-center gap-4">
+                                            <div className="pt-4 flex justify-center gap-4">
                                                 <button
                                                     onClick={() => handleOpenTradeModal(coin, "buy")}
                                                     className="px-4 py-2 min-w-[96px] rounded-2xl bg-green-600 hover:bg-green-700 text-white text-sm"
@@ -873,7 +870,7 @@ function Dashboard() {
                                     </div>
 
                                     {/* Mặt sau */}
-                                    <div className="absolute inset-0 rotate-y-180 backface-hidden h-full w-full flex flex-col justify-between rounded-xl overflow-hidden">
+                                    <div className="absolute inset-0 rotate-y-180 backface-hidden min-h-[640px] w-full flex flex-col rounded-xl overflow-hidden">
                                         <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-4 
                                             shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col items-center justify-center h-full">
                                             <button
