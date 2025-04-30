@@ -767,8 +767,9 @@ function Dashboard() {
                                         <div
                                             className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  
                                                 rounded-xl p-4 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] 
-                                                transition-all h-full flex flex-col justify-between"
+                                                transition-all h-full flex flex-col justify-between pb-[env(safe-area-inset-bottom)] md:pb-6"
                                         >
+
                                             <div className="text-center text-[11px] text-gray-500 italic">
                                                 (Tap icon to view transaction detail)
                                             </div>
