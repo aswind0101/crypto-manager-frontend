@@ -765,7 +765,7 @@ function Dashboard() {
                                     {/* Mặt trước */}
                                     <div className="absolute inset-0 backface-hidden min-h-[700px] w-full rounded-xl overflow-hidden">
                                         <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]
-                                                rounded-xl p-3 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
+                                                rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
                                                 transition-all h-full flex flex-col space-y-4 pb-8 md:pb-10">
                                             <div className="text-center text-[11px] text-gray-500 italic">
                                                 (Tap icon to view transaction detail)
