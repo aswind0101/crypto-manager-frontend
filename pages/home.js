@@ -498,29 +498,6 @@ function Dashboard() {
         if (netInvested <= 0) return 0;
         return ((coin.profit_loss / netInvested) * 100).toFixed(1);
     };
-
-    const getProgressPercent = (coin) => {
-        const target = getTargetPercent(coin);
-        const profit = getRealProfitPercent(coin);
-        return Math.min(Math.max(profit, 0), target); // clamp 0 -> target
-    };
-
-    const getProgressColor = (coin) => {
-        const progress = getRealProfitPercent(coin);
-        const target = getTargetPercent(coin);
-        if (progress >= target) return "#facc15"; // vàng rực 🎉
-        if (progress >= target * 0.8) return "#4ade80"; // xanh lá non
-        return "#60a5fa"; // xanh dương
-    };
-
-    const getProgressEmoji = (coin) => {
-        const progress = getRealProfitPercent(coin);
-        const target = getTargetPercent(coin);
-        if (progress >= target) return "🎉";
-        if (progress >= target * 0.8) return "😎";
-        if (progress >= target * 0.5) return "📈";
-        return "🥲";
-    };
     return (
         <div className="p-0 bg-[#1C1F26] text-white min-h-screen font-mono overflow-y-scroll scrollbar-hide">
             <Navbar />
