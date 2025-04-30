@@ -759,11 +759,11 @@ function Dashboard() {
                         <div key={index} className="w-full min-h-[640px]">
                             <div className="relative perspective-[1500px] w-full h-full">
                                 <div
-                                    className={`transition-transform duration-700 transform-style-preserve-3d w-full h-full ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
+                                    className={`transition-transform duration-700 transform-style-preserve-3d w-full min-h-[640px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
                                         }`}
                                 >
                                     {/* Mặt trước */}
-                                    <div className="absolute inset-0 backface-hidden h-full w-full flex flex-col justify-between rounded-xl overflow-hidden">
+                                    <div className="absolute inset-0 backface-hidden min-h-[640px] w-full flex flex-col justify-between rounded-xl overflow-hidden">
                                         <div
                                             className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  
                                                 rounded-xl p-4 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] 
