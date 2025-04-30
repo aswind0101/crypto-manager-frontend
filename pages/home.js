@@ -103,7 +103,8 @@ function Dashboard() {
             <FaCoins className="text-gray-500 text-2xl" />
         );
     };
-
+    //Flip card
+    const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: true });
     const [flippedCoins, setFlippedCoins] = useState({});
     const toggleFlip = (symbol) =>
         setFlippedCoins((prev) => ({ ...prev, [symbol]: !prev[symbol] }));
@@ -340,7 +341,6 @@ function Dashboard() {
                 // 👇 Ghép transaction gần nhất của coin này
                 const recent_transactions = (data.transactions || [])
                     .filter(tx => tx.coin_symbol === c.coin_symbol)
-                    .slice(0, 3)
                     .map(tx => ({
                         type: tx.transaction_type,
                         date: new Date(tx.transaction_date).toLocaleDateString(),
@@ -864,43 +864,105 @@ function Dashboard() {
 
                                     {/* Mặt sau */}
                                     <div className="absolute inset-0 rotate-y-180 backface-hidden h-full w-full flex flex-col justify-between rounded-xl overflow-hidden">
-                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  text-white rounded-xl p-4 
+                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-4 
                                             shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col items-center justify-center h-full">
+
                                             <h3 className="text-yellow-300 font-bold text-sm mb-4 text-center">Recent Transactions</h3>
 
                                             {coin.recent_transactions && coin.recent_transactions.length > 0 ? (
-                                                <div className="w-full text-xs font-mono space-y-3">
-                                                    {coin.recent_transactions.slice(0, 3).map((tx, idx) => {
-                                                        const total = parseFloat(tx.price) * parseFloat(tx.quantity);
-                                                        return (
-                                                            <div
-                                                                key={idx}
-                                                                className="px-4 py-3 rounded-xl border border-white/5 space-y-1
-                                                                shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]"
-                                                            >
-                                                                <div className="flex items-center gap-2 text-blue-300 text-[11px]">
-                                                                    📅 {tx.date}
-                                                                </div>
+                                                <div className="w-full text-xs font-mono space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                                                    {(() => {
+                                                        const groupedByType = coin.recent_transactions.reduce((acc, tx) => {
+                                                            if (!acc[tx.type]) acc[tx.type] = [];
+                                                            acc[tx.type].push(tx);
+                                                            return acc;
+                                                        }, {});
 
-                                                                <div className="flex flex-wrap items-center justify-between gap-x-2 text-white">
-                                                                    <div className="flex items-center gap-1">
-                                                                        <span className={`${tx.type === "buy" ? "text-green-400" : "text-red-400"} font-bold`}>
-                                                                            {tx.type.toUpperCase()}
+                                                        const typeLabels = { buy: "BUY", sell: "SELL" };
+                                                        const typeColors = { buy: "text-green-400", sell: "text-red-400" };
+
+                                                        return ["buy", "sell"].map((type) => {
+                                                            const list = groupedByType[type] || [];
+                                                            if (list.length === 0) return null;
+
+                                                            // Nhóm theo tháng
+                                                            const groupedByMonth = list.reduce((acc, tx) => {
+                                                                const date = new Date(tx.date);
+                                                                const monthYear = date.toLocaleString("default", {
+                                                                    month: "long",
+                                                                    year: "numeric",
+                                                                });
+                                                                if (!acc[monthYear]) acc[monthYear] = [];
+                                                                acc[monthYear].push(tx);
+                                                                return acc;
+                                                            }, {});
+
+                                                            const totalGroup = list.reduce(
+                                                                (sum, tx) => sum + parseFloat(tx.price) * parseFloat(tx.quantity),
+                                                                0
+                                                            );
+
+                                                            const isExpanded = expandedTypes?.[type];
+
+                                                            return (
+                                                                <div key={type} className="rounded-lg">
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            setExpandedTypes((prev) => ({
+                                                                                ...prev,
+                                                                                [type]: !prev[type],
+                                                                            }))
+                                                                        }
+                                                                        className="flex items-center justify-between w-full text-left font-bold py-2 px-3 rounded-xl bg-[#1e2f41] hover:bg-[#26394f] transition text-sm"
+                                                                    >
+                                                                        <span className={`flex items-center gap-2 ${typeColors[type]}`}>
+                                                                            {isExpanded ? "➖" : "➕"} {typeLabels[type]} ({list.length})
                                                                         </span>
-                                                                        <span className="text-yellow-300">${parseFloat(tx.price).toFixed(4)}</span>
-                                                                        <span>× {formatCurrency(parseFloat(tx.quantity))}</span>
-                                                                    </div>
-                                                                    <div className="text-yellow-200 font-semibold text-[11px] flex items-center gap-1">
-                                                                        💰 ${formatCurrency(total)}
-                                                                    </div>
+                                                                        <span className="text-yellow-300 font-mono">
+                                                                            ${formatCurrency(totalGroup)}
+                                                                        </span>
+                                                                    </button>
+
+                                                                    {isExpanded && (
+                                                                        <div className="mt-2 px-3 pb-2 space-y-4">
+                                                                            {Object.entries(groupedByMonth).map(([month, txs]) => (
+                                                                                <div key={month} className="space-y-2">
+                                                                                    <h4 className="text-[11px] text-blue-300 font-semibold mb-1">
+                                                                                        🗓 {month}
+                                                                                    </h4>
+                                                                                    {txs.map((tx, idx) => {
+                                                                                        const total = parseFloat(tx.price) * parseFloat(tx.quantity);
+                                                                                        return (
+                                                                                            <div
+                                                                                                key={idx}
+                                                                                                className="flex justify-between items-center px-3 py-2 border-t border-white/10 rounded-md"
+                                                                                            >
+                                                                                                <div className="text-blue-300">
+                                                                                                    📅 {tx.date}
+                                                                                                    <br />
+                                                                                                    <span className="text-white">
+                                                                                                        🧾 ${formatCurrency(tx.price)} × {formatCurrency(tx.quantity)}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <div className="text-yellow-200 text-[11px] font-semibold text-right">
+                                                                                                    💰 ${formatCurrency(total)}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                            </div>
-                                                        );
-                                                    })}
+                                                            );
+                                                        });
+                                                    })()}
                                                 </div>
                                             ) : (
                                                 <p className="text-gray-400 text-sm text-center">No recent transactions</p>
                                             )}
+
 
                                             {/* Nút Back */}
                                             <div className="mt-6 text-center">
@@ -913,6 +975,7 @@ function Dashboard() {
                                             </div>
                                         </div>
                                     </div>
+
                                 </div>
                             </div>
                         </div>
