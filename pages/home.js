@@ -104,7 +104,7 @@ function Dashboard() {
         );
     };
     //Flip card
-    const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: false });
+    const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: true });
     const [expandedMonths, setExpandedMonths] = useState({}); // { buy: { 'April 2025': true } }
 
     const [flippedCoins, setFlippedCoins] = useState({});
@@ -770,11 +770,11 @@ function Dashboard() {
                                                 transition-all h-full flex flex-col justify-between"
                                         >
                                             <div className="text-center text-[11px] text-gray-500 italic">
-                                                (Tap to flip)
+                                                (Tap icon to view transaction detail)
                                             </div>
 
-                                            <div className="flex flex-col items-center justify-center mt-2 cursor-pointer" onClick={() => toggleFlip(coin.coin_symbol)}>
-                                                <div className="relative group w-40 h-40">
+                                            <div className="flex flex-col items-center justify-center mt-2">
+                                                <div className="relative group w-40 h-40 cursor-pointer" onClick={() => toggleFlip(coin.coin_symbol)}>
                                                     <CircularProgressbar
                                                         value={Math.abs(getRealProfitPercent(coin))}
                                                         maxValue={getTargetPercent(coin)}
@@ -782,7 +782,7 @@ function Dashboard() {
                                                             pathColor: getRealProfitPercent(coin) >= 0 ? "#4ade80" : "#f87171",
                                                             textColor: "#facc15",
                                                             trailColor: "#2f374a",
-                                                            textSize: "24px",
+                                                            textSize: "24px"
                                                         })}
                                                     />
                                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -875,11 +875,23 @@ function Dashboard() {
                                     <div className="absolute inset-0 rotate-y-180 backface-hidden h-full w-full flex flex-col justify-between rounded-xl overflow-hidden">
                                         <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-4 
                                             shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col items-center justify-center h-full">
+                                            <button
+                                                onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}
+                                                className="absolute bottom-4 left-4 text-xs text-gray-400 hover:text-yellow-400 
+                                                font-semibold flex items-center gap-1 cursor-pointer"
+                                            >
+                                                <span>✏️</span>
+                                                <span>Update Transactions</span>
+                                            </button>
 
-                                            <h3 className="text-yellow-300 font-bold text-sm mb-4 text-center">Recent Transactions</h3>
+                                            <div className="mb-8 text-center">
+                                                <h2 className="text-4xl font-bold text-yellow-400 tracking-widest">
+                                                    {coin.coin_symbol.toUpperCase()}
+                                                </h2>
 
+                                            </div>
                                             {coin.recent_transactions && coin.recent_transactions.length > 0 ? (
-                                                <div className="w-full text-xs font-mono space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                                                <div className="w-full text-xs font-mono space-y-4 max-h-[400px] overflow-y-auto pr-1">
                                                     {(() => {
                                                         const groupedByType = coin.recent_transactions.reduce((acc, tx) => {
                                                             if (!acc[tx.type]) acc[tx.type] = [];
@@ -910,7 +922,7 @@ function Dashboard() {
                                                                 0
                                                             );
 
-                                                            const isExpanded = expandedTypes?.[type];
+                                                            const isExpanded = expandedTypes?.[coin.coin_symbol]?.[type];
 
                                                             return (
                                                                 <div key={type} className="rounded-lg">
@@ -918,10 +930,13 @@ function Dashboard() {
                                                                         onClick={() =>
                                                                             setExpandedTypes((prev) => ({
                                                                                 ...prev,
-                                                                                [type]: !prev[type],
+                                                                                [coin.coin_symbol]: {
+                                                                                    ...(prev[coin.coin_symbol] || {}),
+                                                                                    [type]: !prev?.[coin.coin_symbol]?.[type]
+                                                                                }
                                                                             }))
                                                                         }
-                                                                        className="flex items-center justify-between w-full text-left font-bold py-2 px-3 rounded bg-[#1e2f41] hover:bg-[#26394f] transition text-sm"
+                                                                        className="flex items-center justify-between w-full text-left font-bold py-2 px-3 transition text-sm cursor-pointer"
                                                                     >
                                                                         <span className={`flex items-center gap-2 ${typeColors[type]}`}>
                                                                             {isExpanded ? "➖" : "➕"} {typeLabels[type]} ({list.length})
@@ -934,9 +949,7 @@ function Dashboard() {
                                                                     {isExpanded && (
                                                                         <div className="mt-2 px-3 pb-2 space-y-4">
                                                                             {Object.entries(groupedByMonth).map(([month, txs]) => {
-                                                                                const monthKey = `${type}_${month}`;
-                                                                                const isMonthOpen = expandedMonths?.[type]?.[month];
-
+                                                                                const isMonthOpen = expandedMonths?.[coin.coin_symbol]?.[type]?.[month];
                                                                                 const totalMonth = txs.reduce(
                                                                                     (sum, tx) => sum + parseFloat(tx.price) * parseFloat(tx.quantity),
                                                                                     0
@@ -948,28 +961,35 @@ function Dashboard() {
                                                                                             onClick={() =>
                                                                                                 setExpandedMonths((prev) => ({
                                                                                                     ...prev,
-                                                                                                    [type]: {
-                                                                                                        ...(prev[type] || {}),
-                                                                                                        [month]: !prev?.[type]?.[month],
+                                                                                                    [coin.coin_symbol]: {
+                                                                                                        ...(prev[coin.coin_symbol] || {}),
+                                                                                                        [type]: {
+                                                                                                            ...(prev[coin.coin_symbol]?.[type] || {}),
+                                                                                                            [month]: !prev?.[coin.coin_symbol]?.[type]?.[month],
+                                                                                                        },
                                                                                                     },
                                                                                                 }))
                                                                                             }
-                                                                                            className="flex justify-between items-center w-full text-left px-3 py-1.5 font-semibold text-[11px] text-blue-300"
+                                                                                            className="flex justify-between items-center w-full text-left px-3 py-4 mb-4 cursor-pointer
+                                                                                            shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] rounded-xl font-semibold text-xs text-yellow-300"
                                                                                         >
-                                                                                            <span className="flex items-center gap-2">
+                                                                                            <span className="flex items-center gap-2 ">
                                                                                                 <span
-                                                                                                    className={`w-5 h-5 rounded-full flex items-center justify-center 
-                                                                                                        text-[10px] font-bold "bg-yellow-600 text-white bg-gray-600 text-white"
-                                                                                                        `}
+                                                                                                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-yellow-500
+                                                                                                        ${isMonthOpen ? "text-black" : "text-white"}`}
                                                                                                 >
                                                                                                     {isMonthOpen ? "–" : "+"}
                                                                                                 </span>
                                                                                                 {month}
                                                                                             </span>
 
-                                                                                            <span className="text-yellow-200 font-mono">
+                                                                                            <span
+                                                                                                className={`font-mono ${type === "buy" ? "text-green-400" : "text-red-400"
+                                                                                                    }`}
+                                                                                            >
                                                                                                 ${formatCurrency(totalMonth)}
                                                                                             </span>
+
                                                                                         </button>
 
                                                                                         {isMonthOpen && (
@@ -979,17 +999,22 @@ function Dashboard() {
                                                                                                     return (
                                                                                                         <div
                                                                                                             key={idx}
-                                                                                                            className="flex justify-between items-center px-3 py-2 border-t border-white/10 rounded-md"
+                                                                                                            className="px-3 py-2 border-t border-white/10 rounded-sm"
                                                                                                         >
-                                                                                                            <div className="text-blue-300">
-                                                                                                                📅 {tx.date}
-                                                                                                                <br />
-                                                                                                                <span className="text-white">
-                                                                                                                    🧾 ${formatCurrency(tx.price)} × {formatCurrency(tx.quantity)}
+                                                                                                            <div className="flex justify-between items-center text-[11px] text-blue-300 mb-1">
+                                                                                                                <span className="flex items-center gap-1">
+                                                                                                                    📅 {tx.date}
                                                                                                                 </span>
+                                                                                                                <div
+                                                                                                                    className={`text-[11px] font-semibold text-right ${type === "buy" ? "text-green-300" : "text-red-300"
+                                                                                                                        }`}
+                                                                                                                >
+                                                                                                                    💰 ${formatCurrency(total)}
+                                                                                                                </div>
+
                                                                                                             </div>
-                                                                                                            <div className="text-yellow-200 text-[11px] font-semibold text-right">
-                                                                                                                💰 ${formatCurrency(total)}
+                                                                                                            <div className="pl-4 flex items-center gap-1 text-[11px] text-gray-400">
+                                                                                                                ➤ ${formatCurrency(tx.price)} × {formatCurrency(tx.quantity)}
                                                                                                             </div>
                                                                                                         </div>
                                                                                                     );
@@ -1009,11 +1034,8 @@ function Dashboard() {
                                             ) : (
                                                 <p className="text-gray-400 text-sm text-center">No recent transactions</p>
                                             )}
-
-
-
                                             {/* Nút Back */}
-                                            <div className="mt-6 text-center">
+                                            <div className="mt-6 mb-6 text-center">
                                                 <button
                                                     onClick={() => toggleFlip(coin.coin_symbol)}
                                                     className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 active:scale-95 transition rounded-full text-sm text-black font-bold shadow-md"
