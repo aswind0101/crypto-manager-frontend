@@ -104,7 +104,9 @@ function Dashboard() {
         );
     };
     //Flip card
-    const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: true });
+    const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: false });
+    const [expandedMonths, setExpandedMonths] = useState({}); // { buy: { 'April 2025': true } }
+
     const [flippedCoins, setFlippedCoins] = useState({});
     const toggleFlip = (symbol) =>
         setFlippedCoins((prev) => ({ ...prev, [symbol]: !prev[symbol] }));
@@ -838,9 +840,16 @@ function Dashboard() {
 
                                             <div className="mt-2 text-center border-t border-white/10 pt-2">
                                                 <p className="text-sm text-gray-400">Profit / Loss</p>
-                                                <p className={`text-2xl font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                                    ${Math.round(coin.profit_loss).toLocaleString()} ({getRealProfitPercent(coin)}%)
+                                                <p className={`flex items-baseline justify-center gap-2 font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                                    <span className="text-2xl">
+                                                        ${Math.round(coin.profit_loss).toLocaleString()}
+                                                    </span>
+                                                    <span className="text-sm">
+                                                        ({getRealProfitPercent(coin)}%)
+                                                    </span>
                                                 </p>
+
+
                                             </div>
 
                                             <div className="mt-4 mb-2 flex justify-center gap-4">
@@ -885,7 +894,6 @@ function Dashboard() {
                                                             const list = groupedByType[type] || [];
                                                             if (list.length === 0) return null;
 
-                                                            // Nhóm theo tháng
                                                             const groupedByMonth = list.reduce((acc, tx) => {
                                                                 const date = new Date(tx.date);
                                                                 const monthYear = date.toLocaleString("default", {
@@ -913,7 +921,7 @@ function Dashboard() {
                                                                                 [type]: !prev[type],
                                                                             }))
                                                                         }
-                                                                        className="flex items-center justify-between w-full text-left font-bold py-2 px-3 rounded-xl bg-[#1e2f41] hover:bg-[#26394f] transition text-sm"
+                                                                        className="flex items-center justify-between w-full text-left font-bold py-2 px-3 rounded bg-[#1e2f41] hover:bg-[#26394f] transition text-sm"
                                                                     >
                                                                         <span className={`flex items-center gap-2 ${typeColors[type]}`}>
                                                                             {isExpanded ? "➖" : "➕"} {typeLabels[type]} ({list.length})
@@ -925,33 +933,72 @@ function Dashboard() {
 
                                                                     {isExpanded && (
                                                                         <div className="mt-2 px-3 pb-2 space-y-4">
-                                                                            {Object.entries(groupedByMonth).map(([month, txs]) => (
-                                                                                <div key={month} className="space-y-2">
-                                                                                    <h4 className="text-[11px] text-blue-300 font-semibold mb-1">
-                                                                                        🗓 {month}
-                                                                                    </h4>
-                                                                                    {txs.map((tx, idx) => {
-                                                                                        const total = parseFloat(tx.price) * parseFloat(tx.quantity);
-                                                                                        return (
-                                                                                            <div
-                                                                                                key={idx}
-                                                                                                className="flex justify-between items-center px-3 py-2 border-t border-white/10 rounded-md"
-                                                                                            >
-                                                                                                <div className="text-blue-300">
-                                                                                                    📅 {tx.date}
-                                                                                                    <br />
-                                                                                                    <span className="text-white">
-                                                                                                        🧾 ${formatCurrency(tx.price)} × {formatCurrency(tx.quantity)}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                                <div className="text-yellow-200 text-[11px] font-semibold text-right">
-                                                                                                    💰 ${formatCurrency(total)}
-                                                                                                </div>
+                                                                            {Object.entries(groupedByMonth).map(([month, txs]) => {
+                                                                                const monthKey = `${type}_${month}`;
+                                                                                const isMonthOpen = expandedMonths?.[type]?.[month];
+
+                                                                                const totalMonth = txs.reduce(
+                                                                                    (sum, tx) => sum + parseFloat(tx.price) * parseFloat(tx.quantity),
+                                                                                    0
+                                                                                );
+
+                                                                                return (
+                                                                                    <div key={month} className="space-y-2">
+                                                                                        <button
+                                                                                            onClick={() =>
+                                                                                                setExpandedMonths((prev) => ({
+                                                                                                    ...prev,
+                                                                                                    [type]: {
+                                                                                                        ...(prev[type] || {}),
+                                                                                                        [month]: !prev?.[type]?.[month],
+                                                                                                    },
+                                                                                                }))
+                                                                                            }
+                                                                                            className="flex justify-between items-center w-full text-left px-3 py-1.5 font-semibold text-[11px] text-blue-300"
+                                                                                        >
+                                                                                            <span className="flex items-center gap-2">
+                                                                                                <span
+                                                                                                    className={`w-5 h-5 rounded-full flex items-center justify-center 
+                                                                                                        text-[10px] font-bold "bg-yellow-600 text-white bg-gray-600 text-white"
+                                                                                                        `}
+                                                                                                >
+                                                                                                    {isMonthOpen ? "–" : "+"}
+                                                                                                </span>
+                                                                                                {month}
+                                                                                            </span>
+
+                                                                                            <span className="text-yellow-200 font-mono">
+                                                                                                ${formatCurrency(totalMonth)}
+                                                                                            </span>
+                                                                                        </button>
+
+                                                                                        {isMonthOpen && (
+                                                                                            <div className="space-y-2">
+                                                                                                {txs.map((tx, idx) => {
+                                                                                                    const total = parseFloat(tx.price) * parseFloat(tx.quantity);
+                                                                                                    return (
+                                                                                                        <div
+                                                                                                            key={idx}
+                                                                                                            className="flex justify-between items-center px-3 py-2 border-t border-white/10 rounded-md"
+                                                                                                        >
+                                                                                                            <div className="text-blue-300">
+                                                                                                                📅 {tx.date}
+                                                                                                                <br />
+                                                                                                                <span className="text-white">
+                                                                                                                    🧾 ${formatCurrency(tx.price)} × {formatCurrency(tx.quantity)}
+                                                                                                                </span>
+                                                                                                            </div>
+                                                                                                            <div className="text-yellow-200 text-[11px] font-semibold text-right">
+                                                                                                                💰 ${formatCurrency(total)}
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                })}
                                                                                             </div>
-                                                                                        );
-                                                                                    })}
-                                                                                </div>
-                                                                            ))}
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -964,15 +1011,17 @@ function Dashboard() {
                                             )}
 
 
+
                                             {/* Nút Back */}
                                             <div className="mt-6 text-center">
                                                 <button
                                                     onClick={() => toggleFlip(coin.coin_symbol)}
-                                                    className="mt-6 text-blue-400 hover:text-yellow-300 text-xs font-bold underline flex items-center gap-1"
+                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 active:scale-95 transition rounded-full text-sm text-black font-bold shadow-md"
                                                 >
-                                                    🔙 Back
+                                                    <span className="text-lg">↩</span> Back
                                                 </button>
                                             </div>
+
                                         </div>
                                     </div>
 
