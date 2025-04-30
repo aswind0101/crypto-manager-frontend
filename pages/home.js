@@ -815,7 +815,7 @@ function Dashboard() {
                                                 </p>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-4 w-full px-2 text-center text-sm">
+                                            <div className="grid grid-cols-2 gap-2 w-full px-2 text-center text-sm">
                                                 <div>
                                                     <p className="text-gray-400">🔹 Total Quantity</p>
                                                     <p className="text-white text-lg">{coin.total_quantity.toLocaleString()}</p>
@@ -871,7 +871,7 @@ function Dashboard() {
 
                                     {/* Mặt sau */}
                                     <div className="absolute inset-0 rotate-y-180 backface-hidden min-h-[700px] w-full flex flex-col rounded-xl overflow-hidden">
-                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-3 
+                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-2 
                                             shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col items-center justify-center min-h-[700px]">
                                             <button
                                                 onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}
