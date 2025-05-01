@@ -113,7 +113,7 @@ function Dashboard() {
     const toggleFlip = (symbol) => {
         setFlippedCoins((prev) => {
             const next = !prev[symbol];
-    
+
             if (next) {
                 // ✅ Khi flip sang mặt sau → mở sẵn BUY & SELL cho coin này
                 setExpandedTypes((prevTypes) => ({
@@ -121,11 +121,11 @@ function Dashboard() {
                     [symbol]: { buy: true, sell: true },
                 }));
             }
-    
+
             return { ...prev, [symbol]: next };
         });
     };
-    
+
 
     const getCoinPrices = async (symbols = []) => {
         const prices = {};
@@ -975,8 +975,8 @@ function Dashboard() {
                                                                                                     },
                                                                                                 }))
                                                                                             }
-                                                                                            className="flex justify-between items-center w-full text-left px-3 py-4 mb-4 cursor-pointer
-                          shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] rounded-xl font-semibold text-xs text-yellow-300"
+                                                                                            className="flex justify-between items-center w-full text-left px-3 py-4 mb-4 cursor-pointer bg-white/5
+                                                                                                    shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] rounded-full font-semibold text-xs text-yellow-300"
                                                                                         >
                                                                                             <span className="flex items-center gap-2">
                                                                                                 <span
