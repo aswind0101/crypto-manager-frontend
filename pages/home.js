@@ -621,7 +621,7 @@ function Dashboard() {
                             />
 
                             {lastUpdated && showLastUpdate && (
-                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
+                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-2 text-xs text-gray-400 z-10">
                                     <span>🕒 Last update: {lastUpdated}</span>
                                     <button
                                         onClick={async () => {
@@ -634,8 +634,8 @@ function Dashboard() {
                                             }
                                         }}
                                         className="flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-[#1C1F26] shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631]
-    text-yellow-300 hover:bg-yellow-700 hover:text-white 
-    transition duration-200 border border-[#1C1F26]"
+                                            text-yellow-300 hover:bg-yellow-700 hover:text-white 
+                                            transition duration-200 border border-[#1C1F26]"
                                     >
                                         <span
                                             className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
