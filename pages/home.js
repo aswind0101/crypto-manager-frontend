@@ -801,14 +801,14 @@ function Dashboard() {
                                                 </h2>
                                             </div>
 
-                                            <div className="w-full text-center my-2">
+                                            <div className="w-full text-center">
                                                 <p className="text-sm text-blue-200 font-medium">Current Price – Avg. Buy</p>
                                                 <p className="text-lg text-yellow-300">
                                                     ${formatCurrency(coin.current_price)} – ${formatCurrency((coin.total_invested - coin.total_sold) / coin.total_quantity)}
                                                 </p>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-2 w-full px-2 text-center text-sm">
+                                            <div className="grid grid-cols-2 gap-2 w-full px-2 text-center text-sm mt-2">
                                                 <div>
                                                     <p className="text-gray-400">🔹 Total Quantity</p>
                                                     <p className="text-white text-lg">{coin.total_quantity.toLocaleString()}</p>
