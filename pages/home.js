@@ -941,7 +941,7 @@ function Dashboard() {
                                                                                 }
                                                                             }))
                                                                         }
-                                                                        className="flex items-center justify-between w-full text-left font-bold py-2 px-3 transition text-sm cursor-pointer"
+                                                                        className="flex items-center justify-between w-full text-left font-bold py-1 px-3 transition text-sm cursor-pointer"
                                                                     >
                                                                         <span className={`flex items-center gap-2 ${type === "buy" ? "text-green-400" : "text-red-400"}`}>
                                                                             {isExpanded ? "➖" : "➕"} {type.toUpperCase()} ({list.length})
@@ -976,7 +976,7 @@ function Dashboard() {
                                                                                                 }))
                                                                                             }
                                                                                             className="flex justify-between items-center w-full text-left px-3 py-4 mb-4 cursor-pointer bg-white/5
-                                                                                                    shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] rounded-full font-semibold text-xs text-yellow-300"
+                                                                                                    shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] rounded-full font-semibold text-sm text-yellow-300"
                                                                                         >
                                                                                             <span className="flex items-center gap-2">
                                                                                                 <span
@@ -998,13 +998,13 @@ function Dashboard() {
                                                                                                     const total = parseFloat(tx.price) * parseFloat(tx.quantity);
                                                                                                     return (
                                                                                                         <div key={idx} className="px-3 py-2 border-t border-white/10 rounded-sm">
-                                                                                                            <div className="flex justify-between items-center text-[11px] text-blue-300 mb-1">
+                                                                                                            <div className="flex justify-between items-center text-sm text-blue-300 mb-1">
                                                                                                                 <span className="flex items-center gap-1">📅 {tx.date}</span>
-                                                                                                                <div className={`text-[11px] font-semibold text-right ${type === "buy" ? "text-green-300" : "text-red-300"}`}>
+                                                                                                                <div className={`text-sm font-semibold text-right ${type === "buy" ? "text-green-300" : "text-red-300"}`}>
                                                                                                                     💰 ${formatCurrency(total)}
                                                                                                                 </div>
                                                                                                             </div>
-                                                                                                            <div className="pl-4 flex items-center gap-1 text-[11px] text-gray-400">
+                                                                                                            <div className="pl-4 flex items-center gap-1 text-sm text-gray-400">
                                                                                                                 ➤ ${formatCurrency(tx.price)} × {formatCurrency(tx.quantity)}
                                                                                                             </div>
                                                                                                         </div>
