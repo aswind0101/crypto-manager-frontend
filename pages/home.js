@@ -110,8 +110,22 @@ function Dashboard() {
 
 
     const [flippedCoins, setFlippedCoins] = useState({});
-    const toggleFlip = (symbol) =>
-        setFlippedCoins((prev) => ({ ...prev, [symbol]: !prev[symbol] }));
+    const toggleFlip = (symbol) => {
+        setFlippedCoins((prev) => {
+            const next = !prev[symbol];
+    
+            if (next) {
+                // ✅ Khi flip sang mặt sau → mở sẵn BUY & SELL cho coin này
+                setExpandedTypes((prevTypes) => ({
+                    ...prevTypes,
+                    [symbol]: { buy: true, sell: true },
+                }));
+            }
+    
+            return { ...prev, [symbol]: next };
+        });
+    };
+    
 
     const getCoinPrices = async (symbols = []) => {
         const prices = {};
