@@ -808,7 +808,7 @@ function Dashboard() {
                                                 </p>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-2 w-full px-2 text-center text-sm mt-2">
+                                            <div className="grid grid-cols-2 gap-2 w-full px-2 text-center text-sm">
                                                 <div>
                                                     <p className="text-gray-400">🔹 Total Quantity</p>
                                                     <p className="text-white text-lg">{coin.total_quantity.toLocaleString()}</p>
