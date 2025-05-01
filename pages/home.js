@@ -104,7 +104,7 @@ function Dashboard() {
         );
     };
     //Flip card
-    const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: true });
+    const [expandedTypes, setExpandedTypes] = useState({});
     const [expandedMonths, setExpandedMonths] = useState({}); // { buy: { 'April 2025': true } }
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -468,19 +468,18 @@ function Dashboard() {
 
 
     const filteredPortfolio = portfolio
-        .filter((coin) => includeSoldCoins || coin.total_quantity > 0) // ✅ lọc theo checkbox
-        .filter((coin) => {
-            const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
+    .filter((coin) => {
+        const matchesQty = includeSoldCoins || coin.total_quantity > 0;
+        const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesProfit =
+            filterByProfit === "all" ||
+            (filterByProfit === "profit" && coin.profit_loss >= 0) ||
+            (filterByProfit === "loss" && coin.profit_loss < 0);
 
-            const matchesProfit =
-                filterByProfit === "all" ||
-                (filterByProfit === "profit" && coin.profit_loss >= 0) ||
-                (filterByProfit === "loss" && coin.profit_loss < 0);
-
-            return matchesSearch && matchesProfit;
-        })
-        .sort((a, b) => b.current_value - a.current_value);
+        return matchesQty && matchesSearch && matchesProfit;
+    })
+    .sort((a, b) => b.current_value - a.current_value);
 
     if (!isReadyToRender) {
         return <LoadingScreen />;
@@ -752,7 +751,7 @@ function Dashboard() {
                         <div key={index} className="w-full min-h-[680px]">
                             <div className="relative perspective-[1500px] w-full h-full">
                                 <div
-                                    className={`transition-transform duration-700 transform-style-preserve-3d w-full min-h-[680px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
+                                    className={`transition-transform duration-700 ease-in-out transform-style-preserve-3d w-full min-h-[680px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
                                         }`}
                                 >
                                     {/* Mặt trước */}
@@ -796,7 +795,7 @@ function Dashboard() {
                                                     </div>
                                                 </div>
 
-                                                <h2 className="text-3xl font-bold text-yellow-400 mt-4 tracking-wider">
+                                                <h2 className="text-4xl font-bold text-yellow-400 mt-4 tracking-wider">
                                                     {coin.coin_symbol.toUpperCase()}
                                                 </h2>
                                             </div>

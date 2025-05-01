@@ -103,6 +103,29 @@ function Dashboard() {
             <FaCoins className="text-gray-500 text-2xl" />
         );
     };
+    //Flip card
+    const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: true });
+    const [expandedMonths, setExpandedMonths] = useState({}); // { buy: { 'April 2025': true } }
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+
+    const [flippedCoins, setFlippedCoins] = useState({});
+    const toggleFlip = (symbol) => {
+        setFlippedCoins((prev) => {
+            const next = !prev[symbol];
+
+            if (next) {
+                // ✅ Khi flip sang mặt sau → mở sẵn BUY & SELL cho coin này
+                setExpandedTypes((prevTypes) => ({
+                    ...prevTypes,
+                    [symbol]: { buy: true, sell: true },
+                }));
+            }
+
+            return { ...prev, [symbol]: next };
+        });
+    };
+
 
     const getCoinPrices = async (symbols = []) => {
         const prices = {};
@@ -327,22 +350,30 @@ function Dashboard() {
                 const fallbackPrice = c.total_quantity > 0
                     ? (c.total_invested - c.total_sold) / c.total_quantity
                     : 0;
-
-                const isFallback = !fetchedPrice || fetchedPrice === 0;
-                //const finalPrice = isFallback ? fallbackPrice : fetchedPrice;
-                const finalPrice = isFallback ? fallbackPrice : fetchedPrice;
+                const finalPrice = fetchedPrice && fetchedPrice > 0 ? fetchedPrice : fallbackPrice;
                 const lastUpdatedKey = "price_" + symbol + "_updated";
                 const lastUpdated = localStorage.getItem(lastUpdatedKey);
                 const currentValue = finalPrice * c.total_quantity;
                 const netInvested = c.total_invested - c.total_sold;
+
+                // 👇 Ghép transaction gần nhất của coin này
+                const recent_transactions = (data.transactions || [])
+                    .filter(tx => tx.coin_symbol === c.coin_symbol)
+                    .map(tx => ({
+                        type: tx.transaction_type,
+                        date: new Date(tx.transaction_date).toLocaleDateString(),
+                        quantity: tx.quantity,
+                        price: tx.price
+                    }));
 
                 return {
                     ...c,
                     current_price: finalPrice,
                     current_value: currentValue,
                     profit_loss: currentValue - netInvested,
-                    is_fallback_price: isFallback,
+                    is_fallback_price: !fetchedPrice,
                     price_last_updated: lastUpdated ? parseInt(lastUpdated) : null,
+                    recent_transactions // 🆕 thêm vào
                 };
             });
 
@@ -482,29 +513,6 @@ function Dashboard() {
         const netInvested = coin.total_invested - coin.total_sold;
         if (netInvested <= 0) return 0;
         return ((coin.profit_loss / netInvested) * 100).toFixed(1);
-    };
-
-    const getProgressPercent = (coin) => {
-        const target = getTargetPercent(coin);
-        const profit = getRealProfitPercent(coin);
-        return Math.min(Math.max(profit, 0), target); // clamp 0 -> target
-    };
-
-    const getProgressColor = (coin) => {
-        const progress = getRealProfitPercent(coin);
-        const target = getTargetPercent(coin);
-        if (progress >= target) return "#facc15"; // vàng rực 🎉
-        if (progress >= target * 0.8) return "#4ade80"; // xanh lá non
-        return "#60a5fa"; // xanh dương
-    };
-
-    const getProgressEmoji = (coin) => {
-        const progress = getRealProfitPercent(coin);
-        const target = getTargetPercent(coin);
-        if (progress >= target) return "🎉";
-        if (progress >= target * 0.8) return "😎";
-        if (progress >= target * 0.5) return "📈";
-        return "🥲";
     };
     return (
         <div className="p-0 bg-[#1C1F26] text-white min-h-screen font-mono overflow-y-scroll scrollbar-hide">
@@ -740,169 +748,314 @@ function Dashboard() {
 
                 {/* phần còn lại giữ nguyên */}
                 <div className="w-full max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                    {filteredPortfolio.map((coin, index) => {
-                        const netInvested = coin.total_invested - coin.total_sold;
-                        const avgPrice = (netInvested > 0 && coin.total_quantity > 0)
-                            ? (netInvested / coin.total_quantity)
-                            : 0;
-                        const profitLossPercentage = netInvested > 0
-                            ? ((coin.profit_loss / netInvested) * 100).toFixed(1) + "%"
-                            : coin.profit_loss > 0 ? "∞%" : "0%";
-                        return (
-                            <div key={index}
-                                className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]  
-                                rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] 
-                                transition-all hover:scale-[1.01]"
-                            >
-                                {/* Hint for mobile users */}
-                                <div className="text-center text-[11px] text-gray-500 italic mb-2 mt-4">
-                                    (Tap any coin to view transaction details)
-                                </div>
-                                <div className="flex flex-col items-center justify-center mb-4">
+                    {filteredPortfolio.map((coin, index) => (
+                        <div key={index} className="w-full min-h-[680px]">
+                            <div className="relative perspective-[1500px] w-full h-full">
+                                <div
+                                    className={`transition-transform duration-700 transform-style-preserve-3d w-full min-h-[680px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
+                                        }`}
+                                >
+                                    {/* Mặt trước */}
+                                    <div className="absolute inset-0 backface-hidden min-h-[680px] w-full rounded-xl overflow-hidden">
+                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]
+                                                rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
+                                                transition-all h-full flex flex-col space-y-4 pb-8 md:pb-10">
+                                            <div className="text-center text-[11px] text-gray-500 italic">
+                                                (Tap icon to view transaction detail)
+                                            </div>
 
-                                    <div className="flex flex-col items-center justify-center relative group">
-                                        {/* Vòng tròn progress */}
-                                        <div className="w-40 h-40 relative" onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}>
-                                            <CircularProgressbar
-                                                value={Math.abs(getRealProfitPercent(coin))} // lấy trị tuyệt đối % đang có
-                                                maxValue={getTargetPercent(coin)} // target % (mặc định 50%)
-                                                styles={buildStyles({
-                                                    pathColor: getRealProfitPercent(coin) >= 0 ? "#4ade80" : "#f87171", // ✅ xanh nếu lời, đỏ nếu lỗ
-                                                    textColor: "#facc15", // emoji màu vàng vàng
-                                                    trailColor: "#2f374a", // nền vòng tròn
-                                                    textSize: "24px", // to hơn một chút để emoji nổi bật
-                                                })}
-                                            />
-                                            {/* Avatar Coin nằm giữa vòng tròn */}
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                {getCoinIcon(coin.coin_symbol)}
+                                            <div className="flex flex-col items-center justify-center mt-2">
+                                                <div className="relative group w-40 h-40 cursor-pointer" onClick={() => toggleFlip(coin.coin_symbol)}>
+                                                    <CircularProgressbar
+                                                        value={Math.abs(getRealProfitPercent(coin))}
+                                                        maxValue={getTargetPercent(coin)}
+                                                        styles={buildStyles({
+                                                            pathColor: getRealProfitPercent(coin) >= 0 ? "#4ade80" : "#f87171",
+                                                            textColor: "#facc15",
+                                                            trailColor: "#2f374a",
+                                                            textSize: "24px"
+                                                        })}
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                        {getCoinIcon(coin.coin_symbol)}
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 text-center text-xs">
+                                                    <button
+                                                        className="text-yellow-300 hover:text-yellow-400 hover:underline"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setTargetForCoin(coin.coin_symbol);
+                                                        }}
+                                                    >
+                                                        🎯 Target: +{getTargetPercent(coin)}%
+                                                    </button>
+                                                    <div className="text-xs text-white mt-1">
+                                                        📈 {getRealProfitPercent(coin)}%
+                                                    </div>
+                                                </div>
+
+                                                <h2 className="text-3xl font-bold text-yellow-400 mt-4 tracking-wider">
+                                                    {coin.coin_symbol.toUpperCase()}
+                                                </h2>
+                                            </div>
+
+                                            <div className="w-full text-center">
+                                                <p className="text-sm text-blue-200 font-medium">Current Price – Avg. Buy</p>
+                                                <p className="text-lg text-yellow-300">
+                                                    ${formatCurrency(coin.current_price)} – ${formatCurrency((coin.total_invested - coin.total_sold) / coin.total_quantity)}
+                                                </p>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 w-full px-2 text-center text-sm">
+                                                <div>
+                                                    <p className="text-gray-400">🔹 Total Quantity</p>
+                                                    <p className="text-white text-lg">{coin.total_quantity.toLocaleString()}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-400">🔹 Total Invested</p>
+                                                    <p className="text-orange-400 text-lg">${formatCurrency(coin.total_invested)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-400">🔹 Net Invested</p>
+                                                    <p className={`text-lg ${coin.total_invested - coin.total_sold >= 0 ? "text-purple-400" : "text-green-300"}`}>
+                                                        ${formatCurrency(coin.total_invested - coin.total_sold)}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-400">🔹 Current Value</p>
+                                                    <p className="text-blue-400 text-lg">${Math.round(coin.current_value).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-2 mb-2 text-center border-t border-white/10 pt-2">
+                                                <p className="text-sm text-gray-400">Profit / Loss</p>
+                                                <p className={`flex items-baseline justify-center gap-2 font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                                    <span className="text-2xl">
+                                                        ${Math.round(coin.profit_loss).toLocaleString()}
+                                                    </span>
+                                                    <span className="text-sm">
+                                                        ({getRealProfitPercent(coin)}%)
+                                                    </span>
+                                                </p>
+
+
+                                            </div>
+
+                                            <div className="mt-auto mb-2 flex justify-center gap-4">
+                                                <button
+                                                    onClick={() => handleOpenTradeModal(coin, "buy")}
+                                                    className="px-4 py-2 min-w-[96px] rounded-2xl bg-green-600 hover:bg-green-700 text-white text-sm"
+                                                >
+                                                    Buy
+                                                </button>
+                                                <button
+                                                    onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
+                                                    disabled={coin.total_quantity === 0}
+                                                    className={`px-4 py-2 min-w-[96px] rounded-2xl text-white text-sm ${coin.total_quantity === 0 ? "bg-gray-600 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+                                                        }`}
+                                                >
+                                                    Sell
+                                                </button>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        {/* Target + Current Status */}
-                                        <div className="mt-4 text-center text-xs">
+                                    {/* Mặt sau */}
+                                    <div className="absolute inset-0 rotate-y-180 backface-hidden min-h-[680px] w-full flex flex-col rounded-xl overflow-hidden">
+                                        <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-2 
+                                            shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col items-center justify-center min-h-[680px]">
                                             <button
-                                                className="text-yellow-300 hover:text-yellow-400 hover:underline"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setTargetForCoin(coin.coin_symbol);
-                                                }}
+                                                onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}
+                                                className="absolute bottom-4 left-4 text-xs text-gray-400 hover:text-yellow-400 
+                                                font-semibold flex items-center gap-1 cursor-pointer"
                                             >
-                                                🎯 Target: {getTargetPercent(coin) > 0 ? `+${getTargetPercent(coin)}%` : "Set"}
+                                                <span>✏️</span>
+                                                <span>Update Transactions</span>
                                             </button>
-                                            <div className="text-xs text-white mt-1">
-                                                📈 {getRealProfitPercent(coin)}%
+
+                                            <div className="absolute top-3 right-3">
+                                                <select
+                                                    className="bg-white/5 text-yellow-300 text-xs rounded-full px-2 py-1
+                                                    shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]"
+                                                    value={selectedYear}
+                                                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                                >
+                                                    {[
+                                                        ...new Set(
+                                                            coin.recent_transactions
+                                                                .map((tx) => new Date(tx.date).getFullYear())
+                                                                .sort((a, b) => b - a) // sắp xếp năm giảm dần
+                                                        ),
+                                                    ].map((year) => (
+                                                        <option key={year} value={year}>
+                                                            {year}
+                                                        </option>
+                                                    ))}
+
+                                                </select>
                                             </div>
+
+                                            <div className="mb-8 text-center">
+                                                <h2 className="text-4xl font-bold text-yellow-400 tracking-widest">
+                                                    {coin.coin_symbol.toUpperCase()}
+                                                </h2>
+
+                                            </div>
+                                            {coin.recent_transactions && coin.recent_transactions.length > 0 ? (
+                                                <div className="w-full text-xs font-mono space-y-4 max-h-[400px] overflow-y-auto pr-1">
+                                                    <>
+                                                        {["buy", "sell"].map((type) => {
+                                                            const fullList = coin.recent_transactions.filter(tx => tx.type === type);
+                                                            const list = fullList.filter(tx => {
+                                                                const txYear = new Date(tx.date).getFullYear();
+                                                                return txYear === selectedYear;
+                                                            });
+
+                                                            if (list.length === 0) return null;
+
+                                                            const groupedByMonth = list.reduce((acc, tx) => {
+                                                                const month = new Date(tx.date).toLocaleString("default", { month: "long" });
+                                                                if (!acc[month]) acc[month] = [];
+                                                                acc[month].push(tx);
+                                                                return acc;
+                                                            }, {});
+
+                                                            const totalGroup = list.reduce(
+                                                                (sum, tx) => sum + parseFloat(tx.price) * parseFloat(tx.quantity),
+                                                                0
+                                                            );
+
+                                                            const isExpanded = expandedTypes?.[coin.coin_symbol]?.[type];
+
+                                                            return (
+                                                                <div key={type} className="rounded-lg">
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            setExpandedTypes((prev) => ({
+                                                                                ...prev,
+                                                                                [coin.coin_symbol]: {
+                                                                                    ...(prev[coin.coin_symbol] || {}),
+                                                                                    [type]: !prev?.[coin.coin_symbol]?.[type]
+                                                                                }
+                                                                            }))
+                                                                        }
+                                                                        className="flex items-center justify-between w-full text-left font-bold py-1 px-3 transition text-sm cursor-pointer"
+                                                                    >
+                                                                        <span className={`flex items-center gap-2 ${type === "buy" ? "text-green-400" : "text-red-400"}`}>
+                                                                            {isExpanded ? "➖" : "➕"} {type.toUpperCase()} ({list.length})
+                                                                        </span>
+                                                                        <span className="text-yellow-300 font-mono">
+                                                                            ${formatCurrency(totalGroup)}
+                                                                        </span>
+                                                                    </button>
+
+                                                                    {isExpanded && (
+                                                                        <div className="mt-2 px-3 pb-2 space-y-4">
+                                                                            {Object.entries(groupedByMonth).map(([month, txs]) => {
+                                                                                const isMonthOpen = expandedMonths?.[coin.coin_symbol]?.[type]?.[month];
+                                                                                const totalMonth = txs.reduce(
+                                                                                    (sum, tx) => sum + parseFloat(tx.price) * parseFloat(tx.quantity),
+                                                                                    0
+                                                                                );
+
+                                                                                return (
+                                                                                    <div key={month} className="space-y-2">
+                                                                                        <button
+                                                                                            onClick={() =>
+                                                                                                setExpandedMonths((prev) => ({
+                                                                                                    ...prev,
+                                                                                                    [coin.coin_symbol]: {
+                                                                                                        ...(prev[coin.coin_symbol] || {}),
+                                                                                                        [type]: {
+                                                                                                            ...(prev[coin.coin_symbol]?.[type] || {}),
+                                                                                                            [month]: !prev?.[coin.coin_symbol]?.[type]?.[month],
+                                                                                                        },
+                                                                                                    },
+                                                                                                }))
+                                                                                            }
+                                                                                            className="flex justify-between items-center w-full text-left px-3 py-4 mb-4 cursor-pointer bg-white/5
+                                                                                                    shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] rounded-full font-semibold text-sm text-yellow-300"
+                                                                                        >
+                                                                                            <span className="flex items-center gap-2">
+                                                                                                <span
+                                                                                                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-yellow-500 ${isMonthOpen ? "text-black" : "text-white"
+                                                                                                        }`}
+                                                                                                >
+                                                                                                    {isMonthOpen ? "–" : "+"}
+                                                                                                </span>
+                                                                                                {month}
+                                                                                            </span>
+                                                                                            <span className={`font-mono ${type === "buy" ? "text-green-400" : "text-red-400"}`}>
+                                                                                                ${formatCurrency(totalMonth)}
+                                                                                            </span>
+                                                                                        </button>
+
+                                                                                        {isMonthOpen && (
+                                                                                            <div className="space-y-2">
+                                                                                                {txs.map((tx, idx) => {
+                                                                                                    const total = parseFloat(tx.price) * parseFloat(tx.quantity);
+                                                                                                    return (
+                                                                                                        <div key={idx} className="px-3 py-2 border-t border-white/10 rounded-sm">
+                                                                                                            <div className="flex justify-between items-center text-sm text-blue-300 mb-1">
+                                                                                                                <span className="flex items-center gap-1">📅 {tx.date}</span>
+                                                                                                                <div className={`text-sm font-semibold text-right ${type === "buy" ? "text-green-300" : "text-red-300"}`}>
+                                                                                                                    💰 ${formatCurrency(total)}
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                            <div className="pl-4 flex items-center gap-1 text-sm text-gray-400">
+                                                                                                                ➤ ${formatCurrency(tx.price)} × {formatCurrency(tx.quantity)}
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                })}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+
+                                                        {/* ✅ Thêm thông báo nếu không có giao dịch nào cho năm đã chọn */}
+                                                        {["buy", "sell"].every((type) => {
+                                                            const txs = coin.recent_transactions.filter(tx =>
+                                                                tx.type === type && new Date(tx.date).getFullYear() === selectedYear
+                                                            );
+                                                            return txs.length === 0;
+                                                        }) && (
+                                                                <p className="text-center text-sm text-gray-400 mt-6 italic">
+                                                                    📭 No transactions found in {selectedYear}.
+                                                                </p>
+                                                            )}
+                                                    </>
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-400 text-sm text-center">No recent transactions</p>
+                                            )}
+
+                                            {/* Nút Back */}
+                                            <div className="mt-6 mb-6 text-center">
+                                                <button
+                                                    onClick={() => toggleFlip(coin.coin_symbol)}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 active:scale-95 transition rounded-full text-sm text-black font-bold shadow-md"
+                                                >
+                                                    <span className="text-lg">↩</span> Back
+                                                </button>
+                                            </div>
+
                                         </div>
-
-                                        {/* Tên Coin */}
-                                        <div className="flex items-center gap-2 mt-4">
-                                            <h2 className="text-4xl font-bold text-yellow-400">{coin.coin_symbol.toUpperCase()}</h2>
-                                        </div>
                                     </div>
 
                                 </div>
-
-                                <div className="w-full text-center mb-4">
-                                    <p className="text-sm text-blue-200 font-medium">Current Price - Avg. Buy Price</p>
-                                    <p className="text-lg text-yellow-300">
-                                        ${formatCurrency(coin.current_price)} <span className="text-white">-</span> ${avgPrice > 0 ? `${formatCurrency(avgPrice)}` : "–"}
-                                    </p>
-
-                                    {coin.is_fallback_price && (
-                                        <p className="text-xs text-yellow-400 mt-1">
-                                            ⚠️ Using fallback price (buy price).
-                                        </p>
-                                    )}
-
-                                    {!coin.is_fallback_price &&
-                                        coin.price_last_updated &&
-                                        Math.abs(coin.current_price - parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase()))) < 0.000001 &&
-                                        Math.round((Date.now() - coin.price_last_updated) / 60000) >= 1 && (
-                                            <p className="text-xs text-gray-400 mt-1">
-                                                ⚠️ Last price from {formatLastUpdatedDuration(coin.price_last_updated)}
-                                            </p>
-                                        )}
-
-
-                                </div>
-
-
-                                <div className="grid grid-cols-2 gap-x-3 gap-y-4 w-full px-2 md:px-6 text-center">
-                                    {/* Hàng 1 */}
-                                    <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Total Quantity</p>
-                                        <p className="text-lg text-white">{coin.total_quantity.toLocaleString()}</p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Total Invested</p>
-                                        <p className="text-lg text-orange-400">${formatCurrency(coin.total_invested)}</p>
-                                    </div>
-
-                                    {/* Hàng 2 */}
-                                    <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Net Invested</p>
-                                        <p className={`text-lg ${netInvested >= 0 ? "text-purple-400" : "text-green-300"}`}>
-                                            ${formatCurrency(netInvested)}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1">🔹Current Value</p>
-                                        <p className="text-lg text-blue-400">${Math.round(coin.current_value).toLocaleString()}</p>
-                                    </div>
-
-                                    {/* Hàng 3 - Profit / Loss */}
-                                    <div className="col-span-2 border-t border-white/10 pt-2">
-                                        <p className="text-sm text-gray-400 flex items-center justify-center gap-1 mt-2">
-                                            {(() => {
-                                                const ratio = Math.abs(netInvested) > 0 ? coin.profit_loss / Math.abs(netInvested) : 0;
-                                                if (ratio > 0.5) return "🤑";
-                                                if (ratio > 0.1) return "😎";
-                                                if (ratio > 0) return "🙂";
-                                                if (ratio > -0.1) return "😕";
-                                                if (ratio > -0.5) return "😢";
-                                                return "😭";
-                                            })()} Profit / Loss
-                                        </p>
-                                        <p className={`text-2xl font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                            ${Math.round(coin.profit_loss).toLocaleString()}
-                                            <span className="text-xs ml-1">({profitLossPercentage})</span>
-                                        </p>
-                                    </div>
-                                </div>
-
-
-
-                                <div className="mt-4 mb-6 flex justify-center gap-4">
-                                    <button
-                                        onClick={() => handleOpenTradeModal(coin, "buy")}
-                                        className="px-4 py-2 min-w-[96px] rounded-2xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm transition-all duration-200"
-                                    >
-                                        Buy
-                                    </button>
-
-
-                                    <button
-                                        onClick={() => coin.total_quantity > 0 && handleOpenTradeModal(coin, "sell")}
-                                        disabled={coin.total_quantity === 0}
-                                        className={`px-4 py-2 min-w-[96px] rounded-2xl text-white text-sm transition-all duration-200
-                                                ${coin.total_quantity === 0
-                                                ? "bg-gray-600 cursor-not-allowed"
-                                                : "bg-red-600 hover:bg-red-700 active:bg-red-800"}
-    `}
-                                    >
-                                        Sell
-                                    </button>
-
-
-
-                                </div>
-
                             </div>
-                        );
-                    })}
+                        </div>
+                    ))}
+
                 </div>
             </div>
             {/* FAB chỉ hiển thị khi không mở modal và chỉ trên mobile */}
