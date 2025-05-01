@@ -633,9 +633,8 @@ function Dashboard() {
                                                 setRefreshing(false);
                                             }
                                         }}
-                                        className="flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-[#1C1F26] shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631]
-                                            text-yellow-300 hover:bg-yellow-700 hover:text-white 
-                                            transition duration-200 border border-[#1C1F26]"
+                                        className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-full shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631]
+                                            text-yellow-300 hover:bg-yellow-700 hover:text-white transition duration-200"
                                     >
                                         <span
                                             className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
