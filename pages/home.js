@@ -875,9 +875,9 @@ function Dashboard() {
                                                 <span>Update Transactions</span>
                                             </button>
 
-                                            <div className="absolute top-2 right-2">
+                                            <div className="absolute top-3 right-3">
                                                 <select
-                                                    className="bg-[#1f2a38] border border-white/5 text-yellow-300 text-xs rounded-xl px-2 py-1
+                                                    className="bg-white/5 text-yellow-300 text-xs rounded-full px-2 py-1
                                                     shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]"
                                                     value={selectedYear}
                                                     onChange={(e) => setSelectedYear(parseInt(e.target.value))}
