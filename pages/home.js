@@ -106,6 +106,8 @@ function Dashboard() {
     //Flip card
     const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: true });
     const [expandedMonths, setExpandedMonths] = useState({}); // { buy: { 'April 2025': true } }
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
 
     const [flippedCoins, setFlippedCoins] = useState({});
     const toggleFlip = (symbol) =>
@@ -859,6 +861,28 @@ function Dashboard() {
                                                 <span>Update Transactions</span>
                                             </button>
 
+                                            <div className="absolute top-2 right-2">
+                                                <select
+                                                    className="bg-[#1f2a38] border border-white/5 text-yellow-300 text-xs rounded-xl px-2 py-1
+                                                    shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]"
+                                                    value={selectedYear}
+                                                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                                >
+                                                    {[
+                                                        ...new Set(
+                                                            coin.recent_transactions
+                                                                .map((tx) => new Date(tx.date).getFullYear())
+                                                                .sort((a, b) => b - a) // sắp xếp năm giảm dần
+                                                        ),
+                                                    ].map((year) => (
+                                                        <option key={year} value={year}>
+                                                            {year}
+                                                        </option>
+                                                    ))}
+
+                                                </select>
+                                            </div>
+
                                             <div className="mb-8 text-center">
                                                 <h2 className="text-4xl font-bold text-yellow-400 tracking-widest">
                                                     {coin.coin_symbol.toUpperCase()}
@@ -867,28 +891,20 @@ function Dashboard() {
                                             </div>
                                             {coin.recent_transactions && coin.recent_transactions.length > 0 ? (
                                                 <div className="w-full text-xs font-mono space-y-4 max-h-[400px] overflow-y-auto pr-1">
-                                                    {(() => {
-                                                        const groupedByType = coin.recent_transactions.reduce((acc, tx) => {
-                                                            if (!acc[tx.type]) acc[tx.type] = [];
-                                                            acc[tx.type].push(tx);
-                                                            return acc;
-                                                        }, {});
+                                                    <>
+                                                        {["buy", "sell"].map((type) => {
+                                                            const fullList = coin.recent_transactions.filter(tx => tx.type === type);
+                                                            const list = fullList.filter(tx => {
+                                                                const txYear = new Date(tx.date).getFullYear();
+                                                                return txYear === selectedYear;
+                                                            });
 
-                                                        const typeLabels = { buy: "BUY", sell: "SELL" };
-                                                        const typeColors = { buy: "text-green-400", sell: "text-red-400" };
-
-                                                        return ["buy", "sell"].map((type) => {
-                                                            const list = groupedByType[type] || [];
                                                             if (list.length === 0) return null;
 
                                                             const groupedByMonth = list.reduce((acc, tx) => {
-                                                                const date = new Date(tx.date);
-                                                                const monthYear = date.toLocaleString("default", {
-                                                                    month: "long",
-                                                                    year: "numeric",
-                                                                });
-                                                                if (!acc[monthYear]) acc[monthYear] = [];
-                                                                acc[monthYear].push(tx);
+                                                                const month = new Date(tx.date).toLocaleString("default", { month: "long" });
+                                                                if (!acc[month]) acc[month] = [];
+                                                                acc[month].push(tx);
                                                                 return acc;
                                                             }, {});
 
@@ -913,8 +929,8 @@ function Dashboard() {
                                                                         }
                                                                         className="flex items-center justify-between w-full text-left font-bold py-2 px-3 transition text-sm cursor-pointer"
                                                                     >
-                                                                        <span className={`flex items-center gap-2 ${typeColors[type]}`}>
-                                                                            {isExpanded ? "➖" : "➕"} {typeLabels[type]} ({list.length})
+                                                                        <span className={`flex items-center gap-2 ${type === "buy" ? "text-green-400" : "text-red-400"}`}>
+                                                                            {isExpanded ? "➖" : "➕"} {type.toUpperCase()} ({list.length})
                                                                         </span>
                                                                         <span className="text-yellow-300 font-mono">
                                                                             ${formatCurrency(totalGroup)}
@@ -946,25 +962,20 @@ function Dashboard() {
                                                                                                 }))
                                                                                             }
                                                                                             className="flex justify-between items-center w-full text-left px-3 py-4 mb-4 cursor-pointer
-                                                                                            shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] rounded-xl font-semibold text-xs text-yellow-300"
+                          shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] rounded-xl font-semibold text-xs text-yellow-300"
                                                                                         >
-                                                                                            <span className="flex items-center gap-2 ">
+                                                                                            <span className="flex items-center gap-2">
                                                                                                 <span
-                                                                                                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-yellow-500
-                                                                                                        ${isMonthOpen ? "text-black" : "text-white"}`}
+                                                                                                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-yellow-500 ${isMonthOpen ? "text-black" : "text-white"
+                                                                                                        }`}
                                                                                                 >
                                                                                                     {isMonthOpen ? "–" : "+"}
                                                                                                 </span>
                                                                                                 {month}
                                                                                             </span>
-
-                                                                                            <span
-                                                                                                className={`font-mono ${type === "buy" ? "text-green-400" : "text-red-400"
-                                                                                                    }`}
-                                                                                            >
+                                                                                            <span className={`font-mono ${type === "buy" ? "text-green-400" : "text-red-400"}`}>
                                                                                                 ${formatCurrency(totalMonth)}
                                                                                             </span>
-
                                                                                         </button>
 
                                                                                         {isMonthOpen && (
@@ -972,21 +983,12 @@ function Dashboard() {
                                                                                                 {txs.map((tx, idx) => {
                                                                                                     const total = parseFloat(tx.price) * parseFloat(tx.quantity);
                                                                                                     return (
-                                                                                                        <div
-                                                                                                            key={idx}
-                                                                                                            className="px-3 py-2 border-t border-white/10 rounded-sm"
-                                                                                                        >
+                                                                                                        <div key={idx} className="px-3 py-2 border-t border-white/10 rounded-sm">
                                                                                                             <div className="flex justify-between items-center text-[11px] text-blue-300 mb-1">
-                                                                                                                <span className="flex items-center gap-1">
-                                                                                                                    📅 {tx.date}
-                                                                                                                </span>
-                                                                                                                <div
-                                                                                                                    className={`text-[11px] font-semibold text-right ${type === "buy" ? "text-green-300" : "text-red-300"
-                                                                                                                        }`}
-                                                                                                                >
+                                                                                                                <span className="flex items-center gap-1">📅 {tx.date}</span>
+                                                                                                                <div className={`text-[11px] font-semibold text-right ${type === "buy" ? "text-green-300" : "text-red-300"}`}>
                                                                                                                     💰 ${formatCurrency(total)}
                                                                                                                 </div>
-
                                                                                                             </div>
                                                                                                             <div className="pl-4 flex items-center gap-1 text-[11px] text-gray-400">
                                                                                                                 ➤ ${formatCurrency(tx.price)} × {formatCurrency(tx.quantity)}
@@ -1003,12 +1005,25 @@ function Dashboard() {
                                                                     )}
                                                                 </div>
                                                             );
-                                                        });
-                                                    })()}
+                                                        })}
+
+                                                        {/* ✅ Thêm thông báo nếu không có giao dịch nào cho năm đã chọn */}
+                                                        {["buy", "sell"].every((type) => {
+                                                            const txs = coin.recent_transactions.filter(tx =>
+                                                                tx.type === type && new Date(tx.date).getFullYear() === selectedYear
+                                                            );
+                                                            return txs.length === 0;
+                                                        }) && (
+                                                                <p className="text-center text-sm text-gray-400 mt-6 italic">
+                                                                    📭 No transactions found in {selectedYear}.
+                                                                </p>
+                                                            )}
+                                                    </>
                                                 </div>
                                             ) : (
                                                 <p className="text-gray-400 text-sm text-center">No recent transactions</p>
                                             )}
+
                                             {/* Nút Back */}
                                             <div className="mt-6 mb-6 text-center">
                                                 <button
