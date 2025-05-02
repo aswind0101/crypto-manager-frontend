@@ -85,7 +85,6 @@ function Dashboard() {
     const [showMarketOverview, setShowMarketOverview] = useState(false);
     const [showAllCoins, setShowAllCoins] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [hasRawPortfolioData, setHasRawPortfolioData] = useState(false);
     const [isReadyToRender, setIsReadyToRender] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState("");
@@ -262,7 +261,6 @@ function Dashboard() {
 
             if (!hasTx) {
                 setPortfolio([]);
-                setHasRawPortfolioData(false);
                 setFirstLoaded(true);
                 setIsReadyToRender(true);
                 setLoading(false);
@@ -353,7 +351,6 @@ function Dashboard() {
             const data = await response.json();
             // ✅ Nếu user chưa có giao dịch, dừng tại đây, KHÔNG cần gọi API giá
             if (!data.portfolio || data.portfolio.length === 0) {
-                setHasRawPortfolioData(false);
                 setPortfolio([]);
                 setFirstLoaded(true);
                 setLoading(false);
@@ -361,9 +358,6 @@ function Dashboard() {
                 setPriceFetchFailed(false); // ✅ Không hiển thị lỗi giá
                 return;
             }
-
-            setHasRawPortfolioData(true);  // ✅ Có dữ liệu giao dịch thực tế
-
             const symbols = data.portfolio.map(c => c.coin_symbol);
 
             const prices = await getCoinPrices(symbols);
@@ -512,7 +506,8 @@ function Dashboard() {
     const isEmptyPortfolioView =
         isReadyToRender &&
         !loading &&
-        !hasRawPortfolioData && // 🔥 dùng đúng state xác định đã có giao dịch hay chưa
+        Array.isArray(portfolio) &&
+        portfolio.length === 0 && 
         firstLoaded;
 
     if (isEmptyPortfolioView) {
