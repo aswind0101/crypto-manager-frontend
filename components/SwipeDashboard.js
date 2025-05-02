@@ -152,7 +152,7 @@ const SwipeDashboard = ({
                                             clockWise={true}
                                             dataKey="value"
                                             cornerRadius={0}
-                                            animationDuration={9000} // ✅
+                                            animationDuration={10000} // ✅
                                             animationBegin={0} // ✅
                                             isAnimationActive={ready} // ✅ chỉ animate khi ready
                                         />
