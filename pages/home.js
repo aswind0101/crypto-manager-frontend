@@ -269,6 +269,7 @@ function Dashboard() {
 
                 fetchPortfolioWithRetry(uid);
                 fetchMarketData(true);
+                fetchCoinTargets(uid);
 
                 if (!intervalRef.current) {
                     intervalRef.current = setInterval(() => {
@@ -495,17 +496,64 @@ function Dashboard() {
         return <EmptyPortfolioView />;
     }
 
-    const setTargetForCoin = (coinSymbol) => {
+    const fetchCoinTargets = async (uid) => {
+        try {
+            const auth = getAuth();
+            const user = auth.currentUser;
+            if (!user) return;
+    
+            const idToken = await user.getIdToken();
+            const res = await fetch(`${baseUrl}/api/coin-targets`, {
+                headers: { Authorization: `Bearer ${idToken}` }
+            });
+    
+            if (!res.ok) throw new Error("Failed to fetch targets");
+    
+            const data = await res.json(); // [{ coin_symbol: 'BTC', target_percent: 50 }, ...]
+    
+            data.forEach(item => {
+                localStorage.setItem(`target_${item.coin_symbol.toUpperCase()}`, parseFloat(item.target_percent));
+            });
+    
+        } catch (error) {
+            console.warn("⚠️ Failed to fetch coin targets:", error.message);
+        }
+    };
+    
+    const setTargetForCoin = async (coinSymbol) => {
         const currentTarget = parseFloat(localStorage.getItem(`target_${coinSymbol.toUpperCase()}`)) || 0;
         const input = prompt(`🎯 Set target profit (%) for ${coinSymbol.toUpperCase()}`, currentTarget);
+    
         if (input !== null && !isNaN(parseFloat(input))) {
-            localStorage.setItem(`target_${coinSymbol.toUpperCase()}`, parseFloat(input));
-            // Force re-render
+            const newTarget = parseFloat(input);
+    
+            // 1️⃣ Lưu cache
+            localStorage.setItem(`target_${coinSymbol.toUpperCase()}`, newTarget);
+    
+            // 2️⃣ Lưu database
+            try {
+                const auth = getAuth();
+                const user = auth.currentUser;
+                const idToken = await user.getIdToken();
+                await fetch(`${baseUrl}/api/coin-targets/${coinSymbol}`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({ target_percent: newTarget })
+                });
+            } catch (err) {
+                console.error("⚠️ Failed to update target:", err.message);
+            }
+    
+            // 3️⃣ Re-render
             setPortfolio([...portfolio]);
         }
     };
+    
     const getTargetPercent = (coin) => {
-        return parseFloat(localStorage.getItem(`target_${coin.coin_symbol.toUpperCase()}`)) || 50;
+        return parseFloat(localStorage.getItem(`target_${coin.coin_symbol.toUpperCase()}`)) || 0;
     };
 
     const getRealProfitPercent = (coin) => {
