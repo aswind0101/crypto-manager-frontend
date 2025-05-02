@@ -220,7 +220,30 @@ function Dashboard() {
             return false;
         }
     };
-
+    const fetchCoinTargets = async (uid) => {
+        try {
+            const auth = getAuth();
+            const user = auth.currentUser;
+            if (!user) return;
+    
+            const idToken = await user.getIdToken();
+            const res = await fetch(`${baseUrl}/api/coin-targets`, {
+                headers: { Authorization: `Bearer ${idToken}` }
+            });
+    
+            if (!res.ok) throw new Error("Failed to fetch targets");
+    
+            const data = await res.json(); // [{ coin_symbol: 'BTC', target_percent: 50 }, ...]
+    
+            data.forEach(item => {
+                localStorage.setItem(`target_${item.coin_symbol.toUpperCase()}`, parseFloat(item.target_percent));
+            });
+    
+        } catch (error) {
+            console.warn("⚠️ Failed to fetch coin targets:", error.message);
+        }
+    };
+    
     useEffect(() => {
         const unsubscribe = getAuth().onAuthStateChanged(async (user) => {
             if (!user) {
@@ -496,29 +519,6 @@ function Dashboard() {
         return <EmptyPortfolioView />;
     }
 
-    const fetchCoinTargets = async (uid) => {
-        try {
-            const auth = getAuth();
-            const user = auth.currentUser;
-            if (!user) return;
-    
-            const idToken = await user.getIdToken();
-            const res = await fetch(`${baseUrl}/api/coin-targets`, {
-                headers: { Authorization: `Bearer ${idToken}` }
-            });
-    
-            if (!res.ok) throw new Error("Failed to fetch targets");
-    
-            const data = await res.json(); // [{ coin_symbol: 'BTC', target_percent: 50 }, ...]
-    
-            data.forEach(item => {
-                localStorage.setItem(`target_${item.coin_symbol.toUpperCase()}`, parseFloat(item.target_percent));
-            });
-    
-        } catch (error) {
-            console.warn("⚠️ Failed to fetch coin targets:", error.message);
-        }
-    };
     
     const setTargetForCoin = async (coinSymbol) => {
         const currentTarget = parseFloat(localStorage.getItem(`target_${coinSymbol.toUpperCase()}`)) || 0;

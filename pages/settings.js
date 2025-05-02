@@ -52,6 +52,18 @@ function Settings() {
         }
     };
 
+    const clearAllTargetCache = () => {
+        let count = 0;
+        Object.keys(localStorage).forEach((k) => {
+            if (k.startsWith("target_")) {
+                localStorage.removeItem(k);
+                count++;
+            }
+        });
+        setStatus(`🎯 Cleared ${count} target cache items.`);
+        setTimeout(() => setStatus(""), 3000);
+    };
+    
     return (
         <div className="min-h-screen bg-[#0b1e3d] text-white">
             <Navbar />
@@ -91,6 +103,17 @@ function Settings() {
                     </button>
 
                     {status && <p className="text-sm text-yellow-300">{status}</p>}
+                </div>
+                <div className="bg-[#1a2f46] max-w-xl mx-auto p-6 rounded-2xl border border-[#2c4069] space-y-4 shadow-lg mb-6 mt-4">
+                    <button
+                        onClick={clearAllTargetCache}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-full transition"
+                    >
+                        🗑️ Clear All Target Cache
+                    </button>
+                    {status && (
+                        <p className="text-sm text-yellow-300 text-center mt-2">{status}</p>
+                    )}
                 </div>
             </div>
         </div>
