@@ -1097,7 +1097,7 @@ function Dashboard() {
                                             <div className="mt-6 mb-6 text-center">
                                                 <button
                                                     onClick={() => toggleFlip(coin.coin_symbol)}
-                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 active:scale-95 transition rounded-full text-sm text-black font-bold shadow-md"
+                                                    className="inline-flex items-center gap-2 px-8 py-2 bg-yellow-400 hover:bg-yellow-500 active:scale-95 transition rounded-full text-sm text-black font-bold shadow-md"
                                                 >
                                                     <span className="text-lg">↩</span> Back
                                                 </button>

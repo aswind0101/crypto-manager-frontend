@@ -149,8 +149,8 @@ const SwipeDashboard = ({
                                             background={{ fill: "#2f374a" }}
                                             clockWise={true} 
                                             dataKey="value"
-                                            cornerRadius={50}
-                                            animationDuration={1500} // ✅
+                                            cornerRadius={0}
+                                            animationDuration={9000} // ✅
                                             animationBegin={0} // ✅
                                             isAnimationActive={ready} // ✅ chỉ animate khi ready
                                         />
