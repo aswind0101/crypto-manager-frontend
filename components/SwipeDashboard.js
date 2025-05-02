@@ -172,7 +172,7 @@ const SwipeDashboard = ({
                                         />%
                                         {totalProfitLoss >= 0 ? '▲' : '▼'})
                                     </p>
-                                    <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                    <p className="text-lg text-gray-400 flex items-center justify-center gap-1">
                                         {(() => {
                                             const ratio = Math.abs(totalNetInvested) > 0 ? totalProfitLoss / Math.abs(totalNetInvested) : 0;
                                             if (ratio > 0.5) return "🤑";
