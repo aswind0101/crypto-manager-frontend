@@ -225,25 +225,25 @@ function Dashboard() {
             const auth = getAuth();
             const user = auth.currentUser;
             if (!user) return;
-    
+
             const idToken = await user.getIdToken();
             const res = await fetch(`${baseUrl}/api/coin-targets`, {
                 headers: { Authorization: `Bearer ${idToken}` }
             });
-    
+
             if (!res.ok) throw new Error("Failed to fetch targets");
-    
+
             const data = await res.json(); // [{ coin_symbol: 'BTC', target_percent: 50 }, ...]
-    
+
             data.forEach(item => {
                 localStorage.setItem(`target_${item.coin_symbol.toUpperCase()}`, parseFloat(item.target_percent));
             });
-    
+
         } catch (error) {
             console.warn("⚠️ Failed to fetch coin targets:", error.message);
         }
     };
-    
+
     useEffect(() => {
         const unsubscribe = getAuth().onAuthStateChanged(async (user) => {
             if (!user) {
@@ -492,18 +492,18 @@ function Dashboard() {
 
 
     const filteredPortfolio = portfolio
-    .filter((coin) => {
-        const matchesQty = includeSoldCoins || coin.total_quantity > 0;
-        const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesProfit =
-            filterByProfit === "all" ||
-            (filterByProfit === "profit" && coin.profit_loss >= 0) ||
-            (filterByProfit === "loss" && coin.profit_loss < 0);
+        .filter((coin) => {
+            const matchesQty = includeSoldCoins || coin.total_quantity > 0;
+            const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesProfit =
+                filterByProfit === "all" ||
+                (filterByProfit === "profit" && coin.profit_loss >= 0) ||
+                (filterByProfit === "loss" && coin.profit_loss < 0);
 
-        return matchesQty && matchesSearch && matchesProfit;
-    })
-    .sort((a, b) => b.current_value - a.current_value);
+            return matchesQty && matchesSearch && matchesProfit;
+        })
+        .sort((a, b) => b.current_value - a.current_value);
 
     if (!isReadyToRender) {
         return <LoadingScreen />;
@@ -519,17 +519,17 @@ function Dashboard() {
         return <EmptyPortfolioView />;
     }
 
-    
+
     const setTargetForCoin = async (coinSymbol) => {
         const currentTarget = parseFloat(localStorage.getItem(`target_${coinSymbol.toUpperCase()}`)) || 0;
         const input = prompt(`🎯 Set target profit (%) for ${coinSymbol.toUpperCase()}`, currentTarget);
-    
+
         if (input !== null && !isNaN(parseFloat(input))) {
             const newTarget = parseFloat(input);
-    
+
             // 1️⃣ Lưu cache
             localStorage.setItem(`target_${coinSymbol.toUpperCase()}`, newTarget);
-    
+
             // 2️⃣ Lưu database
             try {
                 const auth = getAuth();
@@ -546,12 +546,12 @@ function Dashboard() {
             } catch (err) {
                 console.error("⚠️ Failed to update target:", err.message);
             }
-    
+
             // 3️⃣ Re-render
             setPortfolio([...portfolio]);
         }
     };
-    
+
     const getTargetPercent = (coin) => {
         return parseFloat(localStorage.getItem(`target_${coin.coin_symbol.toUpperCase()}`)) || 0;
     };
@@ -561,6 +561,19 @@ function Dashboard() {
         if (netInvested <= 0) return 0;
         return ((coin.profit_loss / netInvested) * 100).toFixed(1);
     };
+
+    const getProfitEmoji = (coin) => {
+        const percent = parseFloat(getRealProfitPercent(coin));
+
+        if (percent >= 50) return "🤑";
+        if (percent >= 20) return "😎";
+        if (percent > 0) return "🙂";
+        if (percent === 0) return "😐";
+        if (percent > -20) return "😕";
+        if (percent > -50) return "😢";
+        return "😭";
+    };
+
     return (
         <div className="p-0 bg-[#1C1F26] text-white min-h-screen font-mono overflow-y-scroll scrollbar-hide">
             <Navbar />
@@ -876,7 +889,10 @@ function Dashboard() {
                                             </div>
 
                                             <div className="mt-2 mb-2 text-center border-t border-white/10 pt-2">
-                                                <p className="text-sm text-gray-400">Profit / Loss</p>
+                                                <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                                    <span className="text-xl">{getProfitEmoji(coin)}</span>
+                                                    Profit / Loss
+                                                </p>
                                                 <p className={`flex items-baseline justify-center gap-2 font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                                     <span className="text-2xl">
                                                         ${Math.round(coin.profit_loss).toLocaleString()}
@@ -885,8 +901,6 @@ function Dashboard() {
                                                         ({getRealProfitPercent(coin)}%)
                                                     </span>
                                                 </p>
-
-
                                             </div>
 
                                             <div className="mt-auto mb-2 flex justify-center gap-4">
