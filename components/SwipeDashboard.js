@@ -46,6 +46,7 @@ const SwipeDashboard = ({
 
             setAnimatedData(fullData);
             setReady(true);
+            setAnimatedKey((prev) => prev + 1); // 👈 ép vẽ lại
         }, 50);
 
         return () => clearTimeout(timer);
@@ -131,14 +132,15 @@ const SwipeDashboard = ({
                         drag="x"
                         dragConstraints={{ left: 0, right: 0 }}
                         onDragEnd={(e, info) => {
-                            if (info.offset.x < -100) handleSwipe("left");
-                            if (info.offset.x > 100) handleSwipe("right");
+                            if (info.offset.x < -50) handleSwipe("left");
+                            if (info.offset.x > 50) handleSwipe("right");
                         }}
                     >
                         <div className="h-full w-full flex flex-col items-center justify-center text-white rounded-xl">
                             <div className="relative w-full h-80">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RadialBarChart
+                                        key={animatedKey}
                                         innerRadius="70%"
                                         outerRadius="100%"
                                         startAngle={180}
@@ -147,7 +149,7 @@ const SwipeDashboard = ({
                                     >
                                         <RadialBar
                                             background={{ fill: "#2f374a" }}
-                                            clockWise={true} 
+                                            clockWise={true}
                                             dataKey="value"
                                             cornerRadius={0}
                                             animationDuration={9000} // ✅

@@ -85,7 +85,6 @@ function Dashboard() {
     const [showMarketOverview, setShowMarketOverview] = useState(false);
     const [showAllCoins, setShowAllCoins] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [hasRawPortfolioData, setHasRawPortfolioData] = useState(false);
     const [isReadyToRender, setIsReadyToRender] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState("");
@@ -104,7 +103,7 @@ function Dashboard() {
         );
     };
     //Flip card
-    const [expandedTypes, setExpandedTypes] = useState({ buy: true, sell: true });
+    const [expandedTypes, setExpandedTypes] = useState({});
     const [expandedMonths, setExpandedMonths] = useState({}); // { buy: { 'April 2025': true } }
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -220,6 +219,29 @@ function Dashboard() {
             return false;
         }
     };
+    const fetchCoinTargets = async (uid) => {
+        try {
+            const auth = getAuth();
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const idToken = await user.getIdToken();
+            const res = await fetch(`${baseUrl}/api/coin-targets`, {
+                headers: { Authorization: `Bearer ${idToken}` }
+            });
+
+            if (!res.ok) throw new Error("Failed to fetch targets");
+
+            const data = await res.json(); // [{ coin_symbol: 'BTC', target_percent: 50 }, ...]
+
+            data.forEach(item => {
+                localStorage.setItem(`target_${item.coin_symbol.toUpperCase()}`, parseFloat(item.target_percent));
+            });
+
+        } catch (error) {
+            console.warn("⚠️ Failed to fetch coin targets:", error.message);
+        }
+    };
 
     useEffect(() => {
         const unsubscribe = getAuth().onAuthStateChanged(async (user) => {
@@ -239,7 +261,6 @@ function Dashboard() {
 
             if (!hasTx) {
                 setPortfolio([]);
-                setHasRawPortfolioData(false);
                 setFirstLoaded(true);
                 setIsReadyToRender(true);
                 setLoading(false);
@@ -269,6 +290,7 @@ function Dashboard() {
 
                 fetchPortfolioWithRetry(uid);
                 fetchMarketData(true);
+                fetchCoinTargets(uid);
 
                 if (!intervalRef.current) {
                     intervalRef.current = setInterval(() => {
@@ -329,7 +351,6 @@ function Dashboard() {
             const data = await response.json();
             // ✅ Nếu user chưa có giao dịch, dừng tại đây, KHÔNG cần gọi API giá
             if (!data.portfolio || data.portfolio.length === 0) {
-                setHasRawPortfolioData(false);
                 setPortfolio([]);
                 setFirstLoaded(true);
                 setLoading(false);
@@ -337,9 +358,6 @@ function Dashboard() {
                 setPriceFetchFailed(false); // ✅ Không hiển thị lỗi giá
                 return;
             }
-
-            setHasRawPortfolioData(true);  // ✅ Có dữ liệu giao dịch thực tế
-
             const symbols = data.portfolio.map(c => c.coin_symbol);
 
             const prices = await getCoinPrices(symbols);
@@ -468,17 +486,16 @@ function Dashboard() {
 
 
     const filteredPortfolio = portfolio
-        .filter((coin) => includeSoldCoins || coin.total_quantity > 0) // ✅ lọc theo checkbox
         .filter((coin) => {
+            const matchesQty = includeSoldCoins || coin.total_quantity > 0;
             const matchesSearch = coin.coin_symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (coin.coin_name || "").toLowerCase().includes(searchTerm.toLowerCase());
-
             const matchesProfit =
                 filterByProfit === "all" ||
                 (filterByProfit === "profit" && coin.profit_loss >= 0) ||
                 (filterByProfit === "loss" && coin.profit_loss < 0);
 
-            return matchesSearch && matchesProfit;
+            return matchesQty && matchesSearch && matchesProfit;
         })
         .sort((a, b) => b.current_value - a.current_value);
 
@@ -489,24 +506,49 @@ function Dashboard() {
     const isEmptyPortfolioView =
         isReadyToRender &&
         !loading &&
-        !hasRawPortfolioData && // 🔥 dùng đúng state xác định đã có giao dịch hay chưa
+        Array.isArray(portfolio) &&
+        portfolio.length === 0 && 
         firstLoaded;
 
     if (isEmptyPortfolioView) {
         return <EmptyPortfolioView />;
     }
 
-    const setTargetForCoin = (coinSymbol) => {
+
+    const setTargetForCoin = async (coinSymbol) => {
         const currentTarget = parseFloat(localStorage.getItem(`target_${coinSymbol.toUpperCase()}`)) || 0;
         const input = prompt(`🎯 Set target profit (%) for ${coinSymbol.toUpperCase()}`, currentTarget);
+
         if (input !== null && !isNaN(parseFloat(input))) {
-            localStorage.setItem(`target_${coinSymbol.toUpperCase()}`, parseFloat(input));
-            // Force re-render
+            const newTarget = parseFloat(input);
+
+            // 1️⃣ Lưu cache
+            localStorage.setItem(`target_${coinSymbol.toUpperCase()}`, newTarget);
+
+            // 2️⃣ Lưu database
+            try {
+                const auth = getAuth();
+                const user = auth.currentUser;
+                const idToken = await user.getIdToken();
+                await fetch(`${baseUrl}/api/coin-targets/${coinSymbol}`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({ target_percent: newTarget })
+                });
+            } catch (err) {
+                console.error("⚠️ Failed to update target:", err.message);
+            }
+
+            // 3️⃣ Re-render
             setPortfolio([...portfolio]);
         }
     };
+
     const getTargetPercent = (coin) => {
-        return parseFloat(localStorage.getItem(`target_${coin.coin_symbol.toUpperCase()}`)) || 50;
+        return parseFloat(localStorage.getItem(`target_${coin.coin_symbol.toUpperCase()}`)) || 0;
     };
 
     const getRealProfitPercent = (coin) => {
@@ -514,6 +556,19 @@ function Dashboard() {
         if (netInvested <= 0) return 0;
         return ((coin.profit_loss / netInvested) * 100).toFixed(1);
     };
+
+    const getProfitEmoji = (coin) => {
+        const percent = parseFloat(getRealProfitPercent(coin));
+
+        if (percent >= 50) return "🤑";
+        if (percent >= 20) return "😎";
+        if (percent > 0) return "🙂";
+        if (percent === 0) return "😐";
+        if (percent > -20) return "😕";
+        if (percent > -50) return "😢";
+        return "😭";
+    };
+
     return (
         <div className="p-0 bg-[#1C1F26] text-white min-h-screen font-mono overflow-y-scroll scrollbar-hide">
             <Navbar />
@@ -622,7 +677,7 @@ function Dashboard() {
                             />
 
                             {lastUpdated && showLastUpdate && (
-                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-4 text-xs text-gray-400 z-10">
+                                <div className="absolute bottom-2 w-full flex justify-center items-center gap-2 text-xs text-gray-400 z-10">
                                     <span>🕒 Last update: {lastUpdated}</span>
                                     <button
                                         onClick={async () => {
@@ -634,9 +689,8 @@ function Dashboard() {
                                                 setRefreshing(false);
                                             }
                                         }}
-                                        className="flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-[#1C1F26] shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631]
-    text-yellow-300 hover:bg-yellow-700 hover:text-white 
-    transition duration-200 border border-[#1C1F26]"
+                                        className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-full shadow-[4px_2px_4px_#0b0f17,_-4px_-2px_4px_#1e2631]
+                                            text-yellow-300 hover:bg-yellow-700 hover:text-white transition duration-200"
                                     >
                                         <span
                                             className={`inline-block transition-transform duration-500 ${refreshing ? "animate-spin" : ""
@@ -752,7 +806,7 @@ function Dashboard() {
                         <div key={index} className="w-full min-h-[680px]">
                             <div className="relative perspective-[1500px] w-full h-full">
                                 <div
-                                    className={`transition-transform duration-700 transform-style-preserve-3d w-full min-h-[680px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
+                                    className={`transition-transform duration-700 ease-in-out transform-style-preserve-3d w-full min-h-[680px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
                                         }`}
                                 >
                                     {/* Mặt trước */}
@@ -796,7 +850,7 @@ function Dashboard() {
                                                     </div>
                                                 </div>
 
-                                                <h2 className="text-3xl font-bold text-yellow-400 mt-4 tracking-wider">
+                                                <h2 className="text-4xl font-bold text-yellow-400 mt-4 tracking-wider">
                                                     {coin.coin_symbol.toUpperCase()}
                                                 </h2>
                                             </div>
@@ -830,7 +884,10 @@ function Dashboard() {
                                             </div>
 
                                             <div className="mt-2 mb-2 text-center border-t border-white/10 pt-2">
-                                                <p className="text-sm text-gray-400">Profit / Loss</p>
+                                                <p className="text-sm text-gray-400 flex items-center justify-center gap-1">
+                                                    <span className="text-xl">{getProfitEmoji(coin)}</span>
+                                                    Profit / Loss
+                                                </p>
                                                 <p className={`flex items-baseline justify-center gap-2 font-bold ${coin.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                                                     <span className="text-2xl">
                                                         ${Math.round(coin.profit_loss).toLocaleString()}
@@ -839,14 +896,12 @@ function Dashboard() {
                                                         ({getRealProfitPercent(coin)}%)
                                                     </span>
                                                 </p>
-
-
                                             </div>
 
-                                            <div className="mt-auto mb-2 flex justify-center gap-4">
+                                            <div className="mt-2 mb-2 flex justify-center gap-4">
                                                 <button
                                                     onClick={() => handleOpenTradeModal(coin, "buy")}
-                                                    className="px-4 py-2 min-w-[96px] rounded-2xl bg-green-600 hover:bg-green-700 text-white text-sm"
+                                                    className="px-4 py-3 min-w-[96px] rounded-2xl bg-green-600 hover:bg-green-700 text-white text-sm"
                                                 >
                                                     Buy
                                                 </button>
@@ -875,7 +930,7 @@ function Dashboard() {
                                                 <span>Update Transactions</span>
                                             </button>
 
-                                            <div className="absolute top-3 right-3">
+                                            <div className="absolute top-3 left-3">
                                                 <select
                                                     className="bg-white/5 text-yellow-300 text-xs rounded-full px-2 py-1
                                                     shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]"
@@ -1042,7 +1097,7 @@ function Dashboard() {
                                             <div className="mt-6 mb-6 text-center">
                                                 <button
                                                     onClick={() => toggleFlip(coin.coin_symbol)}
-                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 active:scale-95 transition rounded-full text-sm text-black font-bold shadow-md"
+                                                    className="inline-flex items-center gap-2 px-8 py-2 bg-yellow-400 hover:bg-yellow-500 active:scale-95 transition rounded-full text-sm text-black font-bold shadow-md"
                                                 >
                                                     <span className="text-lg">↩</span> Back
                                                 </button>
