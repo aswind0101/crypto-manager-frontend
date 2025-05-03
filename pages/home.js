@@ -871,7 +871,7 @@ function Dashboard() {
                                                     Math.abs(coin.current_price - parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase()))) < 0.000001 &&
                                                     Math.round((Date.now() - coin.price_last_updated) / 60000) >= 1 && (
                                                         <p className="text-xs text-gray-400 mt-1">
-                                                            ⚠️ Last price from {formatLastUpdatedDuration(coin.price_last_updated)}
+                                                            ⚠️ Last updated: {formatLastUpdatedDuration(coin.price_last_updated)}
                                                         </p>
                                                     )}
                                             </div>
