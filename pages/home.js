@@ -507,7 +507,7 @@ function Dashboard() {
         isReadyToRender &&
         !loading &&
         Array.isArray(portfolio) &&
-        portfolio.length === 0 && 
+        portfolio.length === 0 &&
         firstLoaded;
 
     if (isEmptyPortfolioView) {
@@ -803,14 +803,14 @@ function Dashboard() {
                 {/* phần còn lại giữ nguyên */}
                 <div className="w-full max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                     {filteredPortfolio.map((coin, index) => (
-                        <div key={index} className="w-full min-h-[680px]">
+                        <div key={index} className="w-full min-h-[700px]">
                             <div className="relative perspective-[1500px] w-full h-full">
                                 <div
-                                    className={`transition-transform duration-700 ease-in-out transform-style-preserve-3d w-full min-h-[680px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
+                                    className={`transition-transform duration-700 ease-in-out transform-style-preserve-3d w-full min-h-[700px] ${flippedCoins[coin.coin_symbol] ? "rotate-y-180" : ""
                                         }`}
                                 >
                                     {/* Mặt trước */}
-                                    <div className="absolute inset-0 backface-hidden min-h-[680px] w-full rounded-xl overflow-hidden">
+                                    <div className="absolute inset-0 backface-hidden min-h-[700px] w-full rounded-xl overflow-hidden">
                                         <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17]
                                                 rounded-xl p-2 shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
                                                 transition-all h-full flex flex-col space-y-4 pb-8 md:pb-10">
@@ -860,8 +860,21 @@ function Dashboard() {
                                                 <p className="text-lg text-yellow-300">
                                                     ${formatCurrency(coin.current_price)} – ${formatCurrency((coin.total_invested - coin.total_sold) / coin.total_quantity)}
                                                 </p>
-                                            </div>
+                                                {coin.is_fallback_price && (
+                                                    <p className="text-xs text-yellow-400 mt-1">
+                                                        ⚠️ Using fallback price (buy price).
+                                                    </p>
+                                                )}
 
+                                                {!coin.is_fallback_price &&
+                                                    coin.price_last_updated &&
+                                                    Math.abs(coin.current_price - parseFloat(localStorage.getItem("price_" + coin.coin_symbol.toUpperCase()))) < 0.000001 &&
+                                                    Math.round((Date.now() - coin.price_last_updated) / 60000) >= 1 && (
+                                                        <p className="text-xs text-gray-400 mt-1">
+                                                            ⚠️ Last price from {formatLastUpdatedDuration(coin.price_last_updated)}
+                                                        </p>
+                                                    )}
+                                            </div>
                                             <div className="grid grid-cols-2 gap-2 w-full px-2 text-center text-sm">
                                                 <div>
                                                     <p className="text-gray-400">🔹 Total Quantity</p>
@@ -918,9 +931,9 @@ function Dashboard() {
                                     </div>
 
                                     {/* Mặt sau */}
-                                    <div className="absolute inset-0 rotate-y-180 backface-hidden min-h-[680px] w-full flex flex-col rounded-xl overflow-hidden">
+                                    <div className="absolute inset-0 rotate-y-180 backface-hidden min-h-[700px] w-full flex flex-col rounded-xl overflow-hidden">
                                         <div className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] text-white rounded-xl p-2 
-                                            shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col items-center justify-center min-h-[680px]">
+                                            shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] flex flex-col items-center justify-center min-h-[700px]">
                                             <button
                                                 onClick={() => router.push(`/transactions?coin=${coin.coin_symbol}`)}
                                                 className="absolute bottom-4 left-4 text-xs text-gray-400 hover:text-yellow-400 
