@@ -31,9 +31,9 @@ export default function StaffList() {
     <div className="p-4">
       <h2 className="text-2xl mb-4">Danh sách nhân viên</h2>
       <div className="mb-4">
-        <input placeholder="Salon ID" value={salonId} onChange={e => setSalonId(e.target.value)} className="border p-2 mr-2"/>
-        <input placeholder="Kỹ năng" value={skill} onChange={e => setSkill(e.target.value)} className="border p-2 mr-2"/>
-        <input placeholder="Rating tối thiểu" value={minRating} onChange={e => setMinRating(e.target.value)} className="border p-2 mr-2"/>
+        <input placeholder="Salon ID" value={salonId} onChange={e => setSalonId(e.target.value)} className="border p-2 mr-2" />
+        <input placeholder="Kỹ năng" value={skill} onChange={e => setSkill(e.target.value)} className="border p-2 mr-2" />
+        <input placeholder="Rating tối thiểu" value={minRating} onChange={e => setMinRating(e.target.value)} className="border p-2 mr-2" />
         <button onClick={fetchStaff} className="bg-blue-500 text-white px-4 py-2 rounded">Tìm kiếm</button>
       </div>
       <div className="grid gap-4">
@@ -43,7 +43,10 @@ export default function StaffList() {
             <p>Vị trí: {staff.position}</p>
             <p>Kỹ năng: {JSON.stringify(staff.skills)}</p>
             <p>Rating: {staff.rating}</p>
-            <a href={`/staff/${staff.staff_id}`} className="text-blue-500">Xem chi tiết</a>
+            <Link href={`/staff/${staff.staff_id}`} className="text-blue-500">
+              Xem chi tiết
+            </Link>
+
           </div>
         ))}
       </div>
