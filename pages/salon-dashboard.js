@@ -1,54 +1,104 @@
-import { useState } from "react";
-import withSalonAuth from "../hoc/withAuthProtection";
-import { FaBars, FaTimes, FaCalendarAlt, FaUsers, FaChartBar } from "react-icons/fa";
-import SalonNavbar from "../components/SalonNavbar";
+// pages/salon-dashboard.js
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import SwipeDashboard from "../components/SwipeDashboard"; // giữ nguyên nếu đã có
+import { FaCalendarAlt, FaUser, FaWrench } from "react-icons/fa";
 
-function SalonDashboard() {
-  const [isMenuOpen, setIsMenuOpen] = useState(true);
+export default function SalonDashboard() {
+  const [token, setToken] = useState(null);
+
+  useEffect(() => {
+    const t = localStorage.getItem('salon_token');
+    setToken(t);
+  }, []);
+
+  const staffsDummy = [
+    {
+      id: 1,
+      name: "Nguyễn Thị A",
+      avatar: "/staff1.jpg",
+      skills: ["Nail", "Hair"],
+      status: "Đang làm"
+    },
+    {
+      id: 2,
+      name: "Trần Văn B",
+      avatar: "/staff2.jpg",
+      skills: ["Spa", "Facial"],
+      status: "Đang chờ"
+    },
+    {
+      id: 3,
+      name: "Lê Thị C",
+      avatar: "/staff3.jpg",
+      skills: ["Makeup"],
+      status: "Không có khách"
+    },
+  ];
+
   return (
-    <div className="flex min-h-screen bg-gradient-to-r from-pink-50 to-purple-100">
-      {/* Thanh điều hướng */}
-      <div className={`${isMenuOpen ? 'block' : 'hidden'} md:block`}>
-        <SalonNavbar />
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-100 to-pink-50 p-6">
+      {!token ? (
+        <div className="flex flex-col items-center justify-center text-center p-8 bg-white/70 backdrop-blur-2xl rounded-2xl shadow-lg hover:shadow-2xl transition-all w-full max-w-md mx-auto">
+          <h2 className="text-2xl font-bold text-pink-500 mb-4">Chào mừng đến Salon!</h2>
+          <p className="text-gray-600 mb-6">Bạn chưa đăng nhập. Đặt lịch hẹn nhanh chóng ngay bây giờ 💅.</p>
+          <Link
+            href="/book-appointment"
+            className="inline-block bg-gradient-to-r from-pink-400 to-purple-400 text-white font-semibold px-8 py-3 rounded-full shadow hover:from-pink-500 hover:to-purple-500 transition-all"
+          >
+            Đặt hẹn ngay
+          </Link>
+        </div>
+      ) : (
+        <div className="max-w-6xl mx-auto">
+          {/* Swipe Dashboard */}
+          <div className="mb-8">
+            <SwipeDashboard portfolio={[]} />
+          </div>
 
-      {/* Nội dung chính */}
-      <main className="flex-1 p-6 md:p-10">
-        {/* Nút đóng/mở menu */}
-        <button
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="mb-4 p-3 bg-purple-500 text-white rounded-full shadow-lg md:hidden"
-        >
-          {isMenuOpen ? <FaTimes /> : <FaBars />}
-        </button>
+          {/* Quick actions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Link href="/appointments" className="bg-white/70 backdrop-blur-lg rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all flex flex-col items-center text-center">
+              <FaCalendarAlt className="text-4xl text-pink-400 mb-2" />
+              <h3 className="text-lg font-semibold text-pink-500">Quản lý lịch hẹn</h3>
+              <p className="text-sm text-gray-500 mt-1">Xem & quản lý tất cả lịch hẹn.</p>
+            </Link>
+            <Link href="/book-appointment" className="bg-white/70 backdrop-blur-lg rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all flex flex-col items-center text-center">
+              <FaUser className="text-4xl text-pink-400 mb-2" />
+              <h3 className="text-lg font-semibold text-pink-500">Đặt hẹn mới</h3>
+              <p className="text-sm text-gray-500 mt-1">Tạo lịch hẹn mới cho khách hàng.</p>
+            </Link>
+            <Link href="/staff" className="bg-white/70 backdrop-blur-lg rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all flex flex-col items-center text-center">
+              <FaWrench className="text-4xl text-pink-400 mb-2" />
+              <h3 className="text-lg font-semibold text-pink-500">Quản lý nhân viên</h3>
+              <p className="text-sm text-gray-500 mt-1">Xem và quản lý danh sách nhân viên.</p>
+            </Link>
+          </div>
 
-        <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-lg p-8">
-          <h1 className="text-3xl font-bold text-purple-700 mb-4">Bảng điều khiển Salon</h1>
-          <p className="text-gray-700 text-lg mb-6">
-            Chào mừng bạn quay lại! Đây là bảng điều khiển chính, nơi bạn có thể quản lý lịch hẹn, nhân viên và các chức năng khác.
-          </p>
+          {/* Staff list */}
+          <h2 className="text-2xl font-bold text-pink-500 mb-4 flex items-center gap-2">
+            👥 Danh sách nhân viên
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {staffsDummy.map((staff) => (
+              <div key={staff.id} className="bg-white/70 backdrop-blur-lg rounded-2xl p-4 shadow-lg hover:shadow-xl flex flex-col items-center text-center">
+                <img
+                  src={staff.avatar && staff.avatar.trim() !== "" ? staff.avatar : '/default-avatar.png'}
+                  alt={staff.name}
+                  className="w-24 h-24 rounded-full mb-3 object-cover border border-red-500 bg-gray-100"
+                />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg hover:scale-105 hover:shadow-2xl transition-all flex flex-col items-start gap-3 cursor-pointer">
-              <FaCalendarAlt className="text-4xl" />
-              <h3 className="text-xl font-semibold">Quản lý lịch hẹn</h3>
-              <p className="text-sm">Xem và quản lý các lịch hẹn của khách hàng.</p>
-            </div>
-            <div className="bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg hover:scale-105 hover:shadow-2xl transition-all flex flex-col items-start gap-3 cursor-pointer">
-              <FaUsers className="text-4xl" />
-              <h3 className="text-xl font-semibold">Quản lý nhân viên</h3>
-              <p className="text-sm">Xem danh sách nhân viên và phân quyền quản lý.</p>
-            </div>
-            <div className="bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg hover:scale-105 hover:shadow-2xl transition-all flex flex-col items-start gap-3 cursor-pointer">
-              <FaChartBar className="text-4xl" />
-              <h3 className="text-xl font-semibold">Báo cáo & Thống kê</h3>
-              <p className="text-sm">Xem báo cáo doanh thu và hiệu suất làm việc.</p>
-            </div>
+                <h4 className="text-lg font-semibold text-pink-500">{staff.name}</h4>
+                <p className="text-sm text-gray-500">{staff.skills.join(', ')}</p>
+                <p className={`text-xs mt-2 ${staff.status === 'Đang làm' ? 'text-green-500' : staff.status === 'Đang chờ' ? 'text-yellow-500' : 'text-gray-500'}`}>
+                  {staff.status}
+                </p>
+              </div>
+
+            ))}
           </div>
         </div>
-      </main>
+      )}
     </div>
   );
 }
-
-export default withSalonAuth(SalonDashboard);
