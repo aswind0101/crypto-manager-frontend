@@ -2,6 +2,7 @@
 import axios from "axios";
 
 export default async function handler(req, res) {
+  const baseUrl = "https://crypto-manager-backend.onrender.com"
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -9,7 +10,7 @@ export default async function handler(req, res) {
   try {
     // Gửi dữ liệu sang backend chính (Render server)
     const response = await axios.post(
-      `${process.env.BACKEND_URL}/api/users`,  // Ví dụ: https://crypto-manager-backend.onrender.com/api/users
+      `${baseUrl}/api/users`,  // Ví dụ: https://crypto-manager-backend.onrender.com/api/users
       req.body,
       {
         headers: { Authorization: req.headers.authorization },
