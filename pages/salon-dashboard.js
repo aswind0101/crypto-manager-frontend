@@ -3,9 +3,47 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import SwipeDashboard from "../components/SwipeDashboard"; // giữ nguyên nếu đã có
 import { FaCalendarAlt, FaUser, FaWrench } from "react-icons/fa";
+import axios from "axios";
+import '../firebase';
+import { getAuth } from "firebase/auth";
 
 export default function SalonDashboard() {
   const [token, setToken] = useState(null);
+  const [staffList, setStaffList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const baseUrl = "https://crypto-manager-backend.onrender.com"
+
+
+  useEffect(() => {
+    const fetchStaff = async () => {
+      try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) {
+          console.log('Chưa đăng nhập.');
+          setLoading(false);
+          return;
+        }
+        const token = await user.getIdToken();
+
+        // Giả sử bạn có salonId lấy từ user info hoặc truyền tạm
+        const salonId = 2; // đổi thành đúng salon_id của bạn nếu cần
+
+        const res = await axios.get(`${baseUrl}/api/staff?salon_id=${salonId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        setStaffList(res.data);
+      } catch (err) {
+        console.error('Lỗi lấy staff:', err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStaff();
+  }, []);
+
 
   useEffect(() => {
     const t = localStorage.getItem('salon_token');
@@ -16,21 +54,21 @@ export default function SalonDashboard() {
     {
       id: 1,
       name: "Nguyễn Thị A",
-      avatar: "/staff1.jpg",
+      avatar: "",
       skills: ["Nail", "Hair"],
       status: "Đang làm"
     },
     {
       id: 2,
       name: "Trần Văn B",
-      avatar: "/staff2.jpg",
+      avatar: "",
       skills: ["Spa", "Facial"],
       status: "Đang chờ"
     },
     {
       id: 3,
       name: "Lê Thị C",
-      avatar: "/staff3.jpg",
+      avatar: "",
       skills: ["Makeup"],
       status: "Không có khách"
     },
@@ -79,24 +117,44 @@ export default function SalonDashboard() {
           <h2 className="text-2xl font-bold text-pink-500 mb-4 flex items-center gap-2">
             👥 Danh sách nhân viên
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {staffsDummy.map((staff) => (
-              <div key={staff.id} className="bg-white/70 backdrop-blur-lg rounded-2xl p-4 shadow-lg hover:shadow-xl flex flex-col items-center text-center">
-                <img
-                  src={staff.avatar && staff.avatar.trim() !== "" ? staff.avatar : '/default-avatar.png'}
-                  alt={staff.name}
-                  className="w-24 h-24 rounded-full mb-3 object-cover border border-red-500 bg-gray-100"
-                />
+          {loading ? (
+            <p className="text-gray-500">Đang tải dữ liệu nhân viên...</p>
+          ) : staffList.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {staffList.map((staff) => {
+                const skills = Array.isArray(staff.skills)
+                  ? staff.skills
+                  : JSON.parse(staff.skills || '[]');
+                return (
+                  <div key={staff.staff_id} className="bg-white rounded-2xl p-4 shadow flex flex-col items-center text-center">
+                    <img
+                      src={'/default-avatar.png'}
+                      alt={staff.full_name}
+                      className="w-24 h-24 rounded-full mb-3 object-cover border border-gray-300"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = '/default-avatar.png';
+                      }}
+                    />
+                    <h4 className="text-lg font-semibold text-pink-500">{staff.full_name}</h4>
+                    <p className="text-sm text-gray-500 mb-1">{staff.position || 'Nhân viên'}</p>
+                    <p className="text-sm text-gray-500 mb-1">
+                      {staff.gender} - {staff.is_freelancer ? 'Freelancer' : 'Nội bộ'}
+                    </p>
+                    <p className="text-sm text-gray-500 mb-1">Kỹ năng: {skills.join(', ')}</p>
+                    <p className="text-sm text-gray-500 mb-1">Kinh nghiệm: {staff.experience_years} năm</p>
+                    <p className="text-sm text-yellow-500 mb-1">
+                      ⭐ {staff.rating ? Number(staff.rating).toFixed(1) : 'N/A'}
+                    </p>
 
-                <h4 className="text-lg font-semibold text-pink-500">{staff.name}</h4>
-                <p className="text-sm text-gray-500">{staff.skills.join(', ')}</p>
-                <p className={`text-xs mt-2 ${staff.status === 'Đang làm' ? 'text-green-500' : staff.status === 'Đang chờ' ? 'text-yellow-500' : 'text-gray-500'}`}>
-                  {staff.status}
-                </p>
-              </div>
-
-            ))}
-          </div>
+                    <p className="text-xs italic text-gray-400 mt-2">{staff.bio || 'Chưa có mô tả.'}</p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-gray-500">Chưa có nhân viên nào.</p>
+          )}
         </div>
       )}
     </div>
