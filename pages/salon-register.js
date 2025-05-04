@@ -4,6 +4,7 @@ import { auth } from "../firebase";
 import { useRouter } from "next/router";
 import axios from "axios";
 import { FaUserPlus } from "react-icons/fa";
+import Link from 'next/link';
 
 export default function SalonRegister() {
     const [fullName, setFullName] = useState("");
@@ -133,10 +134,11 @@ export default function SalonRegister() {
 
                 <p className="mt-4 text-center text-sm">
                     Đã có tài khoản?{" "}
-                    <a href="/salon-login" className="text-purple-500 hover:underline">
+                    <Link href="/salon-login" className="text-purple-500 hover:underline">
                         Đăng nhập
-                    </a>
+                    </Link>
                 </p>
+
             </form>
         </div>
     );
