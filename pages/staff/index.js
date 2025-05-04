@@ -30,24 +30,43 @@ export default function StaffList() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl mb-4">Danh sách nhân viên</h2>
-      <div className="mb-4">
-        <input placeholder="Salon ID" value={salonId} onChange={e => setSalonId(e.target.value)} className="border p-2 mr-2" />
-        <input placeholder="Kỹ năng" value={skill} onChange={e => setSkill(e.target.value)} className="border p-2 mr-2" />
-        <input placeholder="Rating tối thiểu" value={minRating} onChange={e => setMinRating(e.target.value)} className="border p-2 mr-2" />
-        <button onClick={fetchStaff} className="bg-blue-500 text-white px-4 py-2 rounded">Tìm kiếm</button>
+      <h2 className="text-2xl font-bold text-purple-600 mb-4">Danh sách nhân viên</h2>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <input
+          placeholder="Salon ID"
+          value={salonId}
+          onChange={e => setSalonId(e.target.value)}
+          className="border border-gray-300 p-2 rounded w-40"
+        />
+        <input
+          placeholder="Kỹ năng"
+          value={skill}
+          onChange={e => setSkill(e.target.value)}
+          className="border border-gray-300 p-2 rounded w-40"
+        />
+        <input
+          placeholder="Rating tối thiểu"
+          value={minRating}
+          onChange={e => setMinRating(e.target.value)}
+          className="border border-gray-300 p-2 rounded w-40"
+        />
+        <button
+          onClick={fetchStaff}
+          className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded shadow"
+        >
+          Tìm kiếm
+        </button>
       </div>
       <div className="grid gap-4">
         {staffList.map(staff => (
-          <div key={staff.staff_id} className="border p-4 rounded shadow">
-            <h3 className="text-lg font-bold">{staff.full_name}</h3>
-            <p>Vị trí: {staff.position}</p>
-            <p>Kỹ năng: {JSON.stringify(staff.skills)}</p>
-            <p>Rating: {staff.rating}</p>
-            <Link href={`/staff/${staff.staff_id}`} className="text-blue-500">
-              Xem chi tiết
+          <div key={staff.staff_id} className="border border-gray-200 p-4 rounded-xl shadow bg-white/80 backdrop-blur-md">
+            <h3 className="text-lg font-bold text-purple-600">{staff.full_name}</h3>
+            <p className="text-gray-700">Vị trí: {staff.position || 'Chưa cập nhật'}</p>
+            <p className="text-gray-700">Kỹ năng: {JSON.stringify(staff.skills) || 'Chưa có'}</p>
+            <p className="text-gray-700">Rating: {staff.rating || 'N/A'}</p>
+            <Link href={`/staff/${staff.staff_id}`}>
+              <span className="text-purple-500 hover:underline inline-block mt-2">Xem chi tiết</span>
             </Link>
-
           </div>
         ))}
       </div>
