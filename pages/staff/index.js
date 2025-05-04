@@ -16,7 +16,7 @@ export default function StaffList() {
       if (minRating) params.min_rating = minRating;
 
       const res = await axios.get('/api/staff', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('salon_token')}` },
         params
       });
       setStaffList(res.data);
