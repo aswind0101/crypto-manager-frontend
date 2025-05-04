@@ -8,9 +8,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Gửi dữ liệu sang backend chính (Render server)
     const response = await axios.post(
-      `${baseUrl}/api/users`,  // Ví dụ: https://crypto-manager-backend.onrender.com/api/users
+      `${baseUrl}/api/users`,
       req.body,
       {
         headers: { Authorization: req.headers.authorization },
@@ -20,6 +19,14 @@ export default async function handler(req, res) {
     return res.status(200).json(response.data);
   } catch (error) {
     console.error("API salon-register error:", error.response?.data || error.message);
-    return res.status(500).json({ error: "Đăng ký thất bại" });
+
+    // Lấy lỗi chi tiết hơn
+    const errorMessage =
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.message ||
+      "Đăng ký thất bại";
+
+    return res.status(500).json({ error: errorMessage });
   }
 }

@@ -1,145 +1,133 @@
-import { useState } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth } from "../firebase";
-import { useRouter } from "next/router";
-import axios from "axios";
-import { FaUserPlus } from "react-icons/fa";
+// pages/salon-register.js
+import { useState } from 'react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
+import axios from 'axios';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 
 export default function SalonRegister() {
-    const [fullName, setFullName] = useState("");
-    const [phone, setPhone] = useState("");
-    const [role, setRole] = useState("customer");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
+    const [fullName, setFullName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    const handleRegister = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setError('');
+        setLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
             const token = await userCredential.user.getIdToken();
-
             await axios.post(
-                "/api/salon-register",
+                '/api/salon-register',
                 {
                     firebase_uid: userCredential.user.uid,
                     full_name: fullName,
                     email,
                     phone,
-                    role,
+                    role: 'staff',
                 },
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
+            router.push('/salon-dashboard');
+        } catch (error) {
+            console.error("Đăng ký lỗi:", error);
 
-            // Success
-            router.push("/salon-dashboard");
-        } catch (err) {
-            console.error("Đăng ký lỗi:", err);
+            const firebaseError = error?.code || error?.response?.data?.error || "Đăng ký thất bại";
 
-            // Nếu đã tạo user trên Firebase nhưng API fail ➔ xoá user luôn
-            const currentUser = auth.currentUser;
-            if (currentUser) {
-                await currentUser.delete(); // Xoá khỏi Firebase
-            }
-
-            if (err.code === "auth/email-already-in-use") {
-                setError("Email đã tồn tại.");
+            if (firebaseError.includes("email-already-in-use")) {
+                setError("Email này đã được đăng ký trước đó. Vui lòng dùng email khác.");
+            } else if (firebaseError.includes("invalid-email")) {
+                setError("Địa chỉ email không hợp lệ.");
+            } else if (firebaseError.includes("weak-password")) {
+                setError("Mật khẩu quá yếu. Vui lòng chọn mật khẩu mạnh hơn.");
             } else {
-                setError("Có lỗi xảy ra, vui lòng thử lại");
+                setError(firebaseError); // fallback cho các lỗi khác
             }
         }
-
+        setLoading(false);
     };
 
     return (
-        <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-pink-50 to-purple-100 p-4 text-gray-400 font-mono">
-            <form
-                onSubmit={handleRegister}
-                className="bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-xl w-full max-w-sm"
-            >
-                <h2 className="text-3xl font-bold mb-6 text-center text-purple-600 flex items-center justify-center gap-2">
-                    <FaUserPlus /> Salon Register
-                </h2>
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-r from-pink-100 to-purple-200 p-4">
+            <div className="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-2xl shadow-lg p-8">
+                <h2 className="text-3xl font-bold text-center text-purple-700 mb-6">Đăng ký Salon</h2>
+                <form onSubmit={handleSubmit}>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-white mb-1">Họ tên</label>
+                        <input
+                            type="text"
+                            value={fullName}
+                            onChange={(e) => {
+                                setFullName(e.target.value);
+                                setError("");
+                            }}
+                            className="w-full p-3 border border-gray-300 rounded-xl text-gray-900 focus:ring-2 focus:ring-pink-400 focus:border-pink-400 focus:outline-none transition-all"
+                            placeholder="Nhập họ tên..."
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-white mb-1">Số điện thoại</label>
+                        <input
+                            type="text"
+                            value={phone}
+                            onChange={(e) => {
+                                setPhone(e.target.value);
+                                setError("");
+                            }}
+                            className="w-full p-3 border border-gray-300 rounded-xl text-gray-900 focus:ring-2 focus:ring-pink-400 focus:border-pink-400 focus:outline-none transition-all"
+                            placeholder="Nhập số điện thoại..."
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-white mb-1">Email</label>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => {
+                                setEmail(e.target.value);
+                                setError("");
+                            }}
+                            className="w-full p-3 border border-gray-300 rounded-xl text-gray-900 focus:ring-2 focus:ring-pink-400 focus:border-pink-400 focus:outline-none transition-all"
+                            placeholder="Nhập email..."
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-white mb-1">Mật khẩu</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => {
+                                setPassword(e.target.value);
+                                setError("");
+                            }}
+                            className="w-full p-3 border border-gray-300 rounded-xl text-gray-900 focus:ring-2 focus:ring-pink-400 focus:border-pink-400 focus:outline-none transition-all"
+                            placeholder="Nhập mật khẩu..."
+                        />
+                    </div>
 
-                {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
-
-                <div className="mb-4">
-                    <label className="block mb-1 text-sm font-medium text-purple-600">Họ tên</label>
-                    <input
-                        type="text"
-                        placeholder="Nhập họ tên"
-                        className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 bg-white/90"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        required
-                    />
-                </div>
-
-                <div className="mb-4">
-                    <label className="block mb-1 text-sm font-medium text-purple-600">Số điện thoại</label>
-                    <input
-                        type="tel"
-                        placeholder="Nhập số điện thoại"
-                        className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 bg-white/90"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        required
-                    />
-                </div>
-
-                <div className="mb-4">
-                    <label className="block mb-1 text-sm font-medium text-purple-600">Vai trò</label>
-                    <select
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-xl bg-white/90 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400"
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white font-semibold rounded-xl hover:from-pink-600 hover:to-purple-600 transition-all shadow-lg disabled:opacity-50"
                     >
-                        <option value="customer">Khách hàng</option>
-                        <option value="staff">Nhân viên</option>
-                    </select>
-                </div>
+                        {loading ? 'Đang đăng ký...' : 'Đăng ký'}
+                    </button>
 
-                <div className="mb-4">
-                    <label className="block mb-1 text-sm font-medium text-purple-600">Email</label>
-                    <input
-                        type="email"
-                        placeholder="Nhập email"
-                        className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 bg-white/90"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
-                </div>
+                    {error && <p className="text-red-500 mt-3 text-sm">{error}</p>}
+                </form>
 
-                <div className="mb-6">
-                    <label className="block mb-1 text-sm font-medium text-purple-600">Mật khẩu</label>
-                    <input
-                        type="password"
-                        placeholder="Nhập mật khẩu"
-                        className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 bg-white/90"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                    />
-                </div>
-
-                <button className="bg-purple-500 hover:bg-purple-600 text-white font-semibold w-full py-3 rounded-xl shadow transition-all duration-300">
-                    Đăng ký
-                </button>
-
-                <p className="mt-4 text-center text-sm">
-                    Đã có tài khoản?{" "}
+                <p className="mt-4 text-center text-sm text-gray-700">
+                    Đã có tài khoản?{' '}
                     <Link href="/salon-login" className="text-purple-500 hover:underline">
                         Đăng nhập
                     </Link>
                 </p>
-
-            </form>
+            </div>
         </div>
     );
 }
