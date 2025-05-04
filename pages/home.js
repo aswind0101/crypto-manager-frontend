@@ -345,7 +345,7 @@ function Dashboard() {
                     Authorization: `Bearer ${idToken}`,
                 },
             });
-
+            console.log("🔥 Your ID token:", idToken);
             if (!response.ok) throw new Error("Failed to fetch portfolio");
 
             const data = await response.json();
