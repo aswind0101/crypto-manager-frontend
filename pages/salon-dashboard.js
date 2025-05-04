@@ -1,4 +1,4 @@
-import withSalonAuth from "../withSalonAuth";
+import withSalonAuth from "../hoc/withAuthProtection";
 import { FaHome } from "react-icons/fa";
 
 function SalonDashboard() {
