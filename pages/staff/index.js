@@ -1,5 +1,6 @@
 // pages/staff/index.js
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import axios from 'axios';
 
 export default function StaffList() {
