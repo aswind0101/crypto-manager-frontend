@@ -62,6 +62,7 @@ const EditSalon = () => {
                     name: salon.name,
                     address: salon.address,
                     phone: salon.phone,
+                    email: salon.email,
                     owner_user_id: salon.owner_user_id,
                     status: salon.status
                 })
@@ -111,6 +112,16 @@ const EditSalon = () => {
                         value={salon.phone}
                         onChange={(e) => setSalon({ ...salon, phone: e.target.value })}
                         className="w-full p-2 bg-gray-800 rounded border border-gray-600"
+                    />
+                </div>
+                <div>
+                    <label className="block mb-1">Email</label>
+                    <input
+                        type="email"
+                        placeholder="Email (optional)"
+                        value={salon.email || ""}
+                        onChange={(e) => setSalon({ ...salon, email: e.target.value })}
+                        className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
                     />
                 </div>
                 <div>

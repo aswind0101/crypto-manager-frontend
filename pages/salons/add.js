@@ -1,30 +1,42 @@
-// pages/salons/add.js
-import React, { useState } from "react";
-import { getAuth } from "firebase/auth";
-import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
+import Navbar from "../../components/Navbar";
 import withAuthProtection from "../../hoc/withAuthProtection";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/router";
 
-const AddSalon = () => {
+function AddSalon() {
     const [name, setName] = useState("");
     const [address, setAddress] = useState("");
     const [phone, setPhone] = useState("");
+    const [email, setEmail] = useState("");
     const [ownerUserId, setOwnerUserId] = useState("");
     const [status, setStatus] = useState("active");
-    const [loading, setLoading] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [msg, setMsg] = useState("");
     const router = useRouter();
+
+    useEffect(() => {
+        const auth = getAuth();
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setCurrentUser(user);
+                setOwnerUserId(user.displayName || user.uid); // Tự động gán UID
+            }
+        });
+        return () => unsubscribe();
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!name.trim()) {
-            alert("Name is required");
+        if (!name || !address || !phone || !ownerUserId || !status) {
+            setMsg("❗ Please fill all required fields.");
             return;
         }
-        setLoading(true);
-        try {
-            const auth = getAuth();
-            const user = auth.currentUser;
-            const idToken = await user.getIdToken();
 
+        setIsSubmitting(true);
+        try {
+            const idToken = await currentUser.getIdToken();
             const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons", {
                 method: "POST",
                 headers: {
@@ -35,86 +47,107 @@ const AddSalon = () => {
                     name,
                     address,
                     phone,
-                    owner_user_id: ownerUserId || null,
+                    email,
+                    owner_user_id: ownerUserId,
                     status
                 })
             });
+
             if (res.ok) {
-                router.push("/salons");
+                setMsg("✅ Salon added successfully!");
+                setTimeout(() => {
+                    router.push("/salons");
+                }, 1500);
             } else {
-                const err = await res.json();
-                alert(err.error || "Something went wrong");
+                const error = await res.json();
+                setMsg("❌ " + error.error);
             }
         } catch (err) {
-            console.error("Error adding salon:", err.message);
-            alert("Error adding salon");
-        } finally {
-            setLoading(false);
+            console.error("❌ Error:", err.message);
+            setMsg("❌ Something went wrong.");
         }
+        setIsSubmitting(false);
     };
 
     return (
-        <div className="p-6 min-h-screen bg-[#1C1F26] text-white">
-            <h1 className="text-2xl font-bold mb-4">➕ Add New Salon</h1>
-            <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
-                <div>
-                    <label className="block mb-1">Name *</label>
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full p-2 bg-gray-800 rounded border border-gray-600"
-                        required
-                    />
-                </div>
-                <div>
-                    <label className="block mb-1">Address</label>
-                    <textarea
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        className="w-full p-2 bg-gray-800 rounded border border-gray-600"
-                    ></textarea>
-                </div>
-                <div>
-                    <label className="block mb-1">Phone</label>
-                    <input
-                        type="text"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full p-2 bg-gray-800 rounded border border-gray-600"
-                    />
-                </div>
-                <div>
-                    <label className="block mb-1">Owner User UID</label>
-                    <input
-                        type="text"
-                        value={ownerUserId}
-                        onChange={(e) => setOwnerUserId(e.target.value)}
-                        className="w-full p-2 bg-gray-800 rounded border border-gray-600"
-                        placeholder="(Optional)"
-                    />
-                </div>
-                <div>
-                    <label className="block mb-1">Status</label>
-                    <select
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value)}
-                        className="w-full p-2 bg-gray-800 rounded border border-gray-600"
-                    >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                </div>
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white"
+        <div className="bg-[#1C1F26] min-h-screen text-white p-4 font-mono">
+            <Navbar />
+            <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4">➕ Add Salon</h1>
+
+            <form onSubmit={handleSubmit} className="max-w-xl mx-auto p-6 rounded-2xl shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631] space-y-4 mb-6">
+                <input
+                    type="text"
+                    placeholder="Salon Name *"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
+                    required
+                />
+                <input
+                    type="text"
+                    placeholder="Address *"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
+                    required
+                />
+                <input
+                    type="text"
+                    placeholder="Phone *"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
+                    required
+                />
+                <input
+                    type="email"
+                    placeholder="Email (optional)"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
+                />
+                <input
+                    type="text"
+                    placeholder="Owner UID *"
+                    value={ownerUserId}
+                    onChange={(e) => setOwnerUserId(e.target.value)}
+                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
+                    required
+                />
+                <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full bg-[#1C1F26]"
                 >
-                    {loading ? "Saving..." : "Save Salon"}
-                </button>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+
+                <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4 w-full max-w-md mx-auto">
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className={`flex-1 font-semibold py-2 rounded-xl transition
+                            ${isSubmitting
+                                ? "bg-green-400 cursor-not-allowed"
+                                : "bg-green-600 hover:bg-green-700 text-white"}`}
+                    >
+                        {isSubmitting ? "Saving..." : "Add"}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => router.push('/salons')}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-xl transition"
+                    >
+                        Cancel
+                    </button>
+                </div>
+
+                {msg && <p className="text-yellow-300 text-sm text-center mt-2">{msg}</p>}
             </form>
         </div>
     );
-};
+}
 
 export default withAuthProtection(AddSalon);
