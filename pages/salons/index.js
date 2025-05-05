@@ -27,7 +27,34 @@ const SalonsList = () => {
             setLoading(false);
         }
     };
-
+    const handleDelete = async (id) => {
+        if (!confirm("Are you sure you want to delete this salon?")) return;
+    
+        try {
+            const auth = getAuth();
+            const user = auth.currentUser;
+            const idToken = await user.getIdToken();
+    
+            const res = await fetch(`https://crypto-manager-backend.onrender.com/api/salons/${id}`, {
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${idToken}`
+                }
+            });
+    
+            if (res.ok) {
+                alert("Salon deleted");
+                fetchSalons();  // Refresh danh sách sau khi xóa
+            } else {
+                const err = await res.json();
+                alert(err.error || "Something went wrong");
+            }
+        } catch (err) {
+            console.error("Error deleting salon:", err.message);
+            alert("Error deleting salon");
+        }
+    };
+    
     useEffect(() => {
         fetchSalons();
     }, []);
@@ -64,11 +91,18 @@ const SalonsList = () => {
                                     <td className="px-3 py-2">{salon.phone}</td>
                                     <td className="px-3 py-2 text-xs">{salon.owner_user_id}</td>
                                     <td className="px-3 py-2">{salon.status}</td>
-                                    <td className="px-3 py-2">
+                                    <td className="px-3 py-2 flex gap-4">
                                         <Link href={`/salons/edit/${salon.id}`}>
                                             <span className="text-yellow-400 hover:underline cursor-pointer">Edit</span>
                                         </Link>
+                                        <button
+                                            onClick={() => handleDelete(salon.id)}
+                                            className="text-red-400 hover:underline"
+                                        >
+                                            Delete
+                                        </button>
                                     </td>
+
                                 </tr>
                             ))}
                         </tbody>
