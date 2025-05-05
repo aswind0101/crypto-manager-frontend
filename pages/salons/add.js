@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { getAuth } from "firebase/auth";
 import { useRouter } from "next/router";
-import withAuthProtection from "../hoc/withAuthProtection";
+import withAuthProtection from "../../hoc/withAuthProtection";
 
 const AddSalon = () => {
     const [name, setName] = useState("");
