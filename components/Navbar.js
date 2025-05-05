@@ -1,6 +1,6 @@
 // components/Navbar.js
 import Link from "next/link";
-import { signOut } from "firebase/auth";
+import { signOut, getAuth } from "firebase/auth";
 import { auth } from "../firebase";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
@@ -16,13 +16,18 @@ export default function Navbar() {
     const [expensesOpen, setExpensesOpen] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const menuRef = useRef();
-
-
+    const SUPER_ADMINS = ["D9nW6SLT2pbUuWbNVnCgf2uINok2"];  // 👈 Thay UID của bạn vào đây
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+
+            if (parsedUser.uid && SUPER_ADMINS.includes(parsedUser.uid)) {
+                setIsAdmin(true);
+            }
         }
     }, []);
 
@@ -95,6 +100,11 @@ export default function Navbar() {
                     <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiList /> Transactions
                     </Link>
+                    {isAdmin && (
+                        <Link href="/salons" className="hover:text-cyan-300 transition flex items-center gap-1">
+                            🏠 Salons
+                        </Link>
+                    )}
                     <div className="relative group">
                         <button className="flex items-center gap-1 hover:text-cyan-300 transition">
                             💳 Debts ▾
@@ -175,6 +185,15 @@ export default function Navbar() {
                         >
                             <FiList /> Transactions
                         </Link>
+                        {isAdmin && (
+                            <Link
+                                href="/salons"
+                                onClick={() => setMenuOpen(false)}
+                                className="hover:text-cyan-300 flex items-center gap-2"
+                            >
+                                🏠 Salons
+                            </Link>
+                        )}
                         {/* Debts menu */}
                         <button
                             onClick={() => setDebtsOpen(!debtsOpen)}
