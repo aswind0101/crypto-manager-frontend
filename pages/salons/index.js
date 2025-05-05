@@ -1,6 +1,6 @@
 // pages/salons/index.js
 import React, { useEffect, useState } from "react";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/router";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import Link from "next/link";
@@ -8,14 +8,24 @@ import Navbar from "../../components/Navbar";
 
 function Salons() {
     const [salons, setSalons] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetchSalons();
+        const auth = getAuth();
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setCurrentUser(user);
+                fetchSalons(user);
+            }
+        });
+        return () => unsubscribe();
     }, []);
 
-    const fetchSalons = async () => {
+
+    const fetchSalons = async (user) => {
         try {
-            const token = (await getAuth().currentUser.getIdToken());
+            const token = await user.getIdToken();
             const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -24,12 +34,13 @@ function Salons() {
         } catch (error) {
             console.error("Failed to fetch salons:", error.message);
         }
+        setIsLoading(false);
     };
 
     const handleDelete = async (id) => {
         if (!confirm("Are you sure you want to delete this salon?")) return;
         try {
-            const token = (await getAuth().currentUser.getIdToken());
+            const token = await currentUser.getIdToken();
             const res = await fetch(`https://crypto-manager-backend.onrender.com/api/salons/${id}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` }
@@ -64,7 +75,9 @@ function Salons() {
 
                 {/* Table */}
                 <div className="overflow-x-auto bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] max-w-4xl mx-auto">
-                    {salons.length === 0 ? (
+                    {isLoading ? (
+                        <p className="text-center text-yellow-300 py-6">⏳ Loading salons...</p>
+                    ) : salons.length === 0 ? (
                         <p className="text-center text-yellow-300 py-6">✨ No salons yet. Add your first one!</p>
                     ) : (
                         <table className="min-w-full text-[11px] text-white">
