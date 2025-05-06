@@ -64,7 +64,26 @@ export default function Login() {
                 } catch (err) {
                     console.error("❌ Error calling /api/user-alerts/init (session):", err);
                 }
-
+                try {
+                    // 2️⃣ Gọi API lấy role
+                    const idToken = await user.getIdToken();
+                    const resRole = await fetch("https://crypto-manager-backend.onrender.com/api/user-role", {
+                        headers: {
+                            Authorization: `Bearer ${idToken}`
+                        }
+                    });
+                    if (resRole.ok) {
+                        const data = await resRole.json();
+                        console.log("✅ User role:", data);
+                        // Lưu role vào localStorage (cùng object user)
+                        const updatedUserData = { ...userData, role: data.role };
+                        localStorage.setItem("user", JSON.stringify(updatedUserData));
+                    } else {
+                        console.warn("⚠️ Failed to fetch user role");
+                    }
+                } catch (err) {
+                    console.error("❌ Error calling /api/user-role:", err);
+                }
                 // ✅ Đợi chắc chắn đã login ➔ chuyển trang
                 router.push("/home");
             }

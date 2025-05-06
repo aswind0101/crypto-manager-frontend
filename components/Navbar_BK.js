@@ -1,6 +1,6 @@
 // components/Navbar.js
 import Link from "next/link";
-import { signOut } from "firebase/auth";
+import { signOut, getAuth } from "firebase/auth";
 import { auth } from "../firebase";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
@@ -16,13 +16,8 @@ export default function Navbar() {
     const [expensesOpen, setExpensesOpen] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const menuRef = useRef();
-
-    const SUPER_ADMINS = ["D9nW6SLT2pbUuWbNVnCgf2uINok2"];
-
-    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-    const [isSalonChu, setIsSalonChu] = useState(false);
-    const [isSalonNhanVien, setIsSalonNhanVien] = useState(false);
-    const [isSalonKhachHang, setIsSalonKhachHang] = useState(false);
+    const SUPER_ADMINS = ["D9nW6SLT2pbUuWbNVnCgf2uINok2"];  // 👈 Thay UID của bạn vào đây
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -31,11 +26,8 @@ export default function Navbar() {
             setUser(parsedUser);
 
             if (parsedUser.uid && SUPER_ADMINS.includes(parsedUser.uid)) {
-                setIsSuperAdmin(true);
+                setIsAdmin(true);
             }
-            if (parsedUser.role === "Salon_Chu") setIsSalonChu(true);
-            if (parsedUser.role === "Salon_NhanVien") setIsSalonNhanVien(true);
-            if (parsedUser.role === "Salon_KhachHang") setIsSalonKhachHang(true);
         }
     }, []);
 
@@ -45,10 +37,16 @@ export default function Navbar() {
                 setMenuOpen(false);
             }
         };
+
         if (menuOpen) {
             document.addEventListener("mousedown", handleClickOutside);
+        } else {
+            document.removeEventListener("mousedown", handleClickOutside);
         }
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
     }, [menuOpen]);
 
     const handleLogout = async () => {
@@ -75,9 +73,12 @@ export default function Navbar() {
     return (
         <>
             <nav className="w-full text-white px-4 py-3 flex justify-between items-center rounded-b-2xl z-50">
+
+                {/* Logo + App name */}
                 <Link href="/home" className="flex items-center gap-2 font-bold text-xl text-yellow-400 hover:text-yellow-300 transition cursor-pointer">
                     💰 <span className="tracking-wide">PFMS</span>
                 </Link>
+
 
                 {/* Desktop User Info */}
                 {user && (
@@ -99,24 +100,11 @@ export default function Navbar() {
                     <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
                         <FiList /> Transactions
                     </Link>
-
-                    {(isSuperAdmin || isSalonChu) && (
+                    {isAdmin && (
                         <Link href="/salons" className="hover:text-cyan-300 transition flex items-center gap-1">
                             🏠 Salons
                         </Link>
                     )}
-                    {(isSuperAdmin || isSalonChu) && (
-                        <Link href="/services" className="hover:text-cyan-300 transition flex items-center gap-1">
-                            💈 Services
-                        </Link>
-                    )}
-                    {(isSalonNhanVien || isSalonKhachHang) && (
-                        <Link href="/appointments" className="hover:text-cyan-300 transition flex items-center gap-1">
-                            📅 Appointments
-                        </Link>
-                    )}
-
-                    {/* Debts dropdown */}
                     <div className="relative group">
                         <button className="flex items-center gap-1 hover:text-cyan-300 transition">
                             💳 Debts ▾
@@ -131,7 +119,6 @@ export default function Navbar() {
                         </div>
                     </div>
 
-                    {/* Expenses dropdown */}
                     <div className="relative group">
                         <button className="flex items-center gap-1 hover:text-cyan-300 transition">
                             💸 Expenses ▾
@@ -151,7 +138,10 @@ export default function Navbar() {
                     </Link>
 
                     {user && (
-                        <button onClick={handleLogout} className="hover:text-red-400 transition flex items-center gap-1">
+                        <button
+                            onClick={handleLogout}
+                            className="hover:text-red-400 transition flex items-center gap-1"
+                        >
                             <FiLogOut /> Logout
                         </button>
                     )}
@@ -161,6 +151,7 @@ export default function Navbar() {
                 <button className="text-2xl" onClick={() => setMenuOpen(!menuOpen)}>
                     {menuOpen ? <FaTimes /> : <FaBars />}
                 </button>
+
             </nav>
 
             {/* Mobile Menu */}
@@ -180,28 +171,29 @@ export default function Navbar() {
                                 <div className="text-xs mt-1 font-mono">UID: {user.uid}</div>
                             </div>
                         )}
-                        <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                        <Link
+                            href="/home"
+                            onClick={() => setMenuOpen(false)}
+                            className="hover:text-cyan-300 flex items-center gap-2"
+                        >
                             <FiHome /> Home
                         </Link>
-                        <Link href="/transactions" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                        <Link
+                            href="/transactions"
+                            onClick={() => setMenuOpen(false)}
+                            className="hover:text-cyan-300 flex items-center gap-2"
+                        >
                             <FiList /> Transactions
                         </Link>
-                        {(isSuperAdmin || isSalonChu) && (
-                            <>
-                                <Link href="/salons" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                    🏠 Salons
-                                </Link>
-                                <Link href="/services" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                    💈 Services
-                                </Link>
-                            </>
-                        )}
-                        {(isSalonNhanVien || isSalonKhachHang) && (
-                            <Link href="/appointments" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                📅 Appointments
+                        {isAdmin && (
+                            <Link
+                                href="/salons"
+                                onClick={() => setMenuOpen(false)}
+                                className="hover:text-cyan-300 flex items-center gap-2"
+                            >
+                                🏠 Salons
                             </Link>
                         )}
-
                         {/* Debts menu */}
                         <button
                             onClick={() => setDebtsOpen(!debtsOpen)}
