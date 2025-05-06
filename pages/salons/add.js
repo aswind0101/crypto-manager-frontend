@@ -3,6 +3,8 @@ import Navbar from "../../components/Navbar";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/router";
+import { parsePhoneNumberFromString, AsYouType } from "libphonenumber-js";
+
 
 function AddSalon() {
     const [name, setName] = useState("");
@@ -27,17 +29,80 @@ function AddSalon() {
         return () => unsubscribe();
     }, []);
 
+    const handlePhoneChange = (value) => {
+        // Remove all non-digit characters
+        let digitsOnly = value.replace(/\D/g, "");
+
+        let hasCountryCode = false;
+
+        // Kiểm tra nếu bắt đầu bằng 1
+        if (digitsOnly.startsWith("1")) {
+            hasCountryCode = true;
+        }
+
+        // ✅ Giới hạn:
+        if (hasCountryCode) {
+            if (digitsOnly.length > 11) {
+                digitsOnly = digitsOnly.slice(0, 11);
+            }
+        } else {
+            if (digitsOnly.length > 10) {
+                digitsOnly = digitsOnly.slice(0, 10);
+            }
+        }
+
+        // Khi không còn số nào ➔ clear
+        if (digitsOnly.length === 0) {
+            setPhone("");
+            return;
+        }
+
+        // Nếu chỉ còn <= 3 số (chỉ area code) ➔ giữ nguyên số để user xoá thoải mái
+        if (
+            (hasCountryCode && digitsOnly.length <= 4) ||  // ví dụ: 1 + 3 số local
+            (!hasCountryCode && digitsOnly.length <= 3)    // ví dụ: chỉ 3 số local
+        ) {
+            setPhone(digitsOnly);
+            return;
+        }
+
+        // Format khi đủ số
+        const formatter = new AsYouType('US');
+        formatter.input(digitsOnly);
+        let formatted = formatter.formattedOutput;
+
+        // Thêm + nếu cần
+        if (hasCountryCode && !formatted.startsWith('+')) {
+            formatted = `+${formatted}`;
+        }
+
+        setPhone(formatted);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!name || !address || !phone || !email || !ownerUserId || !status) {
             setMsg("❗ Please fill in all required fields.");
             return;
         }
+
+        // ✅ Kiểm tra email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                setMsg("❗ Invalid email format.");
-                return;
-            }
+        if (!emailRegex.test(email)) {
+            setMsg("❗ Invalid email format.");
+            return;
+        }
+
+        // ✅ Kiểm tra số điện thoại Mỹ
+        const phoneNumber = parsePhoneNumberFromString(phone, 'US');
+        if (!phoneNumber || !phoneNumber.isValid()) {
+            setMsg("❗ Invalid US phone number.");
+            return;
+        }
+
+        // ✅ Chuẩn hoá số điện thoại (luôn gửi dạng E.164 ví dụ +1...)
+        const formattedPhone = phoneNumber.number;
+
         setIsSubmitting(true);
         try {
             const idToken = await currentUser.getIdToken();
@@ -50,13 +115,13 @@ function AddSalon() {
                 body: JSON.stringify({
                     name,
                     address,
-                    phone,
+                    phone: formattedPhone,
                     email,
                     owner_user_id: ownerUserId,
                     status
                 })
             });
- 
+
             if (res.ok) {
                 setMsg("✅ Salon added successfully!");
                 setTimeout(() => {
@@ -97,12 +162,13 @@ function AddSalon() {
                 />
                 <input
                     type="text"
-                    placeholder="Phone *"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
                     className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
                     required
+                    placeholder="Phone"
                 />
+
                 <input
                     type="email"
                     placeholder="Email *"
