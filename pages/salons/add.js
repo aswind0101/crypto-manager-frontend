@@ -29,11 +29,15 @@ function AddSalon() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!name || !address || !phone || !ownerUserId || !status) {
-            setMsg("❗ Please fill all required fields.");
+        if (!name || !address || !phone || !email || !ownerUserId || !status) {
+            setMsg("❗ Please fill in all required fields.");
             return;
         }
-
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                setMsg("❗ Invalid email format.");
+                return;
+            }
         setIsSubmitting(true);
         try {
             const idToken = await currentUser.getIdToken();
@@ -52,7 +56,7 @@ function AddSalon() {
                     status
                 })
             });
-
+ 
             if (res.ok) {
                 setMsg("✅ Salon added successfully!");
                 setTimeout(() => {
@@ -101,10 +105,11 @@ function AddSalon() {
                 />
                 <input
                     type="email"
-                    placeholder="Email (optional)"
+                    placeholder="Email *"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
+                    required
                 />
                 <input
                     type="text"
