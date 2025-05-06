@@ -30,12 +30,22 @@ function Salons() {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await res.json();
-            setSalons(data);
+            console.log("💥 API salons result:", data);
+
+            if (Array.isArray(data)) {
+                setSalons(data);
+            } else if (data.salons && Array.isArray(data.salons)) {
+                setSalons(data.salons);
+            } else {
+                console.warn("Unexpected API response format:", data);
+                setSalons([]);  // fallback để tránh lỗi
+            }
         } catch (error) {
             console.error("Failed to fetch salons:", error.message);
         }
         setIsLoading(false);
     };
+
 
     const handleDelete = async (id) => {
         if (!confirm("Are you sure you want to delete this salon?")) return;

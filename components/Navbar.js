@@ -100,7 +100,7 @@ export default function Navbar() {
                         <FiList /> Transactions
                     </Link>
 
-                    {(isSuperAdmin || isSalonChu) && (
+                    {(isSuperAdmin) && (
                         <Link href="/salons" className="hover:text-cyan-300 transition flex items-center gap-1">
                             🏠 Salons
                         </Link>
@@ -186,16 +186,18 @@ export default function Navbar() {
                         <Link href="/transactions" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
                             <FiList /> Transactions
                         </Link>
-                        {(isSuperAdmin || isSalonChu) && (
-                            <>
-                                <Link href="/salons" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                    🏠 Salons
-                                </Link>
-                                <Link href="/services" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                    💈 Services
-                                </Link>
-                            </>
+                        {isSuperAdmin && (
+                            <Link href="/salons" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                🏠 Salons
+                            </Link>
                         )}
+
+                        {(isSuperAdmin || isSalonChu) && (
+                            <Link href="/services" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                💈 Services
+                            </Link>
+                        )}
+
                         {(isSalonNhanVien || isSalonKhachHang) && (
                             <Link href="/appointments" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
                                 📅 Appointments
