@@ -15,7 +15,7 @@ function Register() {
         }
 
         try {
-            const res = await fetch("/api/register", {
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),
