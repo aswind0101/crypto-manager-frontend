@@ -49,10 +49,12 @@ router.get("/", verifyToken, async (req, res) => {
         if (SUPER_ADMINS.includes(uid)) {
             result = await pool.query(`SELECT * FROM employees ORDER BY id DESC`);
         } else if (normalizedRole === "salon_chu") {
-            const salon = await pool.query(
-                `SELECT id FROM salons WHERE owner_user_id = $1`,
-                [uid]
-            );
+            let salon = await pool.query(`SELECT id FROM salons WHERE owner_user_id = $1`, [uid]);
+
+            // Nếu không tìm thấy bằng owner_user_id → fallback bằng email
+            if (salon.rows.length === 0) {
+                salon = await pool.query(`SELECT id FROM salons WHERE email = $1`, [email]);
+            }
 
             if (salon.rows.length === 0) {
                 return res.status(404).json({ error: "Salon not found for this user" });
@@ -67,14 +69,13 @@ router.get("/", verifyToken, async (req, res) => {
         } else {
             return res.status(403).json({ error: "Access denied" });
         }
-
+        console.log("uid:", uid, "email:", email, "userRole:", userRole);
         res.json(result.rows);
     } catch (err) {
         console.error("❌ Error fetching employees:", err.message);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
-
 // DELETE: Xoá nhân viên (hoặc soft delete)
 router.delete("/:id", verifyToken, async (req, res) => {
     const { uid, role: userRole } = req.user;
