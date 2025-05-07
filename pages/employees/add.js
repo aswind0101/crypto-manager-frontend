@@ -9,22 +9,40 @@ function AddEmployee() {
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
     const [role, setRole] = useState("stylist");
+    const [salonId, setSalonId] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const [msg, setMsg] = useState("");
     const router = useRouter();
 
     useEffect(() => {
         const auth = getAuth();
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) setCurrentUser(user);
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                setCurrentUser(user);
+                const token = await user.getIdToken();
+                try {
+                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/me", {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setSalonId(data.id);
+                    } else {
+                        setMsg("❌ Failed to fetch salon info.");
+                    }
+                } catch (err) {
+                    console.error("Error fetching salon info:", err);
+                    setMsg("❌ Error fetching salon info.");
+                }
+            }
         });
         return () => unsubscribe();
     }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!name || !role) {
-            setMsg("❗ Please fill all required fields.");
+        if (!name || !role || !salonId) {
+            setMsg("❗ Please fill all required fields and wait for salon info.");
             return;
         }
 
@@ -37,7 +55,7 @@ function AddEmployee() {
                     Authorization: `Bearer ${idToken}`
                 },
                 body: JSON.stringify({
-                    salon_id: 9,
+                    salon_id: salonId,
                     name,
                     phone,
                     email,
@@ -65,57 +83,83 @@ function AddEmployee() {
 
             <form
                 onSubmit={handleSubmit}
-                className="max-w-xl mx-auto p-6 rounded-2xl shadow-[2px_2px_6px_#0b0f17,_-2px_-2px_6px_#1e2631] bg-[#2f374a] space-y-4"
+                className="max-w-xl mx-auto p-6 rounded-2xl shadow bg-[#2f374a] space-y-4"
             >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <form
+                    onSubmit={handleSubmit}
+                    className="max-w-xl mx-auto p-6 rounded-2xl shadow-[2px_2px_6px_#0b0f17,_-2px_-2px_6px_#1e2631] bg-[#2f374a] space-y-4"
+                >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block mb-1 text-sm">Name *</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
+                                placeholder="Employee name"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block mb-1 text-sm">Phone</label>
+                            <input
+                                type="text"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
+                                placeholder="e.g. +14085551234"
+                            />
+                        </div>
+                    </div>
+
                     <div>
-                        <label className="block mb-1 text-sm">Name *</label>
+                        <label className="block mb-1 text-sm">Email</label>
                         <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                            placeholder="Employee name"
-                            required
+                            placeholder="example@email.com"
                         />
                     </div>
 
                     <div>
-                        <label className="block mb-1 text-sm">Phone</label>
-                        <input
-                            type="text"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
+                        <label className="block mb-1 text-sm">Role</label>
+                        <select
+                            value={role}
+                            onChange={(e) => setRole(e.target.value)}
                             className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                            placeholder="e.g. +14085551234"
-                        />
+                        >
+                            <option value="stylist">Stylist</option>
+                            <option value="nail_tech">Nail Tech</option>
+                            <option value="receptionist">Receptionist</option>
+                        </select>
                     </div>
-                </div>
 
-                <div>
-                    <label className="block mb-1 text-sm">Email</label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                        placeholder="example@email.com"
-                    />
-                </div>
+                    {msg && (
+                        <p className={`text-center text-sm ${msg.startsWith("✅") ? "text-green-400" : "text-yellow-400"}`}>
+                            {msg}
+                        </p>
+                    )}
 
-                <div>
-                    <label className="block mb-1 text-sm">Role</label>
-                    <select
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                        className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                    >
-                        <option value="stylist">Stylist</option>
-                        <option value="nail_tech">Nail Tech</option>
-                        <option value="receptionist">Receptionist</option>
-                    </select>
-                </div>
-
+                    <div className="flex gap-4 justify-center">
+                        <button
+                            type="submit"
+                            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl transition"
+                        >
+                            ➕ Add Employee
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => router.push("/employees")}
+                            className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-xl transition"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
                 {msg && (
                     <p className={`text-center text-sm ${msg.startsWith("✅") ? "text-green-400" : "text-yellow-400"}`}>
                         {msg}
@@ -143,3 +187,4 @@ function AddEmployee() {
 }
 
 export default withAuthProtection(AddEmployee);
+
