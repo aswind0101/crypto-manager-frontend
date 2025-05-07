@@ -23,7 +23,6 @@ function AddSalon() {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             if (user) {
                 setCurrentUser(user);
-                setOwnerUserId(user.displayName || user.uid); // Tự động gán UID
             }
         });
         return () => unsubscribe();
@@ -81,7 +80,7 @@ function AddSalon() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!name || !address || !phone || !email || !ownerUserId || !status) {
+        if (!name || !address || !phone || !email || !status) {
             setMsg("❗ Please fill in all required fields.");
             return;
         }
@@ -117,7 +116,6 @@ function AddSalon() {
                     address,
                     phone: formattedPhone,
                     email,
-                    owner_user_id: ownerUserId,
                     status
                 })
             });
@@ -174,14 +172,6 @@ function AddSalon() {
                     placeholder="Email *"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
-                    required
-                />
-                <input
-                    type="text"
-                    placeholder="Owner UID *"
-                    value={ownerUserId}
-                    onChange={(e) => setOwnerUserId(e.target.value)}
                     className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
                     required
                 />
