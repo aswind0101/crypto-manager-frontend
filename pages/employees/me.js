@@ -41,6 +41,34 @@ function EmployeeProfile() {
         });
         return () => unsubscribe();
     }, []);
+    const handleTranslateDescription = async (targetLang) => {
+        const token = await currentUser.getIdToken();
+        try {
+            const res = await fetch('https://crypto-manager-backend.onrender.com/api/employees/translate-description', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    description: form.description,
+                    targetLang: targetLang
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setForm({ ...form, description: data.translatedText });
+                setMsg('✅ Translation successful!');
+            } else {
+                setMsg(`❌ ${data.error}`);
+            }
+        } catch (err) {
+            console.error('❌ Translation error:', err);
+            setMsg('❌ Translation failed.');
+        }
+
+        setTimeout(() => setMsg(''), 3000);
+    };
 
     const handlePhoneChange = (value) => {
         let digitsOnly = value.replace(/\D/g, "");
@@ -305,10 +333,25 @@ function EmployeeProfile() {
                                 placeholder="Tell customers about yourself"
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                className="p-2 rounded-xl bg-[#1C1F26] border border-gray-700 w-full"
+                                className="p-2 rounded-xl bg-[#1C1F26] border border-white/5 w-full"
                                 rows={4}
                             />
                         </div>
+                        <div className="flex space-x-2 mb-2">
+                            <button
+                                onClick={() => handleTranslateDescription('en')}
+                                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-xs text-white"
+                            >
+                                🇬🇧 Translate to English
+                            </button>
+                            <button
+                                onClick={() => handleTranslateDescription('vi')}
+                                className="px-3 py-1 bg-green-500 hover:bg-green-600 rounded text-xs text-white"
+                            >
+                                🇻🇳 Dịch sang tiếng Việt
+                            </button>
+                        </div>
+
                         {/* Save Button */}
                         <button
                             onClick={handleSave}
