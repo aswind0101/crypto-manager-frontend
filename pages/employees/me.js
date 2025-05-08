@@ -36,15 +36,15 @@ function EmployeeProfile() {
         if (!file || !currentUser) return;
 
         const formData = new FormData();
-        formData.append("avatar", file);
+        formData.append('avatar', file);
 
         const token = await currentUser.getIdToken();
 
         try {
-            const res = await fetch("https://crypto-manager-backend.onrender.com/api/employees/upload/avatar", {
-                method: "POST",
+            const res = await fetch('https://crypto-manager-backend.onrender.com/api/employees/upload/avatar', {
+                method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${token}`
+                    Authorization: `Bearer ${token}`,
                 },
                 body: formData,
             });
@@ -52,27 +52,25 @@ function EmployeeProfile() {
             let data;
             try {
                 data = await res.json();
-            } catch (parseErr) {
-                console.error("❌ Failed to parse JSON:", parseErr);
-                setMsg("❌ Server error (invalid response)");
-                setTimeout(() => setMsg(""), 3000);
+            } catch (parseError) {
+                console.error('❌ Failed to parse JSON:', parseError);
+                setMsg('❌ Server error (non-JSON response)');
                 return;
             }
 
             if (res.ok) {
                 setEmployee({ ...employee, avatar_url: data.avatar_url });
-                setMsg("✅ Avatar uploaded successfully!");
+                setMsg('✅ Avatar uploaded successfully!');
             } else {
                 setMsg(`❌ ${data.error || 'Upload failed'}`);
             }
         } catch (err) {
-            console.error("❌ Upload error:", err);
-            setMsg("❌ Upload failed.");
+            console.error('❌ Upload error:', err);
+            setMsg('❌ Upload failed.');
         }
 
-        setTimeout(() => setMsg(""), 3000);
+        setTimeout(() => setMsg(''), 3000);
     };
-
 
     const handleCertificationsUpload = (e) => {
         const files = Array.from(e.target.files);
@@ -139,7 +137,7 @@ function EmployeeProfile() {
                             WebkitBackfaceVisibility: "hidden",
                         }}
                     >
-                        <img src={employee.avatar_url || "/default-avatar.png"} alt="Avatar" className="w-24 h-24 rounded-full mb-4" />
+                        <img src={`https://crypto-manager-backend.onrender.com${employee.avatar_url || '/default-avatar.png'}`} alt="Avatar" className="w-24 h-24 rounded-full mb-4" />
                         <h2 className="text-xl font-bold">{employee.name}</h2>
                         <p className="text-yellow-400">{employee.role}</p>
                         <p>⭐ {employee.rating_avg || 0} / 5 ({employee.rating_count || 0} ratings)</p>
