@@ -72,7 +72,39 @@ function EmployeeProfile() {
         setForm({ ...form, phone: formatted });
     };
 
-
+    const handleDocumentsUpload = async (files, type) => {
+        if (!currentUser) return;
+        const formData = new FormData();
+        Array.from(files).forEach(file => formData.append('files', file));
+    
+        const token = await currentUser.getIdToken();
+    
+        try {
+            const res = await fetch(`https://crypto-manager-backend.onrender.com/api/employees/upload/${type}`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            });
+    
+            const data = await res.json();
+            if (res.ok) {
+                setEmployee(prev => ({
+                    ...prev,
+                    [type]: data[type],
+                    [`${type}_status`]: 'In Review',
+                }));
+                setMsg(`✅ ${type === 'certifications' ? 'Certifications' : 'ID Documents'} uploaded!`);
+            } else {
+                setMsg(`❌ ${data.error || 'Upload failed'}`);
+            }
+        } catch (err) {
+            console.error(`❌ Upload ${type} error:`, err);
+            setMsg('❌ Upload failed.');
+        }
+    
+        setTimeout(() => setMsg(''), 3000);
+    };
+    
     const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
         if (!file || !currentUser) return;
@@ -185,7 +217,7 @@ function EmployeeProfile() {
                     <div
                         className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] rounded-xl 
                         shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
-                        absolute  w-full h-full flex flex-col items-center p-6"
+                        absolute  w-full min-h-[500px] flex flex-col items-center p-6"
                         style={{
                             backfaceVisibility: "hidden",
                             WebkitBackfaceVisibility: "hidden",
@@ -193,7 +225,7 @@ function EmployeeProfile() {
                     >
                         <img src={`https://crypto-manager-backend.onrender.com${employee.avatar_url || '/default-avatar.png'}`}
                             alt="Avatar"
-                            className="w-32 h-32 rounded-full mb-4"
+                            className="w-40 h-40 rounded-full mb-4"
                         />
                         {/* New: Avatar Upload Button */}
                         <label className="text-xs text-gray-400 cursor-pointer mb-2 hover:text-yellow-400">
@@ -224,7 +256,7 @@ function EmployeeProfile() {
                     <div
                         className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] rounded-2xl 
                         shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
-                        absolute w-full h-full flex flex-col p-4 space-y-4 overflow-y-auto"
+                        absolute w-full min-h-[500px] flex flex-col p-4 space-y-4"
                         style={{
                             transform: "rotateY(180deg)",
                             backfaceVisibility: "hidden",
@@ -255,35 +287,6 @@ function EmployeeProfile() {
                                 className="p-2 rounded-xl bg-[#1C1F26] text-xs border border-white/5 w-full"
                             />
                         </div>
-                        {/* Certifications */}
-                        <div>
-                            <label className="text-sm mb-1 block">📁 Upload Certifications</label>
-                            <input
-                                type="file"
-                                multiple
-                                onChange={handleCertificationsUpload}
-                                className="text-xs"
-                            />
-                        </div>
-
-                        {/* ID Documents */}
-                        <div>
-                            <label className="text-sm mb-1 block">🪪 Upload ID Documents</label>
-                            <input
-                                type="file"
-                                multiple
-                                onChange={handleIdDocumentsUpload}
-                                className="text-xs"
-                            />
-                        </div>
-
-                        {/* Commission Status */}
-                        {employee.is_freelancer && (
-                            <p className="text-sm text-yellow-300">
-                                💸 Payment Verified: {employee.payment_verified ? "✅ Yes" : "❌ No"}
-                            </p>
-                        )}
-
                         {/* Save Button */}
                         <button
                             onClick={handleSave}
@@ -291,7 +294,6 @@ function EmployeeProfile() {
                         >
                             💾 Save Changes
                         </button>
-
                         {/* Message with animation */}
                         <AnimatePresence>
                             {msg && (
@@ -305,7 +307,51 @@ function EmployeeProfile() {
                                 </motion.p>
                             )}
                         </AnimatePresence>
+                        <h2 className="text-xl font-bold text-center">Documents</h2>
+                        {/* Certifications */}
+                        <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
+                            <div>
+                                <p className="text-sm font-semibold">📁 Certifications</p>
+                                <p className={`text-xs ${employee.certification_status === "Approved" ? "text-green-400" : "text-yellow-400"}`}>
+                                    {employee.certification_status}
+                                </p>
+                            </div>
+                            <label className="text-xs text-yellow-300 cursor-pointer hover:text-yellow-400">
+                                Upload
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={(e) => handleDocumentsUpload(e.target.files, 'certifications')}
+                                    className="hidden"
+                                />
+                            </label>
+                        </div>
 
+                        {/* ID Documents */}
+                        <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
+                            <div>
+                                <p className="text-sm font-semibold">🪪 ID Documents</p>
+                                <p className={`text-xs ${employee.id_document_status === "Approved" ? "text-green-400" : "text-yellow-400"}`}>
+                                    {employee.id_document_status}
+                                </p>
+                            </div>
+                            <label className="text-xs text-yellow-300 cursor-pointer hover:text-yellow-400">
+                                Upload
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={(e) => handleDocumentsUpload(e.target.files, 'id_documents')}
+                                    className="hidden"
+                                />
+                            </label>
+                        </div>
+
+                        {/* Commission Status */}
+                        {employee.is_freelancer && (
+                            <p className="text-sm text-yellow-300">
+                                💸 Payment Verified: {employee.payment_verified ? "✅ Yes" : "❌ No"}
+                            </p>
+                        )}
                         {/* Flip Back */}
                         <span
                             className="text-xs text-gray-400 text-center cursor-pointer mt-2"
