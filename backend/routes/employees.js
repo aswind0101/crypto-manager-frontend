@@ -1,6 +1,8 @@
 import express from "express";
 import verifyToken from "../middleware/verifyToken.js";
 import { attachUserRole } from "../middleware/attachUserRole.js";
+import multer from "multer";
+import path from "path";
 import pkg from "pg";
 const { Pool } = pkg;
 
@@ -11,6 +13,17 @@ const pool = new Pool({
 });
 
 const SUPER_ADMINS = ["D9nW6SLT2pbUuWbNVnCgf2uINok2"];
+// Setup multer storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, "uploads/avatars/");
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, req.user.uid + "_" + Date.now() + ext);
+    },
+});
+const upload = multer({ storage: storage });
 
 router.get("/", verifyToken, attachUserRole, async (req, res) => {
     const { uid, email, role: userRole } = req.user;
@@ -49,6 +62,56 @@ router.get("/", verifyToken, attachUserRole, async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+// GET: Nhân viên lấy profile của chính mình
+router.get("/me", verifyToken, async (req, res) => {
+    const { uid } = req.user;
+
+    try {
+        const emp = await pool.query(
+            `SELECT * FROM employees WHERE firebase_uid = $1`,
+            [uid]
+        );
+
+        if (emp.rows.length === 0) {
+            return res.status(404).json({ error: "Employee not found" });
+        }
+
+        res.json(emp.rows[0]);
+    } catch (err) {
+        console.error("❌ Error fetching employee me:", err.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// PATCH: Nhân viên update profile của chính mình
+router.patch("/me", verifyToken, async (req, res) => {
+    const { uid } = req.user;
+    const { name, phone, avatar_url, certifications, id_documents } = req.body;
+
+    try {
+        const result = await pool.query(
+            `UPDATE employees SET
+                name = COALESCE($1, name),
+                phone = COALESCE($2, phone),
+                avatar_url = COALESCE($3, avatar_url),
+                certifications = COALESCE($4, certifications),
+                id_documents = COALESCE($5, id_documents),
+                updated_at = NOW()
+            WHERE firebase_uid = $6
+            RETURNING *`,
+            [name, phone, avatar_url, certifications, id_documents, uid]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Employee not found" });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error("❌ Error updating employee me:", err.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 
 router.post("/", verifyToken, attachUserRole, async (req, res) => {
     const { uid, role: userRole } = req.user;
@@ -76,7 +139,27 @@ router.post("/", verifyToken, attachUserRole, async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+// API: Upload avatar
+router.post("/upload/avatar", verifyToken, upload.single("avatar"), async (req, res) => {
+    const { uid } = req.user;
+    const filePath = `/uploads/avatars/${req.file.filename}`;
 
+    try {
+        const result = await pool.query(
+            `UPDATE employees SET avatar_url = $1 WHERE firebase_uid = $2 RETURNING *`,
+            [filePath, uid]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Employee not found" });
+        }
+
+        res.json({ message: "Avatar uploaded", avatar_url: filePath });
+    } catch (err) {
+        console.error("❌ Error uploading avatar:", err.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 router.delete("/:id", verifyToken, attachUserRole, async (req, res) => {
     const { uid, role: userRole } = req.user;
     const { id } = req.params;

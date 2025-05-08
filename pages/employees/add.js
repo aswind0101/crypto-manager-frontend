@@ -83,83 +83,57 @@ function AddEmployee() {
 
             <form
                 onSubmit={handleSubmit}
-                className="max-w-xl mx-auto p-6 rounded-2xl shadow bg-[#2f374a] space-y-4"
+                className="max-w-xl mx-auto p-6 rounded-2xl shadow-[2px_2px_6px_#0b0f17,_-2px_-2px_6px_#1e2631] bg-[#2f374a] space-y-4"
             >
-                <form
-                    onSubmit={handleSubmit}
-                    className="max-w-xl mx-auto p-6 rounded-2xl shadow-[2px_2px_6px_#0b0f17,_-2px_-2px_6px_#1e2631] bg-[#2f374a] space-y-4"
-                >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block mb-1 text-sm">Name *</label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                                placeholder="Employee name"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block mb-1 text-sm">Phone</label>
-                            <input
-                                type="text"
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                                className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                                placeholder="e.g. +14085551234"
-                            />
-                        </div>
-                    </div>
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label className="block mb-1 text-sm">Email</label>
+                        <label className="block mb-1 text-sm">Name *</label>
                         <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
                             className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                            placeholder="example@email.com"
+                            placeholder="Employee name"
+                            required
                         />
                     </div>
 
                     <div>
-                        <label className="block mb-1 text-sm">Role</label>
-                        <select
-                            value={role}
-                            onChange={(e) => setRole(e.target.value)}
+                        <label className="block mb-1 text-sm">Phone</label>
+                        <input
+                            type="text"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
                             className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                        >
-                            <option value="stylist">Stylist</option>
-                            <option value="nail_tech">Nail Tech</option>
-                            <option value="receptionist">Receptionist</option>
-                        </select>
+                            placeholder="e.g. +14085551234"
+                        />
                     </div>
+                </div>
 
-                    {msg && (
-                        <p className={`text-center text-sm ${msg.startsWith("✅") ? "text-green-400" : "text-yellow-400"}`}>
-                            {msg}
-                        </p>
-                    )}
+                <div>
+                    <label className="block mb-1 text-sm">Email</label>
+                    <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
+                        placeholder="example@email.com"
+                    />
+                </div>
 
-                    <div className="flex gap-4 justify-center">
-                        <button
-                            type="submit"
-                            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl transition"
-                        >
-                            ➕ Add Employee
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => router.push("/employees")}
-                            className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-xl transition"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </form>
+                <div>
+                    <label className="block mb-1 text-sm">Role</label>
+                    <select
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
+                    >
+                        <option value="stylist">Stylist</option>
+                        <option value="nail_tech">Nail Tech</option>
+                        <option value="receptionist">Receptionist</option>
+                    </select>
+                </div>
+
                 {msg && (
                     <p className={`text-center text-sm ${msg.startsWith("✅") ? "text-green-400" : "text-yellow-400"}`}>
                         {msg}

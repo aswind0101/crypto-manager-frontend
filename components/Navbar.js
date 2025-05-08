@@ -123,15 +123,20 @@ export default function Navbar() {
                         </div>
                     )}
 
-                    {(isSalonNhanVien || isSalonKhachHang) && (
-                        <Link href="/appointments" className="hover:text-cyan-300 transition flex items-center gap-1">
-                            📅 Appointments
-                        </Link>
-                    )}
                     {isSalonNhanVien && (
-                        <Link href="/profile" className="hover:text-cyan-300 transition flex items-center gap-1">
-                            👤 Profile
-                        </Link>
+                        <div className="relative group">
+                            <button className="flex items-center gap-1 hover:text-cyan-300 transition">
+                                👤 Account ▾
+                            </button>
+                            <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
+                                <Link href="/employees/me" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                                    👤 My Profile
+                                </Link>
+                                <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                    📅 Appointments
+                                </Link>
+                            </div>
+                        </div>
                     )}
 
                     {/* Debts dropdown */}
@@ -248,16 +253,31 @@ export default function Navbar() {
                                 </div>
                             </div>
                         )}
-                        {(isSalonNhanVien || isSalonKhachHang) && (
-                            <Link href="/appointments" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                📅 Appointments
-                            </Link>
-                        )}
-
                         {isSalonNhanVien && (
-                            <Link href="/profile" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                👤 Profile
-                            </Link>
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setIsSalonsOpen(!isSalonsOpen)}
+                                >
+                                    👤 Account {isSalonsOpen ? "▴" : "▾"}
+                                </button>
+                                <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
+                                    <Link
+                                        href="/employees/me"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        👤 My Profile
+                                    </Link>
+                                    <Link
+                                        href="/appointments"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        📅 Appointments
+                                    </Link>
+                                </div>
+                            </div>
                         )}
 
                         {/* Debts menu */}

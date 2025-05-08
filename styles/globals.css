@@ -38,6 +38,22 @@
 .transform-style-preserve-3d {
   transform-style: preserve-3d;
 }
+.card {
+  transform-style: preserve-3d;
+}
+
+.card-front,
+.card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-back {
+  transform: rotateY(180deg);
+}
 
 body {
   background: #1C1F26;
