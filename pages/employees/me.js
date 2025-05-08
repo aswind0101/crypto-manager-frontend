@@ -337,21 +337,6 @@ function EmployeeProfile() {
                                 rows={4}
                             />
                         </div>
-                        <div className="flex space-x-2 mb-2">
-                            <button
-                                onClick={() => handleTranslateDescription('en')}
-                                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-xs text-white"
-                            >
-                                🇬🇧 Translate to English
-                            </button>
-                            <button
-                                onClick={() => handleTranslateDescription('vi')}
-                                className="px-3 py-1 bg-green-500 hover:bg-green-600 rounded text-xs text-white"
-                            >
-                                🇻🇳 Dịch sang tiếng Việt
-                            </button>
-                        </div>
-
                         {/* Save Button */}
                         <button
                             onClick={handleSave}
