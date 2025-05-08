@@ -34,12 +34,12 @@ function EmployeeProfile() {
     const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
         if (!file || !currentUser) return;
-    
+
         const formData = new FormData();
         formData.append("avatar", file);
-    
+
         const token = await currentUser.getIdToken();
-    
+
         try {
             const res = await fetch("https://crypto-manager-backend.onrender.com/api/employees/upload/avatar", {
                 method: "POST",
@@ -48,22 +48,32 @@ function EmployeeProfile() {
                 },
                 body: formData,
             });
-    
-            const data = await res.json();
+
+            let data;
+            try {
+                data = await res.json();
+            } catch (parseErr) {
+                console.error("❌ Failed to parse JSON:", parseErr);
+                setMsg("❌ Server error (invalid response)");
+                setTimeout(() => setMsg(""), 3000);
+                return;
+            }
+
             if (res.ok) {
                 setEmployee({ ...employee, avatar_url: data.avatar_url });
                 setMsg("✅ Avatar uploaded successfully!");
             } else {
-                setMsg(`❌ ${data.error}`);
+                setMsg(`❌ ${data.error || 'Upload failed'}`);
             }
         } catch (err) {
-            console.error("Upload error:", err);
+            console.error("❌ Upload error:", err);
             setMsg("❌ Upload failed.");
         }
-    
+
         setTimeout(() => setMsg(""), 3000);
     };
-    
+
+
     const handleCertificationsUpload = (e) => {
         const files = Array.from(e.target.files);
         if (files.length) {
