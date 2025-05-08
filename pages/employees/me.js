@@ -251,7 +251,7 @@ function EmployeeProfile() {
                         <p>⭐ {employee.rating_avg || 0} / 5 ({employee.rating_count || 0} ratings)</p>
                         <p>👥 {employee.total_customers || 0} customers</p>
                         <p>💰 {employee.commission_percent || 0}% commission</p>
-                        <p>🕒 Active: {employee.status}</p>
+                        <p>🕒 Status: {employee.status}</p>
                         <span
                             className="absolute bottom-4 text-xs text-gray-400 cursor-pointer"
                             onClick={() => setIsFlipped(true)}
