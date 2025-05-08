@@ -3,6 +3,8 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import { AnimatePresence, motion } from "framer-motion";
+import { parsePhoneNumberFromString, AsYouType } from "libphonenumber-js";
+
 
 function EmployeeProfile() {
     const [employee, setEmployee] = useState(null);
@@ -31,6 +33,46 @@ function EmployeeProfile() {
         });
         return () => unsubscribe();
     }, []);
+
+    const handlePhoneChange = (value) => {
+        let digitsOnly = value.replace(/\D/g, "");
+        let hasCountryCode = false;
+
+        if (digitsOnly.startsWith("1")) {
+            hasCountryCode = true;
+        }
+
+        if (hasCountryCode) {
+            if (digitsOnly.length > 11) digitsOnly = digitsOnly.slice(0, 11);
+        } else {
+            if (digitsOnly.length > 10) digitsOnly = digitsOnly.slice(0, 10);
+        }
+
+        if (digitsOnly.length === 0) {
+            setForm({ ...form, phone: "" });
+            return;
+        }
+
+        if (
+            (hasCountryCode && digitsOnly.length <= 4) ||
+            (!hasCountryCode && digitsOnly.length <= 3)
+        ) {
+            setForm({ ...form, phone: digitsOnly });
+            return;
+        }
+
+        const formatter = new AsYouType("US");
+        formatter.input(digitsOnly);
+        let formatted = formatter.formattedOutput;
+
+        if (hasCountryCode && !formatted.startsWith("+")) {
+            formatted = `+${formatted}`;
+        }
+
+        setForm({ ...form, phone: formatted });
+    };
+
+
     const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
         if (!file || !currentUser) return;
@@ -91,6 +133,16 @@ function EmployeeProfile() {
     const handleSave = async () => {
         if (!currentUser) return;
         const token = await currentUser.getIdToken();
+        const phoneNumber = parsePhoneNumberFromString(form.phone, "US");
+        if (!phoneNumber || !phoneNumber.isValid()) {
+            setMsg("❗ Invalid US phone number.");
+            setTimeout(() => setMsg(""), 3000);
+            return;
+        }
+
+        // Gửi dạng E.164 lên server
+        const formattedPhone = phoneNumber.number;
+
         try {
             const res = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
                 method: "PATCH",
@@ -131,13 +183,29 @@ function EmployeeProfile() {
                 >
                     {/* Front side */}
                     <div
-                        className="absolute w-full h-full flex flex-col items-center p-6"
+                        className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] rounded-xl 
+                        shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
+                        absolute  w-full h-full flex flex-col items-center p-6"
                         style={{
                             backfaceVisibility: "hidden",
                             WebkitBackfaceVisibility: "hidden",
                         }}
                     >
-                        <img src={`https://crypto-manager-backend.onrender.com${employee.avatar_url || '/default-avatar.png'}`} alt="Avatar" className="w-24 h-24 rounded-full mb-4" />
+                        <img src={`https://crypto-manager-backend.onrender.com${employee.avatar_url || '/default-avatar.png'}`}
+                            alt="Avatar"
+                            className="w-32 h-32 rounded-full mb-4"
+                        />
+                        {/* New: Avatar Upload Button */}
+                        <label className="text-xs text-gray-400 cursor-pointer mb-2 hover:text-yellow-400">
+                            📸 Change Avatar
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleAvatarUpload}
+                                className="hidden"
+                            />
+                        </label>
+
                         <h2 className="text-xl font-bold">{employee.name}</h2>
                         <p className="text-yellow-400">{employee.role}</p>
                         <p>⭐ {employee.rating_avg || 0} / 5 ({employee.rating_count || 0} ratings)</p>
@@ -154,63 +222,64 @@ function EmployeeProfile() {
 
                     {/* Back side */}
                     <div
-                        className="absolute w-full h-full flex flex-col p-6 overflow-y-auto"
+                        className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] rounded-2xl 
+                        shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
+                        absolute w-full h-full flex flex-col p-4 space-y-4 overflow-y-auto"
                         style={{
                             transform: "rotateY(180deg)",
                             backfaceVisibility: "hidden",
                             WebkitBackfaceVisibility: "hidden",
                         }}
                     >
-                        <h2 className="text-xl font-bold mb-2">Edit Profile</h2>
+                        <h2 className="text-xl font-bold text-center">Edit Profile</h2>
 
-                        {/* Upload Avatar */}
-                        <label className="text-sm mb-1">Avatar</label>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleAvatarUpload}
-                            className="mb-2 text-xs"
-                        />
-
-                        {/* Name */}
-                        <input
-                            type="text"
-                            placeholder="Name"
-                            value={form.name}
-                            onChange={(e) => setForm({ ...form, name: e.target.value })}
-                            className="mb-2 p-2 rounded bg-[#1C1F26] border border-gray-700"
-                        />
+                        <div>
+                            <label className="text-sm mb-1 block">👤 Full Name</label>
+                            <input
+                                type="text"
+                                placeholder="Full Name"
+                                value={form.name}
+                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                className="p-2 rounded-xl bg-[#1C1F26] text-xs border border-white/5 w-full"
+                            />
+                        </div>
 
                         {/* Phone */}
-                        <input
-                            type="text"
-                            placeholder="Phone"
-                            value={form.phone}
-                            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                            className="mb-2 p-2 rounded bg-[#1C1F26] border border-gray-700"
-                        />
-
+                        <div>
+                            <label className="text-sm mb-1 block">📞 Phone Number</label>
+                            <input
+                                type="text"
+                                placeholder="Phone"
+                                value={form.phone}
+                                onChange={(e) => handlePhoneChange(e.target.value)}
+                                className="p-2 rounded-xl bg-[#1C1F26] text-xs border border-white/5 w-full"
+                            />
+                        </div>
                         {/* Certifications */}
-                        <label className="text-sm mb-1">Certifications</label>
-                        <input
-                            type="file"
-                            multiple
-                            onChange={handleCertificationsUpload}
-                            className="mb-2 text-xs"
-                        />
+                        <div>
+                            <label className="text-sm mb-1 block">📁 Upload Certifications</label>
+                            <input
+                                type="file"
+                                multiple
+                                onChange={handleCertificationsUpload}
+                                className="text-xs"
+                            />
+                        </div>
 
                         {/* ID Documents */}
-                        <label className="text-sm mb-1">ID Documents</label>
-                        <input
-                            type="file"
-                            multiple
-                            onChange={handleIdDocumentsUpload}
-                            className="mb-2 text-xs"
-                        />
+                        <div>
+                            <label className="text-sm mb-1 block">🪪 Upload ID Documents</label>
+                            <input
+                                type="file"
+                                multiple
+                                onChange={handleIdDocumentsUpload}
+                                className="text-xs"
+                            />
+                        </div>
 
                         {/* Commission Status */}
                         {employee.is_freelancer && (
-                            <p className="text-sm text-yellow-300 mb-2">
+                            <p className="text-sm text-yellow-300">
                                 💸 Payment Verified: {employee.payment_verified ? "✅ Yes" : "❌ No"}
                             </p>
                         )}
@@ -218,11 +287,12 @@ function EmployeeProfile() {
                         {/* Save Button */}
                         <button
                             onClick={handleSave}
-                            className="bg-green-600 hover:bg-green-700 py-2 rounded mb-2"
+                            className="bg-green-600 hover:bg-green-700 py-2 rounded-xl font-semibold text-white"
                         >
-                            💾 Save
+                            💾 Save Changes
                         </button>
 
+                        {/* Message with animation */}
                         <AnimatePresence>
                             {msg && (
                                 <motion.p
@@ -236,13 +306,15 @@ function EmployeeProfile() {
                             )}
                         </AnimatePresence>
 
+                        {/* Flip Back */}
                         <span
-                            className="absolute bottom-4 text-xs text-gray-400 cursor-pointer"
+                            className="text-xs text-gray-400 text-center cursor-pointer mt-2"
                             onClick={() => setIsFlipped(false)}
                         >
-                            Tap to flip back ↺
+                            ↺ Tap to flip back
                         </span>
                     </div>
+
 
                 </motion.div>
 
