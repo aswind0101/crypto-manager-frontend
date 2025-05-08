@@ -10,7 +10,11 @@ function EmployeeProfile() {
     const [employee, setEmployee] = useState(null);
     const [isFlipped, setIsFlipped] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
-    const [form, setForm] = useState({ name: "", phone: "" });
+    const [form, setForm] = useState({
+        name: "",
+        phone: "",
+        description: ""
+    });
     const [msg, setMsg] = useState("");
 
     useEffect(() => {
@@ -25,7 +29,11 @@ function EmployeeProfile() {
                     });
                     const data = await res.json();
                     setEmployee(data);
-                    setForm({ name: data.name || "", phone: data.phone || "" });
+                    setForm({
+                        name: data.name || "",
+                        phone: data.phone || "",
+                        description: data.description || ""
+                    });
                 } catch (err) {
                     console.error("Error fetching employee:", err);
                 }
@@ -76,16 +84,16 @@ function EmployeeProfile() {
         if (!currentUser) return;
         const formData = new FormData();
         Array.from(files).forEach(file => formData.append('files', file));
-    
+
         const token = await currentUser.getIdToken();
-    
+
         try {
             const res = await fetch(`https://crypto-manager-backend.onrender.com/api/employees/upload/${type}`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` },
                 body: formData,
             });
-    
+
             const data = await res.json();
             if (res.ok) {
                 setEmployee(prev => ({
@@ -101,10 +109,10 @@ function EmployeeProfile() {
             console.error(`❌ Upload ${type} error:`, err);
             setMsg('❌ Upload failed.');
         }
-    
+
         setTimeout(() => setMsg(''), 3000);
     };
-    
+
     const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
         if (!file || !currentUser) return;
@@ -250,6 +258,10 @@ function EmployeeProfile() {
                         >
                             Tap to edit ↺
                         </span>
+                        <p className="text-sm italic text-gray-400">
+                            {employee.description || "No description provided yet."}
+                        </p>
+
                     </div>
 
                     {/* Back side */}
@@ -285,6 +297,16 @@ function EmployeeProfile() {
                                 value={form.phone}
                                 onChange={(e) => handlePhoneChange(e.target.value)}
                                 className="p-2 rounded-xl bg-[#1C1F26] text-xs border border-white/5 w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm mb-1 block">📝 About Me</label>
+                            <textarea
+                                placeholder="Tell customers about yourself"
+                                value={form.description}
+                                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                                className="p-2 rounded-xl bg-[#1C1F26] border border-gray-700 w-full"
+                                rows={4}
                             />
                         </div>
                         {/* Save Button */}
