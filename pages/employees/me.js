@@ -41,34 +41,6 @@ function EmployeeProfile() {
         });
         return () => unsubscribe();
     }, []);
-    const handleTranslateDescription = async (targetLang) => {
-        const token = await currentUser.getIdToken();
-        try {
-            const res = await fetch('https://crypto-manager-backend.onrender.com/api/employees/translate-description', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    description: form.description,
-                    targetLang: targetLang
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setForm({ ...form, description: data.translatedText });
-                setMsg('✅ Translation successful!');
-            } else {
-                setMsg(`❌ ${data.error}`);
-            }
-        } catch (err) {
-            console.error('❌ Translation error:', err);
-            setMsg('❌ Translation failed.');
-        }
-
-        setTimeout(() => setMsg(''), 3000);
-    };
 
     const handlePhoneChange = (value) => {
         let digitsOnly = value.replace(/\D/g, "");
@@ -327,7 +299,7 @@ function EmployeeProfile() {
                                 className="p-2 rounded-xl bg-[#1C1F26] text-xs border border-white/5 w-full"
                             />
                         </div>
-                        <div className="relative w-full">
+                        <div>
                             <label className="text-sm mb-1 block">📝 About Me</label>
                             <textarea
                                 placeholder="Tell customers about yourself"
@@ -336,22 +308,7 @@ function EmployeeProfile() {
                                 className="p-2 rounded-xl bg-[#1C1F26] border border-white/5 w-full"
                                 rows={4}
                             />
-                            <div className="absolute top-1 right-1 flex space-x-1">
-                                <button
-                                    onClick={() => handleTranslateDescription('en')}
-                                    className="px-2 py-1 bg-blue-500 hover:bg-blue-600 rounded text-[10px] text-white"
-                                >
-                                    🇬🇧
-                                </button>
-                                <button
-                                    onClick={() => handleTranslateDescription('vi')}
-                                    className="px-2 py-1 bg-green-500 hover:bg-green-600 rounded text-[10px] text-white"
-                                >
-                                    🇻🇳
-                                </button>
-                            </div>
                         </div>
-
                         {/* Save Button */}
                         <button
                             onClick={handleSave}
