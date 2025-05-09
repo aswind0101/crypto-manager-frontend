@@ -4,11 +4,14 @@ import { useRouter } from "next/router";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
+import DocumentPreviewModal from "../../components/DocumentPreviewModal";
 
 function Employees() {
     const [employees, setEmployees] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [previewFiles, setPreviewFiles] = useState([]);
+    const [previewOpen, setPreviewOpen] = useState(false);
     const router = useRouter();
     // Đọc role & uid từ localStorage
     const [role, setRole] = useState("");
@@ -113,6 +116,12 @@ function Employees() {
     return (
         <div className="bg-[#1C1F26] min-h-screen text-white font-mono">
             <Navbar />
+            {/* Modal xem nhanh tài liệu */}
+            <DocumentPreviewModal
+                files={previewFiles}
+                isOpen={previewOpen}
+                onClose={() => setPreviewOpen(false)}
+            />
             <h1 className="text-2xl font-bold text-yellow-400 mt-6 mb-4 text-center">👥 Employee Manager</h1>
 
             <div className="max-w-5xl mx-auto rounded-xl overflow-hidden shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
@@ -141,11 +150,9 @@ function Employees() {
                                     <th className="px-4 py-2 text-left">Phone</th>
                                     <th className="px-4 py-2 text-left">Email</th>
                                     <th className="px-4 py-2 text-left">Role</th>
-                                    <th className="px-4 py-2 text-left">Status</th>
                                     <th className="px-4 py-2 text-left">Cert Status</th>
                                     <th className="px-4 py-2 text-left">ID Doc Status</th>
-                                    <th className="px-4 py-2 text-center">Actions</th>
-
+                                    <th className="px-4 py-2 text-left">Status</th>
                                     <th className="px-4 py-2 text-center">Actions</th>
                                 </tr>
                             </thead>
@@ -156,62 +163,103 @@ function Employees() {
                                         <td className="px-4 py-2">{emp.phone}</td>
                                         <td className="px-4 py-2">{emp.email}</td>
                                         <td className="px-4 py-2">{emp.role}</td>
-                                        {/* Cert Status column */}
+                                        {/* Cert Status */}
                                         <td className="px-4 py-2">
-                                            {canApprove ? (
-                                                <select
-                                                    value={emp.certification_status}
-                                                    onChange={(e) =>
-                                                        handleApproval(emp.id, "certification_status", e.target.value)
-                                                    }
-                                                    className="bg-[#1C1F26] border border-gray-700 text-xs rounded px-1"
-                                                >
-                                                    <option value="In Review">In Review</option>
-                                                    <option value="Approved">Approved</option>
-                                                    <option value="Rejected">Rejected</option>
-                                                </select>
-                                            ) : (
-                                                <span
-                                                    className={`font-semibold ${emp.certification_status === "Approved"
-                                                            ? "text-green-400"
-                                                            : emp.certification_status === "Rejected"
-                                                                ? "text-red-400"
-                                                                : "text-yellow-300"
-                                                        }`}
-                                                >
-                                                    {emp.certification_status}
-                                                </span>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {canApprove ? (
+                                                    <select
+                                                        value={emp.certification_status}
+                                                        onChange={(e) =>
+                                                            handleApproval(
+                                                                emp.id,
+                                                                "certification_status",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className="bg-[#1C1F26] border border-gray-700 text-xs rounded px-1"
+                                                    >
+                                                        <option value="In Review">In Review</option>
+                                                        <option value="Approved">Approved</option>
+                                                        <option value="Rejected">Rejected</option>
+                                                    </select>
+                                                ) : (
+                                                    <span
+                                                        className={`font-semibold ${emp.certification_status === "Approved"
+                                                                ? "text-green-400"
+                                                                : emp.certification_status === "Rejected"
+                                                                    ? "text-red-400"
+                                                                    : "text-yellow-300"
+                                                            }`}
+                                                    >
+                                                        {emp.certification_status}
+                                                    </span>
+                                                )}
+
+                                                {/* nút xem nhanh nếu có file */}
+                                                {(emp.certifications || []).length > 0 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setPreviewFiles(
+                                                                emp.certifications.map((f) =>
+                                                                    `https://crypto-manager-backend.onrender.com${f}`
+                                                                )
+                                                            );
+                                                            setPreviewOpen(true);
+                                                        }}
+                                                        className="text-xs text-yellow-300 hover:underline"
+                                                    >
+                                                        🔍
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
 
-                                        {/* ID Doc Status column */}
+                                        {/* ID Doc Status */}
                                         <td className="px-4 py-2">
-                                            {canApprove ? (
-                                                <select
-                                                    value={emp.id_document_status}
-                                                    onChange={(e) =>
-                                                        handleApproval(emp.id, "id_document_status", e.target.value)
-                                                    }
-                                                    className="bg-[#1C1F26] border border-gray-700 text-xs rounded px-1"
-                                                >
-                                                    <option value="In Review">In Review</option>
-                                                    <option value="Approved">Approved</option>
-                                                    <option value="Rejected">Rejected</option>
-                                                </select>
-                                            ) : (
-                                                <span
-                                                    className={`font-semibold ${emp.id_document_status === "Approved"
-                                                            ? "text-green-400"
-                                                            : emp.id_document_status === "Rejected"
-                                                                ? "text-red-400"
-                                                                : "text-yellow-300"
-                                                        }`}
-                                                >
-                                                    {emp.id_document_status}
-                                                </span>
-                                            )}
-                                        </td>
+                                            <div className="flex items-center gap-2">
+                                                {canApprove ? (
+                                                    <select
+                                                        value={emp.id_document_status}
+                                                        onChange={(e) =>
+                                                            handleApproval(emp.id, "id_document_status", e.target.value)
+                                                        }
+                                                        className="bg-[#1C1F26] border border-gray-700 text-xs rounded px-1"
+                                                    >
+                                                        <option value="In Review">In Review</option>
+                                                        <option value="Approved">Approved</option>
+                                                        <option value="Rejected">Rejected</option>
+                                                    </select>
+                                                ) : (
+                                                    <span
+                                                        className={`font-semibold ${emp.id_document_status === "Approved"
+                                                                ? "text-green-400"
+                                                                : emp.id_document_status === "Rejected"
+                                                                    ? "text-red-400"
+                                                                    : "text-yellow-300"
+                                                            }`}
+                                                    >
+                                                        {emp.id_document_status}
+                                                    </span>
+                                                )}
 
+                                                {/* nút xem nhanh nếu có file */}
+                                                {(emp.id_documents || []).length > 0 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setPreviewFiles(
+                                                                emp.id_documents.map((f) =>
+                                                                    `https://crypto-manager-backend.onrender.com${f}`
+                                                                )
+                                                            );
+                                                            setPreviewOpen(true);
+                                                        }}
+                                                        className="text-xs text-yellow-300 hover:underline"
+                                                    >
+                                                        🔍
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-2">
                                             {emp.status ? (
                                                 <span className={`font-bold ${emp.status.toLowerCase() === "active"
