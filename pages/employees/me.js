@@ -227,7 +227,7 @@ function EmployeeProfile() {
                     <div
                         className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] rounded-xl 
                         shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
-                        absolute  w-full min-h-[500px] flex flex-col items-center p-6"
+                        absolute  w-full min-h-[650px] flex flex-col items-center p-6"
                         style={{
                             backfaceVisibility: "hidden",
                             WebkitBackfaceVisibility: "hidden",
@@ -263,7 +263,7 @@ function EmployeeProfile() {
                         <p>💰 {employee.commission_percent || 0}% commission</p>
                         <p>🕒 Status: {employee.status}</p>
                         <span
-                            className="absolute bottom-4 text-xs text-gray-400 cursor-pointer"
+                            className="absolute bottom-14 text-xs text-gray-400 cursor-pointer"
                             onClick={() => setIsFlipped(true)}
                         >
                             Tap to edit ↺
@@ -278,7 +278,7 @@ function EmployeeProfile() {
                     <div
                         className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] rounded-2xl 
                         shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
-                        absolute w-full min-h-[500px] flex flex-col p-4 space-y-4"
+                        absolute w-full min-h-[650px] flex flex-col p-4 space-y-4"
                         style={{
                             transform: "rotateY(180deg)",
                             backfaceVisibility: "hidden",
@@ -315,7 +315,7 @@ function EmployeeProfile() {
                                 placeholder="Tell customers about yourself"
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                className="p-2 rounded-xl bg-[#1C1F26] border border-white/5 w-full"
+                                className="p-2 rounded-xl bg-[#1C1F26] text-xs border border-white/5 w-full"
                                 rows={4}
                             />
                         </div>
@@ -345,11 +345,14 @@ function EmployeeProfile() {
                             <div>
                                 <p className="text-sm font-semibold">📁 Certifications</p>
                                 {employee.certifications && employee.certifications.length > 0 ? (
-                                    <p className={`text-xs ${employee.certification_status === "Approved"
+                                    <p className={`text-xs flex items-center ${employee.certification_status === "Approved"
                                         ? "text-green-400"
                                         : "text-yellow-400"
                                         }`}>
                                         {employee.certification_status}
+                                        {employee.certification_status === "Approved" && (
+                                            <span className="ml-2 text-xs text-green-500 leading-none">✓</span>
+                                        )}
                                     </p>
                                 ) : (
                                     <p className="text-xs italic text-gray-500">Empty</p>
@@ -376,17 +379,20 @@ function EmployeeProfile() {
                             </label>
 
                         </div>
-                        
+
                         {/* ID Documents */}
                         <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
                             <div>
                                 <p className="text-sm font-semibold">🪪 ID Documents</p>
                                 {employee.id_documents && employee.id_documents.length > 0 ? (
-                                    <p className={`text-xs ${employee.id_document_status === "Approved"
-                                        ? "text-green-400"
-                                        : "text-yellow-400"
+                                    <p className={`text-xs flex items-center ${employee.id_document_status === "Approved"
+                                            ? "text-green-400"
+                                            : "text-yellow-400"
                                         }`}>
                                         {employee.id_document_status}
+                                        {employee.id_document_status === "Approved" && (
+                                            <span className="ml-2 text-xs text-green-500 leading-none">✓</span>
+                                        )}
                                     </p>
                                 ) : (
                                     <p className="text-xs italic text-gray-500">Empty</p>
