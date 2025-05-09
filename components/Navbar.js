@@ -95,7 +95,7 @@ export default function Navbar() {
                 {/* Desktop Menu */}
                 <div className="hidden items-center gap-6 font-medium">
 
-                    {(isSuperAdmin || isSalonChu) && (
+                    {isSuperAdmin && (
                         <div className="relative group">
                             <Link href="/home" className="hover:text-cyan-300 transition flex items-center gap-1">
                                 <FiHome /> Home
@@ -226,7 +226,7 @@ export default function Navbar() {
                         )}
 
                         {/* Salons dropdown */}
-                        {(isSuperAdmin || isSalonChu) && (
+                        {isSuperAdmin && (
                             <div className="flex flex-col">
                                 <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
                                     <FiHome /> Home
