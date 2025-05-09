@@ -216,7 +216,7 @@ function EmployeeProfile() {
     return (
         <div className="bg-[#1C1F26] min-h-screen text-white font-mono">
             <Navbar />
-            <div className="flex flex-col items-center justify-center mt-10 px-2">
+            <div className="flex flex-col items-center justify-center mt-10 px-1 py-2">
                 <motion.div
                     className={`relative w-full max-w-xs h-96 bg-[#2f374a] rounded-xl shadow-lg`}
                     animate={{ rotateY: isFlipped ? 180 : 0 }}
@@ -227,7 +227,7 @@ function EmployeeProfile() {
                     <div
                         className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] rounded-xl 
                         shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
-                        absolute  w-full min-h-[650px] flex flex-col items-center p-6"
+                        absolute w-full min-h-[650px] flex flex-col items-center p-6"
                         style={{
                             backfaceVisibility: "hidden",
                             WebkitBackfaceVisibility: "hidden",
