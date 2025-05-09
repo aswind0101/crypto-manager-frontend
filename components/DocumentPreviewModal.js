@@ -17,7 +17,7 @@ export default function DocumentPreviewModal({ files = [], isOpen, onClose }) {
         >
           <div className="relative max-w-[90vw] max-h-[90vh]">
             <img
-              src={files[idx]}
+              src="https://crypto-manager-backend.onrender.com/uploads/id_documents/92x22nv7asTztYXP0XLatdGhsRo2_1746737441434.jpg"
               alt={`document ${idx + 1}`}
               className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
             />
