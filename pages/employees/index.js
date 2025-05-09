@@ -166,7 +166,9 @@ function Employees() {
                                         {/* Cert Status */}
                                         <td className="px-4 py-2">
                                             <div className="flex items-center gap-2">
-                                                {canApprove ? (
+                                                {(!emp.certifications || emp.certifications.length === 0) ? (
+                                                    <span className="italic text-gray-500">Empty</span>
+                                                ) : canApprove ? (
                                                     <select
                                                         value={emp.certification_status}
                                                         onChange={(e) =>
@@ -217,7 +219,9 @@ function Employees() {
                                         {/* ID Doc Status */}
                                         <td className="px-4 py-2">
                                             <div className="flex items-center gap-2">
-                                                {canApprove ? (
+                                                {(!emp.id_documents || emp.id_documents.length === 0) ? (
+                                                    <span className="italic text-gray-500">Empty</span>
+                                                ) : canApprove ? (
                                                     <select
                                                         value={emp.id_document_status}
                                                         onChange={(e) =>
@@ -260,6 +264,7 @@ function Employees() {
                                                 )}
                                             </div>
                                         </td>
+
                                         <td className="px-4 py-2">
                                             {emp.status ? (
                                                 <span className={`font-bold ${emp.status.toLowerCase() === "active"

@@ -344,9 +344,16 @@ function EmployeeProfile() {
                         <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
                             <div>
                                 <p className="text-sm font-semibold">📁 Certifications</p>
-                                <p className={`text-xs ${employee.certification_status === "Approved" ? "text-green-400" : "text-yellow-400"}`}>
-                                    {employee.certification_status}
-                                </p>
+                                {employee.certifications && employee.certifications.length > 0 ? (
+                                    <p className={`text-xs ${employee.certification_status === "Approved"
+                                        ? "text-green-400"
+                                        : "text-yellow-400"
+                                        }`}>
+                                        {employee.certification_status}
+                                    </p>
+                                ) : (
+                                    <p className="text-xs italic text-gray-500">Empty</p>
+                                )}
                             </div>
                             <label className="text-xs text-yellow-300 cursor-pointer hover:text-yellow-400">
                                 Upload
@@ -363,9 +370,16 @@ function EmployeeProfile() {
                         <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
                             <div>
                                 <p className="text-sm font-semibold">🪪 ID Documents</p>
-                                <p className={`text-xs ${employee.id_document_status === "Approved" ? "text-green-400" : "text-yellow-400"}`}>
-                                    {employee.id_document_status}
-                                </p>
+                                {employee.id_documents && employee.id_documents.length > 0 ? (
+                                    <p className={`text-xs ${employee.id_document_status === "Approved"
+                                            ? "text-green-400"
+                                            : "text-yellow-400"
+                                        }`}>
+                                        {employee.id_document_status}
+                                    </p>
+                                ) : (
+                                    <p className="text-xs italic text-gray-500">Empty</p>
+                                )}
                             </div>
                             <label className="text-xs text-yellow-300 cursor-pointer hover:text-yellow-400">
                                 Upload
