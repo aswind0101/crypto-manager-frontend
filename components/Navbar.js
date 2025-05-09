@@ -155,6 +155,29 @@ export default function Navbar() {
                         </div>
                     )}
 
+
+                    {isSalonChu && (
+                        <div className="relative group">
+                            <button className="flex items-center gap-1 hover:text-cyan-300 transition">
+                                🏠 Salons ▾
+                            </button>
+                            <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-52 text-sm z-50 border border-gray-700">
+                                <Link href="/salons" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                                    View Salon
+                                </Link>
+                                <Link href="/employees" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                    Employees
+                                </Link>
+                                <Link href="/services" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                    Service
+                                </Link>
+                                <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                    Appointments
+                                </Link>
+                            </div>
+                        </div>
+                    )}
+
                     {isSalonNhanVien && (
                         <div className="relative group">
                             <button className="flex items-center gap-1 hover:text-cyan-300 transition">
@@ -304,6 +327,49 @@ export default function Navbar() {
                                 <Link href="/settings" className="hover:text-cyan-300 flex items-center gap-2">
                                     ⚙️ Settings
                                 </Link>
+                            </div>
+                        )}
+
+                        {isSalonChu && (
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setIsSalonsOpen(!isSalonsOpen)}
+                                >
+                                    🏠 Salons {isSalonsOpen ? "▴" : "▾"}
+                                </button>
+                                <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
+                                    {isSuperAdmin && (
+                                        <Link
+                                            href="/salons"
+                                            onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                            className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                        >
+                                            📍 View Salon
+                                        </Link>
+                                    )}
+                                    <Link
+                                        href="/employees"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        👥 Employees
+                                    </Link>
+                                    <Link
+                                        href="/services"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        💈 Service
+                                    </Link>
+                                    <Link
+                                        href="/appointments"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        📅 Appointments
+                                    </Link>
+                                </div>
                             </div>
                         )}
                         {isSalonNhanVien && (

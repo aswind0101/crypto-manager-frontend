@@ -227,7 +227,7 @@ function EmployeeProfile() {
                     <div
                         className="bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] rounded-xl 
                         shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]
-                        absolute w-full min-h-[650px] flex flex-col items-center p-6"
+                        absolute w-full min-h-[650px] flex flex-col items-center p-8"
                         style={{
                             backfaceVisibility: "hidden",
                             WebkitBackfaceVisibility: "hidden",
