@@ -355,25 +355,36 @@ function EmployeeProfile() {
                                     <p className="text-xs italic text-gray-500">Empty</p>
                                 )}
                             </div>
-                            <label className="text-xs text-yellow-300 cursor-pointer hover:text-yellow-400">
+                            <label className="
+                                        relative inline-block
+                                        px-3 py-1
+                                        text-sm font-medium
+                                        text-yellow-300
+                                        border border-yellow-300
+                                        rounded-lg
+                                        hover:bg-yellow-300 hover:text-black
+                                        transition
+                                        cursor-pointer
+                                    ">
                                 Upload
                                 <input
                                     type="file"
                                     multiple
                                     onChange={(e) => handleDocumentsUpload(e.target.files, 'certifications')}
-                                    className="hidden"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
                             </label>
-                        </div>
 
+                        </div>
+                        
                         {/* ID Documents */}
                         <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
                             <div>
                                 <p className="text-sm font-semibold">🪪 ID Documents</p>
                                 {employee.id_documents && employee.id_documents.length > 0 ? (
                                     <p className={`text-xs ${employee.id_document_status === "Approved"
-                                            ? "text-green-400"
-                                            : "text-yellow-400"
+                                        ? "text-green-400"
+                                        : "text-yellow-400"
                                         }`}>
                                         {employee.id_document_status}
                                     </p>
@@ -381,13 +392,23 @@ function EmployeeProfile() {
                                     <p className="text-xs italic text-gray-500">Empty</p>
                                 )}
                             </div>
-                            <label className="text-xs text-yellow-300 cursor-pointer hover:text-yellow-400">
+                            <label className="
+                                        relative inline-block
+                                        px-3 py-1
+                                        text-sm font-medium
+                                        text-yellow-300
+                                        border border-yellow-300
+                                        rounded-lg
+                                        hover:bg-yellow-300 hover:text-black
+                                        transition
+                                        cursor-pointer
+                                    ">
                                 Upload
                                 <input
                                     type="file"
                                     multiple
                                     onChange={(e) => handleDocumentsUpload(e.target.files, 'id_documents')}
-                                    className="hidden"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
                             </label>
                         </div>
