@@ -10,6 +10,22 @@ function Employees() {
     const [currentUser, setCurrentUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
+    // Đọc role & uid từ localStorage
+    const [role, setRole] = useState("");
+    const [uid, setUid] = useState("");
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const u = JSON.parse(localStorage.getItem("user") || "{}");
+            setRole(u.role);
+            setUid(u.uid);
+        }
+    }, []);
+    // SuperAdmin list
+    const SUPER_ADMINS = ["D9nW6SLT2pbUuWbNVnCgf2uINok2"];
+    const isSuperAdmin = SUPER_ADMINS.includes(uid);
+    const isSalonChu = role === "Salon_Chu";
+    const canApprove = isSalonChu || isSuperAdmin;
+
 
     useEffect(() => {
         const auth = getAuth();
@@ -63,6 +79,36 @@ function Employees() {
             alert("Error deleting employee.");
         }
     };
+    const handleApproval = async (employeeId, type, newStatus) => {
+        try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch(
+                "https://crypto-manager-backend.onrender.com/api/employees/update-status",
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        employee_id: employeeId,
+                        type,
+                        status: newStatus,
+                    }),
+                }
+            );
+            if (!res.ok) throw new Error("Failed to update");
+            // Cập nhật state local để reflect ngay
+            setEmployees((prev) =>
+                prev.map((emp) =>
+                    emp.id === employeeId ? { ...emp, [type]: newStatus } : emp
+                )
+            );
+        } catch (err) {
+            console.error("❌ Approval error:", err);
+            alert("Failed to update status.");
+        }
+    };
 
     return (
         <div className="bg-[#1C1F26] min-h-screen text-white font-mono">
@@ -96,6 +142,10 @@ function Employees() {
                                     <th className="px-4 py-2 text-left">Email</th>
                                     <th className="px-4 py-2 text-left">Role</th>
                                     <th className="px-4 py-2 text-left">Status</th>
+                                    <th className="px-4 py-2 text-left">Cert Status</th>
+                                    <th className="px-4 py-2 text-left">ID Doc Status</th>
+                                    <th className="px-4 py-2 text-center">Actions</th>
+
                                     <th className="px-4 py-2 text-center">Actions</th>
                                 </tr>
                             </thead>
@@ -106,15 +156,70 @@ function Employees() {
                                         <td className="px-4 py-2">{emp.phone}</td>
                                         <td className="px-4 py-2">{emp.email}</td>
                                         <td className="px-4 py-2">{emp.role}</td>
+                                        {/* Cert Status column */}
+                                        <td className="px-4 py-2">
+                                            {canApprove ? (
+                                                <select
+                                                    value={emp.certification_status}
+                                                    onChange={(e) =>
+                                                        handleApproval(emp.id, "certification_status", e.target.value)
+                                                    }
+                                                    className="bg-[#1C1F26] border border-gray-700 text-xs rounded px-1"
+                                                >
+                                                    <option value="In Review">In Review</option>
+                                                    <option value="Approved">Approved</option>
+                                                    <option value="Rejected">Rejected</option>
+                                                </select>
+                                            ) : (
+                                                <span
+                                                    className={`font-semibold ${emp.certification_status === "Approved"
+                                                            ? "text-green-400"
+                                                            : emp.certification_status === "Rejected"
+                                                                ? "text-red-400"
+                                                                : "text-yellow-300"
+                                                        }`}
+                                                >
+                                                    {emp.certification_status}
+                                                </span>
+                                            )}
+                                        </td>
+
+                                        {/* ID Doc Status column */}
+                                        <td className="px-4 py-2">
+                                            {canApprove ? (
+                                                <select
+                                                    value={emp.id_document_status}
+                                                    onChange={(e) =>
+                                                        handleApproval(emp.id, "id_document_status", e.target.value)
+                                                    }
+                                                    className="bg-[#1C1F26] border border-gray-700 text-xs rounded px-1"
+                                                >
+                                                    <option value="In Review">In Review</option>
+                                                    <option value="Approved">Approved</option>
+                                                    <option value="Rejected">Rejected</option>
+                                                </select>
+                                            ) : (
+                                                <span
+                                                    className={`font-semibold ${emp.id_document_status === "Approved"
+                                                            ? "text-green-400"
+                                                            : emp.id_document_status === "Rejected"
+                                                                ? "text-red-400"
+                                                                : "text-yellow-300"
+                                                        }`}
+                                                >
+                                                    {emp.id_document_status}
+                                                </span>
+                                            )}
+                                        </td>
+
                                         <td className="px-4 py-2">
                                             {emp.status ? (
-                                                <span className={`font-bold ${
-                                                    emp.status.toLowerCase() === "active"
-                                                        ? "text-green-400"
-                                                        : emp.status.toLowerCase() === "inactive"
+                                                <span className={`font-bold ${emp.status.toLowerCase() === "active"
+                                                    ? "text-green-400"
+                                                    : emp.status.toLowerCase() === "inactive"
                                                         ? "text-red-400"
                                                         : "text-yellow-300"
-                                                }`}>
+                                                    }`}>
                                                     {emp.status}
                                                 </span>
                                             ) : (

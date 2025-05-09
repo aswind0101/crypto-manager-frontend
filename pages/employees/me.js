@@ -210,7 +210,9 @@ function EmployeeProfile() {
     if (!employee) {
         return <div className="bg-black min-h-screen text-white flex items-center justify-center">Loading...</div>;
     }
-
+    const avatarSrc = employee.avatar_url
+        ? `https://crypto-manager-backend.onrender.com${employee.avatar_url}`
+        : '/default-avatar.png';
     return (
         <div className="bg-[#1C1F26] min-h-screen text-white font-mono">
             <Navbar />
@@ -231,10 +233,18 @@ function EmployeeProfile() {
                             WebkitBackfaceVisibility: "hidden",
                         }}
                     >
-                        <img src={`https://crypto-manager-backend.onrender.com${employee.avatar_url || '/default-avatar.png'}`}
+                        <img
+                            src={avatarSrc}
                             alt="Avatar"
-                            className="w-40 h-40 rounded-full mb-4"
+                            className="
+                                w-44 h-44
+                                rounded-full
+                                ring-4 ring-white        /* độ dày và màu vòng ring */
+                                ring-offset-2                  /* khoảng cách giữa ảnh và ring */
+                                ring-offset-[#1C1F26]          /* màu nền phía sau ring */
+                                mb-4"
                         />
+
                         {/* New: Avatar Upload Button */}
                         <label className="text-xs text-gray-400 cursor-pointer mb-2 hover:text-yellow-400">
                             📸 Change Avatar
