@@ -216,9 +216,9 @@ function EmployeeProfile() {
     return (
         <div className="bg-[#1C1F26] min-h-screen text-white font-mono">
             <Navbar />
-            <div className="flex flex-col items-center justify-center mt-10">
+            <div className="flex flex-col items-center justify-center mt-10 px-2">
                 <motion.div
-                    className={`relative w-80 h-96 bg-[#2f374a] rounded-xl shadow-lg`}
+                    className={`relative w-full max-w-xs h-96 bg-[#2f374a] rounded-xl shadow-lg`}
                     animate={{ rotateY: isFlipped ? 180 : 0 }}
                     transition={{ duration: 0.8 }}
                     style={{ transformStyle: "preserve-3d" }}
