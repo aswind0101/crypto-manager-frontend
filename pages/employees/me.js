@@ -4,6 +4,7 @@ import Navbar from "../../components/Navbar";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import { AnimatePresence, motion } from "framer-motion";
 import { parsePhoneNumberFromString, AsYouType } from "libphonenumber-js";
+import { FiRefreshCw } from "react-icons/fi";
 
 function EmployeeProfile() {
     const [employee, setEmployee] = useState(null);
@@ -18,31 +19,93 @@ function EmployeeProfile() {
 
     const [uploadingCertifications, setUploadingCertifications] = useState(false);
     const [uploadingIdDocuments, setUploadingIdDocuments] = useState(false);
+    const [isRefreshingCert, setIsRefreshingCert] = useState(false);
+    const [isRefreshingID, setIsRefreshingID] = useState(false);
 
     useEffect(() => {
+        //let intervalId;
         const auth = getAuth();
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 setCurrentUser(user);
                 const token = await user.getIdToken();
-                try {
-                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
-                        headers: { Authorization: `Bearer ${token}` },
-                    });
-                    const data = await res.json();
-                    setEmployee(data);
-                    setForm({
-                        name: data.name || "",
-                        phone: data.phone || "",
-                        description: data.description || ""
-                    });
-                } catch (err) {
-                    console.error("Error fetching employee:", err);
-                }
+                const fetchData = async () => {
+                    try {
+                        const res = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
+                            headers: { Authorization: `Bearer ${token}` },
+                        });
+                        const data = await res.json();
+                        setEmployee(data);
+                        setForm({
+                            name: data.name || "",
+                            phone: data.phone || "",
+                            description: data.description || ""
+                        });
+                    } catch (err) {
+                        console.error("Error fetching employee:", err);
+                    }
+                };
+                await fetchData();
+                //intervalId = setInterval(fetchData, 30000); // ⏰ 10s cập nhật
             }
         });
-        return () => unsubscribe();
+        return () => {
+            unsubscribe();
+            //if (intervalId) clearInterval(intervalId);
+        };
     }, []);
+    const handleRefreshCert = async () => {
+        if (!currentUser) return;
+        setIsRefreshingCert(true);
+        await refreshEmployee();
+        setIsRefreshingCert(false);
+    };
+
+    const handleRefreshID = async () => {
+        if (!currentUser) return;
+        setIsRefreshingID(true);
+        await refreshEmployee();
+        setIsRefreshingID(false);
+    };
+    const refreshEmployee = async () => {
+        const token = await currentUser.getIdToken();
+        try {
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            setEmployee(data);
+            setForm({
+                name: data.name || "",
+                phone: data.phone || "",
+                description: data.description || ""
+            });
+        } catch (err) {
+            console.error("Error refreshing employee:", err);
+        }
+    };
+
+    const handleManualRefresh = async () => {
+        if (!currentUser) return;
+        setIsRefreshing(true);
+        const token = await currentUser.getIdToken();
+        try {
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            setEmployee(data);
+            setForm({
+                name: data.name || "",
+                phone: data.phone || "",
+                description: data.description || ""
+            });
+        } catch (err) {
+            console.error("Error refreshing employee:", err);
+        }
+        setIsRefreshing(false);
+    };
+
 
     const handlePhoneChange = (value) => {
         let digitsOnly = value.replace(/\D/g, "");
@@ -372,7 +435,18 @@ function EmployeeProfile() {
                         {/* Certifications */}
                         <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
                             <div>
-                                <p className="text-sm font-semibold">📁 Certifications</p>
+                                <p className="text-sm font-semibold flex items-center gap-1">
+                                    📁 Certifications
+                                    <span
+                                        onClick={handleRefreshCert}
+                                        className={`cursor-pointer text-yellow-300 hover:text-yellow-400 text-[10px] ${isRefreshingCert ? "animate-spin" : ""
+                                            }`}
+                                        title="Refresh Certifications"
+                                    >
+                                        <FiRefreshCw />
+                                    </span>
+                                </p>
+
                                 {employee.certifications && employee.certifications.length > 0 ? (
                                     <p className={`text-xs flex items-center ${employee.certification_status === "Approved" ? "text-green-400" : "text-yellow-400"
                                         }`}>
@@ -409,7 +483,18 @@ function EmployeeProfile() {
                         {/* ID Documents */}
                         <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
                             <div>
-                                <p className="text-sm font-semibold">🪪 ID Documents</p>
+                                <p className="text-sm font-semibold flex items-center gap-1">
+                                    🪪 ID Documents
+                                    <span
+                                        onClick={handleRefreshID}
+                                        className={`cursor-pointer text-yellow-300 hover:text-yellow-400 text-[10px] ${isRefreshingID ? "animate-spin" : ""
+                                            }`}
+                                        title="Refresh ID Documents"
+                                    >
+                                        <FiRefreshCw />
+                                    </span>
+                                </p>
+
                                 {employee.id_documents && employee.id_documents.length > 0 ? (
                                     <p className={`text-xs flex items-center ${employee.id_document_status === "Approved" ? "text-green-400" : "text-yellow-400"
                                         }`}>
