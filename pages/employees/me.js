@@ -4,6 +4,7 @@ import Navbar from "../../components/Navbar";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import { AnimatePresence, motion } from "framer-motion";
 import { parsePhoneNumberFromString, AsYouType } from "libphonenumber-js";
+import socket from "../../lib/socket";
 
 
 function EmployeeProfile() {
@@ -44,7 +45,27 @@ function EmployeeProfile() {
         });
         return () => unsubscribe();
     }, []);
+    useEffect(() => {
+        if (currentUser && isSalonNhanVien) {
+            socket.auth = { token: currentUserToken };
+            socket.connect();
+            // join room riêng của mình
+            socket.emit("joinRoom", `employee_${firebaseUid}`);
 
+            socket.on("certificationStatusUpdated", ({ certification_status }) => {
+                setEmployee(emp => ({ ...emp, certification_status }));
+            });
+
+            socket.on("idDocumentStatusUpdated", ({ id_document_status }) => {
+                setEmployee(emp => ({ ...emp, id_document_status }));
+            });
+        }
+        return () => {
+            socket.off("certificationStatusUpdated");
+            socket.off("idDocumentStatusUpdated");
+            socket.disconnect();
+        };
+    }, [currentUser, firebaseUid, isSalonNhanVien]);
     const handlePhoneChange = (value) => {
         let digitsOnly = value.replace(/\D/g, "");
         let hasCountryCode = false;
