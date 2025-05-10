@@ -9,6 +9,8 @@ import socket from "../../lib/socket";
 
 function Employees() {
     const [employees, setEmployees] = useState([]);
+    const [salonId, setSalonId] = useState(null);
+    const auth = getAuth();
     const [currentUser, setCurrentUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [previewFiles, setPreviewFiles] = useState([]);
@@ -17,6 +19,20 @@ function Employees() {
     // Đọc role & uid từ localStorage
     const [role, setRole] = useState("");
     const [uid, setUid] = useState("");
+    // 1️⃣ Lấy salonId ngay khi user load page
+    useEffect(() => {
+        if (!currentUser) return;
+        currentUser.getIdToken().then(token => {
+            fetch("https://crypto-manager-backend.onrender.com/api/salons/me", {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.id) setSalonId(data.id);
+                });
+        });
+    }, [currentUser]);
+
     useEffect(() => {
         if (typeof window !== "undefined") {
             const u = JSON.parse(localStorage.getItem("user") || "{}");
@@ -42,23 +58,26 @@ function Employees() {
         return () => unsubscribe();
     }, []);
 
+    // 2️⃣ Kết nối Socket.IO và join đúng room
     useEffect(() => {
-        if (currentUser && isSalonChu) {
-            // join room salon_<salonId>
-            socket.auth = { token: currentUserToken };
-            socket.connect();
-            socket.emit("joinRoom", `salon_${salonId}`);
+        if (!currentUser || salonId === null) return;
 
-            socket.on("certificationsUpdated", (data) => {
-                // reload lại list employees
-                fetchEmployees();
-            });
-        }
+        currentUser.getIdToken().then(token => {
+            socket.auth = { token };
+            if (!socket.connected) socket.connect();
+            socket.emit("joinRoom", `salon_${salonId}`);
+        });
+
+        // Ví dụ: khi có cập nhật, fetch lại list
+        socket.on("certificationsUpdated", () => {
+            fetchEmployees();
+        });
+
         return () => {
             socket.off("certificationsUpdated");
             socket.disconnect();
         };
-    }, [currentUser, isSalonChu, salonId]);
+    }, [currentUser, salonId]);
 
     const fetchEmployees = async (user) => {
         try {
@@ -131,7 +150,9 @@ function Employees() {
             alert("Failed to update status.");
         }
     };
-
+    useEffect(() => {
+        if (salonId !== null) fetchEmployees();
+    }, [salonId]);
     return (
         <div className="bg-[#1C1F26] min-h-screen text-white font-mono">
             <Navbar />
