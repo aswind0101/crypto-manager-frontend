@@ -4,12 +4,9 @@ import Navbar from "../../components/Navbar";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import { AnimatePresence, motion } from "framer-motion";
 import { parsePhoneNumberFromString, AsYouType } from "libphonenumber-js";
-import socket from "../../lib/socket";
-
 
 function EmployeeProfile() {
     const [employee, setEmployee] = useState(null);
-    const isSalonNhanVien = !!employee && employee.role === "Salon_NhanVien";
     const [isFlipped, setIsFlipped] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [form, setForm] = useState({
@@ -46,29 +43,6 @@ function EmployeeProfile() {
         });
         return () => unsubscribe();
     }, []);
-
-    useEffect(() => {
-        if (currentUser && isSalonNhanVien) {
-            const uid = currentUser.uid;
-            currentUser.getIdToken().then(token => {
-                socket.auth = { token };
-                if (!socket.connected) socket.connect();
-                socket.emit("joinRoom", `employee_${uid}`);
-            });
-            socket.on("certificationStatusUpdated", ({ certification_status }) => {
-                setEmployee(emp => ({ ...emp, certification_status }));
-            });
-            socket.on("idDocumentStatusUpdated", ({ id_document_status }) => {
-                setEmployee(emp => ({ ...emp, id_document_status }));
-            });
-        }
-        return () => {
-            socket.off("certificationStatusUpdated");
-            socket.off("idDocumentStatusUpdated");
-            socket.disconnect();
-        };
-    }, [currentUser, isSalonNhanVien]);
-
 
     const handlePhoneChange = (value) => {
         let digitsOnly = value.replace(/\D/g, "");
