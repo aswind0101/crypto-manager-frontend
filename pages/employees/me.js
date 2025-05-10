@@ -435,7 +435,7 @@ function EmployeeProfile() {
                         {/* Certifications */}
                         <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
                             <div>
-                                <p className="text-sm font-semibold flex items-center gap-1">
+                                <p className="text-sm font-semibold flex items-center gap-2">
                                     📁 Certifications
                                     <span
                                         onClick={handleRefreshCert}
@@ -448,7 +448,11 @@ function EmployeeProfile() {
                                 </p>
 
                                 {employee.certifications && employee.certifications.length > 0 ? (
-                                    <p className={`text-xs flex items-center ${employee.certification_status === "Approved" ? "text-green-400" : "text-yellow-400"
+                                    <p className={`text-[10px] flex items-center ${employee.certification_status === "Approved"
+                                        ? "text-green-400"
+                                        : employee.certification_status === "Rejected"
+                                            ? "text-red-400"
+                                            : "text-yellow-400"
                                         }`}>
                                         {employee.certification_status}
                                         {employee.certification_status === "Approved" && (
@@ -483,7 +487,7 @@ function EmployeeProfile() {
                         {/* ID Documents */}
                         <div className="flex items-center justify-between border border-white/5 rounded-xl p-2">
                             <div>
-                                <p className="text-sm font-semibold flex items-center gap-1">
+                                <p className="text-sm font-semibold flex items-center gap-2">
                                     🪪 ID Documents
                                     <span
                                         onClick={handleRefreshID}
@@ -496,7 +500,11 @@ function EmployeeProfile() {
                                 </p>
 
                                 {employee.id_documents && employee.id_documents.length > 0 ? (
-                                    <p className={`text-xs flex items-center ${employee.id_document_status === "Approved" ? "text-green-400" : "text-yellow-400"
+                                    <p className={`text-[10px] flex items-center ${employee.id_document_status === "Approved"
+                                            ? "text-green-400"
+                                            : employee.id_document_status === "Rejected"
+                                                ? "text-red-400"
+                                                : "text-yellow-400"
                                         }`}>
                                         {employee.id_document_status}
                                         {employee.id_document_status === "Approved" && (
@@ -506,6 +514,7 @@ function EmployeeProfile() {
                                 ) : (
                                     <p className="text-xs italic text-gray-500">Empty</p>
                                 )}
+
                             </div>
 
                             {uploadingIdDocuments ? (
