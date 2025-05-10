@@ -17,6 +17,9 @@ function EmployeeProfile() {
     });
     const [msg, setMsg] = useState("");
 
+    const [uploadingCertifications, setUploadingCertifications] = useState(false);
+    const [uploadingIdDocuments, setUploadingIdDocuments] = useState(false);
+
     useEffect(() => {
         const auth = getAuth();
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -82,35 +85,62 @@ function EmployeeProfile() {
 
     const handleDocumentsUpload = async (files, type) => {
         if (!currentUser) return;
+
+        // bật loading
+        if (type === 'certifications')
+            setUploadingCertifications(true);
+        else
+            setUploadingIdDocuments(true);
+
         const formData = new FormData();
         Array.from(files).forEach(file => formData.append('files', file));
 
         const token = await currentUser.getIdToken();
 
         try {
-            const res = await fetch(`https://crypto-manager-backend.onrender.com/api/employees/upload/${type}`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-                body: formData,
-            });
-
+            const res = await fetch(
+                `https://crypto-manager-backend.onrender.com/api/employees/upload/${type}`,
+                {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` },
+                    body: formData,
+                }
+            );
             const data = await res.json();
-            if (res.ok) {
+
+            if (!res.ok) {
+                setMsg(`❌ ${data.error || 'Upload failed'}`);
+            } else {
+                // Chọn đúng field status trả về
+                const statusField = type === 'certifications'
+                    ? 'certification_status'
+                    : 'id_document_status';
+
                 setEmployee(prev => ({
                     ...prev,
+                    // cập nhật mảng đường dẫn file mới
                     [type]: data[type],
-                    [`${type}_status`]: 'In Review',
+                    // cập nhật status chính xác từ response
+                    [statusField]: data[statusField],
                 }));
-                setMsg(`✅ ${type === 'certifications' ? 'Certifications' : 'ID Documents'} uploaded!`);
-            } else {
-                setMsg(`❌ ${data.error || 'Upload failed'}`);
+                setMsg(
+                    `✅ ${type === 'certifications' ? 'Certifications' : 'ID Documents'
+                    } uploaded!`
+                );
             }
         } catch (err) {
             console.error(`❌ Upload ${type} error:`, err);
             setMsg('❌ Upload failed.');
         }
+        finally {
+            if (type === 'certifications')
+                setUploadingCertifications(false);
+            else
+                setUploadingIdDocuments(false);
+            // ẩn thông báo sau 3s
+            setTimeout(() => setMsg(''), 3000);
+        }
 
-        setTimeout(() => setMsg(''), 3000);
     };
 
     const handleAvatarUpload = async (e) => {
@@ -345,9 +375,7 @@ function EmployeeProfile() {
                             <div>
                                 <p className="text-sm font-semibold">📁 Certifications</p>
                                 {employee.certifications && employee.certifications.length > 0 ? (
-                                    <p className={`text-xs flex items-center ${employee.certification_status === "Approved"
-                                        ? "text-green-400"
-                                        : "text-yellow-400"
+                                    <p className={`text-xs flex items-center ${employee.certification_status === "Approved" ? "text-green-400" : "text-yellow-400"
                                         }`}>
                                         {employee.certification_status}
                                         {employee.certification_status === "Approved" && (
@@ -358,26 +386,25 @@ function EmployeeProfile() {
                                     <p className="text-xs italic text-gray-500">Empty</p>
                                 )}
                             </div>
-                            <label className="
-                                        relative inline-block
-                                        px-3 py-1
-                                        text-sm font-medium
-                                        text-yellow-300
-                                        border border-yellow-300
-                                        rounded-lg
-                                        hover:bg-yellow-300 hover:text-black
-                                        transition
-                                        cursor-pointer
-                                    ">
-                                Upload
-                                <input
-                                    type="file"
-                                    multiple
-                                    onChange={(e) => handleDocumentsUpload(e.target.files, 'certifications')}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                />
-                            </label>
 
+                            {/* Hiển thị Upload hoặc Uploading… */}
+                            {uploadingCertifications ? (
+                                <span className="text-xs italic text-yellow-300">Uploading…</span>
+                            ) : (
+                                <label className="
+                                    relative inline-block px-3 py-1 text-sm font-medium
+                                    text-yellow-300 border border-yellow-300 rounded-lg
+                                    hover:bg-yellow-300 hover:text-black transition cursor-pointer
+                                    ">
+                                    Upload
+                                    <input
+                                        type="file"
+                                        multiple
+                                        onChange={(e) => handleDocumentsUpload(e.target.files, 'certifications')}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    />
+                                </label>
+                            )}
                         </div>
 
                         {/* ID Documents */}
@@ -385,9 +412,7 @@ function EmployeeProfile() {
                             <div>
                                 <p className="text-sm font-semibold">🪪 ID Documents</p>
                                 {employee.id_documents && employee.id_documents.length > 0 ? (
-                                    <p className={`text-xs flex items-center ${employee.id_document_status === "Approved"
-                                            ? "text-green-400"
-                                            : "text-yellow-400"
+                                    <p className={`text-xs flex items-center ${employee.id_document_status === "Approved" ? "text-green-400" : "text-yellow-400"
                                         }`}>
                                         {employee.id_document_status}
                                         {employee.id_document_status === "Approved" && (
@@ -398,27 +423,25 @@ function EmployeeProfile() {
                                     <p className="text-xs italic text-gray-500">Empty</p>
                                 )}
                             </div>
-                            <label className="
-                                        relative inline-block
-                                        px-3 py-1
-                                        text-sm font-medium
-                                        text-yellow-300
-                                        border border-yellow-300
-                                        rounded-lg
-                                        hover:bg-yellow-300 hover:text-black
-                                        transition
-                                        cursor-pointer
-                                    ">
-                                Upload
-                                <input
-                                    type="file"
-                                    multiple
-                                    onChange={(e) => handleDocumentsUpload(e.target.files, 'id_documents')}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                />
-                            </label>
-                        </div>
 
+                            {uploadingIdDocuments ? (
+                                <span className="text-xs italic text-yellow-300">Uploading…</span>
+                            ) : (
+                                <label className="
+                                    relative inline-block px-3 py-1 text-sm font-medium
+                                    text-yellow-300 border border-yellow-300 rounded-lg
+                                    hover:bg-yellow-300 hover:text-black transition cursor-pointer
+                                    ">
+                                    Upload
+                                    <input
+                                        type="file"
+                                        multiple
+                                        onChange={(e) => handleDocumentsUpload(e.target.files, 'id_documents')}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    />
+                                </label>
+                            )}
+                        </div>
                         {/* Commission Status */}
                         {employee.is_freelancer && (
                             <p className="text-sm text-yellow-300">
