@@ -5,6 +5,7 @@ import withAuthProtection from "../../hoc/withAuthProtection";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
 import DocumentPreviewModal from "../../components/DocumentPreviewModal";
+import socket from "../../lib/socket";
 
 function Employees() {
     const [employees, setEmployees] = useState([]);
@@ -40,6 +41,24 @@ function Employees() {
         });
         return () => unsubscribe();
     }, []);
+
+    useEffect(() => {
+        if (currentUser && isSalonChu) {
+            // join room salon_<salonId>
+            socket.auth = { token: currentUserToken };
+            socket.connect();
+            socket.emit("joinRoom", `salon_${salonId}`);
+
+            socket.on("certificationsUpdated", (data) => {
+                // reload lại list employees
+                fetchEmployees();
+            });
+        }
+        return () => {
+            socket.off("certificationsUpdated");
+            socket.disconnect();
+        };
+    }, [currentUser, isSalonChu, salonId]);
 
     const fetchEmployees = async (user) => {
         try {
@@ -187,10 +206,10 @@ function Employees() {
                                                 ) : (
                                                     <span
                                                         className={`font-semibold ${emp.certification_status === "Approved"
-                                                                ? "text-green-400"
-                                                                : emp.certification_status === "Rejected"
-                                                                    ? "text-red-400"
-                                                                    : "text-yellow-300"
+                                                            ? "text-green-400"
+                                                            : emp.certification_status === "Rejected"
+                                                                ? "text-red-400"
+                                                                : "text-yellow-300"
                                                             }`}
                                                     >
                                                         {emp.certification_status}
@@ -236,10 +255,10 @@ function Employees() {
                                                 ) : (
                                                     <span
                                                         className={`font-semibold ${emp.id_document_status === "Approved"
-                                                                ? "text-green-400"
-                                                                : emp.id_document_status === "Rejected"
-                                                                    ? "text-red-400"
-                                                                    : "text-yellow-300"
+                                                            ? "text-green-400"
+                                                            : emp.id_document_status === "Rejected"
+                                                                ? "text-red-400"
+                                                                : "text-yellow-300"
                                                             }`}
                                                     >
                                                         {emp.id_document_status}

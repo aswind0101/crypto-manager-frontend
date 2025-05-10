@@ -9,6 +9,7 @@ import socket from "../../lib/socket";
 
 function EmployeeProfile() {
     const [employee, setEmployee] = useState(null);
+    const isSalonNhanVien = !!employee && employee.role === "Salon_NhanVien";
     const [isFlipped, setIsFlipped] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [form, setForm] = useState({
@@ -45,17 +46,18 @@ function EmployeeProfile() {
         });
         return () => unsubscribe();
     }, []);
+
     useEffect(() => {
         if (currentUser && isSalonNhanVien) {
-            socket.auth = { token: currentUserToken };
-            socket.connect();
-            // join room riêng của mình
-            socket.emit("joinRoom", `employee_${firebaseUid}`);
-
+            const uid = currentUser.uid;
+            currentUser.getIdToken().then(token => {
+                socket.auth = { token };
+                if (!socket.connected) socket.connect();
+                socket.emit("joinRoom", `employee_${uid}`);
+            });
             socket.on("certificationStatusUpdated", ({ certification_status }) => {
                 setEmployee(emp => ({ ...emp, certification_status }));
             });
-
             socket.on("idDocumentStatusUpdated", ({ id_document_status }) => {
                 setEmployee(emp => ({ ...emp, id_document_status }));
             });
@@ -65,7 +67,9 @@ function EmployeeProfile() {
             socket.off("idDocumentStatusUpdated");
             socket.disconnect();
         };
-    }, [currentUser, firebaseUid, isSalonNhanVien]);
+    }, [currentUser, isSalonNhanVien]);
+
+
     const handlePhoneChange = (value) => {
         let digitsOnly = value.replace(/\D/g, "");
         let hasCountryCode = false;
