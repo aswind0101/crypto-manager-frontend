@@ -5,12 +5,10 @@ import withAuthProtection from "../../hoc/withAuthProtection";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
 import DocumentPreviewModal from "../../components/DocumentPreviewModal";
-import socket from "../../lib/socket";
+
 
 function Employees() {
     const [employees, setEmployees] = useState([]);
-    const [salonId, setSalonId] = useState(null);
-    const auth = getAuth();
     const [currentUser, setCurrentUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [previewFiles, setPreviewFiles] = useState([]);
@@ -19,20 +17,6 @@ function Employees() {
     // Đọc role & uid từ localStorage
     const [role, setRole] = useState("");
     const [uid, setUid] = useState("");
-    // 1️⃣ Lấy salonId ngay khi user load page
-    useEffect(() => {
-        if (!currentUser) return;
-        currentUser.getIdToken().then(token => {
-            fetch("https://crypto-manager-backend.onrender.com/api/salons/me", {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.id) setSalonId(data.id);
-                });
-        });
-    }, [currentUser]);
-
     useEffect(() => {
         if (typeof window !== "undefined") {
             const u = JSON.parse(localStorage.getItem("user") || "{}");
@@ -57,27 +41,6 @@ function Employees() {
         });
         return () => unsubscribe();
     }, []);
-
-    // 2️⃣ Kết nối Socket.IO và join đúng room
-    useEffect(() => {
-        if (!currentUser || salonId === null) return;
-
-        currentUser.getIdToken().then(token => {
-            socket.auth = { token };
-            if (!socket.connected) socket.connect();
-            socket.emit("joinRoom", `salon_${salonId}`);
-        });
-
-        // Ví dụ: khi có cập nhật, fetch lại list
-        socket.on("certificationsUpdated", () => {
-            fetchEmployees();
-        });
-
-        return () => {
-            socket.off("certificationsUpdated");
-            socket.disconnect();
-        };
-    }, [currentUser, salonId]);
 
     const fetchEmployees = async (user) => {
         try {
@@ -150,9 +113,7 @@ function Employees() {
             alert("Failed to update status.");
         }
     };
-    useEffect(() => {
-        if (salonId !== null) fetchEmployees();
-    }, [salonId]);
+
     return (
         <div className="bg-[#1C1F26] min-h-screen text-white font-mono">
             <Navbar />
@@ -227,10 +188,10 @@ function Employees() {
                                                 ) : (
                                                     <span
                                                         className={`font-semibold ${emp.certification_status === "Approved"
-                                                            ? "text-green-400"
-                                                            : emp.certification_status === "Rejected"
-                                                                ? "text-red-400"
-                                                                : "text-yellow-300"
+                                                                ? "text-green-400"
+                                                                : emp.certification_status === "Rejected"
+                                                                    ? "text-red-400"
+                                                                    : "text-yellow-300"
                                                             }`}
                                                     >
                                                         {emp.certification_status}
@@ -276,10 +237,10 @@ function Employees() {
                                                 ) : (
                                                     <span
                                                         className={`font-semibold ${emp.id_document_status === "Approved"
-                                                            ? "text-green-400"
-                                                            : emp.id_document_status === "Rejected"
-                                                                ? "text-red-400"
-                                                                : "text-yellow-300"
+                                                                ? "text-green-400"
+                                                                : emp.id_document_status === "Rejected"
+                                                                    ? "text-red-400"
+                                                                    : "text-yellow-300"
                                                             }`}
                                                     >
                                                         {emp.id_document_status}
