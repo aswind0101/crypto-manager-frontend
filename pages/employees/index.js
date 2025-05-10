@@ -32,15 +32,20 @@ function Employees() {
 
 
     useEffect(() => {
+        let intervalId;
         const auth = getAuth();
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             if (user) {
                 setCurrentUser(user);
                 fetchEmployees(user);
+                intervalId = setInterval(() => fetchEmployees(user), 10000); // ⏰ 10s cập nhật
             }
         });
-        return () => unsubscribe();
-    }, []);
+        return () => {
+            unsubscribe();
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, []);    
 
     const fetchEmployees = async (user) => {
         try {
