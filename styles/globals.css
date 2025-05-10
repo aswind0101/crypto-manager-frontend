@@ -4,7 +4,6 @@
   --background: #ffffff;
   --foreground: #171717;
 }
-
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -37,22 +36,6 @@
 }
 .transform-style-preserve-3d {
   transform-style: preserve-3d;
-}
-.card {
-  transform-style: preserve-3d;
-}
-
-.card-front,
-.card-back {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.card-back {
-  transform: rotateY(180deg);
 }
 
 body {
