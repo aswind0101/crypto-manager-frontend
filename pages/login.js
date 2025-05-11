@@ -14,15 +14,13 @@ import { useRouter } from "next/router";
 import { app } from "../firebase";
 import ResendVerifyEmail from "../components/ResendVerifyEmail"; // nhớ tạo component như hướng dẫn trên
 
-const [showVerifyWarning, setShowVerifyWarning] = useState(false);
-const [pendingEmail, setPendingEmail] = useState("");
-
 
 export default function Login() {
     const router = useRouter();
     const auth = getAuth(app);
     const loginClicked = useRef(false);
-
+    const [showVerifyWarning, setShowVerifyWarning] = useState(false);
+    const [pendingEmail, setPendingEmail] = useState("");
     const handleLogin = async () => {
         loginClicked.current = true;
         const provider = new GoogleAuthProvider();
