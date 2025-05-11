@@ -1,5 +1,5 @@
 // 📁 pages/login.js
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     getAuth,
     signInWithPopup,
@@ -12,6 +12,11 @@ import {
 } from "firebase/auth";
 import { useRouter } from "next/router";
 import { app } from "../firebase";
+import ResendVerifyEmail from "../components/ResendVerifyEmail"; // nhớ tạo component như hướng dẫn trên
+
+const [showVerifyWarning, setShowVerifyWarning] = useState(false);
+const [pendingEmail, setPendingEmail] = useState("");
+
 
 export default function Login() {
     const router = useRouter();
@@ -75,11 +80,8 @@ export default function Login() {
                                 if (checkData.exists && checkData.is_verified) {
                                     router.push("/freelancers");
                                 } else {
-                                    alert("❌ You must verify your email before accessing freelancer features.");
-                                    await signOut(auth); // ✅ Đăng xuất Firebase
-                                    localStorage.removeItem("user"); // ✅ Xoá localStorage
-                                    router.push("/home");
-
+                                    setShowVerifyWarning(true);
+                                    setPendingEmail(user.email);
                                 }
                             } catch (err) {
                                 console.error("❌ Error verifying freelancer:", err);
@@ -93,10 +95,8 @@ export default function Login() {
                                 if (checkData.exists && checkData.is_verified) {
                                     router.push("/freelancers");
                                 } else if (checkData.exists && !checkData.is_verified) {
-                                    alert("❌ You must verify your email before accessing freelancer features.");
-                                    await signOut(auth); // ✅ Đăng xuất Firebase
-                                    localStorage.removeItem("user"); // ✅ Xoá localStorage
-                                    router.push("/home");
+                                    setShowVerifyWarning(true);
+                                    setPendingEmail(user.email);
 
                                 } else {
                                     router.push("/home");
@@ -136,6 +136,14 @@ export default function Login() {
                 >
                     Sign in with Google
                 </button>
+                {showVerifyWarning && (
+                    <div className="mt-6 text-center">
+                        <p className="text-red-500 font-semibold">
+                            ❌ Your account is not verified yet.
+                        </p>
+                        <ResendVerifyEmail email={pendingEmail} />
+                    </div>
+                )}
             </div>
         </div>
     );
