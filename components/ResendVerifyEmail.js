@@ -35,8 +35,9 @@ export default function ResendVerifyEmail({ email }) {
     return (
         <div className="mt-4 text-center space-y-2">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-                Didn't receive the verification email?
+                Didn&apos;t receive the verification email?
             </p>
+
             <button
                 onClick={handleResend}
                 disabled={loading}
