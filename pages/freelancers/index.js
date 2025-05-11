@@ -21,14 +21,45 @@ export default function FreelancerDashboard() {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-                setUser({ ...storedUser, ...currentUser });
-                // ❗(Tùy chọn): gọi API để load avatar đã có và cập nhật steps
+                const userData = { ...storedUser, ...currentUser };
+                setUser(userData);
+
+                try {
+                    const token = await currentUser.getIdToken();
+                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/onboarding", {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok) {
+                        setSteps({
+                            has_avatar: data.has_avatar,
+                            has_license: data.has_license,
+                            has_id: data.has_id,
+                            has_salon: data.has_salon,
+                            has_payment: data.has_payment,
+                        });
+
+                        if (data.avatar_url) {
+                            setAvatarUrl(data.avatar_url);
+                        }
+                    } else {
+                        console.warn("⚠️ Failed to load onboarding state:", data.error);
+                    }
+                } catch (err) {
+                    console.error("❌ Error loading onboarding state:", err.message);
+                }
             } else {
                 router.push("/login");
             }
         });
+
         return () => unsubscribe();
     }, []);
+
 
     const uploadAvatar = async (e) => {
         const file = e.target.files[0];
