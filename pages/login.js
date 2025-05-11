@@ -50,47 +50,41 @@ export default function Login() {
                 localStorage.setItem("user", JSON.stringify(userData));
 
                 try {
-                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            user_id: user.uid,
-                            email: user.email
-                        })
-                    });
-
-                    const result = await res.json();
-                    console.log("✅ Session init /user-alerts/init:", result);
-                } catch (err) {
-                    console.error("❌ Error calling /api/user-alerts/init (session):", err);
-                }
-                try {
-                    // 2️⃣ Gọi API lấy role
+                    // 1️⃣ Gọi API lấy role
                     const idToken = await user.getIdToken();
                     const resRole = await fetch("https://crypto-manager-backend.onrender.com/api/user-role", {
                         headers: {
                             Authorization: `Bearer ${idToken}`
                         }
                     });
+
                     if (resRole.ok) {
                         const data = await resRole.json();
-                        console.log("✅ User role:", data);
-                        // Lưu role vào localStorage (cùng object user)
                         const updatedUserData = { ...userData, role: data.role };
                         localStorage.setItem("user", JSON.stringify(updatedUserData));
+
+                        // 2️⃣ Chuyển trang tuỳ theo role
+                        const role = (data.role || "").toLowerCase();
+                        console.log("🔁 Role:", data.role)
+                        if (role === "salon_freelancers") {
+                            router.push("/freelancers");
+                        } else {
+                            router.push("/home");
+                        }
                     } else {
                         console.warn("⚠️ Failed to fetch user role");
+                        router.push("/home");
                     }
                 } catch (err) {
                     console.error("❌ Error calling /api/user-role:", err);
+                    router.push("/home");
                 }
-                // ✅ Đợi chắc chắn đã login ➔ chuyển trang
-                router.push("/home");
             }
         });
 
         return () => unsubscribe();
     }, []);
+
 
     return (
         <div className="flex items-center justify-center h-screen bg-black text-white">
