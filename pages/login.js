@@ -7,7 +7,8 @@ import {
     setPersistence,
     browserLocalPersistence,
     GoogleAuthProvider,
-    onAuthStateChanged
+    onAuthStateChanged,
+    signOut
 } from "firebase/auth";
 import { useRouter } from "next/router";
 import { app } from "../firebase";
@@ -75,7 +76,10 @@ export default function Login() {
                                     router.push("/freelancers");
                                 } else {
                                     alert("❌ You must verify your email before accessing freelancer features.");
+                                    await signOut(auth); // ✅ Đăng xuất Firebase
+                                    localStorage.removeItem("user"); // ✅ Xoá localStorage
                                     router.push("/home");
+
                                 }
                             } catch (err) {
                                 console.error("❌ Error verifying freelancer:", err);
@@ -89,8 +93,11 @@ export default function Login() {
                                 if (checkData.exists && checkData.is_verified) {
                                     router.push("/freelancers");
                                 } else if (checkData.exists && !checkData.is_verified) {
-                                    alert("❌ Please verify your email to access freelancer features.");
+                                    alert("❌ You must verify your email before accessing freelancer features.");
+                                    await signOut(auth); // ✅ Đăng xuất Firebase
+                                    localStorage.removeItem("user"); // ✅ Xoá localStorage
                                     router.push("/home");
+
                                 } else {
                                     router.push("/home");
                                 }
