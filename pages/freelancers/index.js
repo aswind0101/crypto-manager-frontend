@@ -90,6 +90,35 @@ export default function FreelancerDashboard() {
         }
     };
 
+    const uploadLicense = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const token = await auth.currentUser.getIdToken();
+        const formData = new FormData();
+        formData.append("license", file);
+
+        try {
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/upload/license", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+                body: formData,
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                alert("✅ License uploaded!");
+                setSteps((prev) => ({ ...prev, has_license: true }));
+            } else {
+                alert("❌ Upload failed: " + data.error);
+            }
+        } catch (err) {
+            console.error("❌ Upload license error:", err.message);
+            alert("❌ Upload failed.");
+        }
+    };
 
     const onboardingSteps = [
         {
@@ -112,7 +141,17 @@ export default function FreelancerDashboard() {
             title: "Upload License",
             description: "Attach your Nail/Hair license (PDF or Image).",
             button: "Upload License",
-        },
+            renderAction: () => (
+                <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={uploadLicense}
+                    className="text-sm file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold
+                 file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 transition cursor-pointer"
+                />
+            ),
+        }
+        ,
         {
             key: "has_id",
             title: "Upload ID",
