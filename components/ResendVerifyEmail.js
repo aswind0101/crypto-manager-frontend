@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getAuth, signOut } from "firebase/auth";
 
 export default function ResendVerifyEmail({ email }) {
     const [status, setStatus] = useState("");
@@ -22,6 +23,14 @@ export default function ResendVerifyEmail({ email }) {
 
             if (res.ok) {
                 setStatus("✅ Verification email resent. Please check your inbox.");
+
+                // Đợi 3s rồi logout & reload lại trang
+                setTimeout(async () => {
+                    const auth = getAuth();
+                    await signOut(auth);
+                    localStorage.removeItem("user");
+                    window.location.reload();
+                }, 3000);
             } else {
                 setStatus(`❌ ${data.error || "Failed to resend email."}`);
             }
@@ -37,7 +46,6 @@ export default function ResendVerifyEmail({ email }) {
             <p className="text-sm text-gray-500 dark:text-gray-400">
                 Didn&apos;t receive the verification email?
             </p>
-
             <button
                 onClick={handleResend}
                 disabled={loading}
