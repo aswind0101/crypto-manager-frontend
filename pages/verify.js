@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import { getAuth } from "firebase/auth";
 
 export default function VerifyPage() {
   const router = useRouter();
@@ -10,29 +11,44 @@ export default function VerifyPage() {
   useEffect(() => {
     if (!token) return;
 
-    const verify = async () => {
+    const verifyAccount = async () => {
       try {
-        const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`);
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          setStatus("error");
+          setMessage("You must be logged in to verify.");
+          return;
+        }
+
+        const idToken = await currentUser.getIdToken();
+
+        const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`, {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
+
         const data = await res.json();
 
         if (res.ok) {
           setStatus("success");
           setMessage(data.message);
-          setTimeout(() => {
-            router.push("/login");
-          }, 4000);
+          setTimeout(() => router.push("/login"), 4000);
         } else {
           setStatus("error");
           setMessage(data.error || "Verification failed.");
         }
       } catch (err) {
         setStatus("error");
-        setMessage("Network error or server not responding.");
+        setMessage("Network or token error.");
       }
     };
 
-    verify();
+    verifyAccount();
   }, [token]);
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-800 dark:via-sky-700 dark:to-pink-700 px-4">
