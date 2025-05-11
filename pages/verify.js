@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { onAuthStateChanged, getAuth } from "firebase/auth";
+import { auth } from "../firebase"; // hoặc "@/firebase" nếu bạn dùng alias
 
 
 export default function VerifyPage() {
@@ -11,72 +12,43 @@ export default function VerifyPage() {
 
 
   useEffect(() => {
-    if (!token) return;
+  if (!token) return;
 
-    const verifyAccount = async () => {
-      try {
-        const auth = getAuth();
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      setStatus("error");
+      setMessage("You must be logged in to verify.");
+      return;
+    }
 
-        onAuthStateChanged(auth, async (currentUser) => {
-          if (!currentUser) {
-            setStatus("error");
-            setMessage("You must be logged in to verify.");
-            return;
-          }
+    try {
+      const idToken = await user.getIdToken();
 
-          try {
-            const idToken = await currentUser.getIdToken();
+      const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`, {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
 
-            const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`, {
-              headers: {
-                Authorization: `Bearer ${idToken}`,
-              },
-            });
+      const data = await res.json();
 
-            const data = await res.json();
-
-            if (res.ok) {
-              setStatus("success");
-              setMessage(data.message);
-              setTimeout(() => router.push("/login"), 4000);
-            } else {
-              setStatus("error");
-              setMessage(data.error || "Verification failed.");
-            }
-          } catch (err) {
-            console.error("❌ Token error:", err.message);
-            setStatus("error");
-            setMessage("Network or token error.");
-          }
-        });
-
-        console.log("Firebase currentUser:", currentUser);
-        const idToken = await currentUser.getIdToken();
-
-        const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`, {
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-          },
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-          setStatus("success");
-          setMessage(data.message);
-          setTimeout(() => router.push("/login"), 4000);
-        } else {
-          setStatus("error");
-          setMessage(data.error || "Verification failed.");
-        }
-      } catch (err) {
+      if (res.ok) {
+        setStatus("success");
+        setMessage(data.message);
+        setTimeout(() => router.push("/login"), 4000);
+      } else {
         setStatus("error");
-        setMessage("Network or token error.");
+        setMessage(data.error || "Verification failed.");
       }
-    };
+    } catch (err) {
+      console.error("❌ Verification error:", err.message);
+      setStatus("error");
+      setMessage("Network or token error.");
+    }
+  });
 
-    verifyAccount();
-  }, [token]);
+  return () => unsubscribe();
+}, [token]);
 
 
   return (
