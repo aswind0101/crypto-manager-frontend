@@ -60,17 +60,33 @@ export default function Login() {
 
                     if (resRole.ok) {
                         const data = await resRole.json();
+                        const role = (data.role || "").toLowerCase();
+
                         const updatedUserData = { ...userData, role: data.role };
                         localStorage.setItem("user", JSON.stringify(updatedUserData));
 
-                        // 2️⃣ Chuyển trang tuỳ theo role
-                        const role = (data.role || "").toLowerCase();
-                        console.log("🔁 Role:", data.role)
+                        // ✅ Logic chuyển hướng theo role
                         if (role === "salon_freelancers") {
                             router.push("/freelancers");
+                        } else if (role === "salon_nhanvien") {
+                            // Check nếu là nhân viên nhưng có đăng ký freelancer
+                            try {
+                                const checkRes = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/check?email=${user.email}`);
+                                const checkData = await checkRes.json();
+                                if (checkData.exists) {
+                                    router.push("/freelancers");
+                                } else {
+                                    router.push("/home");
+                                }
+                            } catch (err) {
+                                console.error("❌ Error checking freelancer:", err);
+                                router.push("/home");
+                            }
                         } else {
                             router.push("/home");
                         }
+
+
                     } else {
                         console.warn("⚠️ Failed to fetch user role");
                         router.push("/home");
