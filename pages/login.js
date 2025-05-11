@@ -67,14 +67,30 @@ export default function Login() {
 
                         // ✅ Logic chuyển hướng theo role
                         if (role === "salon_freelancers") {
-                            router.push("/freelancers");
-                        } else if (role === "salon_nhanvien") {
-                            // Check nếu là nhân viên nhưng có đăng ký freelancer
                             try {
                                 const checkRes = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/check?email=${user.email}`);
                                 const checkData = await checkRes.json();
-                                if (checkData.exists) {
+
+                                if (checkData.exists && checkData.is_verified) {
                                     router.push("/freelancers");
+                                } else {
+                                    alert("❌ You must verify your email before accessing freelancer features.");
+                                    router.push("/home");
+                                }
+                            } catch (err) {
+                                console.error("❌ Error verifying freelancer:", err);
+                                router.push("/home");
+                            }
+                        } else if (role === "salon_nhanvien") {
+                            try {
+                                const checkRes = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/check?email=${user.email}`);
+                                const checkData = await checkRes.json();
+
+                                if (checkData.exists && checkData.is_verified) {
+                                    router.push("/freelancers");
+                                } else if (checkData.exists && !checkData.is_verified) {
+                                    alert("❌ Please verify your email to access freelancer features.");
+                                    router.push("/home");
                                 } else {
                                     router.push("/home");
                                 }
@@ -82,7 +98,8 @@ export default function Login() {
                                 console.error("❌ Error checking freelancer:", err);
                                 router.push("/home");
                             }
-                        } else {
+                        }
+                        else {
                             router.push("/home");
                         }
 
