@@ -13,6 +13,24 @@ export default function FreelancerDashboard() {
         has_salon: false,
         has_payment: false,
     });
+    const [status, setStatus] = useState({
+        license_status: "",
+        id_doc_status: "",
+    });
+    const StatusBadge = ({ value }) => {
+        const map = {
+            Approved: "bg-green-500",
+            "In Review": "bg-yellow-500",
+            Rejected: "bg-red-500",
+            Pending: "bg-gray-400",
+        };
+
+        return (
+            <span className={`ml-2 px-2 py-0.5 rounded text-white text-xs ${map[value] || "bg-gray-400"}`}>
+                {value || "Pending"}
+            </span>
+        );
+    };
 
     const router = useRouter();
     const auth = getAuth();
@@ -89,6 +107,35 @@ export default function FreelancerDashboard() {
             alert("❌ Upload failed.");
         }
     };
+    const uploadId = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const token = await auth.currentUser.getIdToken();
+        const formData = new FormData();
+        formData.append("id_doc", file);
+
+        try {
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/upload/id", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+                body: formData,
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                alert("✅ ID Document uploaded!");
+                setSteps((prev) => ({ ...prev, has_id: true }));
+            } else {
+                alert("❌ Upload failed: " + data.error);
+            }
+        } catch (err) {
+            console.error("❌ Upload ID error:", err.message);
+            alert("❌ Upload failed.");
+        }
+    };
 
     const uploadLicense = async (e) => {
         const file = e.target.files[0];
@@ -140,15 +187,20 @@ export default function FreelancerDashboard() {
             key: "has_license",
             title: "Upload License",
             description: "Attach your Nail/Hair license (PDF or Image).",
-            button: "Upload License",
+            button: steps.has_license ? "Uploaded ✅" : "Upload License",
             renderAction: () => (
-                <input
-                    type="file"
-                    accept=".pdf,image/*"
-                    onChange={uploadLicense}
-                    className="text-sm file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold
-                 file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 transition cursor-pointer"
-                />
+                <label className="block w-full">
+                    <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={uploadLicense}
+                        hidden
+                    />
+                    <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
+                        {steps.has_license ? "Uploaded ✅" : "Upload License"}
+                        <StatusBadge value={status.license_status} />
+                    </span>
+                </label>
             ),
         }
         ,
@@ -156,8 +208,23 @@ export default function FreelancerDashboard() {
             key: "has_id",
             title: "Upload ID",
             description: "Add Passport or Government-issued ID.",
-            button: "Upload ID",
-        },
+            button: steps.has_id ? "Uploaded ✅" : "Upload ID",
+            renderAction: () => (
+                <label className="block w-full">
+                    <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={uploadId}
+                        hidden
+                    />
+                    <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
+                        {steps.has_id ? "Uploaded ✅" : "Upload ID"}
+                        <StatusBadge value={status.id_doc_status} />
+                    </span>
+                </label>
+            ),
+        }
+        ,
         {
             key: "has_salon",
             title: "Select Your Salon",
