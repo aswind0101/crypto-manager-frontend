@@ -18,6 +18,11 @@ export default function VerifyPage() {
         if (res.ok) {
           setStatus("success");
           setMessage(data.message);
+
+          // ✅ Sau vài giây tự chuyển sang login
+          setTimeout(() => {
+            router.push("/login");
+          }, 4000);
         } else {
           setStatus("error");
           setMessage(data.error || "Verification failed.");
@@ -41,7 +46,7 @@ export default function VerifyPage() {
         {status === "success" && (
           <>
             <p className="text-green-500 text-lg font-semibold mb-2">{message}</p>
-            <p>You can now log in to your account.</p>
+            <p>Redirecting to login...</p>
           </>
         )}
 
