@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { getAuth } from "firebase/auth";
-
 
 export default function VerifyPage() {
   const router = useRouter();
@@ -10,45 +8,31 @@ export default function VerifyPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-  if (!token) return;
+    if (!token) return;
 
-  const verify = async () => {
-    try {
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+    const verify = async () => {
+      try {
+        const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`);
+        const data = await res.json();
+
+        if (res.ok) {
+          setStatus("success");
+          setMessage(data.message);
+          setTimeout(() => {
+            router.push("/login");
+          }, 4000);
+        } else {
+          setStatus("error");
+          setMessage(data.error || "Verification failed.");
+        }
+      } catch (err) {
         setStatus("error");
-        setMessage("You must be logged in to verify.");
-        return;
+        setMessage("Network error or server not responding.");
       }
+    };
 
-      const idToken = await currentUser.getIdToken(); // lấy token Firebase
-
-      const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`, {
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setStatus("success");
-        setMessage(data.message);
-        setTimeout(() => router.push("/login"), 4000);
-      } else {
-        setStatus("error");
-        setMessage(data.error || "Verification failed.");
-      }
-    } catch (err) {
-      setStatus("error");
-      setMessage("Network error or token missing.");
-    }
-  };
-
-  verify();
-}, [token]);
-
+    verify();
+  }, [token]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-800 dark:via-sky-700 dark:to-pink-700 px-4">
