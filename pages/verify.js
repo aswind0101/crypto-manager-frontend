@@ -18,8 +18,6 @@ export default function VerifyPage() {
         if (res.ok) {
           setStatus("success");
           setMessage(data.message);
-
-          // ✅ Sau vài giây tự chuyển sang login
           setTimeout(() => {
             router.push("/login");
           }, 4000);
@@ -38,22 +36,28 @@ export default function VerifyPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-800 dark:via-sky-700 dark:to-pink-700 px-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 max-w-md w-full text-center text-gray-800 dark:text-gray-100">
-        <h1 className="text-2xl font-bold mb-4">🔐 Email Verification</h1>
+      <div className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8 max-w-md w-full text-center text-gray-800 dark:text-gray-100">
+        <h1 className="text-2xl font-bold mb-4 text-emerald-700 dark:text-emerald-300">
+          🔐 Email Verification
+        </h1>
 
-        {status === "loading" && <p>⏳ Verifying your account...</p>}
+        {status === "loading" && (
+          <p className="text-yellow-500 font-medium">⏳ Verifying your account...</p>
+        )}
 
         {status === "success" && (
           <>
             <p className="text-green-500 text-lg font-semibold mb-2">{message}</p>
-            <p>Redirecting to login...</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">Redirecting to login...</p>
           </>
         )}
 
         {status === "error" && (
           <>
             <p className="text-red-500 text-lg font-semibold mb-2">{message}</p>
-            <p>Please try again or contact support.</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Please try again or contact support.
+            </p>
           </>
         )}
       </div>
