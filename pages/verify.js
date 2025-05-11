@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { getAuth } from "firebase/auth";
+import { onAuthStateChanged, getAuth } from "firebase/auth";
+
 
 export default function VerifyPage() {
   const router = useRouter();
@@ -8,20 +9,48 @@ export default function VerifyPage() {
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
 
+
   useEffect(() => {
     if (!token) return;
 
     const verifyAccount = async () => {
       try {
         const auth = getAuth();
-        const currentUser = auth.currentUser;
 
-        if (!currentUser) {
-          setStatus("error");
-          setMessage("You must be logged in to verify.");
-          return;
-        }
+        onAuthStateChanged(auth, async (currentUser) => {
+          if (!currentUser) {
+            setStatus("error");
+            setMessage("You must be logged in to verify.");
+            return;
+          }
 
+          try {
+            const idToken = await currentUser.getIdToken();
+
+            const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`, {
+              headers: {
+                Authorization: `Bearer ${idToken}`,
+              },
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+              setStatus("success");
+              setMessage(data.message);
+              setTimeout(() => router.push("/login"), 4000);
+            } else {
+              setStatus("error");
+              setMessage(data.error || "Verification failed.");
+            }
+          } catch (err) {
+            console.error("❌ Token error:", err.message);
+            setStatus("error");
+            setMessage("Network or token error.");
+          }
+        });
+
+        console.log("Firebase currentUser:", currentUser);
         const idToken = await currentUser.getIdToken();
 
         const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`, {
