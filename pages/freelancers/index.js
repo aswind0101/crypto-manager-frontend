@@ -10,6 +10,12 @@ export default function FreelancerDashboard() {
     const [selectedSalonId, setSelectedSalonId] = useState("");
     const [selectingSalon, setSelectingSalon] = useState(false);
     const [selectedSalonInfo, setSelectedSalonInfo] = useState(null);
+    const [licenseUrl, setLicenseUrl] = useState(null);
+    const [idDocUrl, setIdDocUrl] = useState(null);
+
+    const fullURL = (url) =>
+        url?.startsWith("http") ? url : `https://crypto-manager-backend.onrender.com${url}`;
+
 
 
     const [steps, setSteps] = useState({
@@ -85,6 +91,11 @@ export default function FreelancerDashboard() {
                             license_status: data.license_status || "Pending",
                             id_doc_status: data.id_doc_status || "Pending"
                         });
+
+                        // ✅ Lưu URL file vào state
+                        setAvatarUrl(data.avatar_url || null);
+                        setLicenseUrl(data.license_url || null);
+                        setIdDocUrl(data.id_doc_url || null);
                         if (!data.has_salon) {
                             loadSalonList();
                         }
@@ -216,7 +227,8 @@ export default function FreelancerDashboard() {
             if (res.ok) {
                 alert("✅ ID Document uploaded!");
                 await refreshOnboardingStatus();
-                setSteps((prev) => ({ ...prev, has_id: true }));
+                setSteps((prev) => ({ ...prev, has_id: true }));    
+                setIdDocUrl(data.id_doc_url);     
             } else {
                 alert("❌ Upload failed: " + data.error);
             }
@@ -250,6 +262,7 @@ export default function FreelancerDashboard() {
                 alert("✅ License uploaded!");
                 await refreshOnboardingStatus();
                 setSteps((prev) => ({ ...prev, has_license: true }));
+                setLicenseUrl(data.license_url);
             } else {
                 alert("❌ Upload failed: " + data.error);
             }
@@ -269,14 +282,17 @@ export default function FreelancerDashboard() {
                 <>
                     <p>Add a professional photo to build trust.</p>
                     {steps.has_avatar && avatarUrl && (
-                        <img
-                            src={avatarUrl}
-                            alt="Avatar"
-                            className="w-24 h-24 rounded-full mt-2 border-2 border-white shadow"
-                        />
+                        <div className="mt-3">
+                            <img
+                                src={fullURL(avatarUrl)}
+                                alt="Avatar"
+                                className="w-24 h-24 rounded-full border-2 border-white shadow-lg"
+                            />
+                        </div>
                     )}
                 </>
             ),
+
             button: "Upload Avatar",
             renderAction: () => (
                 <label className="block w-full">
@@ -304,25 +320,24 @@ export default function FreelancerDashboard() {
             description: (
                 <>
                     <p>Attach your Nail/Hair license (PDF or Image).</p>
-                    {steps.has_license && status.license_status !== "Pending" && (
-                        <div className="mt-2">
-                            {selectedSalonInfo?.license_url && (
-                                selectedSalonInfo.license_url.endsWith(".pdf") ? (
-                                    <a
-                                        href={selectedSalonInfo.license_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-blue-300 underline"
-                                    >
-                                        📄 View License (PDF)
-                                    </a>
-                                ) : (
-                                    <img
-                                        src={selectedSalonInfo.license_url}
-                                        alt="License"
-                                        className="w-32 h-auto mt-2 rounded-xl border"
-                                    />
-                                )
+
+                    {steps.has_license && licenseUrl && status.license_status !== "Pending" && (
+                        <div className="mt-3">
+                            {licenseUrl.endsWith(".pdf") ? (
+                                <a
+                                    href={fullURL(licenseUrl)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-blue-300 underline"
+                                >
+                                    📄 View License (PDF)
+                                </a>
+                            ) : (
+                                <img
+                                    src={fullURL(licenseUrl)}
+                                    alt="License"
+                                    className="w-32 h-20 rounded-xl border border-white/20 shadow-lg"
+                                />
                             )}
                         </div>
                     )}
@@ -361,10 +376,10 @@ export default function FreelancerDashboard() {
                     <p>Add Passport or Government-issued ID.</p>
                     {steps.has_id && status.id_doc_status !== "Pending" && (
                         <div className="mt-2">
-                            {selectedSalonInfo?.id_doc_url && (
-                                selectedSalonInfo.id_doc_url.endsWith(".pdf") ? (
+                            {idDocUrl && (
+                                idDocUrl.endsWith(".pdf") ? (
                                     <a
-                                        href={selectedSalonInfo.id_doc_url}
+                                        href={fullURL(idDocUrl)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-sm text-blue-300 underline"
@@ -373,9 +388,9 @@ export default function FreelancerDashboard() {
                                     </a>
                                 ) : (
                                     <img
-                                        src={selectedSalonInfo.id_doc_url}
+                                        src={fullURL(idDocUrl)}
                                         alt="ID Document"
-                                        className="w-32 h-auto mt-2 rounded-xl border"
+                                        className="w-32 h-20 mt-2 rounded-xl border border-white/20 shadow-lg"
                                     />
                                 )
                             )}
@@ -383,7 +398,6 @@ export default function FreelancerDashboard() {
                     )}
                 </>
             ),
-
             badge: status.id_doc_status,
             badgeColor: badgeColor(status.id_doc_status),
             button: steps.has_id ? "Uploaded ✅" : "Upload ID",
