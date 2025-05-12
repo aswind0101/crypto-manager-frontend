@@ -160,18 +160,28 @@ export default function FreelancerDashboard() {
     };
 
     const loadSalonList = async () => {
-        try {
-            const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/active");
-            const data = await res.json();
-            if (res.ok) {
-                setSalonList(data);
-            } else {
-                console.warn("⚠️ Failed to load salons:", data.error);
-            }
-        } catch (err) {
-            console.error("❌ Error loading salons:", err.message);
+    try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        const token = await currentUser.getIdToken();
+
+        const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/active", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            setSalonList(data);
+        } else {
+            console.warn("⚠️ Failed to load salons:", data.error);
         }
-    };
+    } catch (err) {
+        console.error("❌ Error loading salons:", err.message);
+    }
+};
 
     const uploadAvatar = async (e) => {
         const file = e.target.files[0];
