@@ -17,6 +17,12 @@ export default function FreelancerDashboard() {
         license_status: "",
         id_doc_status: "",
     });
+    const [uploading, setUploading] = useState({
+        avatar: false,
+        license: false,
+        id: false,
+    });
+
     const StatusBadge = ({ value }) => {
         const map = {
             Approved: "bg-green-500",
@@ -30,6 +36,15 @@ export default function FreelancerDashboard() {
                 {value || "Pending"}
             </span>
         );
+    };
+    const badgeColor = (status) => {
+        const colorMap = {
+            Approved: "bg-green-500 text-white",
+            "In Review": "bg-yellow-400 text-black",
+            Rejected: "bg-red-500 text-white",
+            Pending: "bg-gray-400 text-white"
+        };
+        return colorMap[status] || "bg-gray-400 text-white";
     };
 
     const router = useRouter();
@@ -60,7 +75,10 @@ export default function FreelancerDashboard() {
                             has_salon: data.has_salon,
                             has_payment: data.has_payment,
                         });
-
+                        setStatus({
+                            license_status: data.license_status || "Pending",
+                            id_doc_status: data.id_doc_status || "Pending"
+                        });
                         if (data.avatar_url) {
                             setAvatarUrl(data.avatar_url);
                         }
@@ -77,6 +95,32 @@ export default function FreelancerDashboard() {
 
         return () => unsubscribe();
     }, []);
+    const refreshOnboardingStatus = async () => {
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/onboarding", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setSteps({
+                    has_avatar: data.has_avatar,
+                    has_license: data.has_license,
+                    has_id: data.has_id,
+                    has_salon: data.has_salon,
+                    has_payment: data.has_payment,
+                });
+                setStatus({
+                    license_status: data.license_status,
+                    id_doc_status: data.id_doc_status,
+                });
+            } else {
+                console.warn("⚠️ Failed to refresh onboarding:", data.error);
+            }
+        } catch (err) {
+            console.error("❌ Error refreshing onboarding:", err.message);
+        }
+    };
 
 
     const uploadAvatar = async (e) => {
@@ -127,6 +171,7 @@ export default function FreelancerDashboard() {
             const data = await res.json();
             if (res.ok) {
                 alert("✅ ID Document uploaded!");
+                await refreshOnboardingStatus();
                 setSteps((prev) => ({ ...prev, has_id: true }));
             } else {
                 alert("❌ Upload failed: " + data.error);
@@ -157,6 +202,7 @@ export default function FreelancerDashboard() {
             const data = await res.json();
             if (res.ok) {
                 alert("✅ License uploaded!");
+                await refreshOnboardingStatus();
                 setSteps((prev) => ({ ...prev, has_license: true }));
             } else {
                 alert("❌ Upload failed: " + data.error);
@@ -174,19 +220,26 @@ export default function FreelancerDashboard() {
             description: "Add a professional photo to build trust.",
             button: "Upload Avatar",
             renderAction: () => (
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={uploadAvatar}
-                    className="text-sm file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold
-                   file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 transition cursor-pointer"
-                />
+                <label className="block w-full">
+                    <input
+                        type="file"
+                        accept="image/*"
+                        onChange={uploadAvatar}
+                        hidden
+                    />
+                    <span className="inline-flex justify-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
+                        {steps.has_avatar ? "Uploaded ✅" : "Upload Avatar"}
+                    </span>
+                </label>
             ),
+
         },
         {
             key: "has_license",
             title: "Upload License",
             description: "Attach your Nail/Hair license (PDF or Image).",
+            badge: status.license_status,
+            badgeColor: badgeColor(status.license_status),
             button: steps.has_license ? "Uploaded ✅" : "Upload License",
             renderAction: () => (
                 <label className="block w-full">
@@ -198,7 +251,7 @@ export default function FreelancerDashboard() {
                     />
                     <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
                         {steps.has_license ? "Uploaded ✅" : "Upload License"}
-                        <StatusBadge value={status.license_status} />
+
                     </span>
                 </label>
             ),
@@ -208,6 +261,8 @@ export default function FreelancerDashboard() {
             key: "has_id",
             title: "Upload ID",
             description: "Add Passport or Government-issued ID.",
+            badge: status.id_doc_status,
+            badgeColor: badgeColor(status.id_doc_status),
             button: steps.has_id ? "Uploaded ✅" : "Upload ID",
             renderAction: () => (
                 <label className="block w-full">
@@ -219,7 +274,7 @@ export default function FreelancerDashboard() {
                     />
                     <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
                         {steps.has_id ? "Uploaded ✅" : "Upload ID"}
-                        <StatusBadge value={status.id_doc_status} />
+
                     </span>
                 </label>
             ),
@@ -259,16 +314,6 @@ export default function FreelancerDashboard() {
                             </p>
                         </div>
 
-                        {avatarUrl && (
-                            <div className="flex justify-center mb-6">
-                                <img
-                                    src={`https://crypto-manager-backend.onrender.com${avatarUrl}`}
-                                    alt="Your Avatar"
-                                    className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-md"
-                                />
-                            </div>
-                        )}
-
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             {onboardingSteps.map((step) => (
                                 <StepCard
@@ -279,6 +324,8 @@ export default function FreelancerDashboard() {
                                     buttonLabel={step.button}
                                     renderAction={step.renderAction ? step.renderAction() : null}
                                     onClick={() => console.log(`Handle: ${step.key}`)}
+                                    badge={step.badge}
+                                    badgeColor={step.badgeColor}
                                 />
                             ))}
                         </div>
@@ -291,22 +338,29 @@ export default function FreelancerDashboard() {
     );
 }
 
-function StepCard({ title, description, completed, buttonLabel, onClick, renderAction }) {
+function StepCard({ title, description, completed, buttonLabel, onClick, renderAction, badge, badgeColor }) {
     return (
-        <div className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">{title}</h3>
-                <span className={`text-sm font-medium ${completed ? "text-green-500" : "text-yellow-400"}`}>
-                    {completed ? "✅ Completed" : "⏳ Pending"}
-                </span>
-            </div>
+        <div className="relative bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+
+            {/* ✅ Badge hiển thị cố định ở góc trên phải */}
+            {badge && (
+                <div className="absolute top-3 right-3">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded ${badgeColor}`}>
+                        {badge}
+                    </span>
+                </div>
+            )}
+
+            <h3 className="text-lg font-semibold text-emerald-700 dark:text-emerald-300 mb-2">{title}</h3>
+
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">{description}</p>
+
             {renderAction ? (
                 <div>{renderAction}</div>
             ) : (
                 <button
                     onClick={onClick}
-                    className="bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 dark:from-emerald-600 dark:via-yellow-500 dark:to-pink-500 text-white py-1.5 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition"
+                    className="bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition"
                 >
                     {buttonLabel}
                 </button>
@@ -314,3 +368,4 @@ function StepCard({ title, description, completed, buttonLabel, onClick, renderA
         </div>
     );
 }
+
