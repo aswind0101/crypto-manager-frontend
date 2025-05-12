@@ -54,7 +54,7 @@ export default function FreelancerDashboard() {
             Approved: "bg-green-500 text-white",
             "In Review": "bg-yellow-400 text-black",
             Rejected: "bg-red-500 text-white",
-            Pending: "bg-gray-400 text-white"
+            Pending: "bg-yellow-500 text-white"
         };
         return colorMap[status] || "bg-gray-400 text-white";
     };
@@ -227,8 +227,8 @@ export default function FreelancerDashboard() {
             if (res.ok) {
                 alert("✅ ID Document uploaded!");
                 await refreshOnboardingStatus();
-                setSteps((prev) => ({ ...prev, has_id: true }));    
-                setIdDocUrl(data.id_doc_url);     
+                setSteps((prev) => ({ ...prev, has_id: true }));
+                setIdDocUrl(data.id_doc_url);
             } else {
                 alert("❌ Upload failed: " + data.error);
             }
@@ -292,7 +292,8 @@ export default function FreelancerDashboard() {
                     )}
                 </>
             ),
-
+            badge: steps.has_avatar ? "Completed" : "Pending",
+            badgeColor: steps.has_avatar ? "bg-green-500 text-white" : "bg-yellow-500 text-white",
             button: "Upload Avatar",
             renderAction: () => (
                 <label className="block w-full">
@@ -344,7 +345,10 @@ export default function FreelancerDashboard() {
                 </>
             ),
 
-            badge: status.license_status,
+            badge:
+                status.license_status === "Approved"
+                    ? "Completed"
+                    : status.license_status || "Pending",
             badgeColor: badgeColor(status.license_status),
             button: steps.has_license ? "Uploaded ✅" : "Upload License",
             renderAction: () => (
@@ -398,7 +402,10 @@ export default function FreelancerDashboard() {
                     )}
                 </>
             ),
-            badge: status.id_doc_status,
+            badge:
+                status.id_doc_status === "Approved"
+                    ? "Completed"
+                    : status.id_doc_status || "Pending",
             badgeColor: badgeColor(status.id_doc_status),
             button: steps.has_id ? "Uploaded ✅" : "Upload ID",
             renderAction: () => (
