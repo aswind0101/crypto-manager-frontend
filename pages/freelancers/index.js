@@ -126,6 +126,7 @@ export default function FreelancerDashboard() {
     const uploadAvatar = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        setUploading((prev) => ({ ...prev, avatar: true }));
 
         const token = await auth.currentUser.getIdToken();
         const formData = new FormData();
@@ -141,20 +142,24 @@ export default function FreelancerDashboard() {
             const data = await res.json();
             if (res.ok) {
                 alert("✅ Avatar uploaded!");
+                await refreshOnboardingStatus();
                 setSteps((prev) => ({ ...prev, has_avatar: true }));
                 setAvatarUrl(data.avatar_url); // Ví dụ: "/uploads/avatars/abc.jpg"
+
             } else {
                 alert("❌ Upload failed: " + data.error);
             }
         } catch (err) {
             console.error("Upload error:", err.message);
             alert("❌ Upload failed.");
+        } finally {
+            setUploading((prev) => ({ ...prev, avatar: false }));
         }
     };
     const uploadId = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
+        setUploading((prev) => ({ ...prev, id: true }));
         const token = await auth.currentUser.getIdToken();
         const formData = new FormData();
         formData.append("id_doc", file);
@@ -179,13 +184,15 @@ export default function FreelancerDashboard() {
         } catch (err) {
             console.error("❌ Upload ID error:", err.message);
             alert("❌ Upload failed.");
+        } finally {
+            setUploading((prev) => ({ ...prev, id: false }));
         }
     };
 
     const uploadLicense = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
+        setUploading((prev) => ({ ...prev, license: true }));
         const token = await auth.currentUser.getIdToken();
         const formData = new FormData();
         formData.append("license", file);
@@ -210,6 +217,8 @@ export default function FreelancerDashboard() {
         } catch (err) {
             console.error("❌ Upload license error:", err.message);
             alert("❌ Upload failed.");
+        } finally {
+            setUploading((prev) => ({ ...prev, license: false }));
         }
     };
 
@@ -228,7 +237,12 @@ export default function FreelancerDashboard() {
                         hidden
                     />
                     <span className="inline-flex justify-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
-                        {steps.has_avatar ? "Uploaded ✅" : "Upload Avatar"}
+                        {uploading.avatar
+                            ? "Uploading..."
+                            : steps.has_avatar
+                                ? "Uploaded ✅"
+                                : "Upload Avatar"
+                        }
                     </span>
                 </label>
             ),
@@ -250,7 +264,12 @@ export default function FreelancerDashboard() {
                         hidden
                     />
                     <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
-                        {steps.has_license ? "Uploaded ✅" : "Upload License"}
+                        {uploading.license
+                            ? "Uploading..."
+                            : steps.has_license
+                                ? "Uploaded ✅"
+                                : "Upload License"
+                        }
 
                     </span>
                 </label>
@@ -273,7 +292,12 @@ export default function FreelancerDashboard() {
                         hidden
                     />
                     <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
-                        {steps.has_id ? "Uploaded ✅" : "Upload ID"}
+                        {uploading.id
+                            ? "Uploading..."
+                            : steps.has_id
+                                ? "Uploaded ✅"
+                                : "Upload ID"
+                        }
 
                     </span>
                 </label>
