@@ -6,6 +6,10 @@ import Navbar from "../../components/Navbar";
 export default function FreelancerDashboard() {
     const [user, setUser] = useState(null);
     const [avatarUrl, setAvatarUrl] = useState(null);
+    const [salonList, setSalonList] = useState([]);
+    const [selectedSalonId, setSelectedSalonId] = useState("");
+    const [selectingSalon, setSelectingSalon] = useState(false);
+
     const [steps, setSteps] = useState({
         has_avatar: false,
         has_license: false,
@@ -79,6 +83,9 @@ export default function FreelancerDashboard() {
                             license_status: data.license_status || "Pending",
                             id_doc_status: data.id_doc_status || "Pending"
                         });
+                        if (!data.has_salon) {
+                            loadSalonList();
+                        }
                         if (data.avatar_url) {
                             setAvatarUrl(data.avatar_url);
                         }
@@ -122,6 +129,19 @@ export default function FreelancerDashboard() {
         }
     };
 
+    const loadSalonList = async () => {
+        try {
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/active");
+            const data = await res.json();
+            if (res.ok) {
+                setSalonList(data);
+            } else {
+                console.warn("⚠️ Failed to load salons:", data.error);
+            }
+        } catch (err) {
+            console.error("❌ Error loading salons:", err.message);
+        }
+    };
 
     const uploadAvatar = async (e) => {
         const file = e.target.files[0];
@@ -308,8 +328,72 @@ export default function FreelancerDashboard() {
             key: "has_salon",
             title: "Select Your Salon",
             description: "Choose where you're currently working.",
-            button: "Select Salon",
-        },
+            badge: steps.has_salon ? "Completed" : null,
+            badgeColor: steps.has_salon ? "bg-green-500 text-white" : "",
+            button: steps.has_salon ? "✅ Confirmed" : "Select Salon",
+            renderAction: () => (
+                steps.has_salon ? (
+                    <button
+                        disabled
+                        className="w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md cursor-default"
+                    >
+                        Confirmed ✅
+                    </button>
+                ) : (
+                    <div className="space-y-2">
+                        <select
+                            value={selectedSalonId}
+                            onChange={(e) => setSelectedSalonId(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-white"
+                        >
+                            <option value="">-- Select Salon --</option>
+                            {salonList.map((salon) => (
+                                <option key={salon.id} value={salon.id}>
+                                    {salon.name} — {salon.address}
+                                </option>
+                            ))}
+                        </select>
+
+                        <button
+                            onClick={async () => {
+                                if (!selectedSalonId) {
+                                    alert("❗ Please select a salon.");
+                                    return;
+                                }
+                                setSelectingSalon(true);
+                                const token = await auth.currentUser.getIdToken();
+                                try {
+                                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/select-salon", {
+                                        method: "PATCH",
+                                        headers: {
+                                            Authorization: `Bearer ${token}`,
+                                            "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({ salon_id: selectedSalonId }),
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok) {
+                                        alert("✅ Salon selected successfully!");
+                                        setSteps((prev) => ({ ...prev, has_salon: true }));
+                                    } else {
+                                        alert("❌ " + (data.error || "Selection failed"));
+                                    }
+                                } catch (err) {
+                                    alert("❌ Error selecting salon");
+                                } finally {
+                                    setSelectingSalon(false);
+                                }
+                            }}
+                            className="bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition w-full"
+                            disabled={selectingSalon}
+                        >
+                            {selectingSalon ? "Submitting..." : "Confirm Salon"}
+                        </button>
+                    </div>
+                )
+            )
+        }
+        ,
         {
             key: "has_payment",
             title: "Add Payment Method",
