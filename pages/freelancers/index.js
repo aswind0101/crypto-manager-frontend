@@ -306,21 +306,23 @@ export default function FreelancerDashboard() {
                     <p>Attach your Nail/Hair license (PDF or Image).</p>
                     {steps.has_license && status.license_status !== "Pending" && (
                         <div className="mt-2">
-                            {selectedSalonInfo?.license_url?.endsWith(".pdf") ? (
-                                <a
-                                    href={selectedSalonInfo.license_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-300 underline"
-                                >
-                                    📄 View License (PDF)
-                                </a>
-                            ) : (
-                                <img
-                                    src={selectedSalonInfo.license_url}
-                                    alt="License"
-                                    className="w-32 h-auto mt-2 rounded-xl border"
-                                />
+                            {selectedSalonInfo?.license_url && (
+                                selectedSalonInfo.license_url.endsWith(".pdf") ? (
+                                    <a
+                                        href={selectedSalonInfo.license_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-blue-300 underline"
+                                    >
+                                        📄 View License (PDF)
+                                    </a>
+                                ) : (
+                                    <img
+                                        src={selectedSalonInfo.license_url}
+                                        alt="License"
+                                        className="w-32 h-auto mt-2 rounded-xl border"
+                                    />
+                                )
                             )}
                         </div>
                     )}
@@ -359,21 +361,23 @@ export default function FreelancerDashboard() {
                     <p>Add Passport or Government-issued ID.</p>
                     {steps.has_id && status.id_doc_status !== "Pending" && (
                         <div className="mt-2">
-                            {selectedSalonInfo?.id_doc_url?.endsWith(".pdf") ? (
-                                <a
-                                    href={selectedSalonInfo.id_doc_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-300 underline"
-                                >
-                                    📄 View ID Document (PDF)
-                                </a>
-                            ) : (
-                                <img
-                                    src={selectedSalonInfo.id_doc_url}
-                                    alt="ID Document"
-                                    className="w-32 h-auto mt-2 rounded-xl border"
-                                />
+                            {selectedSalonInfo?.id_doc_url && (
+                                selectedSalonInfo.id_doc_url.endsWith(".pdf") ? (
+                                    <a
+                                        href={selectedSalonInfo.id_doc_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-blue-300 underline"
+                                    >
+                                        📄 View ID Document (PDF)
+                                    </a>
+                                ) : (
+                                    <img
+                                        src={selectedSalonInfo.id_doc_url}
+                                        alt="ID Document"
+                                        className="w-32 h-auto mt-2 rounded-xl border"
+                                    />
+                                )
                             )}
                         </div>
                     )}
