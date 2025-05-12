@@ -91,12 +91,14 @@ export default function FreelancerDashboard() {
                         if (data.has_salon) {
                             try {
                                 const token = await currentUser.getIdToken();
-                                const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/me", {
+                                const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/by-id", {
                                     headers: { Authorization: `Bearer ${token}` },
                                 });
                                 const salonData = await resSalon.json();
                                 if (resSalon.ok) {
                                     setSelectedSalonInfo(salonData); // Gồm: name, address, phone
+                                } else {
+                                    console.warn("⚠️ Failed to load salon by ID:", salonData.error);
                                 }
                             } catch (err) {
                                 console.error("❌ Error loading selected salon:", err.message);
@@ -263,7 +265,18 @@ export default function FreelancerDashboard() {
         {
             key: "has_avatar",
             title: "Upload your Avatar",
-            description: "Add a professional photo to build trust.",
+            description: (
+                <>
+                    <p>Add a professional photo to build trust.</p>
+                    {steps.has_avatar && avatarUrl && (
+                        <img
+                            src={avatarUrl}
+                            alt="Avatar"
+                            className="w-24 h-24 rounded-full mt-2 border-2 border-white shadow"
+                        />
+                    )}
+                </>
+            ),
             button: "Upload Avatar",
             renderAction: () => (
                 <label className="block w-full">
@@ -288,7 +301,32 @@ export default function FreelancerDashboard() {
         {
             key: "has_license",
             title: "Upload License",
-            description: "Attach your Nail/Hair license (PDF or Image).",
+            description: (
+                <>
+                    <p>Attach your Nail/Hair license (PDF or Image).</p>
+                    {steps.has_license && status.license_status !== "Pending" && (
+                        <div className="mt-2">
+                            {selectedSalonInfo?.license_url?.endsWith(".pdf") ? (
+                                <a
+                                    href={selectedSalonInfo.license_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-blue-300 underline"
+                                >
+                                    📄 View License (PDF)
+                                </a>
+                            ) : (
+                                <img
+                                    src={selectedSalonInfo.license_url}
+                                    alt="License"
+                                    className="w-32 h-auto mt-2 rounded-xl border"
+                                />
+                            )}
+                        </div>
+                    )}
+                </>
+            ),
+
             badge: status.license_status,
             badgeColor: badgeColor(status.license_status),
             button: steps.has_license ? "Uploaded ✅" : "Upload License",
@@ -316,7 +354,32 @@ export default function FreelancerDashboard() {
         {
             key: "has_id",
             title: "Upload ID",
-            description: "Add Passport or Government-issued ID.",
+            description: (
+                <>
+                    <p>Add Passport or Government-issued ID.</p>
+                    {steps.has_id && status.id_doc_status !== "Pending" && (
+                        <div className="mt-2">
+                            {selectedSalonInfo?.id_doc_url?.endsWith(".pdf") ? (
+                                <a
+                                    href={selectedSalonInfo.id_doc_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-blue-300 underline"
+                                >
+                                    📄 View ID Document (PDF)
+                                </a>
+                            ) : (
+                                <img
+                                    src={selectedSalonInfo.id_doc_url}
+                                    alt="ID Document"
+                                    className="w-32 h-auto mt-2 rounded-xl border"
+                                />
+                            )}
+                        </div>
+                    )}
+                </>
+            ),
+
             badge: status.id_doc_status,
             badgeColor: badgeColor(status.id_doc_status),
             button: steps.has_id ? "Uploaded ✅" : "Upload ID",
