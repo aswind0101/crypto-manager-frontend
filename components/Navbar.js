@@ -24,6 +24,8 @@ export default function Navbar() {
     const [isSalonNhanVien, setIsSalonNhanVien] = useState(false);
     const [isSalonKhachHang, setIsSalonKhachHang] = useState(false);
     const [isSalonsOpen, setIsSalonsOpen] = useState(false);
+    const [isAdminOpen, setIsAdminOpen] = useState(false);
+
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -120,6 +122,20 @@ export default function Navbar() {
                                 <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
                                     Appointments
                                 </Link>
+                            </div>
+                            <div className="relative group">
+                                <button className="px-4 py-2 hover:text-yellow-400 font-semibold">
+                                    Admin ▾
+                                </button>
+                                <div className="absolute hidden group-hover:block bg-white shadow-md rounded mt-1 z-50 min-w-[160px]">
+                                    <Link
+                                        href="/admin/freelancers-review"
+                                        className="block px-4 py-2 text-sm text-gray-800 hover:bg-emerald-100"
+                                    >
+                                        Freelancers
+                                    </Link>
+                                    {/* Có thể thêm các mục khác trong Admin tại đây */}
+                                </div>
                             </div>
                             {/* Debts dropdown */}
                             <div className="relative group">
@@ -272,6 +288,33 @@ export default function Navbar() {
                                         📅 Appointments
                                     </Link>
                                 </div>
+                                {/* Admin - Freelancers */}
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setIsAdminOpen(!isAdminOpen)}
+                                >
+                                    🧑‍💼 Freelancers {isAdminOpen ? "▾" : "▸"}
+                                </button>
+
+                                <AnimatePresence>
+                                    {isAdminOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: "auto" }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="pl-4 flex flex-col gap-2 text-sm"
+                                        >
+                                            <Link
+                                                href="/admin/freelancers-review"
+                                                onClick={() => setMenuOpen(false)}
+                                                className="hover:text-yellow-300"
+                                            >
+                                                🧾 Review Documents
+                                            </Link>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                                 {/* Debts menu */}
                                 <button
                                     onClick={() => setDebtsOpen(!debtsOpen)}
