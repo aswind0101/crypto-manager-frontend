@@ -9,6 +9,8 @@ export default function FreelancerDashboard() {
     const [salonList, setSalonList] = useState([]);
     const [selectedSalonId, setSelectedSalonId] = useState("");
     const [selectingSalon, setSelectingSalon] = useState(false);
+    const [selectedSalonInfo, setSelectedSalonInfo] = useState(null);
+
 
     const [steps, setSteps] = useState({
         has_avatar: false,
@@ -86,6 +88,21 @@ export default function FreelancerDashboard() {
                         if (!data.has_salon) {
                             loadSalonList();
                         }
+                        if (data.has_salon) {
+                            try {
+                                const token = await currentUser.getIdToken();
+                                const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/me", {
+                                    headers: { Authorization: `Bearer ${token}` },
+                                });
+                                const salonData = await resSalon.json();
+                                if (resSalon.ok) {
+                                    setSelectedSalonInfo(salonData); // Gồm: name, address, phone
+                                }
+                            } catch (err) {
+                                console.error("❌ Error loading selected salon:", err.message);
+                            }
+                        }
+
                         if (data.avatar_url) {
                             setAvatarUrl(data.avatar_url);
                         }
@@ -326,8 +343,14 @@ export default function FreelancerDashboard() {
         ,
         {
             key: "has_salon",
-            title: "Select Your Salon",
-            description: "Choose where you're currently working.",
+            title: steps.has_salon ? "Your selected Salon" : "Select Your Salon",
+            description: steps.has_salon && selectedSalonInfo ? (
+                <div className="text-sm space-y-1">
+                    <p><strong>🏠 Name:</strong> {selectedSalonInfo.name}</p>
+                    <p><strong>📍 Address:</strong> {selectedSalonInfo.address}</p>
+                    <p><strong>📞 Phone:</strong> {selectedSalonInfo.phone}</p>
+                </div>
+            ) : "Choose where you're currently working.",
             badge: steps.has_salon ? "Completed" : null,
             badgeColor: steps.has_salon ? "bg-green-500 text-white" : "",
             button: steps.has_salon ? "✅ Confirmed" : "Select Salon",
@@ -375,6 +398,14 @@ export default function FreelancerDashboard() {
                                     if (res.ok) {
                                         alert("✅ Salon selected successfully!");
                                         setSteps((prev) => ({ ...prev, has_salon: true }));
+
+                                        // ⏬ Sau khi xác nhận, lấy salon info
+                                        const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/by-id", {
+                                            headers: { Authorization: `Bearer ${token}` }
+                                        });
+                                        const salonInfo = await resSalon.json();
+                                        if (resSalon.ok) setSelectedSalonInfo(salonInfo);
+
                                     } else {
                                         alert("❌ " + (data.error || "Selection failed"));
                                     }
