@@ -89,43 +89,27 @@ export default function FreelancerDashboard() {
                             has_salon: data.has_salon,
                             has_payment: data.has_payment,
                         });
+
                         setStatus({
                             license_status: data.license_status || "Pending",
-                            id_doc_status: data.id_doc_status || "Pending"
+                            id_doc_status: data.id_doc_status || "Pending",
                         });
 
-                        // ✅ Lưu URL file vào state
                         setAvatarUrl(data.avatar_url || null);
                         setLicenseUrl(data.license_url || null);
                         setIdDocUrl(data.id_doc_url || null);
-                        if (!data.has_salon) {
-                            loadSalonList();
-                        }
+
+                        let empStatus = null;
+
                         if (data.has_salon) {
                             try {
-                                const token = await currentUser.getIdToken();
-                                const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/by-id", {
-                                    headers: { Authorization: `Bearer ${token}` },
-                                });
-                                const salonData = await resSalon.json();
-                                if (resSalon.ok) {
-                                    setSelectedSalonInfo(salonData); // Gồm: name, address, phone
-                                } else {
-                                    console.warn("⚠️ Failed to load salon by ID:", salonData.error);
-                                }
-                            } catch (err) {
-                                console.error("❌ Error loading selected salon:", err.message);
-                            }
-                        }
-                        if (data.has_salon) {
-                            try {
-                                const token = await currentUser.getIdToken();
                                 const resEmp = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
                                     headers: { Authorization: `Bearer ${token}` },
                                 });
                                 const empData = await resEmp.json();
                                 if (resEmp.ok) {
-                                    setEmployeeStatus(empData.status); // Lưu status vào state
+                                    empStatus = empData.status;
+                                    setEmployeeStatus(empStatus);
                                 } else {
                                     console.warn("⚠️ Failed to get employee status");
                                 }
@@ -134,8 +118,24 @@ export default function FreelancerDashboard() {
                             }
                         }
 
-                        if (data.avatar_url) {
-                            setAvatarUrl(data.avatar_url);
+                        if (!data.has_salon || empStatus === "rejected") {
+                            loadSalonList();
+                        }
+
+                        if (data.has_salon) {
+                            try {
+                                const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/by-id", {
+                                    headers: { Authorization: `Bearer ${token}` },
+                                });
+                                const salonData = await resSalon.json();
+                                if (resSalon.ok) {
+                                    setSelectedSalonInfo(salonData); // name, address, phone
+                                } else {
+                                    console.warn("⚠️ Failed to load salon by ID:", salonData.error);
+                                }
+                            } catch (err) {
+                                console.error("❌ Error loading selected salon:", err.message);
+                            }
                         }
                     } else {
                         console.warn("⚠️ Failed to load onboarding state:", data.error);
@@ -150,6 +150,7 @@ export default function FreelancerDashboard() {
 
         return () => unsubscribe();
     }, []);
+
     const refreshOnboardingStatus = async () => {
         try {
             const token = await auth.currentUser.getIdToken();
@@ -473,27 +474,36 @@ export default function FreelancerDashboard() {
             ) : "Choose where you're currently working.",
 
             badge: steps.has_salon
-                ? (employeeStatus === "active" ? "Completed" : "In Review")
+                ? employeeStatus === "active"
+                    ? "Completed"
+                    : employeeStatus === "rejected"
+                        ? "Rejected"
+                        : "In Review"
                 : null,
 
             badgeColor: steps.has_salon
-                ? (employeeStatus === "active"
+                ? employeeStatus === "active"
                     ? "bg-green-500 text-white"
-                    : "bg-yellow-400 text-black")
+                    : employeeStatus === "rejected"
+                        ? "bg-red-500 text-white"
+                        : "bg-yellow-400 text-black"
                 : "",
+
 
             button: steps.has_salon ? "✅ Confirmed" : "Select Salon",
             renderAction: () => {
                 const readyToSelect =
                     steps.has_avatar && steps.has_license && steps.has_id;
 
-                if (steps.has_salon) {
+                const allowReselect = steps.has_salon && employeeStatus === "rejected";
+
+                if (steps.has_salon && !allowReselect) {
                     return (
                         <button
                             disabled
                             className="w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md cursor-default"
                         >
-                            Confirmed ✅
+                            {employeeStatus === "rejected" ? "Rejected ❌" : "Confirmed ✅"}
                         </button>
                     );
                 }
@@ -513,6 +523,11 @@ export default function FreelancerDashboard() {
 
                 return (
                     <div className="space-y-2">
+                        {employeeStatus === "rejected" && (
+                            <div className="text-sm text-yellow-500 mb-1">
+                                ⚠️ Your previous salon selection was rejected. Please choose another salon.
+                            </div>
+                        )}
                         <select
                             value={selectedSalonId}
                             onChange={(e) => setSelectedSalonId(e.target.value)}
@@ -553,7 +568,6 @@ export default function FreelancerDashboard() {
                                         });
                                         const salonInfo = await resSalon.json();
                                         if (resSalon.ok) setSelectedSalonInfo(salonInfo);
-
                                     } else {
                                         alert("❌ " + (data.error || "Selection failed"));
                                     }
@@ -566,7 +580,7 @@ export default function FreelancerDashboard() {
                             className="bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition w-full"
                             disabled={selectingSalon}
                         >
-                            {selectingSalon ? "Submitting..." : "Confirm Salon"}
+                            {selectingSalon ? "Submitting..." : allowReselect ? "Re-select Salon" : "Confirm Salon"}
                         </button>
                     </div>
                 );

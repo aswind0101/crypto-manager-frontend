@@ -187,7 +187,7 @@ export default function Navbar() {
                                 <Link href="/services" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
                                     Service
                                 </Link>
-                                <Link href="/salons/freelancers-approval" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                <Link href="/salon/freelancers-approval" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
                                     Freelancers Approval
                                 </Link>
                                 <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
@@ -409,7 +409,7 @@ export default function Navbar() {
                                         💈 Service
                                     </Link>
                                     <Link
-                                        href="/salons/freelancers-approval"
+                                        href="/salon/freelancers-approval"
                                         onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
                                         className="hover:text-yellow-400 flex items-center gap-2 py-1"
                                     >

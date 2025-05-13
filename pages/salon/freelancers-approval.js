@@ -1,3 +1,4 @@
+// pages/salons/freelancers-approval.js
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
@@ -48,6 +49,32 @@ export default function SalonFreelancerApproval() {
     }
   };
 
+  const handleDocumentStatusChange = async (employeeId, type, newStatus) => {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch("https://crypto-manager-backend.onrender.com/api/employees/update-status", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ employee_id: employeeId, type, status: newStatus }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFreelancers((prev) =>
+          prev.map((f) =>
+            f.id === employeeId ? { ...f, [type]: newStatus } : f
+          )
+        );
+      } else {
+        alert("❌ " + (data.error || "Update failed"));
+      }
+    } catch (err) {
+      alert("❌ Network error");
+    }
+  };
+
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -72,37 +99,71 @@ export default function SalonFreelancerApproval() {
         ) : freelancers.length === 0 ? (
           <p className="text-center text-gray-600">✅ No pending freelancers.</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {freelancers.map((f) => (
-              <div key={f.id} className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4 shadow-md space-y-3">
-                <div className="flex items-center gap-3">
+              <div key={f.id} className="bg-white/40 dark:bg-black/30 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-xl space-y-4 transition hover:shadow-2xl hover:scale-[1.01]">
+                <div className="flex items-center gap-4">
                   <img
                     src={f.avatar_url ? `https://crypto-manager-backend.onrender.com${f.avatar_url}` : "/no-avatar.png"}
-                    className="w-12 h-12 rounded-full object-cover border"
+                    className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
                     alt="avatar"
                   />
                   <div>
-                    <p className="font-bold truncate">{f.name}</p>
+                    <p className="font-bold text-lg">{f.name}</p>
                     <p className="text-xs text-gray-700 dark:text-gray-300">{f.email}</p>
+                    <p className="text-xs text-gray-500 mt-1">💼 <strong>{f.role}</strong></p>
                   </div>
                 </div>
 
-                <p className="text-sm">💼 Role: <strong>{f.role}</strong></p>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 text-sm text-gray-800 dark:text-gray-100">
+                  {/* License */}
+                  <div className="rounded-xl">
+                    <p className="font-semibold mb-1">📄 License</p>
+                    {f.certifications?.[0]?.endsWith(".pdf") ? (
+                      <a href={`https://crypto-manager-backend.onrender.com${f.certifications[0]}`} target="_blank" className="text-blue-300 underline">View PDF</a>
+                    ) : (
+                      <img src={`https://crypto-manager-backend.onrender.com${f.certifications[0]}`} alt="license" className="w-full h-44 object-contain bg-white rounded-2xl border  border-white/20" />
+                    )}
+                    <select
+                      value={f.certification_status}
+                      onChange={e => handleDocumentStatusChange(f.id, "certification_status", e.target.value)}
+                      className="w-full mt-2 rounded text-sm bg-white/10 border border-white/30"
+                    >
+                      <option>In Review</option>
+                      <option>Approved</option>
+                      <option>Rejected</option>
+                    </select>
+                  </div>
 
-                <div className="text-xs text-gray-600 dark:text-gray-300">
-                  <p>License Status: {f.certification_status}</p>
-                  <p>ID Status: {f.id_document_status}</p>
+                  {/* ID */}
+                  <div className="rounded-xl">
+                    <p className="font-semibold mb-1">🆔 ID Document</p>
+                    {f.id_documents?.[0]?.endsWith(".pdf") ? (
+                      <a href={`https://crypto-manager-backend.onrender.com${f.id_documents[0]}`} target="_blank" className="text-blue-300 underline">View PDF</a>
+                    ) : (
+                      <img src={`https://crypto-manager-backend.onrender.com${f.id_documents[0]}`} alt="id doc" className="w-full h-44 object-contain bg-white rounded-2xl border  border-white/20" />
+                    )}
+                    <select
+                      value={f.id_document_status}
+                      onChange={e => handleDocumentStatusChange(f.id, "id_document_status", e.target.value)}
+                      className="w-full mt-2 rounded text-sm bg-white/10 border border-white/30"
+                    >
+                      <option>In Review</option>
+                      <option>Approved</option>
+                      <option>Rejected</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => handleAction(f.id, "approve")}
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-white py-1 rounded"
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl font-semibold shadow"
                   >✅ Approve</button>
 
                   <button
                     onClick={() => handleAction(f.id, "reject")}
-                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-1 rounded"
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl font-semibold shadow"
                   >❌ Reject</button>
                 </div>
               </div>
