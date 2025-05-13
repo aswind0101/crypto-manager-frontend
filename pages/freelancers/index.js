@@ -12,6 +12,8 @@ export default function FreelancerDashboard() {
     const [selectedSalonInfo, setSelectedSalonInfo] = useState(null);
     const [licenseUrl, setLicenseUrl] = useState(null);
     const [idDocUrl, setIdDocUrl] = useState(null);
+    const [employeeStatus, setEmployeeStatus] = useState(null);
+
 
     const fullURL = (url) =>
         url?.startsWith("http") ? url : `https://crypto-manager-backend.onrender.com${url}`;
@@ -115,6 +117,22 @@ export default function FreelancerDashboard() {
                                 console.error("❌ Error loading selected salon:", err.message);
                             }
                         }
+                        if (data.has_salon) {
+                            try {
+                                const token = await currentUser.getIdToken();
+                                const resEmp = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
+                                    headers: { Authorization: `Bearer ${token}` },
+                                });
+                                const empData = await resEmp.json();
+                                if (resEmp.ok) {
+                                    setEmployeeStatus(empData.status); // Lưu status vào state
+                                } else {
+                                    console.warn("⚠️ Failed to get employee status");
+                                }
+                            } catch (err) {
+                                console.error("❌ Error fetching employee status:", err.message);
+                            }
+                        }
 
                         if (data.avatar_url) {
                             setAvatarUrl(data.avatar_url);
@@ -160,28 +178,28 @@ export default function FreelancerDashboard() {
     };
 
     const loadSalonList = async () => {
-    try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) return;
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
 
-        const token = await currentUser.getIdToken();
+            const token = await currentUser.getIdToken();
 
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/active", {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/active", {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
 
-        const data = await res.json();
-        if (res.ok) {
-            setSalonList(data);
-        } else {
-            console.warn("⚠️ Failed to load salons:", data.error);
+            const data = await res.json();
+            if (res.ok) {
+                setSalonList(data);
+            } else {
+                console.warn("⚠️ Failed to load salons:", data.error);
+            }
+        } catch (err) {
+            console.error("❌ Error loading salons:", err.message);
         }
-    } catch (err) {
-        console.error("❌ Error loading salons:", err.message);
-    }
-};
+    };
 
     const uploadAvatar = async (e) => {
         const file = e.target.files[0];
@@ -447,10 +465,23 @@ export default function FreelancerDashboard() {
                     <p><strong>🏠 Name:</strong> {selectedSalonInfo.name}</p>
                     <p><strong>📍 Address:</strong> {selectedSalonInfo.address}</p>
                     <p><strong>📞 Phone:</strong> {selectedSalonInfo.phone}</p>
+
+                    {employeeStatus === "inactive" && (
+                        <p className="text-yellow-500 mt-2">⏳ Waiting for salon owner approval...</p>
+                    )}
                 </div>
             ) : "Choose where you're currently working.",
-            badge: steps.has_salon ? "Completed" : null,
-            badgeColor: steps.has_salon ? "bg-green-500 text-white" : "",
+
+            badge: steps.has_salon
+                ? (employeeStatus === "active" ? "Completed" : "In Review")
+                : null,
+
+            badgeColor: steps.has_salon
+                ? (employeeStatus === "active"
+                    ? "bg-green-500 text-white"
+                    : "bg-yellow-400 text-black")
+                : "",
+
             button: steps.has_salon ? "✅ Confirmed" : "Select Salon",
             renderAction: () => (
                 steps.has_salon ? (
