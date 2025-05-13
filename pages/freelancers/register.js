@@ -64,7 +64,16 @@ export default function FreelancerRegister() {
         <Input name="password" label="Password" type="password" value={form.password} onChange={handleChange} />
         <Input name="phone" label="Phone" value={form.phone} onChange={handleChange} />
         <Input name="address" label="Address" value={form.address} onChange={handleChange} />
-        <Select name="gender" label="Gender" value={form.gender} onChange={handleChange} options={["Male", "Female", "Other"]} />
+        <Select
+          name="gender"
+          label="Gender"
+          value={form.gender}
+          onChange={handleChange}
+          options={[
+            { label: "Male", value: "Male" },
+            { label: "Female", value: "Female" },
+            { label: "Other", value: "Other" },
+          ]} />
         <Input name="birthday" label="Birthday" type="date" value={form.birthday} onChange={handleChange} />
         <Textarea name="about" label="About Me" value={form.about} onChange={handleChange} />
         <Input name="experience" label="Years of Experience" type="number" value={form.experience} onChange={handleChange} />
@@ -144,7 +153,9 @@ function Select({ name, label, value, onChange, options }) {
       >
         <option value="">Select</option>
         {options.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
         ))}
       </select>
     </div>
