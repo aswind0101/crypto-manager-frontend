@@ -20,6 +20,7 @@ export default function FreelancerRegister() {
     temp_salon_name: "",
     temp_salon_address: "",
     temp_salon_phone: "",
+    specialization: "",
   });
 
   const handleChange = (e) => {
@@ -67,6 +68,22 @@ export default function FreelancerRegister() {
         <Input name="birthday" label="Birthday" type="date" value={form.birthday} onChange={handleChange} />
         <Textarea name="about" label="About Me" value={form.about} onChange={handleChange} />
         <Input name="experience" label="Years of Experience" type="number" value={form.experience} onChange={handleChange} />
+        <Select
+          name="specialization"
+          label="Your Specialization"
+          value={form.specialization}
+          onChange={handleChange}
+          options={[
+            { label: "Nail Technician", value: "nail_tech" },
+            { label: "Hair Stylist", value: "hair_stylist" },
+            { label: "Barber", value: "barber" },
+            { label: "Esthetician", value: "esthetician" },
+            { label: "Lash Technician", value: "lash_tech" },
+            { label: "Massage Therapist", value: "massage_therapist" },
+            { label: "Makeup Artist", value: "makeup_artist" },
+            { label: "Receptionist", value: "receptionist" },
+          ]}
+        />
 
         <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200 mt-2">
           <input
