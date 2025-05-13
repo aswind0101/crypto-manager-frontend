@@ -483,15 +483,35 @@ export default function FreelancerDashboard() {
                 : "",
 
             button: steps.has_salon ? "✅ Confirmed" : "Select Salon",
-            renderAction: () => (
-                steps.has_salon ? (
-                    <button
-                        disabled
-                        className="w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md cursor-default"
-                    >
-                        Confirmed ✅
-                    </button>
-                ) : (
+            renderAction: () => {
+                const readyToSelect =
+                    steps.has_avatar && steps.has_license && steps.has_id;
+
+                if (steps.has_salon) {
+                    return (
+                        <button
+                            disabled
+                            className="w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md cursor-default"
+                        >
+                            Confirmed ✅
+                        </button>
+                    );
+                }
+
+                if (!readyToSelect) {
+                    return (
+                        <div className="text-sm text-red-500">
+                            ⚠️ Please complete the following before selecting a salon:
+                            <ul className="list-disc ml-6 mt-1">
+                                {!steps.has_avatar && <li>Upload Avatar</li>}
+                                {!steps.has_license && <li>Upload License</li>}
+                                {!steps.has_id && <li>Upload ID Document</li>}
+                            </ul>
+                        </div>
+                    );
+                }
+
+                return (
                     <div className="space-y-2">
                         <select
                             value={selectedSalonId}
@@ -528,7 +548,6 @@ export default function FreelancerDashboard() {
                                         alert("✅ Salon selected successfully!");
                                         setSteps((prev) => ({ ...prev, has_salon: true }));
 
-                                        // ⏬ Sau khi xác nhận, lấy salon info
                                         const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/by-id", {
                                             headers: { Authorization: `Bearer ${token}` }
                                         });
@@ -550,8 +569,9 @@ export default function FreelancerDashboard() {
                             {selectingSalon ? "Submitting..." : "Confirm Salon"}
                         </button>
                     </div>
-                )
-            )
+                );
+            }
+
         }
         ,
         {

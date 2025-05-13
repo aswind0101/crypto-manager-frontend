@@ -5,6 +5,7 @@ export default function FreelancerRegister() {
   const router = useRouter();
   const [workingAtSalon, setWorkingAtSalon] = useState(false);
   const [msg, setMsg] = useState("");
+  const [errors, setErrors] = useState({});
 
   const [form, setForm] = useState({
     name: "",
@@ -29,6 +30,25 @@ export default function FreelancerRegister() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const requiredFields = [
+      "name", "email", "password", "phone", "address",
+      "gender", "birthday", "about", "experience", "specialization"
+    ];
+
+    const newErrors = {};
+    for (let field of requiredFields) {
+      if (!form[field]) {
+        newErrors[field] = true;
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setMsg("❌ Please fill in all required fields.");
+      return;
+    }
+
+    setErrors({}); // xoá lỗi nếu đã hợp lệ
     try {
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/register", {
         method: "POST",
@@ -59,11 +79,11 @@ export default function FreelancerRegister() {
           ✨ Join as a Freelancer
         </h1>
 
-        <Input name="name" label="Full Name" value={form.name} onChange={handleChange} />
-        <Input name="email" label="Email" type="email" value={form.email} onChange={handleChange} />
-        <Input name="password" label="Password" type="password" value={form.password} onChange={handleChange} />
-        <Input name="phone" label="Phone" value={form.phone} onChange={handleChange} />
-        <Input name="address" label="Address" value={form.address} onChange={handleChange} />
+        <Input name="name" label="Full Name" value={form.name} onChange={handleChange} required errors={errors} />
+        <Input name="email" label="Email" type="email" value={form.email} onChange={handleChange} required errors={errors} />
+        <Input name="password" label="Password" type="password" value={form.password} onChange={handleChange} required errors={errors} />
+        <Input name="phone" label="Phone" value={form.phone} onChange={handleChange} required errors={errors} />
+        <Input name="address" label="Address" value={form.address} onChange={handleChange} required errors={errors} />
         <Select
           name="gender"
           label="Gender"
@@ -73,10 +93,10 @@ export default function FreelancerRegister() {
             { label: "Male", value: "Male" },
             { label: "Female", value: "Female" },
             { label: "Other", value: "Other" },
-          ]} />
-        <Input name="birthday" label="Birthday" type="date" value={form.birthday} onChange={handleChange} />
-        <Textarea name="about" label="About Me" value={form.about} onChange={handleChange} />
-        <Input name="experience" label="Years of Experience" type="number" value={form.experience} onChange={handleChange} />
+          ]} required errors={errors} />
+        <Input name="birthday" label="Birthday" type="date" value={form.birthday} onChange={handleChange} required errors={errors} />
+        <Textarea name="about" label="About Me" value={form.about} onChange={handleChange} required errors={errors} />
+        <Input name="experience" label="Years of Experience" type="number" value={form.experience} onChange={handleChange} required errors={errors} />
         <Select
           name="specialization"
           label="Your Specialization"
@@ -91,7 +111,7 @@ export default function FreelancerRegister() {
             { label: "Massage Therapist", value: "massage_therapist" },
             { label: "Makeup Artist", value: "makeup_artist" },
             { label: "Receptionist", value: "receptionist" },
-          ]}
+          ]} required errors={errors}
         />
 
         <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200 mt-2">
@@ -128,28 +148,41 @@ export default function FreelancerRegister() {
   );
 }
 
-function Input({ name, label, ...props }) {
+function Input({ name, label, required, errors, ...props }) {
+  const hasError = errors?.[name];
+
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
       <input
         name={name}
         {...props}
-        className="w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+        className={`w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
+          } text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+          }`}
       />
     </div>
   );
 }
 
-function Select({ name, label, value, onChange, options }) {
+
+function Select({ name, label, value, onChange, options, required, errors }) {
+  const hasError = errors?.[name];
+
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
       <select
         name={name}
         value={value}
         onChange={onChange}
-        className="w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+        className={`w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
+          } text-gray-800 dark:text-white focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+          }`}
       >
         <option value="">Select</option>
         {options.map((opt) => (
@@ -162,17 +195,25 @@ function Select({ name, label, value, onChange, options }) {
   );
 }
 
-function Textarea({ name, label, value, onChange }) {
+
+function Textarea({ name, label, value, onChange, required, errors }) {
+  const hasError = errors?.[name];
+
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
       <textarea
         name={name}
         value={value}
         onChange={onChange}
         rows={3}
-        className="w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+        className={`w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
+          } text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+          }`}
       />
     </div>
   );
 }
+
