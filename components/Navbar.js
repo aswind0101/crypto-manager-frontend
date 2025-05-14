@@ -22,9 +22,11 @@ export default function Navbar() {
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [isSalonChu, setIsSalonChu] = useState(false);
     const [isSalonNhanVien, setIsSalonNhanVien] = useState(false);
+    const [isCrypto, setIsCrypto] = useState(false);
     const [isSalonKhachHang, setIsSalonKhachHang] = useState(false);
     const [isSalonsOpen, setIsSalonsOpen] = useState(false);
     const [isAdminOpen, setIsAdminOpen] = useState(false);
+
 
 
     useEffect(() => {
@@ -212,6 +214,20 @@ export default function Navbar() {
                             </div>
                         </div>
                     )}
+                    {isCrypto && (
+                        <>
+                            <Link href="/home" className="hover:text-cyan-300 transition flex items-center gap-1">
+                                <FiHome /> Home
+                            </Link>
+                            <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
+                                <FiList /> Transactions
+                            </Link>
+                            <Link href="/settings" className="hover:text-cyan-300 transition flex items-center gap-1">
+                                ⚙️ Settings
+                            </Link>
+                        </>
+                    )}
+
                     {user && (
                         <button onClick={handleLogout} className="hover:text-red-400 transition flex items-center gap-1">
                             <FiLogOut /> Logout
@@ -451,6 +467,19 @@ export default function Navbar() {
                                     </Link>
                                 </div>
                             </div>
+                        )}
+                        {isCrypto && (
+                            <>
+                                <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                    <FiHome /> Home
+                                </Link>
+                                <Link href="/transactions" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                    <FiList /> Transactions
+                                </Link>
+                                <Link href="/settings" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                    ⚙️ Settings
+                                </Link>
+                            </>
                         )}
                         {user && (
                             <button
