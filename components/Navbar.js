@@ -41,6 +41,7 @@ export default function Navbar() {
             if (parsedUser.role === "Salon_Chu") setIsSalonChu(true);
             if (parsedUser.role === "Salon_NhanVien") setIsSalonNhanVien(true);
             if (parsedUser.role === "Salon_KhachHang") setIsSalonKhachHang(true);
+            if (parsedUser.role === "Crypto") setIsCrypto(true);
         }
     }, []);
 
@@ -100,7 +101,7 @@ export default function Navbar() {
                 <div className="hidden items-center gap-6 font-medium">
 
                     {isSuperAdmin && (
-                        <div className="relative group">
+                        <>
                             <Link href="/home" className="hover:text-cyan-300 transition flex items-center gap-1">
                                 <FiHome /> Home
                             </Link>
@@ -139,43 +140,57 @@ export default function Navbar() {
                                     {/* Có thể thêm các mục khác trong Admin tại đây */}
                                 </div>
                             </div>
-                            {/* Debts dropdown */}
-                            <div className="relative group">
-                                <button className="flex items-center gap-1 hover:text-cyan-300 transition">
-                                    💳 Debts ▾
+                            {/* 💰 Expenses (desktop) */}
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setExpensesOpen(!expensesOpen)}
+                                >
+                                    💰 Expenses {expensesOpen ? "▴" : "▾"}
                                 </button>
-                                <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
-                                    <Link href="/debts" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
-                                        View Debts
+                                <div
+                                    className="ml-6 flex flex-col text-sm"
+                                    style={{ display: expensesOpen ? 'flex' : 'none' }}
+                                >
+                                    <Link href="/expenses" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        📄 View Expenses
                                     </Link>
-                                    <Link href="/lenders" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
-                                        Manage Lenders
+                                    <Link href="/expenses/categories" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        🗂 Categories
                                     </Link>
                                 </div>
                             </div>
-                            {/* Expenses dropdown */}
-                            <div className="relative group">
-                                <button className="flex items-center gap-1 hover:text-cyan-300 transition">
-                                    💸 Expenses ▾
+
+                            {/* 💳 Debts (desktop) */}
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setDebtsOpen(!debtsOpen)}
+                                >
+                                    💳 Debts {debtsOpen ? "▴" : "▾"}
                                 </button>
-                                <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
-                                    <Link href="/expenses" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
-                                        View Expenses
+                                <div
+                                    className="ml-6 flex flex-col text-sm"
+                                    style={{ display: debtsOpen ? 'flex' : 'none' }}
+                                >
+                                    <Link href="/debts" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        📄 View Debts
                                     </Link>
-                                    <Link href="/categories" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
-                                        Manage Categories
+                                    <Link href="/debts/lenders" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        🙋‍♂️ Lenders
                                     </Link>
                                 </div>
                             </div>
+
                             <Link href="/settings" className="hover:text-cyan-300 transition flex items-center gap-1">
                                 ⚙️ Settings
                             </Link>
-                        </div>
+                        </>
                     )}
 
 
                     {isSalonChu && (
-                        <div className="relative group">
+                        <>
                             <button className="flex items-center gap-1 hover:text-cyan-300 transition">
                                 🏠 Salons ▾
                             </button>
@@ -196,11 +211,11 @@ export default function Navbar() {
                                     Appointments
                                 </Link>
                             </div>
-                        </div>
+                        </>
                     )}
 
                     {isSalonNhanVien && (
-                        <div className="relative group">
+                        <>
                             <button className="flex items-center gap-1 hover:text-cyan-300 transition">
                                 👤 Account ▾
                             </button>
@@ -212,21 +227,66 @@ export default function Navbar() {
                                     📅 Appointments
                                 </Link>
                             </div>
-                        </div>
+                        </>
                     )}
                     {isCrypto && (
                         <>
-                            <Link href="/home" className="hover:text-cyan-300 transition flex items-center gap-1">
-                                <FiHome /> Home
+                            <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                🏠 Home
                             </Link>
-                            <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
-                                <FiList /> Transactions
+                            <Link href="/transactions" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                📄 Transactions
                             </Link>
-                            <Link href="/settings" className="hover:text-cyan-300 transition flex items-center gap-1">
+
+                            {/* 💰 Expenses (desktop) */}
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setExpensesOpen(!expensesOpen)}
+                                >
+                                    💰 Expenses {expensesOpen ? "▴" : "▾"}
+                                </button>
+                                <div
+                                    className="ml-6 flex flex-col text-sm"
+                                    style={{ display: expensesOpen ? 'flex' : 'none' }}
+                                >
+                                    <Link href="/expenses" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        📄 View Expenses
+                                    </Link>
+                                    <Link href="/expenses/categories" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        🗂 Categories
+                                    </Link>
+                                </div>
+                            </div>
+
+                            {/* 💳 Debts (desktop) */}
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setDebtsOpen(!debtsOpen)}
+                                >
+                                    💳 Debts {debtsOpen ? "▴" : "▾"}
+                                </button>
+                                <div
+                                    className="ml-6 flex flex-col text-sm"
+                                    style={{ display: debtsOpen ? 'flex' : 'none' }}
+                                >
+                                    <Link href="/debts" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        📄 View Debts
+                                    </Link>
+                                    <Link href="/debts/lenders" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        🙋‍♂️ Lenders
+                                    </Link>
+                                </div>
+                            </div>
+
+
+                            <Link href="/settings" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
                                 ⚙️ Settings
                             </Link>
                         </>
                     )}
+
 
                     {user && (
                         <button onClick={handleLogout} className="hover:text-red-400 transition flex items-center gap-1">
@@ -262,7 +322,7 @@ export default function Navbar() {
 
                         {/* Salons dropdown */}
                         {isSuperAdmin && (
-                            <div className="flex flex-col">
+                            <>
                                 <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
                                     <FiHome /> Home
                                 </Link>
@@ -334,66 +394,66 @@ export default function Navbar() {
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
-                                {/* Debts menu */}
-                                <button
-                                    onClick={() => setDebtsOpen(!debtsOpen)}
-                                    className="hover:text-cyan-300 flex items-center gap-2"
-                                >
-                                    💳 Debts {debtsOpen ? "▾" : "▸"}
-                                </button>
-                                <AnimatePresence>
-                                    {debtsOpen && (
-                                        <motion.div
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: "auto" }}
-                                            exit={{ opacity: 0, height: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="pl-4 flex flex-col gap-2 text-sm"
-                                        >
-                                            <Link href="/debts" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
-                                                👁️ View Debts
-                                            </Link>
-                                            <Link href="/lenders" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
-                                                👥 Manage Lenders
-                                            </Link>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                                {/* Expenses menu */}
+                                {/* 💰 Expenses (mobile) */}
                                 <button
                                     onClick={() => setExpensesOpen(!expensesOpen)}
-                                    className="hover:text-cyan-300 flex items-center gap-2"
+                                    className="flex items-center gap-2 hover:text-cyan-300"
                                 >
-                                    💸 Expenses {expensesOpen ? "▾" : "▸"}
+                                    💰 Expenses {expensesOpen ? "▴" : "▾"}
                                 </button>
-                                <AnimatePresence>
-                                    {expensesOpen && (
-                                        <motion.div
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: "auto" }}
-                                            exit={{ opacity: 0, height: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="pl-4 flex flex-col gap-2 text-sm"
+                                {expensesOpen && (
+                                    <>
+                                        <Link
+                                            href="/expenses"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
                                         >
-                                            <Link href="/expenses" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
-                                                👁️ View Expenses
-                                            </Link>
-                                            <Link href="/categories" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
-                                                🗂 Manage Categories
-                                            </Link>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                            📄 View Expenses
+                                        </Link>
+                                        <Link
+                                            href="/expenses/categories"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🗂 Categories
+                                        </Link>
+                                    </>
+                                )}
 
+                                {/* 💳 Debts (mobile) */}
+                                <button
+                                    onClick={() => setDebtsOpen(!debtsOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    💳 Debts {debtsOpen ? "▴" : "▾"}
+                                </button>
+                                {debtsOpen && (
+                                    <>
+                                        <Link
+                                            href="/debts"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📄 View Debts
+                                        </Link>
+                                        <Link
+                                            href="/debts/lenders"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🙋‍♂️ Lenders
+                                        </Link>
+                                    </>
+                                )}
 
                                 <Link href="/settings" className="hover:text-cyan-300 flex items-center gap-2">
                                     ⚙️ Settings
                                 </Link>
-                            </div>
+                            </>
                         )}
 
                         {isSalonChu && (
-                            <div className="flex flex-col">
+                            <>
                                 <button
                                     className="flex items-center gap-2 hover:text-cyan-300"
                                     onClick={() => setIsSalonsOpen(!isSalonsOpen)}
@@ -439,11 +499,11 @@ export default function Navbar() {
                                         📅 Appointments
                                     </Link>
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {isSalonNhanVien && (
-                            <div className="flex flex-col">
+                            <>
                                 <button
                                     className="flex items-center gap-2 hover:text-cyan-300"
                                     onClick={() => setIsSalonsOpen(!isSalonsOpen)}
@@ -466,16 +526,70 @@ export default function Navbar() {
                                         📅 Appointments
                                     </Link>
                                 </div>
-                            </div>
+                            </>
                         )}
                         {isCrypto && (
                             <>
                                 <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                    <FiHome /> Home
+                                    🏠 Home
                                 </Link>
                                 <Link href="/transactions" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
-                                    <FiList /> Transactions
+                                    📄 Transactions
                                 </Link>
+
+                                {/* 💰 Expenses (mobile) */}
+                                <button
+                                    onClick={() => setExpensesOpen(!expensesOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    💰 Expenses {expensesOpen ? "▴" : "▾"}
+                                </button>
+                                {expensesOpen && (
+                                    <>
+                                        <Link
+                                            href="/expenses"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📄 View Expenses
+                                        </Link>
+                                        <Link
+                                            href="/expenses/categories"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🗂 Categories
+                                        </Link>
+                                    </>
+                                )}
+
+                                {/* 💳 Debts (mobile) */}
+                                <button
+                                    onClick={() => setDebtsOpen(!debtsOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    💳 Debts {debtsOpen ? "▴" : "▾"}
+                                </button>
+                                {debtsOpen && (
+                                    <>
+                                        <Link
+                                            href="/debts"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📄 View Debts
+                                        </Link>
+                                        <Link
+                                            href="/debts/lenders"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🙋‍♂️ Lenders
+                                        </Link>
+                                    </>
+                                )}
+
+
                                 <Link href="/settings" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
                                     ⚙️ Settings
                                 </Link>
