@@ -22,10 +22,13 @@ export default function Navbar() {
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [isSalonChu, setIsSalonChu] = useState(false);
     const [isSalonNhanVien, setIsSalonNhanVien] = useState(false);
+    const [isFreelancer, setIsFreelancer] = useState(false);
     const [isCrypto, setIsCrypto] = useState(false);
     const [isSalonKhachHang, setIsSalonKhachHang] = useState(false);
     const [isSalonsOpen, setIsSalonsOpen] = useState(false);
     const [isAdminOpen, setIsAdminOpen] = useState(false);
+    const [isFreelancerMenuOpen, setIsFreelancerMenuOpen] = useState(false);
+
 
 
 
@@ -42,6 +45,8 @@ export default function Navbar() {
             if (parsedUser.role === "Salon_NhanVien") setIsSalonNhanVien(true);
             if (parsedUser.role === "Salon_KhachHang") setIsSalonKhachHang(true);
             if (parsedUser.role === "Crypto") setIsCrypto(true);
+            if (parsedUser.role === "Salon_Freelancers") setIsFreelancer(true);
+
         }
     }, []);
 
@@ -109,7 +114,7 @@ export default function Navbar() {
                                 <FiList /> Transactions
                             </Link>
 
-                            <button className="flex items-center gap-1 hover:text-cyan-300 transition">
+                            <button className="flex flex-col">
                                 🏠 Salons ▾
                             </button>
                             <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-52 text-sm z-50 border border-gray-700">
@@ -126,19 +131,17 @@ export default function Navbar() {
                                     Appointments
                                 </Link>
                             </div>
-                            <div className="relative group">
-                                <button className="px-4 py-2 hover:text-yellow-400 font-semibold">
-                                    Admin ▾
-                                </button>
-                                <div className="absolute hidden group-hover:block bg-white shadow-md rounded mt-1 z-50 min-w-[160px]">
-                                    <Link
-                                        href="/admin/freelancers-review"
-                                        className="block px-4 py-2 text-sm text-gray-800 hover:bg-emerald-100"
-                                    >
-                                        Freelancers
-                                    </Link>
-                                    {/* Có thể thêm các mục khác trong Admin tại đây */}
-                                </div>
+                            <button className="px-4 py-2 hover:text-yellow-400 font-semibold">
+                                Admin ▾
+                            </button>
+                            <div className="absolute hidden group-hover:block bg-white shadow-md rounded mt-1 z-50 min-w-[160px]">
+                                <Link
+                                    href="/admin/freelancers-review"
+                                    className="block px-4 py-2 text-sm text-gray-800 hover:bg-emerald-100"
+                                >
+                                    Freelancers
+                                </Link>
+                                {/* Có thể thêm các mục khác trong Admin tại đây */}
                             </div>
                             {/* 💰 Expenses (desktop) */}
                             <div className="flex flex-col">
@@ -191,7 +194,7 @@ export default function Navbar() {
 
                     {isSalonChu && (
                         <>
-                            <button className="flex items-center gap-1 hover:text-cyan-300 transition">
+                            <button className="flex flex-col">
                                 🏠 Salons ▾
                             </button>
                             <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-52 text-sm z-50 border border-gray-700">
@@ -216,7 +219,7 @@ export default function Navbar() {
 
                     {isSalonNhanVien && (
                         <>
-                            <button className="flex items-center gap-1 hover:text-cyan-300 transition">
+                            <button className="flex flex-col">
                                 👤 Account ▾
                             </button>
                             <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
@@ -229,6 +232,34 @@ export default function Navbar() {
                             </div>
                         </>
                     )}
+                    {isFreelancer && (
+                        <div className="flex flex-col">
+                            <button
+                                className="flex items-center gap-2 hover:text-cyan-300"
+                                onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
+                            >
+                                🧑‍🎨 Freelancer {isFreelancerMenuOpen ? "▴" : "▾"}
+                            </button>
+                            <div
+                                className="ml-6 flex flex-col text-sm"
+                                style={{ display: isFreelancerMenuOpen ? "flex" : "none" }}
+                            >
+                                <Link href="/freelancers" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    🧾 Dashboard
+                                </Link>
+                                <Link href="/freelancers/me" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    👤 My Profile
+                                </Link>
+                                <Link href="/appointments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    📅 Appointments
+                                </Link>
+                                <Link href="/freelancers/payments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    💳 Payments
+                                </Link>
+                            </div>
+                        </div>
+                    )}
+
                     {isCrypto && (
                         <>
                             <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
@@ -528,6 +559,50 @@ export default function Navbar() {
                                 </div>
                             </>
                         )}
+                        {isFreelancer && (
+                            <>
+                                <button
+                                    onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    🧑‍🎨 Freelancer {isFreelancerMenuOpen ? "▴" : "▾"}
+                                </button>
+
+                                {isFreelancerMenuOpen && (
+                                    <>
+                                        <Link
+                                            href="/freelancers"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🧾 Dashboard
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/me"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            👤 My Profile
+                                        </Link>
+                                        <Link
+                                            href="/appointments"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📅 Appointments
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/payments"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            💳 Payments
+                                        </Link>
+                                    </>
+                                )}
+                            </>
+                        )}
+
                         {isCrypto && (
                             <>
                                 <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">

@@ -56,7 +56,7 @@ export default function FreelancerDashboard() {
             Approved: "bg-green-500 text-white",
             "In Review": "bg-yellow-400 text-black",
             Rejected: "bg-red-500 text-white",
-            Pending: "bg-yellow-500 text-white"
+            Pending: "bg-gray-400",
         };
         return colorMap[status] || "bg-gray-400 text-white";
     };
@@ -322,7 +322,7 @@ export default function FreelancerDashboard() {
                 </>
             ),
             badge: steps.has_avatar ? "Completed" : "Pending",
-            badgeColor: steps.has_avatar ? "bg-green-500 text-white" : "bg-yellow-500 text-white",
+            badgeColor: steps.has_avatar ? "bg-green-500 text-white" : "bg-gray-400 text-white",
             button: "Upload Avatar",
             renderAction: () => (
                 <label className="block w-full">
