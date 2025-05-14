@@ -642,12 +642,12 @@ export default function FreelancerDashboard() {
 
 function StepCard({ title, description, completed, buttonLabel, onClick, renderAction, badge, badgeColor }) {
     return (
-        <div className="relative bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+        <div className="relative pt-8 pb-8 bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
 
             {/* ✅ Badge hiển thị cố định ở góc trên phải */}
             {badge && (
-                <div className="absolute top-3 right-3">
-                    <span className={`text-xs font-semibold px-2 py-1 rounded ${badgeColor}`}>
+                <div className="absolute top-2 right-2">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-xl ${badgeColor}`}>
                         {badge}
                     </span>
                 </div>
