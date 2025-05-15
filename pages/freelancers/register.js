@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
+import { AsYouType, parsePhoneNumberFromString } from "libphonenumber-js";
+import { Phone, Mail, User, Lock, CalendarDays, MapPin } from "lucide-react"; // icon gợi ý
+import { MessageCircle } from "lucide-react";
+import { Briefcase } from "lucide-react";
+
 
 export default function FreelancerRegister() {
   const router = useRouter();
@@ -49,6 +54,11 @@ export default function FreelancerRegister() {
     }
 
     setErrors({}); // xoá lỗi nếu đã hợp lệ
+    const phoneNumber = parsePhoneNumberFromString(form.phone, 'US');
+    if (!phoneNumber || !phoneNumber.isValid()) {
+      setMsg("❗ Invalid US phone number.");
+      return;
+    }
     try {
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/register", {
         method: "POST",
@@ -68,6 +78,36 @@ export default function FreelancerRegister() {
       setMsg("❌ Đã xảy ra lỗi kết nối server.");
     }
   };
+  const handlePhoneChange = (value) => {
+    let digitsOnly = value.replace(/\D/g, "");
+    let hasCountryCode = digitsOnly.startsWith("1");
+
+    if (hasCountryCode) {
+      if (digitsOnly.length > 11) digitsOnly = digitsOnly.slice(0, 11);
+    } else {
+      if (digitsOnly.length > 10) digitsOnly = digitsOnly.slice(0, 10);
+    }
+
+    if (digitsOnly.length === 0) {
+      setForm((prev) => ({ ...prev, phone: "" }));
+      return;
+    }
+
+    if ((hasCountryCode && digitsOnly.length <= 4) || (!hasCountryCode && digitsOnly.length <= 3)) {
+      setForm((prev) => ({ ...prev, phone: digitsOnly }));
+      return;
+    }
+
+    const formatter = new AsYouType('US');
+    formatter.input(digitsOnly);
+    let formatted = formatter.formattedOutput;
+
+    if (hasCountryCode && !formatted.startsWith('+')) {
+      formatted = `+${formatted}`;
+    }
+
+    setForm((prev) => ({ ...prev, phone: formatted }));
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-700 dark:via-sky-700 dark:to-pink-700 flex items-center justify-center px-4 py-8">
@@ -82,7 +122,7 @@ export default function FreelancerRegister() {
         <Input name="name" label="Full Name" value={form.name} onChange={handleChange} required errors={errors} />
         <Input name="email" label="Email" type="email" value={form.email} onChange={handleChange} required errors={errors} />
         <Input name="password" label="Password" type="password" value={form.password} onChange={handleChange} required errors={errors} />
-        <Input name="phone" label="Phone" value={form.phone} onChange={handleChange} required errors={errors} />
+        <Input name="phone" label="Phone" value={form.phone} onChange={(e) => handlePhoneChange(e.target.value)} required errors={errors} />
         <Input name="address" label="Address" value={form.address} onChange={handleChange} required errors={errors} />
         <Select
           name="gender"
@@ -148,21 +188,35 @@ export default function FreelancerRegister() {
   );
 }
 
-function Input({ name, label, required, errors, ...props }) {
+
+function Input({ name, label, required, errors, type = "text", ...props }) {
   const hasError = errors?.[name];
+  const iconMap = {
+    name: <User className="w-4 h-4 text-pink-400" />,
+    email: <Mail className="w-4 h-4 text-pink-400" />,
+    password: <Lock className="w-4 h-4 text-pink-400" />,
+    phone: <Phone className="w-4 h-4 text-pink-400" />,
+    birthday: <CalendarDays className="w-4 h-4 text-pink-400" />,
+    address: <MapPin className="w-4 h-4 text-pink-400" />,
+    experience: <Briefcase className="w-4 h-4 text-pink-400" />,
+  };
 
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
-      <input
-        name={name}
-        {...props}
-        className={`w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
-          } text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
-          }`}
-      />
+      <div className="relative">
+        <div className="absolute left-3 top-2.5">{iconMap[name]}</div>
+        <input
+          name={name}
+          type={type}
+          {...props}
+          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
+            } text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+            }`}
+        />
+      </div>
     </div>
   );
 }
@@ -176,24 +230,31 @@ function Select({ name, label, value, onChange, options, required, errors }) {
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        className={`w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
-          } text-gray-800 dark:text-white focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
-          }`}
-      >
-        <option value="">Select</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          name={name}
+          value={value}
+          onChange={onChange}
+          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
+            } text-gray-800 dark:text-white focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+            } appearance-none`}
+        >
+          <option value="">Select</option>
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <div className="absolute left-3 top-2.5">
+          <User className="w-4 h-4 text-pink-300" />
+        </div>
+      </div>
     </div>
   );
 }
+
+
 
 
 function Textarea({ name, label, value, onChange, required, errors }) {
@@ -204,16 +265,22 @@ function Textarea({ name, label, value, onChange, required, errors }) {
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
-      <textarea
-        name={name}
-        value={value}
-        onChange={onChange}
-        rows={3}
-        className={`w-full px-4 py-2 rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
-          } text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
-          }`}
-      />
+      <div className="relative">
+        <div className="absolute left-3 top-2.5">
+          <MessageCircle className="w-4 h-4 text-pink-400" />
+        </div>
+        <textarea
+          name={name}
+          value={value}
+          onChange={onChange}
+          rows={3}
+          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
+            } text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+            }`}
+        />
+      </div>
     </div>
   );
 }
+
 

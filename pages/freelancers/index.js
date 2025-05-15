@@ -65,90 +65,95 @@ export default function FreelancerDashboard() {
     const auth = getAuth();
 
     useEffect(() => {
+        let intervalId;
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
                 const userData = { ...storedUser, ...currentUser };
                 setUser(userData);
 
-                try {
-                    const token = await currentUser.getIdToken();
-                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/onboarding", {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    });
-
-                    const data = await res.json();
-
-                    if (res.ok) {
-                        setSteps({
-                            has_avatar: data.has_avatar,
-                            has_license: data.has_license,
-                            has_id: data.has_id,
-                            has_salon: data.has_salon,
-                            has_payment: data.has_payment,
+                const loadAllData = async () => {
+                    try {
+                        const token = await currentUser.getIdToken();
+                        const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/onboarding", {
+                            headers: { Authorization: `Bearer ${token}` },
                         });
 
-                        setStatus({
-                            license_status: data.license_status || "Pending",
-                            id_doc_status: data.id_doc_status || "Pending",
-                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            setSteps({
+                                has_avatar: data.has_avatar,
+                                has_license: data.has_license,
+                                has_id: data.has_id,
+                                has_salon: data.has_salon,
+                                has_payment: data.has_payment,
+                            });
 
-                        setAvatarUrl(data.avatar_url || null);
-                        setLicenseUrl(data.license_url || null);
-                        setIdDocUrl(data.id_doc_url || null);
+                            setStatus({
+                                license_status: data.license_status || "Pending",
+                                id_doc_status: data.id_doc_status || "Pending",
+                            });
 
-                        let empStatus = null;
+                            setAvatarUrl(data.avatar_url || null);
+                            setLicenseUrl(data.license_url || null);
+                            setIdDocUrl(data.id_doc_url || null);
 
-                        if (data.has_salon) {
-                            try {
-                                const resEmp = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
-                                    headers: { Authorization: `Bearer ${token}` },
-                                });
-                                const empData = await resEmp.json();
-                                if (resEmp.ok) {
-                                    empStatus = empData.status;
-                                    setEmployeeStatus(empStatus);
-                                } else {
-                                    console.warn("⚠️ Failed to get employee status");
+                            let empStatus = null;
+                            if (data.has_salon) {
+                                try {
+                                    const resEmp = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
+                                        headers: { Authorization: `Bearer ${token}` },
+                                    });
+                                    const empData = await resEmp.json();
+                                    if (resEmp.ok) {
+                                        empStatus = empData.status;
+                                        setEmployeeStatus(empStatus);
+                                    } else {
+                                        console.warn("⚠️ Failed to get employee status");
+                                    }
+                                } catch (err) {
+                                    console.error("❌ Error fetching employee status:", err.message);
                                 }
-                            } catch (err) {
-                                console.error("❌ Error fetching employee status:", err.message);
                             }
-                        }
 
-                        if (!data.has_salon || empStatus === "rejected") {
-                            loadSalonList();
-                        }
+                            if (!data.has_salon || empStatus === "rejected") {
+                                loadSalonList();
+                            }
 
-                        if (data.has_salon) {
-                            try {
-                                const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/by-id", {
-                                    headers: { Authorization: `Bearer ${token}` },
-                                });
-                                const salonData = await resSalon.json();
-                                if (resSalon.ok) {
-                                    setSelectedSalonInfo(salonData); // name, address, phone
-                                } else {
-                                    console.warn("⚠️ Failed to load salon by ID:", salonData.error);
+                            if (data.has_salon) {
+                                try {
+                                    const resSalon = await fetch("https://crypto-manager-backend.onrender.com/api/salons/by-id", {
+                                        headers: { Authorization: `Bearer ${token}` },
+                                    });
+                                    const salonData = await resSalon.json();
+                                    if (resSalon.ok) {
+                                        setSelectedSalonInfo(salonData);
+                                    } else {
+                                        console.warn("⚠️ Failed to load salon by ID:", salonData.error);
+                                    }
+                                } catch (err) {
+                                    console.error("❌ Error loading selected salon:", err.message);
                                 }
-                            } catch (err) {
-                                console.error("❌ Error loading selected salon:", err.message);
                             }
+                        } else {
+                            console.warn("⚠️ Failed to load onboarding state:", data.error);
                         }
-                    } else {
-                        console.warn("⚠️ Failed to load onboarding state:", data.error);
+                    } catch (err) {
+                        console.error("❌ Error loading onboarding state:", err.message);
                     }
-                } catch (err) {
-                    console.error("❌ Error loading onboarding state:", err.message);
-                }
+                };
+
+                await loadAllData();
+                intervalId = setInterval(loadAllData, 10000); // ⏱ tự động làm mới mỗi 10 giây
             } else {
                 router.push("/login");
             }
         });
 
-        return () => unsubscribe();
+        return () => {
+            unsubscribe();
+            if (intervalId) clearInterval(intervalId);
+        };
     }, []);
 
     const refreshOnboardingStatus = async () => {
@@ -628,6 +633,11 @@ export default function FreelancerDashboard() {
                                     onClick={() => console.log(`Handle: ${step.key}`)}
                                     badge={step.badge}
                                     badgeColor={step.badgeColor}
+                                    disabled={
+                                        (step.key === "has_avatar" && uploading.avatar) ||
+                                        (step.key === "has_license" && uploading.license) ||
+                                        (step.key === "has_id" && uploading.id)
+                                    }
                                 />
                             ))}
                         </div>
@@ -640,11 +650,12 @@ export default function FreelancerDashboard() {
     );
 }
 
-function StepCard({ title, description, completed, buttonLabel, onClick, renderAction, badge, badgeColor }) {
+function StepCard({ title, description, completed, buttonLabel, onClick, renderAction, badge, badgeColor, disabled }) {
     return (
-        <div className="relative pt-8 pb-8 bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
-
-            {/* ✅ Badge hiển thị cố định ở góc trên phải */}
+        <div
+            className={`relative pt-8 pb-8 bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-xl flex flex-col justify-between transition ${disabled ? "opacity-50 pointer-events-none" : ""
+                }`}
+        >
             {badge && (
                 <div className="absolute top-2 right-2">
                     <span className={`text-xs font-semibold px-2 py-1 rounded-xl ${badgeColor}`}>
@@ -652,9 +663,7 @@ function StepCard({ title, description, completed, buttonLabel, onClick, renderA
                     </span>
                 </div>
             )}
-
             <h3 className="text-lg font-semibold text-emerald-700 dark:text-emerald-300 mb-2">{title}</h3>
-
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">{description}</p>
 
             {renderAction ? (
@@ -670,4 +679,5 @@ function StepCard({ title, description, completed, buttonLabel, onClick, renderA
         </div>
     );
 }
+
 
