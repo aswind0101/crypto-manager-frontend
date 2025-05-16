@@ -23,6 +23,7 @@ export default function Navbar() {
     const [isSalonChu, setIsSalonChu] = useState(false);
     const [isSalonNhanVien, setIsSalonNhanVien] = useState(false);
     const [isFreelancer, setIsFreelancer] = useState(false);
+    const [isSalonAll, setIsSalonAll] = useState(false);
     const [isCrypto, setIsCrypto] = useState(false);
     const [isSalonKhachHang, setIsSalonKhachHang] = useState(false);
     const [isSalonsOpen, setIsSalonsOpen] = useState(false);
@@ -41,13 +42,12 @@ export default function Navbar() {
             if (parsedUser.uid && SUPER_ADMINS.includes(parsedUser.uid)) {
                 setIsSuperAdmin(true);
             }
-            const role = (parsedUser.role || "").toLowerCase();
-
-            if (role === "salon_chu") setIsSalonChu(true);
-            if (role === "salon_nhanvien" || role === "salon_all") setIsSalonNhanVien(true);
-            if (role === "salon_freelancers" || role === "salon_all") setIsFreelancer(true);
-            if (role === "salon_khachhang") setIsSalonKhachHang(true);
-            if (role === "crypto") setIsCrypto(true);
+            if (parsedUser.role === "Salon_Chu") setIsSalonChu(true);
+            if (parsedUser.role === "Salon_NhanVien") setIsSalonNhanVien(true);
+            if (parsedUser.role === "Salon_KhachHang") setIsSalonKhachHang(true);
+            if (parsedUser.role === "Salon_Freelancers") setIsFreelancer(true);
+            if (parsedUser.role === "Salon_All") setIsSalonAll(true);
+            if (parsedUser.role === "Crypto") setIsCrypto(true);
 
         }
     }, []);
@@ -261,7 +261,7 @@ export default function Navbar() {
                             </div>
                         </div>
                     )}
-                    {isFreelancer && isSalonNhanVien && (
+                    {isSalonAll && (
                         <div className="flex flex-col">
                             <button className="flex flex-col">
                                 👤 Account ▾
@@ -641,7 +641,7 @@ export default function Navbar() {
                                 )}
                             </>
                         )}
-                        {isFreelancer && isSalonNhanVien && (
+                        {isSalonAll && (
                             <>
                                 <button
                                     className="flex items-center gap-2 hover:text-cyan-300"
