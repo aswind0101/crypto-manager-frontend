@@ -327,7 +327,7 @@ export default function FreelancerDashboard() {
                 </>
             ),
             badge: steps.has_avatar ? "Completed" : "Pending",
-            badgeColor: steps.has_avatar ? "bg-green-500 text-white" : "bg-gray-400 text-white",
+            badgeColor: steps.has_avatar ? "bg-green-500 text-white" : "bg-gray-400",
             button: "Upload Avatar",
             renderAction: () => (
                 <label className="block w-full">
