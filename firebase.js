@@ -3,7 +3,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAX6viOZkDh4EBDQDBM7NN0VHU0gq9ZMuc",
+    apiKey: "AIzaSyDMmLJ5URpa3MqEjmXt9apkJFHHRTivo30",
     authDomain: "crypto-manager-93a43.firebaseapp.com",
     projectId: "crypto-manager-93a43",
     storageBucket: "crypto-manager-93a43.appspot.com", // đã sửa lại ở đây
