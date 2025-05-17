@@ -1,10 +1,11 @@
 import { MapPin } from "lucide-react"; // icon gợi ý
+import { useEffect, useState } from "react";
 import usePlacesAutocomplete, { getGeocode } from "use-places-autocomplete";
-import { useEffect } from "react";
 
 export default function AddressAutocomplete({ value, onChange, placeholder = "Enter address..." }) {
+    const [showDropdown, setShowDropdown] = useState(false);
+
     const {
-        ready,
         value: inputValue,
         setValue,
         suggestions: { status, data },
@@ -19,33 +20,32 @@ export default function AddressAutocomplete({ value, onChange, placeholder = "En
     }, [value]);
 
     const extractFullAddressWithZip = async (address) => {
-        const results = await getGeocode({ address });
-        const first = results[0];
+        try {
+            const results = await getGeocode({ address });
+            const first = results[0];
+            if (!first) return address;
 
-        if (!first) return address;
+            const components = first.address_components;
+            const zipcodeObj = components.find((c) => c.types.includes("postal_code"));
+            const zipcode = zipcodeObj?.long_name;
 
-        const components = first.address_components;
-        const zipcodeObj = components.find((c) => c.types.includes("postal_code"));
-        const zipcode = zipcodeObj?.long_name;
+            if (zipcode && !address.includes(zipcode)) {
+                return `${address}, ${zipcode}`;
+            }
 
-        // If ZIP found and not already included
-        if (zipcode && !address.includes(zipcode)) {
-            return `${address}, ${zipcode}`;
+            return address;
+        } catch (err) {
+            return address;
         }
-
-        return address;
     };
 
     const handleSelect = async (selectedAddress) => {
         const fullAddress = await extractFullAddressWithZip(selectedAddress);
-
-        setValue(fullAddress, false);
-        clearSuggestions(); // ✅ đặt sau setValue để đảm bảo đóng hoàn toàn dropdown
-
+        setValue(fullAddress);
+        setShowDropdown(false); // ✅ Ngắt dropdown
+        clearSuggestions();
         onChange({ target: { name: "address", value: fullAddress } });
-
     };
-
 
     return (
         <div className="relative">
@@ -54,12 +54,14 @@ export default function AddressAutocomplete({ value, onChange, placeholder = "En
                 value={inputValue}
                 onChange={(e) => {
                     setValue(e.target.value);
+                    setShowDropdown(true); // ✅ Mở dropdown khi user gõ
                     onChange(e);
                 }}
                 onBlur={() => {
                     setTimeout(() => {
-                        clearSuggestions(); // ẩn dropdown sau khi focus ra ngoài
-                    }, 100);
+                        setShowDropdown(false); // ✅ Ẩn dropdown sau blur
+                        clearSuggestions();
+                    }, 150);
                 }}
                 placeholder={placeholder}
                 className="pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 border border-white/20 text-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-300"
@@ -68,12 +70,13 @@ export default function AddressAutocomplete({ value, onChange, placeholder = "En
                 <MapPin className="w-4 h-4 text-pink-300" />
             </div>
 
-            {status === "OK" && (
+            {/* ✅ Dropdown chỉ hiển thị khi showDropdown === true */}
+            {showDropdown && status === "OK" && data.length > 0 && (
                 <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg text-sm max-h-56 overflow-y-auto">
                     {data.map(({ place_id, description }) => (
                         <li
                             key={place_id}
-                            onClick={() => handleSelect(description)}
+                            onMouseDown={() => handleSelect(description)}
                             className="px-4 py-2 cursor-pointer hover:bg-pink-100 text-gray-800"
                         >
                             {description}
