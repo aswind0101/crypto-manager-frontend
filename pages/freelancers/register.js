@@ -4,6 +4,10 @@ import { AsYouType, parsePhoneNumberFromString } from "libphonenumber-js";
 import { Phone, Mail, User, Lock, CalendarDays, MapPin } from "lucide-react"; // icon gợi ý
 import { MessageCircle } from "lucide-react";
 import { Briefcase } from "lucide-react";
+import { Leaf, Flower, Sparkles, Lotus, Spa } from "lucide-react";
+import { FaLeaf } from "react-icons/fa";
+import AddressAutocomplete from "../../components/AddressAutocomplete";
+
 
 
 export default function FreelancerRegister() {
@@ -113,17 +117,29 @@ export default function FreelancerRegister() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-700 dark:via-sky-700 dark:to-pink-700 flex items-center justify-center px-4 py-8">
       <form
         onSubmit={handleSubmit}
-        className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8 w-full max-w-lg space-y-4"
+        className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8 w-full max-w-lg space-y-8"
       >
-        <h1 className="text-3xl font-extrabold text-center text-emerald-700 dark:text-emerald-300 mb-4">
-          ✨ Join as a Freelancer
-        </h1>
-
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <FaLeaf className="w-12 h-12 text-pink-400" />
+          <h1 className="text-3xl font-extrabold text-emerald-700 dark:text-emerald-300">
+            Join as a Freelancer
+          </h1>
+        </div>
         <Input name="name" label="Full Name" value={form.name} onChange={handleChange} required errors={errors} />
         <Input name="email" label="Email" type="email" value={form.email} onChange={handleChange} required errors={errors} />
         <Input name="password" label="Password" type="password" value={form.password} onChange={handleChange} required errors={errors} />
         <Input name="phone" label="Phone" value={form.phone} onChange={(e) => handlePhoneChange(e.target.value)} required errors={errors} />
-        <Input name="address" label="Address" value={form.address} onChange={handleChange} required errors={errors} />
+        {/*<Input name="address" label="Address" value={form.address} onChange={handleChange} required errors={errors} />*/}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+            Address <span className="text-white">*</span>
+          </label>
+          <AddressAutocomplete
+            value={form.address}
+            onChange={handleChange}
+            placeholder="Enter your address..."
+          />
+        </div>
         <Select
           name="gender"
           label="Gender"
@@ -189,31 +205,35 @@ export default function FreelancerRegister() {
 }
 
 
-function Input({ name, label, required, errors, type = "text", ...props }) {
+
+export function Input({ name, label, required, errors, type = "text", ...props }) {
   const hasError = errors?.[name];
   const iconMap = {
-    name: <User className="w-4 h-4 text-pink-400" />,
-    email: <Mail className="w-4 h-4 text-pink-400" />,
-    password: <Lock className="w-4 h-4 text-pink-400" />,
-    phone: <Phone className="w-4 h-4 text-pink-400" />,
-    birthday: <CalendarDays className="w-4 h-4 text-pink-400" />,
-    address: <MapPin className="w-4 h-4 text-pink-400" />,
-    experience: <Briefcase className="w-4 h-4 text-pink-400" />,
+    name: <User className="w-4 h-4 text-pink-300" />,
+    email: <Mail className="w-4 h-4 text-pink-300" />,
+    password: <Lock className="w-4 h-4 text-pink-300" />,
+    phone: <Phone className="w-4 h-4 text-pink-300" />,
+    birthday: <CalendarDays className="w-4 h-4 text-pink-300" />,
+    address: <MapPin className="w-4 h-4 text-pink-300" />,
+    experience: <Briefcase className="w-4 h-4 text-pink-300" />,
   };
+
+  const value = props.value ?? "";
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
       <div className="relative">
         <div className="absolute left-3 top-2.5">{iconMap[name]}</div>
         <input
           name={name}
           type={type}
+          placeholder={type === "date" ? "" : label}
           {...props}
-          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
-            } text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 border 
+    ${hasError ? "border-red-500" : "border-white/20"} 
+    ${value === "" ? "text-pink-300" : "text-pink-300"} 
+
+    focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-300" : "focus:ring-pink-300"
             }`}
         />
       </div>
@@ -222,24 +242,24 @@ function Input({ name, label, required, errors, type = "text", ...props }) {
 }
 
 
-function Select({ name, label, value, onChange, options, required, errors }) {
+export function Select({ name, label, value, onChange, options, required, errors }) {
   const hasError = errors?.[name];
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
       <div className="relative">
         <select
           name={name}
           value={value}
           onChange={onChange}
-          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
-            } text-gray-800 dark:text-white focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+          required={required}
+          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/40 dark:bg-white/10 border 
+    ${hasError ? "border-red-500" : "border-white/20"} 
+    ${value === "" ? "text-pink-300" : "text-pink-300"} 
+    focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-300" : "focus:ring-pink-300"
             } appearance-none`}
         >
-          <option value="">Select</option>
+          <option value="" disabled hidden className="text-gray-400">-- {label} --</option>
           {options.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -255,32 +275,31 @@ function Select({ name, label, value, onChange, options, required, errors }) {
 }
 
 
-
-
-function Textarea({ name, label, value, onChange, required, errors }) {
+export function Textarea({ name, label, value, onChange, required, errors }) {
   const hasError = errors?.[name];
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
       <div className="relative">
         <div className="absolute left-3 top-2.5">
-          <MessageCircle className="w-4 h-4 text-pink-400" />
+          <MessageCircle className="w-4 h-4 text-pink-300" />
         </div>
         <textarea
           name={name}
           value={value}
           onChange={onChange}
           rows={3}
-          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 backdrop-blur-md border ${hasError ? "border-red-500" : "border-white/20"
-            } text-gray-800 dark:text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-400" : "focus:ring-emerald-400"
+          placeholder={label}
+          className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 border 
+    ${hasError ? "border-red-500" : "border-white/20"} 
+    ${value === "" ? "text-pink-300" : "text-pink-300"} 
+    focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-300" : "focus:ring-pink-300"
             }`}
         />
       </div>
     </div>
   );
 }
+
 
 
