@@ -148,7 +148,7 @@ export default function FreelancerRegister() {
             { label: "Other", value: "Other" },
           ]} required errors={errors} />
         <Input name="birthday" label="Birthday" type="date" value={form.birthday} onChange={handleChange} required errors={errors} />
-        <Textarea name="about" label="About Me" value={form.about} onChange={handleChange} required errors={errors} />
+        <Textarea name="about" label="Briefly introduce yourself to clients. . ." value={form.about} onChange={handleChange} required errors={errors} />
         <Input name="experience" label="Years of Experience" type="number" value={form.experience} onChange={handleChange} required errors={errors} />
         <Select
           name="specialization"
