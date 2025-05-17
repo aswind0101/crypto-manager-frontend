@@ -1,6 +1,6 @@
-import usePlacesAutocomplete from "use-places-autocomplete";
+import { MapPin } from "lucide-react"; // icon gợi ý
+import usePlacesAutocomplete, { getGeocode } from "use-places-autocomplete";
 import { useEffect } from "react";
-import {MapPin } from "lucide-react"; // icon gợi ý
 
 export default function AddressAutocomplete({ value, onChange, placeholder = "Enter address..." }) {
     const {
@@ -18,10 +18,30 @@ export default function AddressAutocomplete({ value, onChange, placeholder = "En
         setValue(value || "");
     }, [value]);
 
-    const handleSelect = (val) => {
-        setValue(val, false);
+    const extractFullAddressWithZip = async (address) => {
+        const results = await getGeocode({ address });
+        const first = results[0];
+
+        if (!first) return address;
+
+        const components = first.address_components;
+        const zipcodeObj = components.find((c) => c.types.includes("postal_code"));
+        const zipcode = zipcodeObj?.long_name;
+
+        // If ZIP found and not already included
+        if (zipcode && !address.includes(zipcode)) {
+            return `${address}, ${zipcode}`;
+        }
+
+        return address;
+    };
+
+    const handleSelect = async (selectedAddress) => {
         clearSuggestions();
-        onChange({ target: { name: "address", value: val } });
+        const fullAddress = await extractFullAddressWithZip(selectedAddress);
+
+        setValue(fullAddress, false);
+        onChange({ target: { name: "address", value: fullAddress } });
     };
 
     return (

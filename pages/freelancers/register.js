@@ -131,9 +131,6 @@ export default function FreelancerRegister() {
         <Input name="phone" label="Phone" value={form.phone} onChange={(e) => handlePhoneChange(e.target.value)} required errors={errors} />
         {/*<Input name="address" label="Address" value={form.address} onChange={handleChange} required errors={errors} />*/}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-            Address <span className="text-white">*</span>
-          </label>
           <AddressAutocomplete
             value={form.address}
             onChange={handleChange}
