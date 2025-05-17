@@ -10,7 +10,6 @@ export default function VerifyPage() {
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
 
-
   useEffect(() => {
   if (!token) return;
 
