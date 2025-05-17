@@ -184,50 +184,28 @@ export default function FreelancerDashboard() {
     };
 
     const loadSalonList = async () => {
-    try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) return;
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
 
-        const token = await currentUser.getIdToken();
+            const token = await currentUser.getIdToken();
 
-        // ⚠️ Gọi API check xem nhân viên đang thuộc salon nào chưa
-        const empRes = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        const empData = await empRes.json();
-
-        if (empRes.ok && empData?.salon_id) {
-            // ✅ Nếu đã là nhân viên salon nào đó ➜ chỉ load đúng salon đó
-            const salonRes = await fetch(`https://crypto-manager-backend.onrender.com/api/salons/${empData.salon_id}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const salonInfo = await salonRes.json();
-
-            if (salonRes.ok) {
-                setSalonList([salonInfo]);
-                setSelectedSalonId(salonInfo.id); // auto-select luôn nếu bạn muốn
-            } else {
-                console.warn("⚠️ Failed to load specific salon info");
-                setSalonList([]);
-            }
-        } else {
-            // ✅ Nếu không phải nhân viên salon nào ➜ load toàn bộ salon active
             const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/active", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
             });
+
             const data = await res.json();
             if (res.ok) {
                 setSalonList(data);
             } else {
                 console.warn("⚠️ Failed to load salons:", data.error);
-                setSalonList([]);
             }
+        } catch (err) {
+            console.error("❌ Error loading salons:", err.message);
         }
-    } catch (err) {
-        console.error("❌ Error loading salons:", err.message);
-    }
-};
-
+    };
 
     const uploadAvatar = async (e) => {
         const file = e.target.files[0];
