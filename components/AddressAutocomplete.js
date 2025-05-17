@@ -37,12 +37,15 @@ export default function AddressAutocomplete({ value, onChange, placeholder = "En
     };
 
     const handleSelect = async (selectedAddress) => {
-        clearSuggestions();
         const fullAddress = await extractFullAddressWithZip(selectedAddress);
 
         setValue(fullAddress, false);
+        clearSuggestions(); // ✅ đặt sau setValue để đảm bảo đóng hoàn toàn dropdown
+
         onChange({ target: { name: "address", value: fullAddress } });
+
     };
+
 
     return (
         <div className="relative">
@@ -52,6 +55,11 @@ export default function AddressAutocomplete({ value, onChange, placeholder = "En
                 onChange={(e) => {
                     setValue(e.target.value);
                     onChange(e);
+                }}
+                onBlur={() => {
+                    setTimeout(() => {
+                        clearSuggestions(); // ẩn dropdown sau khi focus ra ngoài
+                    }, 100);
                 }}
                 placeholder={placeholder}
                 className="pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 border border-white/20 text-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-300"
