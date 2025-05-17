@@ -229,9 +229,8 @@ export function Input({ name, label, required, errors, type = "text", ...props }
           className={`pl-10 pr-4 py-2 w-full rounded-xl bg-white/30 dark:bg-white/10 border 
     ${hasError ? "border-red-500" : "border-white/20"} 
     ${value === "" ? "text-pink-300" : "text-pink-300"} 
-
-    focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-300" : "focus:ring-pink-300"
-            }`}
+    focus:outline-none focus:ring-2 ${hasError ? "focus:ring-red-300" : "focus:ring-pink-300"} 
+    appearance-none`}
         />
       </div>
     </div>
