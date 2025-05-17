@@ -21,23 +21,26 @@ export default function AddressAutocomplete({ value, onChange, placeholder = "En
 
     const extractFullAddressWithZip = async (address) => {
         try {
-            const results = await getGeocode({ address });
+            const cleanedAddress = address.replace(/,\s*USA$/, ""); // ✅ Xoá ", USA" cuối dòng
+
+            const results = await getGeocode({ address: cleanedAddress });
             const first = results[0];
-            if (!first) return address;
+            if (!first) return cleanedAddress;
 
             const components = first.address_components;
             const zipcodeObj = components.find((c) => c.types.includes("postal_code"));
             const zipcode = zipcodeObj?.long_name;
 
-            if (zipcode && !address.includes(zipcode)) {
-                return `${address}, ${zipcode}`;
+            if (zipcode && !cleanedAddress.includes(zipcode)) {
+                return `${cleanedAddress} ${zipcode}`;
             }
 
-            return address;
+            return cleanedAddress;
         } catch (err) {
             return address;
         }
     };
+
 
     const handleSelect = async (selectedAddress) => {
         const fullAddress = await extractFullAddressWithZip(selectedAddress);
