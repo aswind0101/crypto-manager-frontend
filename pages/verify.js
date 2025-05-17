@@ -11,44 +11,30 @@ export default function VerifyPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-  if (!token) return;
+    if (!token) return;
 
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      setStatus("error");
-      setMessage("You must be logged in to verify.");
-      return;
-    }
+    const verify = async () => {
+      try {
+        const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`);
+        const data = await res.json();
 
-    try {
-      const idToken = await user.getIdToken();
-
-      const res = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/verify?token=${token}`, {
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setStatus("success");
-        setMessage(data.message);
-        setTimeout(() => router.push("/login"), 4000);
-      } else {
+        if (res.ok) {
+          setStatus("success");
+          setMessage(data.message);
+          setTimeout(() => router.push("/login"), 4000);
+        } else {
+          setStatus("error");
+          setMessage(data.error || "Verification failed.");
+        }
+      } catch (err) {
+        console.error("❌ Verification error:", err.message);
         setStatus("error");
-        setMessage(data.error || "Verification failed.");
+        setMessage("Network or token error.");
       }
-    } catch (err) {
-      console.error("❌ Verification error:", err.message);
-      setStatus("error");
-      setMessage("Network or token error.");
-    }
-  });
+    };
 
-  return () => unsubscribe();
-}, [token]);
-
+    verify();
+  }, [token]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-800 dark:via-sky-700 dark:to-pink-700 px-4">
