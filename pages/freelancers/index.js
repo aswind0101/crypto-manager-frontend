@@ -157,7 +157,36 @@ export default function FreelancerDashboard() {
             if (intervalId) clearInterval(intervalId);
         };
     }, []);
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const success = urlParams.get("paypal");
+        const subscriptionId = urlParams.get("subscription_id");
 
+        if (success === "success" && subscriptionId) {
+            const saveSubscription = async () => {
+                const idToken = await auth.currentUser.getIdToken();
+                const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/save-subscription", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${idToken}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ subscription_id: subscriptionId }),
+                });
+
+                if (res.ok) {
+                    alert("✅ PayPal subscription saved successfully!");
+                    setSteps((prev) => ({ ...prev, has_payment: true }));
+                    // Clean URL
+                    window.history.replaceState({}, document.title, "/freelancers");
+                } else {
+                    alert("❌ Failed to save subscription");
+                }
+            };
+
+            saveSubscription();
+        }
+    }, []);
     const refreshOnboardingStatus = async () => {
         try {
             const token = await auth.currentUser.getIdToken();
