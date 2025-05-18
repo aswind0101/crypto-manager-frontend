@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 export default function FreelancerDashboard() {
     const [user, setUser] = useState(null);
@@ -65,6 +66,14 @@ export default function FreelancerDashboard() {
 
     const router = useRouter();
     const auth = getAuth();
+
+    const [paypalClientId, setPaypalClientId] = useState("");
+    useEffect(() => {
+        fetch("https://crypto-manager-backend.onrender.com/api/paypal/client-id")
+            .then((res) => res.json())
+            .then((data) => setPaypalClientId(data.clientId))
+            .catch((err) => console.error("❌ Failed to fetch PayPal clientId:", err));
+    }, []);
 
     useEffect(() => {
         let intervalId;
@@ -664,19 +673,46 @@ export default function FreelancerDashboard() {
         {
             key: "has_payment",
             title: "Add Payment Method (PayPal)",
-            description: "Connect your PayPal account to pay service fees.",
+            description: "Connect your PayPal account to allow service fee collection.",
             badge: steps.has_payment ? "Completed" : "Pending",
             badgeColor: steps.has_payment ? "bg-green-500 text-white" : "bg-gray-400 text-white",
             button: steps.has_payment ? "Connected ✅" : "Connect with PayPal",
             renderAction: () => (
-                <button
-                    onClick={connectWithPayPal}
-                    className="bg-blue-600 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition w-full"
-                    disabled={steps.has_payment}
-                >
-                    {steps.has_payment ? "✅ Connected" : "🔐 Connect with PayPal"}
-                </button>
-            ),
+                !steps.has_payment && paypalClientId && (
+                    <PayPalScriptProvider options={{
+                        "client-id": paypalClientId,
+                        intent: "tokenize",
+                        vault: true
+                    }}>
+                        <PayPalButtons
+                            style={{ layout: "vertical" }}
+                            fundingSource="paypal"
+                            createBillingAgreement={(_, actions) => {
+                                return actions.billingAgreement.create({ flow: "vault" });
+                            }}
+                            onApprove={async (data) => {
+                                const token = data.billingToken;
+                                const idToken = await auth.currentUser.getIdToken();
+                                const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/save-token", {
+                                    method: "POST",
+                                    headers: {
+                                        Authorization: `Bearer ${idToken}`,
+                                        "Content-Type": "application/json"
+                                    },
+                                    body: JSON.stringify({ paypal_token: token })
+                                });
+
+                                if (res.ok) {
+                                    alert("✅ PayPal connected successfully!");
+                                    setSteps((prev) => ({ ...prev, has_payment: true }));
+                                } else {
+                                    alert("❌ Failed to save PayPal token.");
+                                }
+                            }}
+                        />
+                    </PayPalScriptProvider>
+                )
+            )
         }
         ,
     ];
