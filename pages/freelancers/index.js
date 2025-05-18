@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 export default function FreelancerDashboard() {
     const [user, setUser] = useState(null);
@@ -67,14 +66,6 @@ export default function FreelancerDashboard() {
     const router = useRouter();
     const auth = getAuth();
 
-    const [paypalClientId, setPaypalClientId] = useState("");
-    useEffect(() => {
-        fetch("https://crypto-manager-backend.onrender.com/api/paypal/client-id")
-            .then((res) => res.json())
-            .then((data) => setPaypalClientId(data.clientId))
-            .catch((err) => console.error("❌ Failed to fetch PayPal clientId:", err));
-    }, []);
-
     useEffect(() => {
         let intervalId;
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -92,12 +83,6 @@ export default function FreelancerDashboard() {
 
                         const data = await res.json();
                         if (res.ok) {
-                            // 👇 Gọi thêm Stripe để kiểm tra has_payment
-                            const resStatus = await fetch("https://crypto-manager-backend.onrender.com/api/payments/status", {
-                                headers: { Authorization: `Bearer ${token}` },
-                            });
-                            const statusData = await resStatus.json();
-                            const hasPayment = resStatus.ok && statusData.connected;
                             setSteps({
                                 has_avatar: data.has_avatar,
                                 has_license: data.has_license,
