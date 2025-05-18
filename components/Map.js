@@ -26,63 +26,33 @@ export default function Map({ stylists }) {
         url?.startsWith("http") ? url : `https://crypto-manager-backend.onrender.com${url}`;
 
     if (!isLoaded) return <p>Loading Google Map...</p>;
-    const getIconURL = (specialization) => {
-        switch (specialization) {
-            case "nail_tech":
-                return "https://cdn-icons-png.flaticon.com/512/1995/1995521.png";
-            case "hair_stylist":
-            case "barber":
-                return "https://cdn-icons-png.flaticon.com/512/2876/2876633.png";
-            case "esthetician":
-            case "massage_therapist":
-                return "https://cdn-icons-png.flaticon.com/512/2965/2965567.png";
-            case "makeup_artist":
-                return "https://cdn-icons-png.flaticon.com/512/3501/3501236.png";
-            default:
-                return "https://cdn-icons-png.flaticon.com/512/847/847969.png";
-        }
-    };
-    const getEmojiBySpecialization = (specialization) => {
-        switch (specialization) {
-            case "nail_tech":
-                return "💅";
-            case "hair_stylist":
-            case "barber":
-                return "💇‍♀️";
-            case "esthetician":
-            case "massage_therapist":
-                return "💆‍♀️";
-            case "makeup_artist":
-                return "💄";
-            default:
-                return "👩‍🎨";
-        }
-    };
-
+    
     return (
         <GoogleMap mapContainerStyle={containerStyle} center={centerDefault} zoom={11}>
             {stylists.map((s) => (
                 <OverlayView
                     key={s.id}
-                    position={{ lat: s.latitude, lng: s.longitude }}
+                    position={{
+                        lat: s.latitude + (Math.random() * 0.0002 - 0.0001),
+                        lng: s.longitude + (Math.random() * 0.0002 - 0.0001),
+                    }}
                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                 >
                     <div
                         onClick={() => setSelectedStylist(s)}
-                        className="cursor-pointer"
                         style={{
-                            transform: "translate(-50%, -50%)",
+                            transform: "translate(-50%, -100%)",
+                            cursor: "pointer",
                         }}
                     >
-                        <div
-                            className="w-10 h-10 rounded-full bg-white shadow-md border-2 border-pink-500 flex items-center justify-center text-xl"
-                            title={s.name}
-                        >
-                            {getEmojiBySpecialization(s.specialization)}
+                        <div className="relative flex flex-col items-center group">
+                            <div className="bg-white text-3xl shadow-lg px-4 py-2 rounded-xl border-2 border-pink-500">
+                                💇‍♀️
+                            </div>
+                            <div className="w-3 h-3 bg-pink-500 rotate-45 mt-[-6px]"></div>
                         </div>
                     </div>
                 </OverlayView>
-
 
             ))}
 
