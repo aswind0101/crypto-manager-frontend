@@ -4,6 +4,8 @@ import withAuthProtection from "../../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/router";
 import { parsePhoneNumberFromString, AsYouType } from "libphonenumber-js";
+import AddressAutocomplete from "../../components/AddressAutocomplete";
+
 
 
 function AddSalon() {
@@ -150,13 +152,10 @@ function AddSalon() {
                     className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
                     required
                 />
-                <input
-                    type="text"
-                    placeholder="Address *"
+                <AddressAutocomplete
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="border border-gray-800 text-white px-4 py-2 rounded-xl w-full outline-none"
-                    required
+                    placeholder="Enter address..."
                 />
                 <input
                     type="text"
