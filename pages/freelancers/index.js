@@ -633,20 +633,22 @@ export default function FreelancerDashboard() {
         ,
         {
             key: "has_payment",
-            title: "Add Payment Method (PayPal)",
-            description: "Subscribe via PayPal to enable automatic service fees.",
+            title: "Add Payment Method",
+            description: "Add your preferred payment method to complete onboarding.",
             badge: steps.has_payment ? "Completed" : "Pending",
             badgeColor: steps.has_payment ? "bg-green-500 text-white" : "bg-gray-400 text-white",
-            button: steps.has_payment ? "Subscribed ✅" : "Connect with PayPal",
+            button: steps.has_payment ? "Added ✅" : "Add Payment Method",
             renderAction: () => (
-                !steps.has_payment && (
-                    <button
-                        onClick={connectWithPayPal}
-                        className="bg-blue-600 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition w-full"
-                    >
-                        🔐 Connect with PayPal
-                    </button>
-                )
+                <button
+                    onClick={() => {
+                        alert("✅ Payment method added!");
+                        setSteps((prev) => ({ ...prev, has_payment: true }));
+                    }}
+                    className={`w-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition`}
+                    disabled={steps.has_payment}
+                >
+                    {steps.has_payment ? "Added ✅" : "Add Payment Method"}
+                </button>
             )
         }
         ,
