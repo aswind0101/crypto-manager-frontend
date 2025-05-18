@@ -681,46 +681,52 @@ export default function FreelancerDashboard() {
                 !steps.has_payment && paypalClientId && (
                     <PayPalScriptProvider options={{
                         "client-id": paypalClientId,
+                        vault: true,
                         intent: "tokenize",
-                        vault: true
                     }}>
                         <PayPalButtons
                             style={{ layout: "vertical" }}
+                            createBillingAgreement={undefined} // 🚫 không dùng nữa
                             createOrder={(data, actions) => {
                                 return actions.order.create({
                                     purchase_units: [{
-                                        amount: { value: "0.01", currency_code: "USD" },
-                                    }],
+                                        amount: {
+                                            value: "0.01", // giả lập đơn hàng nhỏ để khởi động Vault
+                                            currency_code: "USD"
+                                        }
+                                    }]
                                 });
                             }}
                             onApprove={async (data, actions) => {
-                                const tokenResult = await actions.payment.tokenize();
-                                const token = tokenResult?.payment_source?.paypal?.vault_id;
+                                try {
+                                    const result = await actions.payment.tokenize();
+                                    const token = result?.payment_source?.paypal?.vault_id;
 
-                                if (!token) {
-                                    alert("❌ Tokenization failed");
-                                    return;
-                                }
+                                    if (!token) return alert("❌ Tokenization failed");
 
-                                const idToken = await auth.currentUser.getIdToken();
-                                const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/save-token", {
-                                    method: "POST",
-                                    headers: {
-                                        Authorization: `Bearer ${idToken}`,
-                                        "Content-Type": "application/json"
-                                    },
-                                    body: JSON.stringify({ paypal_token: token })
-                                });
+                                    const idToken = await auth.currentUser.getIdToken();
+                                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/save-token", {
+                                        method: "POST",
+                                        headers: {
+                                            Authorization: `Bearer ${idToken}`,
+                                            "Content-Type": "application/json"
+                                        },
+                                        body: JSON.stringify({ paypal_token: token })
+                                    });
 
-                                if (res.ok) {
-                                    alert("✅ PayPal connected successfully!");
-                                    setSteps((prev) => ({ ...prev, has_payment: true }));
-                                } else {
-                                    alert("❌ Failed to save PayPal token.");
+                                    if (res.ok) {
+                                        alert("✅ PayPal connected successfully!");
+                                        setSteps((prev) => ({ ...prev, has_payment: true }));
+                                    } else {
+                                        alert("❌ Failed to save PayPal token.");
+                                    }
+                                } catch (err) {
+                                    console.error("❌ Tokenize error:", err.message);
                                 }
                             }}
                         />
                     </PayPalScriptProvider>
+
                 )
             )
         }
