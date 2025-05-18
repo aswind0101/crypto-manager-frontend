@@ -1,5 +1,7 @@
 import { GoogleMap, Marker, useJsApiLoader, InfoWindow } from "@react-google-maps/api";
 import { useState } from "react";
+import { OverlayView } from "@react-google-maps/api";
+
 
 const containerStyle = {
     width: "100%",
@@ -40,24 +42,47 @@ export default function Map({ stylists }) {
                 return "https://cdn-icons-png.flaticon.com/512/847/847969.png";
         }
     };
+    const getEmojiBySpecialization = (specialization) => {
+        switch (specialization) {
+            case "nail_tech":
+                return "💅";
+            case "hair_stylist":
+            case "barber":
+                return "💇‍♀️";
+            case "esthetician":
+            case "massage_therapist":
+                return "💆‍♀️";
+            case "makeup_artist":
+                return "💄";
+            default:
+                return "👩‍🎨";
+        }
+    };
 
     return (
         <GoogleMap mapContainerStyle={containerStyle} center={centerDefault} zoom={11}>
             {stylists.map((s) => (
-                <Marker
+                <OverlayView
                     key={s.id}
-                    position={{
-                        lat: s.latitude + (Math.random() * 0.0002 - 0.0001),
-                        lng: s.longitude + (Math.random() * 0.0002 - 0.0001),
-                    }}
-                    onClick={() => setSelectedStylist(s)}
-                    icon={{
-                        url: getIconURL(s.specialization),
-                        scaledSize: new window.google.maps.Size(42, 42),
-                        origin: new window.google.maps.Point(0, 0),
-                        anchor: new window.google.maps.Point(21, 21),
-                    }}
-                />
+                    position={{ lat: s.latitude, lng: s.longitude }}
+                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                >
+                    <div
+                        onClick={() => setSelectedStylist(s)}
+                        className="cursor-pointer"
+                        style={{
+                            transform: "translate(-50%, -50%)",
+                        }}
+                    >
+                        <div
+                            className="w-10 h-10 rounded-full bg-white shadow-md border-2 border-pink-500 flex items-center justify-center text-xl"
+                            title={s.name}
+                        >
+                            {getEmojiBySpecialization(s.specialization)}
+                        </div>
+                    </div>
+                </OverlayView>
+
 
             ))}
 
