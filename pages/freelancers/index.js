@@ -686,12 +686,22 @@ export default function FreelancerDashboard() {
                     }}>
                         <PayPalButtons
                             style={{ layout: "vertical" }}
-                            fundingSource="paypal"
-                            createBillingAgreement={(_, actions) => {
-                                return actions.billingAgreement.create({ flow: "vault" });
+                            createOrder={(data, actions) => {
+                                return actions.order.create({
+                                    purchase_units: [{
+                                        amount: { value: "0.01", currency_code: "USD" },
+                                    }],
+                                });
                             }}
-                            onApprove={async (data) => {
-                                const token = data.billingToken;
+                            onApprove={async (data, actions) => {
+                                const tokenResult = await actions.payment.tokenize();
+                                const token = tokenResult?.payment_source?.paypal?.vault_id;
+
+                                if (!token) {
+                                    alert("❌ Tokenization failed");
+                                    return;
+                                }
+
                                 const idToken = await auth.currentUser.getIdToken();
                                 const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/save-token", {
                                     method: "POST",
