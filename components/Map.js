@@ -24,21 +24,41 @@ export default function Map({ stylists }) {
         url?.startsWith("http") ? url : `https://crypto-manager-backend.onrender.com${url}`;
 
     if (!isLoaded) return <p>Loading Google Map...</p>;
+    const getIconURL = (specialization) => {
+        switch (specialization) {
+            case "nail_tech":
+                return "https://cdn-icons-png.flaticon.com/512/1995/1995521.png";
+            case "hair_stylist":
+            case "barber":
+                return "https://cdn-icons-png.flaticon.com/512/2876/2876633.png";
+            case "esthetician":
+            case "massage_therapist":
+                return "https://cdn-icons-png.flaticon.com/512/2965/2965567.png";
+            case "makeup_artist":
+                return "https://cdn-icons-png.flaticon.com/512/3501/3501236.png";
+            default:
+                return "https://cdn-icons-png.flaticon.com/512/847/847969.png";
+        }
+    };
 
     return (
         <GoogleMap mapContainerStyle={containerStyle} center={centerDefault} zoom={11}>
             {stylists.map((s) => (
                 <Marker
                     key={s.id}
-                    position={{ lat: s.latitude, lng: s.longitude }}
+                    position={{
+                        lat: s.latitude + (Math.random() * 0.0002 - 0.0001),
+                        lng: s.longitude + (Math.random() * 0.0002 - 0.0001),
+                    }}
                     onClick={() => setSelectedStylist(s)}
                     icon={{
-                        url: fullURL(s.avatar_url) || "/default-avatar.png",
-                        scaledSize: new window.google.maps.Size(48, 48),
+                        url: getIconURL(s.specialization),
+                        scaledSize: new window.google.maps.Size(42, 42),
                         origin: new window.google.maps.Point(0, 0),
-                        anchor: new window.google.maps.Point(24, 24),
+                        anchor: new window.google.maps.Point(21, 21),
                     }}
                 />
+
             ))}
 
             {selectedStylist && (
