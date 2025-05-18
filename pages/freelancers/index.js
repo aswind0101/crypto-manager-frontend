@@ -246,25 +246,18 @@ export default function FreelancerDashboard() {
     };
     const connectWithPayPal = async () => {
         const token = await auth.currentUser.getIdToken();
-
-        try {
-            const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/create-vault-session", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                }
-            });
-
-            const data = await res.json();
-            if (res.ok && data.url) {
-                window.location.href = data.url;
-            } else {
-                alert("❌ Failed to generate PayPal link");
+        const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/create-subscription", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
             }
-        } catch (err) {
-            console.error("❌ PayPal connect error:", err.message);
-            alert("❌ Failed to initiate PayPal connection");
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+            window.location.href = data.url;
+        } else {
+            alert("❌ PayPal connect failed");
         }
     };
 
@@ -657,15 +650,15 @@ export default function FreelancerDashboard() {
         {
             key: "has_payment",
             title: "Add Payment Method (PayPal)",
-            description: "Connect your PayPal account to allow service fee collection.",
+            description: "Subscribe via PayPal to enable automatic service fees.",
             badge: steps.has_payment ? "Completed" : "Pending",
             badgeColor: steps.has_payment ? "bg-green-500 text-white" : "bg-gray-400 text-white",
-            button: steps.has_payment ? "Connected ✅" : "Connect with PayPal",
+            button: steps.has_payment ? "Subscribed ✅" : "Connect with PayPal",
             renderAction: () => (
                 !steps.has_payment && (
                     <button
                         onClick={connectWithPayPal}
-                        className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition w-full"
+                        className="bg-blue-600 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition w-full"
                     >
                         🔐 Connect with PayPal
                     </button>
