@@ -244,27 +244,11 @@ export default function FreelancerDashboard() {
             console.error("❌ Error loading salons:", err.message);
         }
     };
-    const connectWithStripe = async () => {
-        const token = await auth.currentUser.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/payments/connect", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
-        });
-        const data = await res.json();
-        if (res.ok) {
-            window.location.href = data.url;
-        } else {
-            alert("❌ Stripe connect failed");
-        }
-    };
-
     const connectWithPayPal = async () => {
         const token = await auth.currentUser.getIdToken();
+
         try {
-            const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/create-subscription", {
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/create-vault-session", {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -276,7 +260,7 @@ export default function FreelancerDashboard() {
             if (res.ok && data.url) {
                 window.location.href = data.url;
             } else {
-                alert("❌ PayPal connection failed");
+                alert("❌ Failed to generate PayPal link");
             }
         } catch (err) {
             console.error("❌ PayPal connect error:", err.message);
@@ -678,55 +662,13 @@ export default function FreelancerDashboard() {
             badgeColor: steps.has_payment ? "bg-green-500 text-white" : "bg-gray-400 text-white",
             button: steps.has_payment ? "Connected ✅" : "Connect with PayPal",
             renderAction: () => (
-                !steps.has_payment && paypalClientId && (
-                    <PayPalScriptProvider options={{
-                        "client-id": paypalClientId,
-                        vault: true,
-                        intent: "tokenize",
-                    }}>
-                        <PayPalButtons
-                            style={{ layout: "vertical" }}
-                            createBillingAgreement={undefined} // 🚫 không dùng nữa
-                            createOrder={(data, actions) => {
-                                return actions.order.create({
-                                    purchase_units: [{
-                                        amount: {
-                                            value: "0.01", // giả lập đơn hàng nhỏ để khởi động Vault
-                                            currency_code: "USD"
-                                        }
-                                    }]
-                                });
-                            }}
-                            onApprove={async (data, actions) => {
-                                try {
-                                    const result = await actions.payment.tokenize();
-                                    const token = result?.payment_source?.paypal?.vault_id;
-
-                                    if (!token) return alert("❌ Tokenization failed");
-
-                                    const idToken = await auth.currentUser.getIdToken();
-                                    const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/save-token", {
-                                        method: "POST",
-                                        headers: {
-                                            Authorization: `Bearer ${idToken}`,
-                                            "Content-Type": "application/json"
-                                        },
-                                        body: JSON.stringify({ paypal_token: token })
-                                    });
-
-                                    if (res.ok) {
-                                        alert("✅ PayPal connected successfully!");
-                                        setSteps((prev) => ({ ...prev, has_payment: true }));
-                                    } else {
-                                        alert("❌ Failed to save PayPal token.");
-                                    }
-                                } catch (err) {
-                                    console.error("❌ Tokenize error:", err.message);
-                                }
-                            }}
-                        />
-                    </PayPalScriptProvider>
-
+                !steps.has_payment && (
+                    <button
+                        onClick={connectWithPayPal}
+                        className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition w-full"
+                    >
+                        🔐 Connect with PayPal
+                    </button>
                 )
             )
         }
