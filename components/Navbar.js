@@ -531,6 +531,13 @@ export default function Navbar() {
                                     🏠 Salons {isSalonsOpen ? "▴" : "▾"}
                                 </button>
                                 <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
+                                    <Link
+                                        href="/salon"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        📊 Dashboard
+                                    </Link>
                                     {isSuperAdmin && (
                                         <Link
                                             href="/salons"
