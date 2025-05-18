@@ -255,21 +255,23 @@ export default function FreelancerDashboard() {
     const connectWithPayPal = async () => {
         const token = await auth.currentUser.getIdToken();
         try {
-            const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/create-billing", {
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/paypal/create-subscription", {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json"
                 }
             });
+
             const data = await res.json();
-            if (res.ok) {
+            if (res.ok && data.url) {
                 window.location.href = data.url;
             } else {
-                alert("❌ PayPal connect failed");
+                alert("❌ PayPal connection failed");
             }
         } catch (err) {
             console.error("❌ PayPal connect error:", err.message);
+            alert("❌ Failed to initiate PayPal connection");
         }
     };
 
@@ -662,7 +664,7 @@ export default function FreelancerDashboard() {
         {
             key: "has_payment",
             title: "Add Payment Method (PayPal)",
-            description: "Connect your PayPal to allow fee deduction.",
+            description: "Connect your PayPal account to pay service fees.",
             badge: steps.has_payment ? "Completed" : "Pending",
             badgeColor: steps.has_payment ? "bg-green-500 text-white" : "bg-gray-400 text-white",
             button: steps.has_payment ? "Connected ✅" : "Connect with PayPal",
