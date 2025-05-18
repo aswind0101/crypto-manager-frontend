@@ -155,7 +155,7 @@ function AddSalon() {
                 <AddressAutocomplete
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Enter address..."
+                    placeholder="Enter salon address..."
                 />
                 <input
                     type="text"
