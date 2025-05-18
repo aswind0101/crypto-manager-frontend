@@ -26,7 +26,7 @@ export default function Map({ stylists }) {
         url?.startsWith("http") ? url : `https://crypto-manager-backend.onrender.com${url}`;
 
     if (!isLoaded) return <p>Loading Google Map...</p>;
-    
+
     return (
         <GoogleMap mapContainerStyle={containerStyle} center={centerDefault} zoom={11}>
             {stylists.map((s) => (
@@ -61,18 +61,18 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="text-sm text-gray-800">
-                        <img
-                            src={fullURL(selectedStylist.avatar_url)}
-                            alt={selectedStylist.name}
-                            className="w-16 h-16 rounded-full border mb-1"
-                        />
-                        <p className="font-bold">{selectedStylist.name}</p>
-                        <p>{selectedStylist.specialization}</p>
-                        <p>{selectedStylist.gender}</p>
-                        <p>⭐ {selectedStylist.rating || "N/A"}</p>
+                    <div className="text-sm text-gray-800 dark:text-white px-3 py-2 rounded-xl shadow-lg bg-white/90 dark:bg-white/10 border border-pink-300 min-w-[160px]">
+                        <p className="font-bold text-emerald-600 dark:text-emerald-300 truncate">
+                            {selectedStylist.name}
+                        </p>
+                        <p className="text-xs italic text-gray-500 dark:text-gray-300">
+                            {selectedStylist.specialization}
+                        </p>
+                        <p className="text-xs text-pink-500">{selectedStylist.gender}</p>
+                        <p className="text-xs mt-1">⭐ {selectedStylist.rating || "N/A"}</p>
                     </div>
                 </InfoWindow>
+
             )}
         </GoogleMap>
     );
