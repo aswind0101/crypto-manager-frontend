@@ -640,11 +640,25 @@ export default function FreelancerDashboard() {
             button: steps.has_payment ? "Added ✅" : "Add Payment Method",
             renderAction: () => (
                 <button
-                    onClick={() => {
-                        alert("✅ Payment method added!");
-                        setSteps((prev) => ({ ...prev, has_payment: true }));
+                    onClick={async () => {
+                        const token = await auth.currentUser.getIdToken();
+
+                        const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/mark-payment-added", {
+                            method: "PATCH",
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                "Content-Type": "application/json"
+                            }
+                        });
+
+                        if (res.ok) {
+                            alert("✅ Payment method saved!");
+                            setSteps((prev) => ({ ...prev, has_payment: true }));
+                        } else {
+                            alert("❌ Failed to save payment method");
+                        }
                     }}
-                    className={`w-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition`}
+                    className="w-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition"
                     disabled={steps.has_payment}
                 >
                     {steps.has_payment ? "Added ✅" : "Add Payment Method"}
