@@ -15,6 +15,8 @@ export default function FreelancerDashboard() {
     const [employeeStatus, setEmployeeStatus] = useState(null);
 
 
+
+
     const fullURL = (url) =>
         url?.startsWith("http") ? url : `https://crypto-manager-backend.onrender.com${url}`;
 
@@ -36,7 +38,7 @@ export default function FreelancerDashboard() {
         license: false,
         id: false,
     });
-
+    const isUploadingAny = uploading.avatar || uploading.license || uploading.id;
     const StatusBadge = ({ value }) => {
         const map = {
             Approved: "bg-green-500",
@@ -81,6 +83,12 @@ export default function FreelancerDashboard() {
 
                         const data = await res.json();
                         if (res.ok) {
+                            // 👇 Gọi thêm Stripe để kiểm tra has_payment
+                            const resStatus = await fetch("https://crypto-manager-backend.onrender.com/api/payments/status", {
+                                headers: { Authorization: `Bearer ${token}` },
+                            });
+                            const statusData = await resStatus.json();
+                            const hasPayment = resStatus.ok && statusData.connected;
                             setSteps({
                                 has_avatar: data.has_avatar,
                                 has_license: data.has_license,
@@ -184,49 +192,65 @@ export default function FreelancerDashboard() {
     };
 
     const loadSalonList = async () => {
-    try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) return;
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
 
-        const token = await currentUser.getIdToken();
+            const token = await currentUser.getIdToken();
 
-        // ⚠️ Gọi API check xem nhân viên đang thuộc salon nào chưa
-        const empRes = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        const empData = await empRes.json();
-
-        if (empRes.ok && empData?.salon_id) {
-            // ✅ Nếu đã là nhân viên salon nào đó ➜ chỉ load đúng salon đó
-            const salonRes = await fetch(`https://crypto-manager-backend.onrender.com/api/salons/${empData.salon_id}`, {
+            // ⚠️ Gọi API check xem nhân viên đang thuộc salon nào chưa
+            const empRes = await fetch("https://crypto-manager-backend.onrender.com/api/employees/me", {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            const salonInfo = await salonRes.json();
+            const empData = await empRes.json();
 
-            if (salonRes.ok) {
-                setSalonList([salonInfo]);
-                setSelectedSalonId(salonInfo.id); // auto-select luôn nếu bạn muốn
+            if (empRes.ok && empData?.salon_id) {
+                // ✅ Nếu đã là nhân viên salon nào đó ➜ chỉ load đúng salon đó
+                const salonRes = await fetch(`https://crypto-manager-backend.onrender.com/api/salons/${empData.salon_id}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const salonInfo = await salonRes.json();
+
+                if (salonRes.ok) {
+                    setSalonList([salonInfo]);
+                    setSelectedSalonId(salonInfo.id); // auto-select luôn nếu bạn muốn
+                } else {
+                    console.warn("⚠️ Failed to load specific salon info");
+                    setSalonList([]);
+                }
             } else {
-                console.warn("⚠️ Failed to load specific salon info");
-                setSalonList([]);
+                // ✅ Nếu không phải nhân viên salon nào ➜ load toàn bộ salon active
+                const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/active", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    setSalonList(data);
+                } else {
+                    console.warn("⚠️ Failed to load salons:", data.error);
+                    setSalonList([]);
+                }
             }
-        } else {
-            // ✅ Nếu không phải nhân viên salon nào ➜ load toàn bộ salon active
-            const res = await fetch("https://crypto-manager-backend.onrender.com/api/salons/active", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setSalonList(data);
-            } else {
-                console.warn("⚠️ Failed to load salons:", data.error);
-                setSalonList([]);
-            }
+        } catch (err) {
+            console.error("❌ Error loading salons:", err.message);
         }
-    } catch (err) {
-        console.error("❌ Error loading salons:", err.message);
-    }
-};
+    };
+    const connectWithStripe = async () => {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch("https://crypto-manager-backend.onrender.com/api/payments/connect", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+        const data = await res.json();
+        if (res.ok) {
+            window.location.href = data.url;
+        } else {
+            alert("❌ Stripe connect failed");
+        }
+    };
 
 
     const uploadAvatar = async (e) => {
@@ -618,58 +642,123 @@ export default function FreelancerDashboard() {
         {
             key: "has_payment",
             title: "Add Payment Method",
-            description: "Connect Stripe, PayPal or enter bank info.",
-            button: "Add Payment",
-        },
+            description: "Securely connect your card or bank via Stripe.",
+            badge: steps.has_payment ? "Completed" : "Pending",
+            badgeColor: steps.has_payment ? "bg-green-500 text-white" : "bg-gray-400 text-white",
+            button: steps.has_payment ? "Connected ✅" : "Connect with Stripe",
+            renderAction: () => (
+                <button
+                    onClick={connectWithStripe}
+                    className="bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition w-full"
+                    disabled={steps.has_payment}
+                >
+                    {steps.has_payment ? "✅ Connected" : "🔐 Connect with Stripe"}
+                </button>
+            ),
+        }
+        ,
     ];
+    {
+        isUploadingAny && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white/20 backdrop-blur-xl p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center">
+                    <svg className="animate-spin h-8 w-8 text-white mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <p className="text-white text-sm">Uploading... Please wait</p>
+                </div>
+            </div>
+        )
+    }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-800 dark:via-sky-700 dark:to-pink-700 px-4 py-8 text-gray-800 dark:text-gray-100">
-            <Navbar />
+        <>
+            {/* ✅ Overlay loading trung tâm khi đang upload */}
+            {isUploadingAny && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white/20 backdrop-blur-xl p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center">
+                        <svg
+                            className="animate-spin h-8 w-8 text-white mb-2"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                        >
+                            <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                            ></circle>
+                            <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            ></path>
+                        </svg>
+                        <p className="text-white text-sm">Uploading... Please wait</p>
+                    </div>
+                </div>
+            )}
 
-            <div className="max-w-3xl mx-auto bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8">
-                <h1 className="text-3xl font-extrabold text-center text-emerald-700 dark:text-emerald-300 mb-6">
-                    🌟 Welcome, Freelancer!
-                </h1>
+            {/* ✅ Giao diện chính, bị khóa nếu đang upload */}
+            <div
+                className={`min-h-screen bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-800 dark:via-sky-700 dark:to-pink-700 px-4 py-8 text-gray-800 dark:text-gray-100 ${isUploadingAny ? "pointer-events-none opacity-50" : ""
+                    }`}
+            >
+                <Navbar />
 
-                {user ? (
-                    <>
-                        <div className="text-center space-y-4 text-sm mb-6">
-                            <p>Hello <span className="font-bold">{user.name}</span>!</p>
-                            <p>Email: <span className="font-mono">{user.email}</span></p>
-                            <p className="text-yellow-400">Role: {user.role}</p>
-                            <p className="italic text-gray-600 dark:text-gray-400">
-                                Let’s complete your onboarding below to go online.
-                            </p>
-                        </div>
+                <div className="max-w-3xl mx-auto bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8">
+                    <h1 className="text-3xl font-extrabold text-center text-emerald-700 dark:text-emerald-300 mb-6">
+                        🌟 Welcome, Freelancer!
+                    </h1>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            {onboardingSteps.map((step) => (
-                                <StepCard
-                                    key={step.key}
-                                    title={step.title}
-                                    description={step.description}
-                                    completed={steps[step.key]}
-                                    buttonLabel={step.button}
-                                    renderAction={step.renderAction ? step.renderAction() : null}
-                                    onClick={() => console.log(`Handle: ${step.key}`)}
-                                    badge={step.badge}
-                                    badgeColor={step.badgeColor}
-                                    disabled={
-                                        (step.key === "has_avatar" && uploading.avatar) ||
-                                        (step.key === "has_license" && uploading.license) ||
-                                        (step.key === "has_id" && uploading.id)
-                                    }
-                                />
-                            ))}
-                        </div>
-                    </>
-                ) : (
-                    <p className="text-center text-yellow-500">⏳ Loading user...</p>
-                )}
+                    {user ? (
+                        <>
+                            <div className="text-center space-y-4 text-sm mb-6">
+                                <p>
+                                    Hello <span className="font-bold">{user.name}</span>!
+                                </p>
+                                <p>
+                                    Email: <span className="font-mono">{user.email}</span>
+                                </p>
+                                <p className="text-yellow-400">Role: {user.role}</p>
+                                <p className="italic text-gray-600 dark:text-gray-400">
+                                    Let’s complete your onboarding below to go online.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                {onboardingSteps.map((step) => (
+                                    <StepCard
+                                        key={step.key}
+                                        title={step.title}
+                                        description={step.description}
+                                        completed={steps[step.key]}
+                                        buttonLabel={step.button}
+                                        renderAction={step.renderAction ? step.renderAction() : null}
+                                        onClick={() => console.log(`Handle: ${step.key}`)}
+                                        badge={step.badge}
+                                        badgeColor={step.badgeColor}
+                                        disabled={
+                                            (step.key === "has_avatar" && uploading.avatar) ||
+                                            (step.key === "has_license" && uploading.license) ||
+                                            (step.key === "has_id" && uploading.id)
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        </>
+                    ) : (
+                        <p className="text-center text-yellow-500">⏳ Loading user...</p>
+                    )}
+                </div>
             </div>
-        </div>
+        </>
     );
+
 }
 
 function StepCard({ title, description, completed, buttonLabel, onClick, renderAction, badge, badgeColor, disabled }) {
