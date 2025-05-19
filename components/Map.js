@@ -135,7 +135,7 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl transition-all duration-300 ease-in-out animate-fade-in">
+                    <div className="animate-fade-in min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl transition-all duration-300 ease-in-out animate-fade-in">
                         {/* Avatar */}
                         <div className="flex items-center gap-3 mb-3">
                             <img

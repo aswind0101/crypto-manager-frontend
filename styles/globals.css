@@ -24,9 +24,14 @@
   }
   to {
     opacity: 1;
-    transform: translateY(0px) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-in-out forwards;
+}
+
 
 /* Ẩn scrollbar cho mọi trình duyệt */
 .scrollbar-hide::-webkit-scrollbar {
