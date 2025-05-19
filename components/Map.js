@@ -46,19 +46,22 @@ export default function Map({ stylists }) {
     const mapOptions = {
         styles: [
             {
-                featureType: "all",
-                elementType: "all",
-                stylers: [{ visibility: "off" }],
+                elementType: "geometry",
+                stylers: [{ color: "#1c1c1c" }]
             },
             {
-                elementType: "geometry",
-                stylers: [{ color: "#111111" }], // nền đen đậm
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
             },
+            {
+                featureType: "all",
+                elementType: "all",
+                stylers: [{ saturation: -100 }, { lightness: -20 }]
+            }
         ],
         disableDefaultUI: true,
         zoomControl: true,
     };
-
 
     const mapCenter = userLocation || centerDefault;
 
