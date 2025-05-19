@@ -90,7 +90,6 @@ export default function Map({ stylists }) {
             center={mapCenter}
             zoom={13}
             options={mapOptions}
-            onClick={() => setSelectedStylist(null)}
         >
             {/* 📍 Vị trí người dùng */}
             {userLocation && (
