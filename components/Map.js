@@ -135,19 +135,36 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="backdrop-blur-md rounded-xl p-4 border border-pink-400 shadow-xl min-w-[180px] text-sm">
-                        <p className="text-emerald-600 dark:text-emerald-300 font-semibold mb-1">
-                            {selectedStylist.name}
-                        </p>
-                        <p className="text-xs italic text-gray-500 dark:text-gray-300 mb-1">
-                            {selectedStylist.specialization}
-                        </p>
+                    <div className="min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl transition-all duration-300 ease-in-out animate-fade-in">
+                        {/* Avatar */}
+                        <div className="flex items-center gap-3 mb-3">
+                            <img
+                                src={
+                                    selectedStylist.avatar_url?.startsWith("http")
+                                        ? selectedStylist.avatar_url
+                                        : `https://crypto-manager-backend.onrender.com${selectedStylist.avatar_url}`
+                                }
+                                alt="avatar"
+                                className="w-12 h-12 rounded-full border-2 border-white shadow-md"
+                            />
+                            <div>
+                                <p className="text-emerald-700 dark:text-emerald-300 font-bold text-base leading-tight">
+                                    {selectedStylist.name}
+                                </p>
+                                <p className="text-xs italic text-gray-500 dark:text-gray-300">
+                                    {selectedStylist.specialization}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Info */}
                         <p className="text-xs text-pink-600 mb-1">{selectedStylist.gender}</p>
                         <p className="text-xs text-yellow-500 flex items-center gap-1">
                             ⭐ {selectedStylist.rating || "N/A"}
                         </p>
                     </div>
                 </InfoWindow>
+
             )}
         </GoogleMap>
     );
