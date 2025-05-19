@@ -90,6 +90,7 @@ export default function Map({ stylists }) {
             center={mapCenter}
             zoom={13}
             options={mapOptions}
+            onClick={() => setSelectedStylist(null)}
         >
             {/* 📍 Vị trí người dùng */}
             {userLocation && (
@@ -133,21 +134,30 @@ export default function Map({ stylists }) {
             {selectedStylist && (
                 <InfoWindow
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
-                    onCloseClick={() => setSelectedStylist(null)}
+                    options={{ disableAutoPan: true }}
                 >
-                    <div className="relative animate-fade-in min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl transition-all duration-300 ease-in-out animate-fade-in"
+                    <div className="relative animate-fade-in min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl text-sm"
                         style={{
                             boxSizing: "border-box",         // 👈 THÊM DÒNG NÀY
                             maxWidth: "90vw",                 // 👈 Để ngăn tràn trên mobile
                         }}
                     >
-                        {/* Avatar */}
+
+                        {/* Nút đóng tùy chỉnh */}
+                        <button
+                            onClick={() => setSelectedStylist(null)}
+                            className="absolute top-2 right-2 text-gray-400 hover:text-pink-500 text-lg"
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
+
+                        {/* Avatar & info */}
                         <div className="flex items-center gap-3 mb-3">
                             <img
-                                src={
-                                    selectedStylist.avatar_url?.startsWith("http")
-                                        ? selectedStylist.avatar_url
-                                        : `https://crypto-manager-backend.onrender.com${selectedStylist.avatar_url}`
+                                src={selectedStylist.avatar_url?.startsWith("http")
+                                    ? selectedStylist.avatar_url
+                                    : `https://crypto-manager-backend.onrender.com${selectedStylist.avatar_url}`
                                 }
                                 alt="avatar"
                                 className="w-12 h-12 rounded-full border-2 border-white shadow-md"
@@ -162,7 +172,6 @@ export default function Map({ stylists }) {
                             </div>
                         </div>
 
-                        {/* Info */}
                         <p className="text-xs text-pink-600 mb-1">{selectedStylist.gender}</p>
                         <p className="text-xs text-yellow-500 flex items-center gap-1">
                             ⭐ {selectedStylist.rating || "N/A"}
