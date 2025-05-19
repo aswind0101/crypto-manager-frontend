@@ -41,42 +41,11 @@ export default function Map({ stylists }) {
     const mapOptions = {
         styles: [
             {
-                elementType: "geometry",
-                stylers: [{ color: "#f9f6f2" }],
-            },
-            {
-                elementType: "labels.text.fill",
-                stylers: [{ color: "#8a8a8a" }],
-            },
-            {
-                elementType: "labels.text.stroke",
-                stylers: [{ color: "#ffffff" }],
-            },
-            {
-                featureType: "road",
-                elementType: "geometry",
-                stylers: [{ color: "#ffffff" }],
-            },
-            {
-                featureType: "road.highway",
-                elementType: "geometry",
-                stylers: [{ color: "#ffd1dc" }],
-            },
-            {
-                featureType: "water",
-                elementType: "geometry",
-                stylers: [{ color: "#c0f0f8" }],
-            },
-            {
-                featureType: "poi",
+                featureType: "all",
+                elementType: "all",
                 stylers: [{ visibility: "off" }],
-            },
-            {
-                featureType: "transit",
-                stylers: [{ visibility: "off" }],
-            },
+            }
         ],
-
         disableDefaultUI: true,
         zoomControl: true,
     };
@@ -136,17 +105,18 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="text-sm px-3 py-2 rounded-xl shadow-xl bg-white/90 dark:bg-white/10 border border-pink-300 min-w-[160px] backdrop-blur-md">
-                        <p className="font-semibold text-emerald-700 dark:text-emerald-300 truncate">
+                    <div className="bg-white/80 dark:bg-zinc-800 backdrop-blur-md rounded-xl p-3 shadow-xl border border-pink-300 w-48">
+                        <div className="text-base font-semibold text-emerald-700 dark:text-emerald-300">
                             {selectedStylist.name}
-                        </p>
-                        <p className="text-xs italic text-gray-500 dark:text-gray-300">
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-300 italic">
                             {selectedStylist.specialization}
-                        </p>
-                        <p className="text-xs text-pink-500">{selectedStylist.gender}</p>
-                        <p className="text-xs mt-1">⭐ {selectedStylist.rating || "N/A"}</p>
+                        </div>
+                        <div className="text-xs text-pink-500 mt-1">{selectedStylist.gender}</div>
+                        <div className="text-xs mt-1">⭐ {selectedStylist.rating || "N/A"}</div>
                     </div>
                 </InfoWindow>
+
             )}
         </GoogleMap>
     );
