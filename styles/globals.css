@@ -4,24 +4,29 @@
   --background: #ffffff;
   --foreground: #171717;
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
 }
+
 /* 📅 Đổi màu icon date picker */
 @layer utilities {
   .custom-date::-webkit-calendar-picker-indicator {
-    filter: invert(1); /* biến icon thành màu trắng */
+    filter: invert(1);
+    /* biến icon thành màu trắng */
     cursor: pointer;
   }
 }
+
 @keyframes fade-in {
   from {
     opacity: 0;
     transform: translateY(5px) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -32,24 +37,48 @@
   animation: fade-in 0.3s ease-in-out forwards;
 }
 
+/* Xóa khung trắng của InfoWindow */
+.gm-style-iw {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* Xóa mũi tên viền trắng phía dưới */
+.gm-style-iw-d {
+  overflow: visible !important;
+}
+
+.gm-style-iw-t::after,
+.gm-style-iw-t::before {
+  display: none !important;
+}
 
 /* Ẩn scrollbar cho mọi trình duyệt */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
+
 .perspective-\[1500px\] {
   perspective: 1500px;
 }
+
 .backface-hidden {
   backface-visibility: hidden;
 }
+
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
+
 .transform-style-preserve-3d {
   transform-style: preserve-3d;
 }
@@ -59,4 +88,3 @@ body {
   color: #ffffff;
   font-family: 'Poppins', sans-serif;
 }
-

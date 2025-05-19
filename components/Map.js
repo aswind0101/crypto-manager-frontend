@@ -122,7 +122,7 @@ export default function Map({ stylists }) {
                         }}
                     >
                         <div className="relative flex flex-col items-center group">
-                            <div className="text-4xl">💇‍♀️</div>
+                            <div className="text-3xl">💇‍♀️</div>
                             <div className="w-3 h-3 bg-pink-500 rotate-45 mt-[-6px] shadow-sm"></div>
                         </div>
                     </div>
