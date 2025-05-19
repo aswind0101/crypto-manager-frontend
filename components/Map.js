@@ -91,12 +91,11 @@ export default function Map({ stylists }) {
                             cursor: "pointer",
                         }}
                     >
-                        <div className="relative flex flex-col items-center group">
-                            <div className="bg-white text-3xl shadow-lg px-4 py-2 rounded-xl border-2 border-pink-500">
-                                💇‍♀️
-                            </div>
-                            <div className="w-3 h-3 bg-pink-500 rotate-45 mt-[-6px]"></div>
+                        <div className="bg-white text-4xl shadow-md px-5 py-2 rounded-2xl border-2 border-pink-500">
+                            💇‍♀️
                         </div>
+                        <div className="w-3 h-3 bg-pink-500 rotate-45 mt-[-6px] shadow-sm"></div>
+
                     </div>
                 </OverlayView>
 
@@ -107,13 +106,9 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="text-sm text-gray-800 dark:text-white px-3 py-2 rounded-xl shadow-lg bg-white/90 dark:bg-white/10 border border-pink-300 min-w-[160px]">
-                        <p className="font-bold text-emerald-600 dark:text-emerald-300 truncate">
-                            {selectedStylist.name}
-                        </p>
-                        <p className="text-xs italic text-gray-500 dark:text-gray-300">
-                            {selectedStylist.specialization}
-                        </p>
+                    <div className="text-sm px-3 py-2 rounded-xl shadow-xl bg-white/90 dark:bg-white/10 border border-pink-300 min-w-[160px] backdrop-blur-md">
+                        <p className="font-semibold text-emerald-700 dark:text-emerald-300 truncate">{selectedStylist.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-300 italic">{selectedStylist.specialization}</p>
                         <p className="text-xs text-pink-500">{selectedStylist.gender}</p>
                         <p className="text-xs mt-1">⭐ {selectedStylist.rating || "N/A"}</p>
                     </div>
