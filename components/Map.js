@@ -47,16 +47,33 @@ export default function Map({ stylists }) {
         styles: [
             {
                 elementType: "geometry",
-                stylers: [{ color: "#1c1c1c" }]
+                stylers: [{ color: "#2c2b3f" }] // ✅ nền tím than ngọc trầm
+            },
+            {
+                featureType: "water",
+                elementType: "geometry",
+                stylers: [{ color: "#30475e" }] // ✅ xanh ngọc trầm cho nước
             },
             {
                 elementType: "labels",
                 stylers: [{ visibility: "off" }]
             },
             {
+                featureType: "road",
+                stylers: [{ visibility: "off" }]
+            },
+            {
+                featureType: "poi",
+                stylers: [{ visibility: "off" }]
+            },
+            {
+                featureType: "administrative",
+                stylers: [{ visibility: "off" }]
+            },
+            {
                 featureType: "all",
                 elementType: "all",
-                stylers: [{ saturation: -100 }, { lightness: -20 }]
+                stylers: [{ saturation: -100 }, { lightness: -10 }]
             }
         ],
         disableDefaultUI: true,
