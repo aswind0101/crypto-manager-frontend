@@ -4,10 +4,15 @@ import { useState, useEffect } from "react";
 const containerStyle = {
     width: "100%",
     height: "600px",
-    borderRadius: "1.25rem",
-    boxShadow: "0 0 20px rgba(0,0,0,0.1)",
+    borderRadius: "1.5rem", // rounded-3xl
+    backgroundColor: "rgba(255, 255, 255, 0.05)", // tương đương bg-white/10
+    backdropFilter: "blur(16px)", // backdrop-blur-md
+    WebkitBackdropFilter: "blur(16px)",
+    border: "1px solid rgba(255, 255, 255, 0.2)",
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.25)",
     overflow: "hidden",
 };
+
 
 const centerDefault = {
     lat: 37.7749,
@@ -41,22 +46,19 @@ export default function Map({ stylists }) {
     const mapOptions = {
         styles: [
             {
-                elementType: "geometry",
-                stylers: [{ color: "#1c1c1c" }]
-            },
-            {
-                elementType: "labels",
-                stylers: [{ visibility: "off" }]
-            },
-            {
                 featureType: "all",
                 elementType: "all",
-                stylers: [{ saturation: -100 }, { lightness: -20 }]
-            }
+                stylers: [{ visibility: "off" }],
+            },
+            {
+                elementType: "geometry",
+                stylers: [{ color: "#111111" }], // nền đen đậm
+            },
         ],
         disableDefaultUI: true,
         zoomControl: true,
     };
+
 
     const mapCenter = userLocation || centerDefault;
 
