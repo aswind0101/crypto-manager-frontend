@@ -5,7 +5,7 @@ const containerStyle = {
     width: "100%",
     height: "600px",
     borderRadius: "1.5rem", // rounded-3xl
-    backgroundColor: "rgba(255, 255, 255, 0.05)", // tương đương bg-white/10
+    backgroundColor: "rgba(16, 185, 129, 0.08)", // tương đương bg-white/10
     backdropFilter: "blur(16px)", // backdrop-blur-md
     WebkitBackdropFilter: "blur(16px)",
     border: "1px solid rgba(255, 255, 255, 0.2)",
