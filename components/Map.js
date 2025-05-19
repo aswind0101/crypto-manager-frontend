@@ -122,9 +122,7 @@ export default function Map({ stylists }) {
                         }}
                     >
                         <div className="relative flex flex-col items-center group">
-                            <div className="bg-white text-4xl shadow-lg px-5 py-2 rounded-2xl border-2 border-pink-500">
-                                💇‍♀️
-                            </div>
+                            <div className="text-4xl">💇‍♀️</div>
                             <div className="w-3 h-3 bg-pink-500 rotate-45 mt-[-6px] shadow-sm"></div>
                         </div>
                     </div>
@@ -137,11 +135,11 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="bg-white/80 dark:bg-zinc-800 backdrop-blur-md rounded-xl p-3 shadow-xl border border-pink-300 w-48">
-                        <div className="text-base font-semibold text-emerald-700 dark:text-emerald-300">
+                    <div className="bg-white dark:bg-zinc-800 px-4 py-3 rounded-2xl shadow-lg border-2 border-pink-500 w-48 text-sm">
+                        <div className="font-semibold text-emerald-700 dark:text-emerald-300 truncate">
                             {selectedStylist.name}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300 italic">
+                        <div className="text-xs italic text-gray-500 dark:text-gray-300">
                             {selectedStylist.specialization}
                         </div>
                         <div className="text-xs text-pink-500 mt-1">{selectedStylist.gender}</div>
