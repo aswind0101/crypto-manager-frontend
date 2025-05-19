@@ -135,7 +135,7 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md rounded-xl p-4 border border-pink-400 shadow-xl min-w-[180px] text-sm">
+                    <div className="bg-white/20 dark:bg-zinc-900/80 backdrop-blur-md rounded-xl p-4 border border-pink-400 shadow-xl min-w-[180px] text-sm">
                         <p className="text-emerald-600 dark:text-emerald-300 font-semibold mb-1">
                             {selectedStylist.name}
                         </p>
