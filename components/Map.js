@@ -135,7 +135,7 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="relative animate-fade-in min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl transition-all duration-300 ease-in-out animate-fade-in"
+                    <div className="relative min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl transition-all duration-300 ease-in-out animate-fade-in"
                         style={{
                             boxSizing: "border-box",         // 👈 THÊM DÒNG NÀY
                             maxWidth: "90vw",                 // 👈 Để ngăn tràn trên mobile
@@ -167,6 +167,8 @@ export default function Map({ stylists }) {
                         <p className="text-xs text-yellow-500 flex items-center gap-1">
                             ⭐ {selectedStylist.rating || "N/A"}
                         </p>
+                        <p className="text-xs text-cyan-600 mb-1">🏠 {selectedStylist.salon_name}</p>
+                        <p className="text-xs text-gray-500 mb-2 line-clamp-2">📍 {selectedStylist.salon_address}</p>
                     </div>
                 </InfoWindow>
 
