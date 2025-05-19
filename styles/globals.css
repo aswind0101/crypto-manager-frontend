@@ -37,15 +37,15 @@
   animation: fade-in 0.3s ease-in-out forwards;
 }
 
-/* Xóa khung trắng của InfoWindow */
+/* Ẩn hoàn toàn phần khung và nút X mặc định của InfoWindow */
 .gm-style-iw {
-  padding: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
+  padding: 0 !important;
   border-radius: 0 !important;
+  overflow: visible !important;
 }
 
-/* Xóa mũi tên viền trắng phía dưới */
 .gm-style-iw-d {
   overflow: visible !important;
 }
@@ -54,6 +54,7 @@
 .gm-style-iw-t::before {
   display: none !important;
 }
+
 
 /* Ẩn scrollbar cho mọi trình duyệt */
 .scrollbar-hide::-webkit-scrollbar {

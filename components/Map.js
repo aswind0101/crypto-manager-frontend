@@ -122,7 +122,7 @@ export default function Map({ stylists }) {
                         }}
                     >
                         <div className="relative flex flex-col items-center group">
-                            <div className="text-3xl">💇‍♀️</div>
+                            <div className="text-4xl">💇‍♀️</div>
                             <div className="w-3 h-3 bg-pink-500 rotate-45 mt-[-6px] shadow-sm"></div>
                         </div>
                     </div>
@@ -135,7 +135,12 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="animate-fade-in min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl transition-all duration-300 ease-in-out animate-fade-in">
+                    <div className="relative animate-fade-in min-w-[220px] p-4 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-lg border border-pink-400 shadow-xl transition-all duration-300 ease-in-out animate-fade-in"
+                        style={{
+                            boxSizing: "border-box",         // 👈 THÊM DÒNG NÀY
+                            maxWidth: "90vw",                 // 👈 Để ngăn tràn trên mobile
+                        }}
+                    >
                         {/* Avatar */}
                         <div className="flex items-center gap-3 mb-3">
                             <img
