@@ -135,18 +135,19 @@ export default function Map({ stylists }) {
                     position={{ lat: selectedStylist.latitude, lng: selectedStylist.longitude }}
                     onCloseClick={() => setSelectedStylist(null)}
                 >
-                    <div className="bg-white dark:bg-zinc-800 px-4 py-3 rounded-2xl shadow-lg border-2 border-pink-500 w-48 text-sm">
-                        <div className="font-semibold text-emerald-700 dark:text-emerald-300 truncate">
+                    <div className="bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md rounded-xl p-4 border border-pink-400 shadow-xl min-w-[180px] text-sm">
+                        <p className="text-emerald-600 dark:text-emerald-300 font-semibold mb-1">
                             {selectedStylist.name}
-                        </div>
-                        <div className="text-xs italic text-gray-500 dark:text-gray-300">
+                        </p>
+                        <p className="text-xs italic text-gray-500 dark:text-gray-300 mb-1">
                             {selectedStylist.specialization}
-                        </div>
-                        <div className="text-xs text-pink-500 mt-1">{selectedStylist.gender}</div>
-                        <div className="text-xs mt-1">⭐ {selectedStylist.rating || "N/A"}</div>
+                        </p>
+                        <p className="text-xs text-pink-600 mb-1">{selectedStylist.gender}</p>
+                        <p className="text-xs text-yellow-500 flex items-center gap-1">
+                            ⭐ {selectedStylist.rating || "N/A"}
+                        </p>
                     </div>
                 </InfoWindow>
-
             )}
         </GoogleMap>
     );
