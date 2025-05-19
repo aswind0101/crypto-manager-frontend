@@ -26,9 +26,55 @@ export default function Map({ stylists }) {
         url?.startsWith("http") ? url : `https://crypto-manager-backend.onrender.com${url}`;
 
     if (!isLoaded) return <p>Loading Google Map...</p>;
+    const mapOptions = {
+        styles: [
+            {
+                elementType: "geometry",
+                stylers: [{ color: "#e9e9e9" }],
+            },
+            {
+                elementType: "labels.text.fill",
+                stylers: [{ color: "#777" }],
+            },
+            {
+                elementType: "labels.text.stroke",
+                stylers: [{ color: "#ffffff" }],
+            },
+            {
+                featureType: "administrative",
+                elementType: "geometry",
+                stylers: [{ visibility: "off" }],
+            },
+            {
+                featureType: "poi",
+                stylers: [{ visibility: "off" }],
+            },
+            {
+                featureType: "road",
+                stylers: [{ color: "#ffffff" }],
+            },
+            {
+                featureType: "transit",
+                stylers: [{ visibility: "off" }],
+            },
+            {
+                featureType: "water",
+                stylers: [{ color: "#c0e4f3" }],
+            },
+        ],
+        disableDefaultUI: true,
+        zoomControl: true,
+    };
+    const containerStyle = {
+        width: "100%",
+        height: "600px",
+        borderRadius: "1.25rem",
+        boxShadow: "0 0 20px rgba(0,0,0,0.1)",
+        overflow: "hidden",
+    };
 
     return (
-        <GoogleMap mapContainerStyle={containerStyle} center={centerDefault} zoom={11}>
+        <GoogleMap mapContainerStyle={containerStyle} center={centerDefault} zoom={11} options={mapOptions}>
             {stylists.map((s) => (
                 <OverlayView
                     key={s.id}
