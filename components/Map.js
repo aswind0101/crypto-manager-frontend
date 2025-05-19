@@ -41,9 +41,17 @@ export default function Map({ stylists }) {
     const mapOptions = {
         styles: [
             {
+                elementType: "geometry",
+                stylers: [{ color: "#1c1c1c" }]
+            },
+            {
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+            },
+            {
                 featureType: "all",
                 elementType: "all",
-                stylers: [{ visibility: "off" }],
+                stylers: [{ saturation: -100 }, { lightness: -20 }]
             }
         ],
         disableDefaultUI: true,
@@ -66,10 +74,12 @@ export default function Map({ stylists }) {
                 <Marker
                     position={userLocation}
                     icon={{
-                        url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-                        scaledSize: new window.google.maps.Size(36, 36),
+                        url: "https://maps.gstatic.com/mapfiles/ms2/micons/blue-pushpin.png",
+                        scaledSize: new window.google.maps.Size(40, 40),
+                        anchor: new window.google.maps.Point(10, 40),
                     }}
                 />
+
             )}
 
             {/* 💇‍♀️ Marker stylist kiểu balloon */}
