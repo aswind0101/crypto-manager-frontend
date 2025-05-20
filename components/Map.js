@@ -62,14 +62,17 @@ export default function Map({ salons }) {
         styles: [
             { elementType: "geometry", stylers: [{ color: "#1e1e2f" }] },
             { featureType: "water", stylers: [{ color: "#2e3b4e" }] },
-            { elementType: "labels", stylers: [{ visibility: "off" }] },
-            { featureType: "road", stylers: [{ visibility: "off" }] },
+            { featureType: "road", elementType: "geometry", stylers: [{ visibility: "on" }, { color: "#444" }] },
+            { featureType: "road", elementType: "labels", stylers: [{ visibility: "on" }, { color: "#ffffff" }] },
+            { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#cccccc" }] },
+            { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
             { featureType: "poi", stylers: [{ visibility: "off" }] },
             { featureType: "administrative", stylers: [{ visibility: "off" }] },
         ],
         disableDefaultUI: true,
         zoomControl: true,
     };
+
 
     const mapCenter = userLocation || centerDefault;
 
