@@ -1,4 +1,4 @@
-// ✅ Map.js với animation nâng cao bằng framer-motion-có hiển thị bản đò
+// ✅ Map.js với animation nâng cao bằng framer-motion
 import {
     GoogleMap,
     Marker,
@@ -11,16 +11,12 @@ import "keen-slider/keen-slider.min.css";
 import { AnimatePresence, motion } from "framer-motion";
 
 const containerStyle = {
-    width: "100%",
-    height: "600px",
-    borderRadius: "1.5rem",
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
-    backdropFilter: "blur(16px)",
-    WebkitBackdropFilter: "blur(16px)",
-    border: "1px solid rgba(255, 255, 255, 0.2)",
-    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.25)",
-    overflow: "hidden",
+  width: "100%",
+  height: typeof window !== "undefined" && window.innerWidth <= 768 ? "100vh" : "600px",
+  borderRadius: "1.5rem",
+  overflow: "hidden",
 };
+
 
 const centerDefault = {
     lat: 37.7749,
