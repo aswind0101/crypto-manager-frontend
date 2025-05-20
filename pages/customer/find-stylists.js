@@ -78,7 +78,7 @@ export default function FindStylists() {
                     }`}
                 >
                   {/* Mặt trước */}
-                  <div className="absolute w-full h-full rounded-2xl backface-hidden bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 p-4 shadow-md flex flex-col items-center justify-between text-center relative">
+                  <div className="absolute w-full h-full rounded-2xl backface-hidden bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 p-4 shadow-md flex flex-col items-center justify-between text-center">
 
                     {/* ⭐ Góc trên phải: hiển thị 5 sao theo rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
@@ -102,7 +102,7 @@ export default function FindStylists() {
                           ? s.avatar_url
                           : `https://crypto-manager-backend.onrender.com${s.avatar_url}`
                       }
-                      className="w-24 h-24 rounded-full object-cover border-2 border-white shadow mb-3"
+                      className="w-28 h-28 rounded-full object-cover border-2 border-white shadow mb-3"
                       alt={s.name}
                     />
 
