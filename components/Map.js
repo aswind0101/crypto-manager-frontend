@@ -4,9 +4,12 @@ import {
     useJsApiLoader,
     OverlayView,
 } from "@react-google-maps/api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useKeenSlider } from "keen-slider/react";
 import "keen-slider/keen-slider.min.css";
+
+const mapRef = useRef(null);
+
 
 const containerStyle = {
     width: "100%",
@@ -93,7 +96,14 @@ export default function Map({ salons }) {
             center={mapCenter}
             zoom={13}
             options={mapOptions}
-            onClick={() => setSelectedSalon(null)} // 👈 click ra ngoài là đóng popup
+            onLoad={(map) => {
+                mapRef.current = map;
+                if (userLocation) {
+                    map.setCenter(userLocation);
+                    map.setZoom(15); // 👈 bạn có thể chỉnh zoom level tại đây
+                }
+            }}
+
         >
             {userLocation && (
                 <Marker
@@ -113,10 +123,16 @@ export default function Map({ salons }) {
                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                 >
                     <div
-                        onClick={() => setSelectedSalon(salon)}
+                        onClick={() => {
+                            setSelectedSalon(salon);
+                            if (mapRef.current) {
+                                mapRef.current.panTo({ lat: salon.latitude, lng: salon.longitude });
+                            }
+                        }}
                         style={{ transform: "translate(-50%, -100%)", cursor: "pointer" }}
                         className="relative flex flex-col items-center"
                     >
+
                         {/* Số lượng stylist */}
                         {salon.stylists.length > 1 && (
                             <div className="absolute -top-3 bg-pink-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
