@@ -91,7 +91,7 @@ export default function Map({ salons }) {
         <GoogleMap
             mapContainerStyle={containerStyle}
             center={mapCenter}
-            zoom={15}
+            zoom={9}
             options={mapOptions}
 
         >
@@ -125,7 +125,7 @@ export default function Map({ salons }) {
                         )}
 
                         {/* Icon */}
-                        <div className="bg-white rounded-full shadow-lg w-14 h-14 flex items-center justify-center text-2xl border-2 border-pink-500">
+                        <div className="bg-white rounded-full shadow-lg w-12 h-12 flex items-center justify-center text-2xl border-2 border-pink-500">
                             💇‍♀️
                         </div>
                     </div>
@@ -165,16 +165,13 @@ export default function Map({ salons }) {
                                 <div key={idx} className="keen-slider__slide flex flex-col items-center text-sm">
                                     <img
                                         src={
-                                            stylist.avatar_url
-                                                ? (stylist.avatar_url.startsWith("http")
-                                                    ? stylist.avatar_url
-                                                    : `https://crypto-manager-backend.onrender.com${stylist.avatar_url}`)
-                                                : "/default-avatar.png"
+                                            stylist.avatar_url?.startsWith("http")
+                                                ? stylist.avatar_url
+                                                : `https://crypto-manager-backend.onrender.com${stylist.avatar_url}`
                                         }
-                                        className="w-24 h-24 rounded-full border-2 border-white shadow-md mb-2"
+                                        className="w-32 h-32 rounded-full border-2 border-white shadow-md mb-2"
                                         alt={stylist.name}
                                     />
-
                                     <p className="text-emerald-700 dark:text-emerald-300 font-semibold">
                                         {stylist.name}
                                     </p>
