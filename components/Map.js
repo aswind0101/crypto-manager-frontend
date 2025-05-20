@@ -74,33 +74,16 @@ export default function Map({ salons }) {
     const mapCenter = userLocation || centerDefault;
 
     const centerMapOnSalon = (salon) => {
-        if (!mapRef.current || !window.google || !mapRef.current.getProjection) return;
+        if (!mapRef.current) return;
         const map = mapRef.current;
-        const projection = map.getProjection();
-        const zoom = map.getZoom();
-        const bounds = map.getBounds();
-        const mapHeight = map.getDiv().clientHeight;
-
-        if (!projection || !bounds || !zoom || !mapHeight) return;
-
-        const scale = Math.pow(2, zoom);
-
-        const worldCoordinateCenter = projection.fromLatLngToPoint(
-            new window.google.maps.LatLng(salon.latitude, salon.longitude)
-        );
-
-        // ✅ Offset theo chiều cao 1/3 bản đồ (đẩy lên trên)
-        const pixelOffset = {
-            x: 0,
-            y: -(mapHeight / 3) / scale,
-        };
-
+        const scale = Math.pow(2, map.getZoom());
+        const worldCoordinateCenter = map.getProjection().fromLatLngToPoint(new window.google.maps.LatLng(salon.latitude, salon.longitude));
+        const pixelOffset = { x: 0, y: -100 / scale }; // dịch lên 100px (tuỳ chỉnh)
         const worldCoordinateNewCenter = new window.google.maps.Point(
             worldCoordinateCenter.x + pixelOffset.x,
             worldCoordinateCenter.y + pixelOffset.y
         );
-
-        const newCenter = projection.fromPointToLatLng(worldCoordinateNewCenter);
+        const newCenter = map.getProjection().fromPointToLatLng(worldCoordinateNewCenter);
         map.panTo(newCenter);
     };
 
