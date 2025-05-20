@@ -89,153 +89,142 @@ export default function Map({ salons }) {
     if (!isLoaded) return <p>Loading Google Map...</p>;
 
     return (
-        <div className="relative w-full h-full">
-            {/* Layer mờ khi popup hiển thị */}
-            {selectedSalon && !popupLoading && (
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-10 pointer-events-none"></div>
+        <GoogleMap
+            mapContainerStyle={containerStyle}
+            center={mapCenter}
+            zoom={17}
+            options={mapOptions}
+
+        >
+      
+            {userLocation && (
+                <Marker
+                    position={userLocation}
+                    icon={{
+                        url: "https://maps.gstatic.com/mapfiles/ms2/micons/blue-pushpin.png",
+                        scaledSize: new window.google.maps.Size(40, 40),
+                        anchor: new window.google.maps.Point(10, 40),
+                    }}
+                />
             )}
-            <GoogleMap
-                mapContainerStyle={containerStyle}
-                center={mapCenter}
-                zoom={19}
-                options={mapOptions}
-            >
-                {/* Overlay mờ – dùng OverlayView để không che popup */}
-                {selectedSalon && !popupLoading && (
-                    <OverlayView
-                        position={mapCenter}
-                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                    >
-                        <div
-                            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1] pointer-events-none"
-                            style={{ width: "100vw", height: "100vh" }}
-                        ></div>
-                    </OverlayView>
-                )}
 
-                {/* Vị trí người dùng */}
-                {userLocation && (
-                    <Marker
-                        position={userLocation}
-                        icon={{
-                            url: "https://maps.gstatic.com/mapfiles/ms2/micons/blue-pushpin.png",
-                            scaledSize: new window.google.maps.Size(40, 40),
-                            anchor: new window.google.maps.Point(10, 40),
+            {salons.map((salon) => (
+                <OverlayView
+                    key={salon.salon_id}
+                    position={{ lat: salon.latitude, lng: salon.longitude }}
+                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                >
+                    <div
+                        onClick={() => {
+                            setPopupLoading(true); // Bắt đầu loading
+                            setTimeout(() => {
+                                setSelectedSalon(salon);         // Set dữ liệu salon sau delay
+                                setPopupLoading(false);          // Tắt loading
+                                if (mapRef.current) {
+                                    mapRef.current.panTo({
+                                        lat: salon.latitude,
+                                        lng: salon.longitude,
+                                    });
+                                }
+                            }, 150); // Delay nhỏ để đảm bảo dữ liệu load mượt
                         }}
-                    />
-                )}
-
-                {/* Icon stylist */}
-                {salons.map((salon) => (
-                    <OverlayView
-                        key={salon.salon_id}
-                        position={{ lat: salon.latitude, lng: salon.longitude }}
-                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                        style={{ transform: "translate(-50%, -100%)", cursor: "pointer" }}
+                        className="relative flex flex-col items-center"
                     >
-                        <div
-                            onClick={() => {
-                                setPopupLoading(true);
-                                setTimeout(() => {
-                                    setSelectedSalon(salon);
-                                    setPopupLoading(false);
-                                    if (mapRef.current) {
-                                        mapRef.current.panTo({
-                                            lat: salon.latitude,
-                                            lng: salon.longitude,
-                                        });
-                                    }
-                                }, 150);
-                            }}
-                            style={{ transform: "translate(-50%, -100%)", cursor: "pointer" }}
-                            className="relative z-[5] flex flex-col items-center"
+                        {/* Số lượng stylist */}
+                        {salon.stylists.length > 1 && (
+                            <div className="absolute -top-3 bg-pink-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                                {salon.stylists.length}
+                            </div>
+                        )}
+
+                        {/* Icon */}
+                        <div className="bg-white rounded-full shadow-lg w-12 h-12 flex items-center justify-center text-2xl border-2 border-pink-500">
+                            💇‍♀️
+                        </div>
+                    </div>
+
+                </OverlayView>
+            ))}
+
+            {selectedSalon && !popupLoading && (
+                <OverlayView
+                    position={{
+                        lat: selectedSalon.latitude,
+                        lng: selectedSalon.longitude,
+                    }}
+                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                >
+                    <div className="relative animate-fade-in w-[260px] p-3 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md
+                                    shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
+                        {/* Nút mũi tên trái */}
+                        <button
+                            onClick={() => instanceRef.current?.prev()}
+                            className="absolute left-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
                         >
-                            {salon.stylists.length > 1 && (
-                                <div className="absolute -top-3 bg-pink-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-                                    {salon.stylists.length}
+                            ‹
+                        </button>
+
+                        {/* Nút đóng */}
+                        <button
+                            onClick={() => setSelectedSalon(null)}
+                            className="absolute top-2 right-2 text-gray-400 hover:text-pink-500 text-xl font-bold z-10"
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
+
+                        {/* Slider */}
+                        <div ref={sliderRef} className="keen-slider">
+                            {selectedSalon.stylists.map((stylist, idx) => (
+                                <div key={idx} className="keen-slider__slide flex flex-col items-center text-sm">
+                                    <img
+                                        src={
+                                            stylist.avatar_url?.startsWith("http")
+                                                ? stylist.avatar_url
+                                                : `https://crypto-manager-backend.onrender.com${stylist.avatar_url}`
+                                        }
+                                        className="w-32 h-32 rounded-full border-2 border-white shadow-md mb-2"
+                                        alt={stylist.name}
+                                    />
+                                    <p className="text-emerald-700 dark:text-emerald-300 font-semibold">
+                                        {stylist.name}
+                                    </p>
+                                    <p className="text-xs italic text-gray-500 dark:text-gray-300">
+                                        {stylist.specialization}
+                                    </p>
+                                    <p className="text-xs text-pink-600">{stylist.gender}</p>
+                                    <p className="text-xs text-yellow-500">
+                                        ⭐ {stylist.rating || "N/A"}
+                                    </p>
+                                    <p className="text-xs text-cyan-600 mt-1 text-center">
+                                        🏠 {selectedSalon.salon_name}
+                                    </p>
+                                    <p className="text-[11px] text-gray-500 text-center">
+                                        📍 {selectedSalon.salon_address}
+                                    </p>
+
+                                    <button
+                                        onClick={() => openBookingModal(stylist)}
+                                        className="mt-2 px-3 py-1 bg-pink-500 text-white text-xs rounded-full hover:bg-pink-600 transition"
+                                    >
+                                        Đặt hẹn
+                                    </button>
                                 </div>
-                            )}
-                            <div className="bg-white rounded-full shadow-lg w-12 h-12 flex items-center justify-center text-2xl border-2 border-pink-500">
-                                💇‍♀️
-                            </div>
+                            ))}
                         </div>
-                    </OverlayView>
-                ))}
 
-                {/* Popup stylist */}
-                {selectedSalon && !popupLoading && (
-                    <OverlayView
-                        position={{
-                            lat: selectedSalon.latitude,
-                            lng: selectedSalon.longitude,
-                        }}
-                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                    >
-                        <div className="relative z-[30] animate-fade-in w-[260px] p-3 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
-                            {/* Nút mũi tên trái */}
-                            {selectedSalon.stylists.length > 1 && (
-                                <button
-                                    onClick={() => instanceRef.current?.prev()}
-                                    className="absolute left-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
-                                >
-                                    ‹
-                                </button>
-                            )}
+                        {/* Nút mũi tên phải */}
+                        <button
+                            onClick={() => instanceRef.current?.next()}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
+                        >
+                            ›
+                        </button>
+                    </div>
 
-                            {/* Nút đóng */}
-                            <button
-                                onClick={() => setSelectedSalon(null)}
-                                className="absolute top-2 right-2 text-gray-400 hover:text-pink-500 text-xl font-bold z-10"
-                                aria-label="Close"
-                            >
-                                ✕
-                            </button>
-
-                            {/* Slider */}
-                            <div ref={sliderRef} className="keen-slider">
-                                {selectedSalon.stylists.map((stylist, idx) => (
-                                    <div key={idx} className="keen-slider__slide flex flex-col items-center text-sm">
-                                        <img
-                                            src={
-                                                stylist.avatar_url
-                                                    ? (stylist.avatar_url.startsWith("http")
-                                                        ? stylist.avatar_url
-                                                        : `https://crypto-manager-backend.onrender.com${stylist.avatar_url}`)
-                                                    : "/default-avatar.png"
-                                            }
-                                            className="w-32 h-32 rounded-full border-2 border-white shadow-md mb-2"
-                                            alt={stylist.name}
-                                        />
-                                        <p className="text-emerald-700 dark:text-emerald-300 font-semibold">{stylist.name}</p>
-                                        <p className="text-xs italic text-gray-500 dark:text-gray-300">{stylist.specialization}</p>
-                                        <p className="text-xs text-pink-600">{stylist.gender}</p>
-                                        <p className="text-xs text-yellow-500">⭐ {stylist.rating || "N/A"}</p>
-                                        <p className="text-xs text-cyan-600 mt-1 text-center">🏠 {selectedSalon.salon_name}</p>
-                                        <p className="text-[11px] text-gray-500 text-center">📍 {selectedSalon.salon_address}</p>
-
-                                        <button
-                                            onClick={() => openBookingModal(stylist)}
-                                            className="mt-2 px-3 py-1 bg-pink-500 text-white text-xs rounded-full hover:bg-pink-600 transition"
-                                        >
-                                            Đặt hẹn
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Nút mũi tên phải */}
-                            {selectedSalon.stylists.length > 1 && (
-                                <button
-                                    onClick={() => instanceRef.current?.next()}
-                                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
-                                >
-                                    ›
-                                </button>
-                            )}
-                        </div>
-                    </OverlayView>
-                )}
-            </GoogleMap>
-
-        </div>
+                </OverlayView>
+            )}
+        </GoogleMap>
     );
 }
