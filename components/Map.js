@@ -92,10 +92,14 @@ export default function Map({ salons }) {
         <GoogleMap
             mapContainerStyle={containerStyle}
             center={mapCenter}
-            zoom={20}
+            zoom={17}
             options={mapOptions}
 
         >
+            {selectedSalon && !popupLoading && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[1] pointer-events-none"></div>
+            )}
+
             {userLocation && (
                 <Marker
                     position={userLocation}
@@ -154,7 +158,7 @@ export default function Map({ salons }) {
                     }}
                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                 >
-                    <div className="relative animate-fade-in w-[260px] p-3 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md
+                    <div className="relative z-10 animate-fade-in w-[260px] p-3 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md
                                     shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]">
                         {/* Nút mũi tên trái */}
                         <button
