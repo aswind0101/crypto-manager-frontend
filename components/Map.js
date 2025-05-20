@@ -60,8 +60,8 @@ export default function Map({ salons }) {
 
     const mapOptions = {
         styles: [
-            { elementType: "geometry", stylers: [{ color: "#ffe0e9" }] },
-            { featureType: "water", stylers: [{ color: "#ffd4cc" }] },
+            { elementType: "geometry", stylers: [{ color: "#1e1e2f" }] },
+            { featureType: "water", stylers: [{ color: "#2e3b4e" }] },
             { elementType: "labels", stylers: [{ visibility: "off" }] },
             { featureType: "road", stylers: [{ visibility: "off" }] },
             { featureType: "poi", stylers: [{ visibility: "off" }] },
