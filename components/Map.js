@@ -36,13 +36,11 @@ export default function Map({ salons }) {
         libraries: ["places"],
     });
 
-    const [sliderRef] = useKeenSlider({
+    const [sliderRef, instanceRef] = useKeenSlider({
         loop: true,
-        slides: {
-            perView: 1,
-            spacing: 8,
-        },
+        slides: { perView: 1, spacing: 8 },
     });
+
 
     useEffect(() => {
         if (navigator.geolocation) {
@@ -95,7 +93,7 @@ export default function Map({ salons }) {
             center={mapCenter}
             zoom={15}
             options={mapOptions}
-            
+
         >
             {userLocation && (
                 <Marker
@@ -143,7 +141,15 @@ export default function Map({ salons }) {
                     }}
                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                 >
-                    <div className="animate-fade-in w-[260px] p-3 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md border border-pink-400 shadow-xl">
+                    <div className="relative animate-fade-in w-[260px] p-3 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md border border-pink-400 shadow-xl">
+                        {/* Nút mũi tên trái */}
+                        <button
+                            onClick={() => instanceRef.current?.prev()}
+                            className="absolute left-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
+                        >
+                            ‹
+                        </button>
+
                         {/* Nút đóng */}
                         <button
                             onClick={() => setSelectedSalon(null)}
@@ -152,12 +158,11 @@ export default function Map({ salons }) {
                         >
                             ✕
                         </button>
+
+                        {/* Slider */}
                         <div ref={sliderRef} className="keen-slider">
                             {selectedSalon.stylists.map((stylist, idx) => (
-                                <div
-                                    key={idx}
-                                    className="keen-slider__slide flex flex-col items-center text-sm"
-                                >
+                                <div key={idx} className="keen-slider__slide flex flex-col items-center text-sm">
                                     <img
                                         src={
                                             stylist.avatar_url?.startsWith("http")
@@ -193,7 +198,16 @@ export default function Map({ salons }) {
                                 </div>
                             ))}
                         </div>
+
+                        {/* Nút mũi tên phải */}
+                        <button
+                            onClick={() => instanceRef.current?.next()}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
+                        >
+                            ›
+                        </button>
                     </div>
+
                 </OverlayView>
             )}
         </GoogleMap>
