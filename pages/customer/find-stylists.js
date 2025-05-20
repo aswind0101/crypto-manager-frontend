@@ -1,8 +1,8 @@
+// ✅ find-stylists.js (Trang chính tìm stylist đã cải tiến)
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Navbar from "../../components/Navbar";
 
-// Lazy load bản đồ (Google hoặc Leaflet tùy bạn chọn)
 const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
 export default function FindStylists() {
@@ -34,12 +34,17 @@ export default function FindStylists() {
         </h1>
 
         {loading ? (
-          <p className="text-center animate-pulse text-gray-600 dark:text-gray-400">
-            ⏳ Loading stylist map...
-          </p>
+          <div className="flex justify-center items-center py-10">
+            <svg className="animate-spin h-6 w-6 text-emerald-600" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0" />
+            </svg>
+            <span className="ml-2 text-gray-600 dark:text-gray-400">Loading stylist map...</span>
+          </div>
         ) : stylists.length === 0 ? (
           <p className="text-center text-sm text-gray-500">
-            😥 No stylists are currently online. Please try again later.
+            😥 No stylists are currently online.<br />
+            <span className="text-xs text-gray-400 italic">Try again later or explore salons manually.</span>
           </p>
         ) : (
           <Map salons={stylists} />
@@ -47,5 +52,4 @@ export default function FindStylists() {
       </div>
     </div>
   );
-
 }
