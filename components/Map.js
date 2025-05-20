@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import { useKeenSlider } from "keen-slider/react";
 import "keen-slider/keen-slider.min.css";
 
-const mapRef = useRef(null);
+
 
 
 const containerStyle = {
@@ -31,6 +31,7 @@ const centerDefault = {
 export default function Map({ salons }) {
     const [selectedSalon, setSelectedSalon] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
+    const mapRef = useRef(null);
 
     const { isLoaded } = useJsApiLoader({
         googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY,
