@@ -91,7 +91,7 @@ export default function Map({ salons }) {
         <GoogleMap
             mapContainerStyle={containerStyle}
             center={mapCenter}
-            zoom={15}
+            zoom={9}
             options={mapOptions}
 
         >
@@ -125,7 +125,7 @@ export default function Map({ salons }) {
                         )}
 
                         {/* Icon */}
-                        <div className="bg-white rounded-full shadow-lg w-12 h-12 flex items-center justify-center text-2xl border-2 border-pink-500">
+                        <div className="bg-white rounded-full shadow-lg w-18 h-18 flex items-center justify-center text-2xl border-2 border-pink-500">
                             💇‍♀️
                         </div>
                     </div>
@@ -199,13 +199,15 @@ export default function Map({ salons }) {
                             ))}
                         </div>
 
-                        {/* Nút mũi tên phải */}
-                        <button
-                            onClick={() => instanceRef.current?.next()}
-                            className="absolute right-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
-                        >
-                            ›
-                        </button>
+                        {/* Nút mũi tên phải – chỉ hiển thị nếu nhiều stylist */}
+                        {selectedSalon.stylists.length > 1 && (
+                            <button
+                                onClick={() => instanceRef.current?.next()}
+                                className="absolute right-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
+                            >
+                                ›
+                            </button>
+                        )}
                     </div>
 
                 </OverlayView>
