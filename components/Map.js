@@ -30,6 +30,7 @@ const centerDefault = {
 export default function Map({ salons }) {
     const [selectedSalon, setSelectedSalon] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
+    const [popupLoading, setPopupLoading] = useState(false); // 👈 NEW
 
     const { isLoaded } = useJsApiLoader({
         googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY,
@@ -113,7 +114,19 @@ export default function Map({ salons }) {
                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                 >
                     <div
-                        onClick={() => setSelectedSalon(salon)}
+                        onClick={() => {
+                            setPopupLoading(true); // Bắt đầu loading
+                            setTimeout(() => {
+                                setSelectedSalon(salon);         // Set dữ liệu salon sau delay
+                                setPopupLoading(false);          // Tắt loading
+                                if (mapRef.current) {
+                                    mapRef.current.panTo({
+                                        lat: salon.latitude,
+                                        lng: salon.longitude,
+                                    });
+                                }
+                            }, 150); // Delay nhỏ để đảm bảo dữ liệu load mượt
+                        }}
                         style={{ transform: "translate(-50%, -100%)", cursor: "pointer" }}
                         className="relative flex flex-col items-center"
                     >
@@ -133,7 +146,7 @@ export default function Map({ salons }) {
                 </OverlayView>
             ))}
 
-            {selectedSalon && (
+            {selectedSalon && !popupLoading && (
                 <OverlayView
                     position={{
                         lat: selectedSalon.latitude,
