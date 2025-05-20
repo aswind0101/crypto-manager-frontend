@@ -78,8 +78,10 @@ export default function Map({ salons }) {
                 stylers: [{ saturation: -100 }, { lightness: -10 }],
             },
         ],
+        
         disableDefaultUI: true,
         zoomControl: true,
+        gestureHandling: "greedy",
     };
 
     const mapCenter = userLocation || centerDefault;
