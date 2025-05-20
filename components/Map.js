@@ -4,10 +4,9 @@ import {
     useJsApiLoader,
     OverlayView,
 } from "@react-google-maps/api";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useKeenSlider } from "keen-slider/react";
 import "keen-slider/keen-slider.min.css";
-
 
 
 
@@ -31,7 +30,6 @@ const centerDefault = {
 export default function Map({ salons }) {
     const [selectedSalon, setSelectedSalon] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
-    const mapRef = useRef(null);
 
     const { isLoaded } = useJsApiLoader({
         googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY,
@@ -95,16 +93,9 @@ export default function Map({ salons }) {
         <GoogleMap
             mapContainerStyle={containerStyle}
             center={mapCenter}
-            zoom={13}
+            zoom={15}
             options={mapOptions}
-            onLoad={(map) => {
-                mapRef.current = map;
-                if (userLocation) {
-                    map.setCenter(userLocation);
-                    map.setZoom(15); // 👈 bạn có thể chỉnh zoom level tại đây
-                }
-            }}
-
+            
         >
             {userLocation && (
                 <Marker
@@ -124,16 +115,10 @@ export default function Map({ salons }) {
                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                 >
                     <div
-                        onClick={() => {
-                            setSelectedSalon(salon);
-                            if (mapRef.current) {
-                                mapRef.current.panTo({ lat: salon.latitude, lng: salon.longitude });
-                            }
-                        }}
+                        onClick={() => setSelectedSalon(salon)}
                         style={{ transform: "translate(-50%, -100%)", cursor: "pointer" }}
                         className="relative flex flex-col items-center"
                     >
-
                         {/* Số lượng stylist */}
                         {salon.stylists.length > 1 && (
                             <div className="absolute -top-3 bg-pink-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
