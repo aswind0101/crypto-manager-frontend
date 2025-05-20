@@ -36,7 +36,7 @@ export default function FindStylists() {
         {loading ? (
           <p className="text-center">⏳ Loading stylist map...</p>
         ) : (
-          <Map stylists={stylists} />
+          <Map salons={stylists} />
         )}
       </div>
     </div>
