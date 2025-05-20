@@ -55,7 +55,6 @@ export default function Map({ salons }) {
     }, []);
 
     const mapOptions = {
-        gestureHandling: "cooperative",
         styles: [
             {
                 featureType: "all",
