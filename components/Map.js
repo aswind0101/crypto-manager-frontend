@@ -1,4 +1,4 @@
-// ✅ Map.js (đã cải tiến chuyên nghiệp)
+// ✅ Map.js (đã cải tiến chuyên nghiệp, popup nằm giữa bản đồ)
 import {
     GoogleMap,
     Marker,
@@ -73,6 +73,20 @@ export default function Map({ salons }) {
 
     const mapCenter = userLocation || centerDefault;
 
+    const centerMapOnSalon = (salon) => {
+        if (!mapRef.current) return;
+        const map = mapRef.current;
+        const scale = Math.pow(2, map.getZoom());
+        const worldCoordinateCenter = map.getProjection().fromLatLngToPoint(new window.google.maps.LatLng(salon.latitude, salon.longitude));
+        const pixelOffset = { x: 0, y: -100 / scale }; // dịch lên 100px (tuỳ chỉnh)
+        const worldCoordinateNewCenter = new window.google.maps.Point(
+            worldCoordinateCenter.x + pixelOffset.x,
+            worldCoordinateCenter.y + pixelOffset.y
+        );
+        const newCenter = map.getProjection().fromPointToLatLng(worldCoordinateNewCenter);
+        map.panTo(newCenter);
+    };
+
     if (!isLoaded) return <p>Loading Google Map...</p>;
 
     return (
@@ -106,10 +120,7 @@ export default function Map({ salons }) {
                             setTimeout(() => {
                                 setSelectedSalon(salon);
                                 setPopupLoading(false);
-                                if (mapRef.current) {
-                                    mapRef.current.panTo({ lat: salon.latitude, lng: salon.longitude });
-                                    mapRef.current.setZoom(15);
-                                }
+                                centerMapOnSalon(salon);
                             }, 150);
                         }}
                         style={{ transform: "translate(-50%, -100%)", cursor: "pointer" }}
