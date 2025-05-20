@@ -34,11 +34,18 @@ export default function FindStylists() {
         </h1>
 
         {loading ? (
-          <p className="text-center">⏳ Loading stylist map...</p>
+          <p className="text-center animate-pulse text-gray-600 dark:text-gray-400">
+            ⏳ Loading stylist map...
+          </p>
+        ) : stylists.length === 0 ? (
+          <p className="text-center text-sm text-gray-500">
+            😥 No stylists are currently online. Please try again later.
+          </p>
         ) : (
           <Map salons={stylists} />
         )}
       </div>
     </div>
   );
+
 }

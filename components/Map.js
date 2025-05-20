@@ -91,7 +91,7 @@ export default function Map({ salons }) {
         <GoogleMap
             mapContainerStyle={containerStyle}
             center={mapCenter}
-            zoom={9}
+            zoom={5}
             options={mapOptions}
 
         >
