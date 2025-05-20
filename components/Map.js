@@ -1,113 +1,201 @@
-// ✅ StylistsRadar.js — Hiển thị stylist theo khoảng cách trên nền ảnh đẹp như game
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+// ✅ Map.js với animation nâng cao bằng framer-motion
+import {
+    GoogleMap,
+    Marker,
+    useJsApiLoader,
+    OverlayView,
+} from "@react-google-maps/api";
+import { useState, useEffect, useRef } from "react";
+import { useKeenSlider } from "keen-slider/react";
+import "keen-slider/keen-slider.min.css";
+import { AnimatePresence, motion } from "framer-motion";
 
-export default function StylistsRadar({ salons }) {
-  const [userLocation, setUserLocation] = useState(null);
-  const [stylistsWithDistance, setStylistsWithDistance] = useState([]);
+const containerStyle = {
+    width: "100%",
+    height: "600px",
+    borderRadius: "1.5rem",
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    border: "1px solid rgba(255, 255, 255, 0.2)",
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.25)",
+    overflow: "hidden",
+};
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const coords = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setUserLocation(coords);
-        },
-        (err) => console.error("❌ Error getting location:", err),
-        { enableHighAccuracy: true }
-      );
-    }
-  }, []);
+const centerDefault = {
+    lat: 37.7749,
+    lng: -122.4194,
+};
 
-  useEffect(() => {
-    if (!userLocation) return;
+export default function Map({ salons }) {
+    const [selectedSalon, setSelectedSalon] = useState(null);
+    const [userLocation, setUserLocation] = useState(null);
+    const [popupLoading, setPopupLoading] = useState(false);
+    const mapRef = useRef(null);
 
-    const allStylists = salons.flatMap((salon) =>
-      salon.stylists.map((s) => ({
-        ...s,
-        salon_name: salon.salon_name,
-        salon_address: salon.salon_address,
-        lat: salon.latitude,
-        lng: salon.longitude,
-      }))
+    const { isLoaded } = useJsApiLoader({
+        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY,
+        libraries: ["places"],
+    });
+
+    const [sliderRef, instanceRef] = useKeenSlider({
+        loop: true,
+        slides: { perView: 1, spacing: 8 },
+    });
+
+    useEffect(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setUserLocation({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                    });
+                },
+                (err) => console.error("❌ Error getting location:", err),
+                { enableHighAccuracy: true }
+            );
+        }
+    }, []);
+
+    const mapOptions = {
+        styles: [
+            {
+                featureType: "all",
+                elementType: "all",
+                stylers: [{ visibility: "off" }],
+            },
+            {
+                elementType: "geometry",
+                stylers: [{ visibility: "on" }, { color: "#000000" }],
+            },
+        ],
+        disableDefaultUI: true,
+        zoomControl: true,
+    };
+
+    const mapCenter = userLocation || centerDefault;
+
+    if (!isLoaded) return <p>Loading Google Map...</p>;
+
+    return (
+        <GoogleMap
+            mapContainerStyle={containerStyle}
+            center={mapCenter}
+            zoom={10}
+            options={mapOptions}
+            onLoad={(map) => (mapRef.current = map)}
+        >
+            {userLocation && (
+                <Marker
+                    position={userLocation}
+                    icon={{
+                        url: "https://maps.gstatic.com/mapfiles/ms2/micons/blue-pushpin.png",
+                        scaledSize: new window.google.maps.Size(40, 40),
+                        anchor: new window.google.maps.Point(10, 40),
+                    }}
+                />
+            )}
+
+            {salons.map((salon) => (
+                <OverlayView
+                    key={salon.salon_id}
+                    position={{ lat: salon.latitude, lng: salon.longitude }}
+                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                >
+                    <div
+                        onClick={() => {
+                            setPopupLoading(true);
+                            setTimeout(() => {
+                                setSelectedSalon(salon);
+                                setPopupLoading(false);
+                                if (mapRef.current) {
+                                    mapRef.current.panTo({ lat: salon.latitude, lng: salon.longitude });
+                                    mapRef.current.setZoom(15);
+                                }
+                            }, 150);
+                        }}
+                        style={{ transform: "translate(-50%, -100%)", cursor: "pointer" }}
+                        className="relative flex flex-col items-center"
+                    >
+                        {salon.stylists.length > 1 && (
+                            <div className="absolute -top-3 bg-pink-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                                {salon.stylists.length}
+                            </div>
+                        )}
+
+                        <div className="bg-white rounded-full shadow-lg w-12 h-12 flex items-center justify-center text-2xl border-2 border-pink-500">
+                            💇‍♀️
+                        </div>
+                    </div>
+                </OverlayView>
+            ))}
+
+            <AnimatePresence>
+                {selectedSalon && !popupLoading && (
+                    <OverlayView
+                        position={{ lat: selectedSalon.latitude, lng: selectedSalon.longitude }}
+                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                            transition={{ duration: 0.3 }}
+                            className="relative w-[260px] p-3 rounded-2xl bg-white/90 dark:bg-zinc-900/80 backdrop-blur-md shadow-[2px_2px_4px_#0b0f17,_-2px_-2px_4px_#1e2631]"
+                        >
+                            <button
+                                onClick={() => instanceRef.current?.prev()}
+                                className="absolute left-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
+                            >‹</button>
+
+                            <button
+                                onClick={() => setSelectedSalon(null)}
+                                className="absolute top-2 right-2 text-gray-400 hover:text-pink-500 text-xl font-bold z-10"
+                                aria-label="Close"
+                            >✕</button>
+
+                            <div ref={sliderRef} className="keen-slider">
+                                {selectedSalon.stylists.map((stylist, idx) => (
+                                    <motion.div
+                                        key={idx}
+                                        className="keen-slider__slide flex flex-col items-center text-sm"
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: idx * 0.1 }}
+                                    >
+                                        <img
+                                            src={stylist.avatar_url?.startsWith("http")
+                                                ? stylist.avatar_url
+                                                : `https://crypto-manager-backend.onrender.com${stylist.avatar_url}`}
+                                            className="w-32 h-32 rounded-full border-2 border-white shadow-md mb-2"
+                                            alt={stylist.name}
+                                            onError={(e) => e.currentTarget.src = "/default-avatar.png"}
+                                        />
+                                        <p className="text-emerald-700 dark:text-emerald-300 font-semibold">{stylist.name}</p>
+                                        <p className="text-xs italic text-gray-500 dark:text-gray-300">{stylist.specialization}</p>
+                                        <p className="text-xs text-pink-600">{stylist.gender}</p>
+                                        <p className="text-xs text-yellow-500">⭐ {stylist.rating || "N/A"}</p>
+                                        <p className="text-xs text-cyan-600 mt-1 text-center">🏠 {selectedSalon.salon_name}</p>
+                                        <p className="text-[11px] text-gray-500 text-center">📍 {selectedSalon.salon_address}</p>
+                                        <button
+                                            onClick={() => alert(`📅 Booking for ${stylist.name} coming soon!`)}
+                                            className="mt-2 px-3 py-1 bg-pink-500 text-white text-xs rounded-full hover:bg-pink-600 transition"
+                                        >
+                                            Đặt hẹn
+                                        </button>
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            <button
+                                onClick={() => instanceRef.current?.next()}
+                                className="absolute right-0 top-1/2 -translate-y-1/2 bg-pink-500 text-white w-6 h-6 rounded-full shadow-md hover:bg-pink-600 z-10"
+                            >›</button>
+                        </motion.div>
+                    </OverlayView>
+                )}
+            </AnimatePresence>
+        </GoogleMap>
     );
-
-    const stylistsWithDist = allStylists.map((s) => ({
-      ...s,
-      distance: getDistanceInKm(userLocation.lat, userLocation.lng, s.lat, s.lng),
-    }));
-
-    const sorted = stylistsWithDist.sort((a, b) => a.distance - b.distance);
-    setStylistsWithDistance(sorted);
-  }, [userLocation, salons]);
-
-  const getDistanceInKm = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  return (
-    <div
-      className="relative w-full h-[600px] rounded-2xl overflow-hidden"
-      style={{
-        backgroundImage: `url('/background-radar.jpg')`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-    >
-      {userLocation && (
-        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20">
-          <div className="w-16 h-16 rounded-full bg-blue-500 border-4 border-white shadow-lg flex items-center justify-center text-white font-bold">
-            YOU
-          </div>
-        </div>
-      )}
-
-      {stylistsWithDistance.map((stylist, idx) => {
-        const angle = (idx / stylistsWithDistance.length) * 2 * Math.PI;
-        const radius = Math.min(250, stylist.distance * 20); // km * scale (tối đa 250px)
-        const x = radius * Math.cos(angle);
-        const y = radius * Math.sin(angle);
-
-        return (
-          <motion.div
-            key={stylist.id}
-            className="absolute z-10"
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: idx * 0.05 }}
-            style={{
-              left: `calc(50% + ${x}px)`,
-              top: `calc(50% + ${y}px)`,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <div className="relative group">
-              <img
-                src={stylist.avatar_url?.startsWith("http")
-                  ? stylist.avatar_url
-                  : `https://crypto-manager-backend.onrender.com${stylist.avatar_url}`}
-                alt={stylist.name}
-                className="w-16 h-16 rounded-full border-2 border-pink-400 shadow-lg hover:scale-110 transition duration-300"
-              />
-              <div className="absolute left-1/2 -translate-x-1/2 mt-2 text-center text-white text-xs bg-black/60 px-2 py-1 rounded-lg hidden group-hover:block">
-                {stylist.name} <br /> {stylist.distance.toFixed(1)} km
-              </div>
-            </div>
-          </motion.div>
-        );
-      })}
-    </div>
-  );
 }
