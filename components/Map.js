@@ -68,7 +68,6 @@ export default function Map({ salons }) {
         ],
         disableDefaultUI: true,
         zoomControl: true,
-        draggable: true,
     };
 
     const mapCenter = userLocation || centerDefault;
