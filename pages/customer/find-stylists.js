@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "../../components/Navbar";
-import { getDistanceInKm } from "../../utils/distance"; // bạn sẽ tạo helper này ở bước sau
+import { getDistanceInKm } from "../../utils/distance"; // bạn sẽ tạo helper này ở bước sau.
 
 export default function FindStylists() {
   const [stylists, setStylists] = useState([]);
