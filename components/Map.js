@@ -78,10 +78,9 @@ export default function Map({ salons }) {
                 stylers: [{ saturation: -100 }, { lightness: -10 }],
             },
         ],
-        
+
         disableDefaultUI: true,
         zoomControl: true,
-        gestureHandling: "greedy",
     };
 
     const mapCenter = userLocation || centerDefault;
@@ -116,16 +115,21 @@ export default function Map({ salons }) {
                     <div
                         onClick={() => setSelectedSalon(salon)}
                         style={{ transform: "translate(-50%, -100%)", cursor: "pointer" }}
+                        className="relative flex flex-col items-center"
                     >
+                        {/* Số lượng stylist */}
+                        {salon.stylists.length > 1 && (
+                            <div className="absolute -top-3 bg-pink-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                                {salon.stylists.length}
+                            </div>
+                        )}
+
+                        {/* Icon */}
                         <div className="bg-white rounded-full shadow-lg w-12 h-12 flex items-center justify-center text-2xl border-2 border-pink-500">
                             💇‍♀️
                         </div>
-                        {salon.stylists.length > 1 && (
-                            <div className="text-xs mt-1 text-center text-pink-600 font-semibold">
-                                {salon.stylists.length} Stylists
-                            </div>
-                        )}
                     </div>
+
                 </OverlayView>
             ))}
 
