@@ -60,18 +60,18 @@ export default function FindStylists() {
   }, [userLocation]);
 
   const formatSpecialization = (code) => {
-  const map = {
-    nail_tech: "Nail Technician",
-    hair_stylist: "Hair Stylist",
-    barber: "Barber",
-    esthetician: "Esthetician",
-    lash_tech: "Lash Technician",
-    massage_therapist: "Massage Therapist",
-    makeup_artist: "Makeup Artist",
-    receptionist: "Receptionist",
+    const map = {
+      nail_tech: "Nail Technician",
+      hair_stylist: "Hair Stylist",
+      barber: "Barber",
+      esthetician: "Esthetician",
+      lash_tech: "Lash Technician",
+      massage_therapist: "Massage Therapist",
+      makeup_artist: "Makeup Artist",
+      receptionist: "Receptionist",
+    };
+    return map[code] || code;
   };
-  return map[code] || code;
-};
 
 
   return (
@@ -144,6 +144,10 @@ export default function FindStylists() {
                           ? s.avatar_url
                           : `https://crypto-manager-backend.onrender.com${s.avatar_url}`
                       }
+                      onError={(e) => {
+                        e.currentTarget.onerror = null; // tránh loop
+                        e.currentTarget.src = "/default-avatar.png";
+                      }}
                       className="w-28 h-28 rounded-full object-cover border-2 border-white shadow mb-3"
                       alt={s.name}
                     />
