@@ -8,9 +8,13 @@ export default function FindStylists() {
   const [userLocation, setUserLocation] = useState(null);
   const [flippedId, setFlippedId] = useState(null);
   const [geoError, setGeoError] = useState(false);
-
+  const [hasAskedLocation, setHasAskedLocation] = useState(false);
 
   useEffect(() => {
+    if (hasAskedLocation) return;
+
+    setHasAskedLocation(true);
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUserLocation({
@@ -19,24 +23,23 @@ export default function FindStylists() {
         });
       },
       (err) => {
-        console.warn("❌ Could not get location:", err);
+        console.warn("❌ Location denied:", err);
         setGeoError(true);
-        // Fallback vị trí nếu user từ chối
-        setUserLocation({ lat: 37.7749, lng: -122.4194 }); // ví dụ: San Francisco
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
-  }, []);
-
+  }, [hasAskedLocation]);
 
   useEffect(() => {
+    if (!userLocation) return;
+
     const fetchStylists = async () => {
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/stylists/online");
       const data = await res.json();
 
-      const flatStylists = data.flatMap((salon) =>
-        salon.stylists.map((stylist) => ({
-          ...stylist,
+      const flat = data.flatMap((salon) =>
+        salon.stylists.map((s) => ({
+          ...s,
           salon_name: salon.salon_name,
           salon_address: salon.salon_address,
           lat: salon.latitude,
@@ -44,21 +47,18 @@ export default function FindStylists() {
         }))
       );
 
-      if (userLocation) {
-        flatStylists.forEach((s) => {
-          s.distance = getDistanceInKm(userLocation.lat, userLocation.lng, s.lat, s.lng);
-        });
-        flatStylists.sort((a, b) => a.distance - b.distance);
-      }
+      flat.forEach((s) => {
+        s.distance = getDistanceInKm(userLocation.lat, userLocation.lng, s.lat, s.lng);
+      });
 
-      setStylists(flatStylists);
+      flat.sort((a, b) => a.distance - b.distance);
+      setStylists(flat);
       setLoading(false);
     };
 
-    if (userLocation !== null) {
-      fetchStylists();
-    }
+    fetchStylists();
   }, [userLocation]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-800 text-gray-800 dark:text-white">
@@ -68,9 +68,26 @@ export default function FindStylists() {
           ✨ Available Stylists Near You
         </h1>
         {geoError && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-center mb-4">
-            📍 We couldn’t access your location. <br />
-            Please enable location services in your browser settings, then refresh this page.
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-4 rounded-lg shadow-sm text-sm text-center max-w-xl mx-auto mb-6">
+            <p className="font-semibold mb-2">📍 Location Access Required</p>
+            <p className="mb-2">
+              We couldn’t access your current location. Please enable location services to see nearby stylists.
+            </p>
+
+            <div className="text-left text-xs bg-white/60 text-gray-700 p-3 rounded-md mt-2">
+              <p className="font-bold mb-1">📱 On Mobile:</p>
+              <ul className="list-disc list-inside mb-2">
+                <li><strong>Android:</strong> Go to Settings → Apps → Browser → Permissions → Allow Location</li>
+                <li><strong>iOS:</strong> Go to Settings → Safari or Chrome → Location → Allow</li>
+              </ul>
+
+              <p className="font-bold mb-1">💻 On Desktop:</p>
+              <p>Click the 🔒 icon near the address bar → Site settings → Location → Allow</p>
+            </div>
+
+            <p className="text-[11px] text-gray-500 mt-3">
+              After enabling, please refresh this page.
+            </p>
           </div>
         )}
         {loading ? (
