@@ -113,7 +113,7 @@ export default function FindStylists() {
             {stylists.map((s) => (
               <div
                 key={s.id}
-                className="relative w-full h-[380px] perspective-[1500px]"
+                className="relative w-full h-[360px] perspective-[1500px]"
               >
                 <div
                   className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""
@@ -148,7 +148,7 @@ export default function FindStylists() {
                         e.currentTarget.onerror = null; // tránh loop
                         e.currentTarget.src = "/default-avatar.png";
                       }}
-                      className="w-28 h-28 rounded-full object-cover border-2 border-white shadow mb-3"
+                      className="w-32 h-32 rounded-full object-cover border-2 border-white shadow mb-3"
                       alt={s.name}
                     />
 
@@ -159,6 +159,11 @@ export default function FindStylists() {
                       <p className="text-xs mt-1">🏠 {s.salon_name}</p>
                       <p className="text-[11px] text-gray-400">{s.salon_address}</p>
                       <p className="text-xs text-emerald-500 mt-1">📍 {s.distance?.toFixed(2)} km away</p>
+                      {s.description && (
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 italic line-clamp-3">
+                          {s.description}
+                        </p>
+                      )}
                       <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">✂️ Available for appointments now!</p>
                     </div>
 
