@@ -159,9 +159,9 @@ export default function FindStylists() {
                       <p className="text-xs mt-1">🏠 {s.salon_name}</p>
                       <p className="text-[11px] text-gray-400">{s.salon_address}</p>
                       <p className="text-xs text-emerald-500 mt-1">📍 {s.distance?.toFixed(2)} km away</p>
-                      {s.description && (
+                      {s.about && (
                         <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 italic line-clamp-3">
-                          {s.description}
+                          {s.about}
                         </p>
                       )}
                       <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">✂️ Available for appointments now!</p>
