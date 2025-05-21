@@ -12,6 +12,7 @@
   "dependencies": {
     "@paypal/react-paypal-js": "^8.8.3",
     "@react-google-maps/api": "^2.20.6",
+    "@tailwindcss/line-clamp": "^0.4.4",
     "axios": "^1.8.4",
     "chart.js": "^4.4.9",
     "dayjs": "^1.11.13",

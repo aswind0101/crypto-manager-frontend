@@ -113,7 +113,7 @@ export default function FindStylists() {
             {stylists.map((s) => (
               <div
                 key={s.id}
-                className="relative w-full h-[360px] perspective-[1500px]"
+                className="relative w-full h-[440px] perspective-[1500px]"
               >
                 <div
                   className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""
@@ -153,26 +153,45 @@ export default function FindStylists() {
                     />
 
                     {/* Thông tin */}
-                    <div>
-                      <h2 className="text-lg font-bold text-pink-500">{s.name}</h2>
-                      <p className="text-sm italic text-gray-600 dark:text-gray-300">{Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}</p>
-                      <p className="text-xs mt-1">🏠 {s.salon_name}</p>
-                      <p className="text-[11px] text-gray-400">{s.salon_address}</p>
-                      <p className="text-xs text-emerald-500 mt-1">📍 {s.distance?.toFixed(2)} km away</p>
-                      {s.description && (
-                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 italic line-clamp-3">
-                          {s.description}
+                    <div className="w-full px-2 space-y-2">
+                      {/* Stylist Info */}
+                      <div>
+                        <h2 className="text-xl font-bold text-pink-500">{s.name}</h2>
+                        <p className="text-sm italic text-gray-600 dark:text-gray-300">
+                          {Array.isArray(s.specialization)
+                            ? s.specialization.map(formatSpecialization).join(", ")
+                            : formatSpecialization(s.specialization)}
                         </p>
-                      )}
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">✂️ Available for appointments now!</p>
+                        {/** 
+                        {s.description && (
+                          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 italic">
+                            {s.description}
+                          </p>
+                        )}
+                        */}
+                      </div>
+
+                      {/* Salon Info */}
+                      <div className="pt-2">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">--Salon--</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 font-medium">🏠 {s.salon_name}</p>
+                        <p className="text-[11px] text-gray-400">{s.salon_address}</p>
+                        <p className="text-xs text-emerald-500 mt-1">📍 {s.distance?.toFixed(2)} km away</p>
+                      </div>
+
+                      {/* Trạng thái */}
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
+                        ✂️ Available for appointments now!
+                      </p>
                     </div>
 
+                    <hr className="w-3/4 border-t border-white/20 dark:border-white/10 my-3" />
                     {/* Nút đặt hẹn */}
                     <button
                       onClick={() => setFlippedId(s.id)}
-                      className="mt-4 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-4 py-2 rounded-full shadow hover:scale-105 transition"
+                      className="mt-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-4 py-2 rounded-full shadow hover:scale-105 transition"
                     >
-                      Đặt hẹn
+                      Book Appointment
                     </button>
                   </div>
 
