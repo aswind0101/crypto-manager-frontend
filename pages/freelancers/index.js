@@ -33,7 +33,7 @@ export default function FreelancerDashboard() {
     return () => unsubscribe();
   }, []);
 
-  const isComplete = onboarding?.has_avatar && onboarding?.has_license && onboarding?.has_id && onboarding?.has_salon && onboarding?.has_payment;
+  const isComplete = onboarding?.isQualified;
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
