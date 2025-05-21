@@ -176,7 +176,7 @@ export default function FindStylists() {
                         <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">--Salon--</p>
                         <p className="text-xs text-gray-600 dark:text-gray-300 font-medium">🏠 {s.salon_name}</p>
                         <p className="text-[11px] text-gray-400">{s.salon_address}</p>
-                        <p className="text-xs text-emerald-500 mt-1">📍 {s.distance?.toFixed(2)} km away</p>
+                        <p className="text-xs text-emerald-500 mt-1">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
                       </div>
 
                       {/* Trạng thái */}
