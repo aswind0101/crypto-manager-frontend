@@ -128,8 +128,13 @@ function AddEmployee() {
                         onChange={(e) => setRole(e.target.value)}
                         className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
                     >
-                        <option value="stylist">Stylist</option>
-                        <option value="nail_tech">Nail Tech</option>
+                        <option value="nail_tech">Nail Technician</option>
+                        <option value="hair_stylist">Hair Stylist</option>
+                        <option value="barber">Barber</option>
+                        <option value="esthetician">Esthetician</option>
+                        <option value="lash_tech">Lash Technician</option>
+                        <option value="massage_therapist">Massage Therapist</option>
+                        <option value="makeup_artist">Makeup Artist</option>
                         <option value="receptionist">Receptionist</option>
                     </select>
                 </div>

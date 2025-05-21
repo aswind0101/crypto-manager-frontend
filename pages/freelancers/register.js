@@ -30,7 +30,7 @@ export default function FreelancerRegister() {
     temp_salon_name: "",
     temp_salon_address: "",
     temp_salon_phone: "",
-    specialization: "",
+    specialization: [],
   });
 
   const handleChange = (e) => {
@@ -46,8 +46,14 @@ export default function FreelancerRegister() {
 
     const newErrors = {};
     for (let field of requiredFields) {
-      if (!form[field]) {
-        newErrors[field] = true;
+      if (field === "specialization") {
+        if (!Array.isArray(form.specialization) || form.specialization.length === 0) {
+          newErrors[field] = true;
+        }
+      } else {
+        if (!form[field]) {
+          newErrors[field] = true;
+        }
       }
     }
 
@@ -150,22 +156,37 @@ export default function FreelancerRegister() {
         <Input name="birthday" label="Birthday" type="date" value={form.birthday} onChange={handleChange} required errors={errors} />
         <Textarea name="about" label="Briefly introduce yourself to clients. . ." value={form.about} onChange={handleChange} required errors={errors} />
         <Input name="experience" label="Years of Experience" type="number" value={form.experience} onChange={handleChange} required errors={errors} />
-        <Select
-          name="specialization"
-          label="Your Specialization"
-          value={form.specialization}
-          onChange={handleChange}
-          options={[
-            { label: "Nail Technician", value: "nail_tech" },
-            { label: "Hair Stylist", value: "hair_stylist" },
-            { label: "Barber", value: "barber" },
-            { label: "Esthetician", value: "esthetician" },
-            { label: "Lash Technician", value: "lash_tech" },
-            { label: "Massage Therapist", value: "massage_therapist" },
-            { label: "Makeup Artist", value: "makeup_artist" },
-            { label: "Receptionist", value: "receptionist" },
-          ]} required errors={errors}
-        />
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-pink-400">Your Specializations</label>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Nail Technician", value: "nail_tech" },
+              { label: "Hair Stylist", value: "hair_stylist" },
+              { label: "Barber", value: "barber" },
+              { label: "Esthetician", value: "esthetician" },
+              { label: "Lash Technician", value: "lash_tech" },
+              { label: "Massage Therapist", value: "massage_therapist" },
+              { label: "Makeup Artist", value: "makeup_artist" },
+              { label: "Receptionist", value: "receptionist" },
+            ].map((opt) => (
+              <label key={opt.value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  value={opt.value}
+                  checked={form.specialization.includes(opt.value)}
+                  onChange={(e) => {
+                    const selected = form.specialization.includes(opt.value)
+                      ? form.specialization.filter((v) => v !== opt.value)
+                      : [...form.specialization, opt.value];
+                    setForm((prev) => ({ ...prev, specialization: selected }));
+                  }}
+                  className="accent-pink-500 w-4 h-4 rounded"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
 
         <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200 mt-2">
           <input

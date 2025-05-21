@@ -59,6 +59,20 @@ export default function FindStylists() {
     fetchStylists();
   }, [userLocation]);
 
+  const formatSpecialization = (code) => {
+  const map = {
+    nail_tech: "Nail Technician",
+    hair_stylist: "Hair Stylist",
+    barber: "Barber",
+    esthetician: "Esthetician",
+    lash_tech: "Lash Technician",
+    massage_therapist: "Massage Therapist",
+    makeup_artist: "Makeup Artist",
+    receptionist: "Receptionist",
+  };
+  return map[code] || code;
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-800 text-gray-800 dark:text-white">
@@ -106,7 +120,7 @@ export default function FindStylists() {
                     }`}
                 >
                   {/* Mặt trước */}
-                  <div className="absolute w-full h-full rounded-2xl backface-hidden bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 p-4 shadow-md flex flex-col items-center justify-between text-center">
+                  <div className="absolute w-full h-full rounded-2xl backface-hidden bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 p-4 shadow-md flex flex-col items-center justify-between text-center ">
 
                     {/* ⭐ Góc trên phải: hiển thị 5 sao theo rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
@@ -137,7 +151,7 @@ export default function FindStylists() {
                     {/* Thông tin */}
                     <div>
                       <h2 className="text-lg font-bold text-pink-500">{s.name}</h2>
-                      <p className="text-sm italic text-gray-600 dark:text-gray-300">{s.specialization}</p>
+                      <p className="text-sm italic text-gray-600 dark:text-gray-300">{Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}</p>
                       <p className="text-xs mt-1">🏠 {s.salon_name}</p>
                       <p className="text-[11px] text-gray-400">{s.salon_address}</p>
                       <p className="text-xs text-emerald-500 mt-1">📍 {s.distance?.toFixed(2)} km away</p>
