@@ -7,6 +7,8 @@ export default function FindStylists() {
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
   const [flippedId, setFlippedId] = useState(null);
+  const [geoError, setGeoError] = useState(false);
+
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -18,10 +20,14 @@ export default function FindStylists() {
       },
       (err) => {
         console.warn("❌ Could not get location:", err);
-        setUserLocation(null);
-      }
+        setGeoError(true);
+        // Fallback vị trí nếu user từ chối
+        setUserLocation({ lat: 37.7749, lng: -122.4194 }); // ví dụ: San Francisco
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
     );
   }, []);
+
 
   useEffect(() => {
     const fetchStylists = async () => {
@@ -61,7 +67,12 @@ export default function FindStylists() {
         <h1 className="text-3xl font-extrabold text-center mb-8 text-emerald-800 dark:text-emerald-300">
           ✨ Available Stylists Near You
         </h1>
-
+        {geoError && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-center mb-4">
+            📍 We couldn’t access your location. <br />
+            Please enable location services in your browser settings, then refresh this page.
+          </div>
+        )}
         {loading ? (
           <p className="text-center">⏳ Loading stylists...</p>
         ) : stylists.length === 0 ? (
