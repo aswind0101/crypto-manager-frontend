@@ -78,7 +78,7 @@ export default function FindStylists() {
               <p className="font-bold mb-1">📱 On Mobile:</p>
               <ul className="list-disc list-inside mb-2">
                 <li><strong>Android:</strong> Go to Settings → Apps → Browser → Permissions → Allow Location</li>
-                <li><strong>iOS:</strong> Go to Settings → Safari or Chrome → Location → Allow</li>
+                <li><strong>iOS:</strong> Go to <em>Settings → Privacy & Security → Location Services → Safari (or your browser)</em> → Allow Location Access.</li>
               </ul>
 
               <p className="font-bold mb-1">💻 On Desktop:</p>
