@@ -54,8 +54,26 @@ export default function Login() {
                 localStorage.setItem("user", JSON.stringify(userData));
 
                 try {
-                    // 1️⃣ Gọi API lấy role
                     const idToken = await user.getIdToken();
+
+                    // ✅ 1️⃣ Nếu đến từ Book Appointment ➝ đăng ký customer trước
+                    const fromBooking = localStorage.getItem("from_booking") === "true";
+                    if (fromBooking) {
+                        try {
+                            await fetch("https://crypto-manager-backend.onrender.com/api/register-customer", {
+                                method: "POST",
+                                headers: {
+                                    Authorization: `Bearer ${idToken}`,
+                                },
+                            });
+                            console.log("✅ Registered Salon_Customer");
+                        } catch (err) {
+                            console.error("❌ Failed to register Salon_Customer:", err.message);
+                        }
+                        localStorage.removeItem("from_booking"); // 🔁 Chỉ gọi một lần
+                    }
+
+                    // ✅ 2️⃣ Gọi API lấy role sau khi đảm bảo đã đăng ký đúng
                     const resRole = await fetch("https://crypto-manager-backend.onrender.com/api/user-role", {
                         headers: {
                             Authorization: `Bearer ${idToken}`
@@ -69,26 +87,7 @@ export default function Login() {
                         const updatedUserData = { ...userData, role: data.role };
                         localStorage.setItem("user", JSON.stringify(updatedUserData));
 
-                        // ✅ Nếu đến từ Book Appointment ➝ đăng ký khách hàng nếu cần
-                        const fromBooking = localStorage.getItem("from_booking") === "true";
-                        if (fromBooking) {
-                            try {
-                                const idToken = await user.getIdToken();
-                                await fetch("https://crypto-manager-backend.onrender.com/api/register-customer", {
-                                    method: "POST",
-                                    headers: {
-                                        Authorization: `Bearer ${idToken}`,
-                                    },
-                                });
-                                console.log("✅ Registered Salon_Customer");
-                            } catch (err) {
-                                console.error("❌ Failed to register Salon_Customer:", err.message);
-                            }
-                            localStorage.removeItem("from_booking"); // xoá để không gọi lại lần sau
-                        }
-
-
-                        // ✅ Logic chuyển hướng theo role
+                        // ✅ 3️⃣ Chuyển hướng theo role
                         if (role === "salon_freelancers") {
                             try {
                                 const checkRes = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/check?email=${user.email}`);
@@ -116,7 +115,6 @@ export default function Login() {
                                 } else if (checkData.exists && !checkData.is_verified) {
                                     setShowVerifyWarning(true);
                                     setPendingEmail(user.email);
-
                                 } else {
                                     router.push("/home");
                                 }
@@ -124,18 +122,16 @@ export default function Login() {
                                 console.error("❌ Error checking freelancer:", err);
                                 router.push("/home");
                             }
-                        }
-                        else {
+                        } else {
                             router.push("/home");
                         }
-
 
                     } else {
                         console.warn("⚠️ Failed to fetch user role");
                         router.push("/home");
                     }
                 } catch (err) {
-                    console.error("❌ Error calling /api/user-role:", err);
+                    console.error("❌ Error during login process:", err);
                     router.push("/home");
                 }
             }
@@ -143,7 +139,6 @@ export default function Login() {
 
         return () => unsubscribe();
     }, []);
-
 
     return (
         <div className="flex items-center justify-center h-screen bg-black text-white">
