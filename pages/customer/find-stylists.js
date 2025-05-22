@@ -175,17 +175,17 @@ export default function FindStylists() {
 
                     </div>
 
-                    <hr className="w-3/4 border-t border-white/20 my-3" />
+                    <hr className="w-3/4 border-t border-white/20 my-1" />
                     <button
                       onClick={() => handleBookClick(s.id)}
-                      className="mt-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
+                      className="mb-4 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
                     >
                       Book Appointment
                     </button>
                   </div>
 
                   {/* Mặt sau */}
-                  <div className="absolute w-full h-full rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border border-white/20 p-4 shadow-md flex flex-col justify-center text-center">
+                  <div className="absolute w-full h-full rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border-b-4 border-t-4 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
                     <h3 className="text-xl font-bold text-emerald-300 mb-2">📅 Coming soon...</h3>
                     <p className="text-sm text-gray-300">Booking form will appear here soon!</p>
                     <button
