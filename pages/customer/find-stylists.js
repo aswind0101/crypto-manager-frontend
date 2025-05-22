@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../../components/Navbar";
 import { getDistanceInKm } from "../../components/utils/distance"; // bạn sẽ tạo helper này ở bước sau.
+import { useRouter } from "next/router";
 
 export default function FindStylists() {
   const [stylists, setStylists] = useState([]);
@@ -9,6 +10,15 @@ export default function FindStylists() {
   const [flippedId, setFlippedId] = useState(null);
   const [geoError, setGeoError] = useState(false);
   const [hasAskedLocation, setHasAskedLocation] = useState(false);
+  const [user, setUser] = useState(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   useEffect(() => {
     if (hasAskedLocation) return;
@@ -73,7 +83,14 @@ export default function FindStylists() {
     return map[code] || code;
   };
 
-
+  const handleBookClick = (stylistId) => {
+    if (!user) {
+      localStorage.setItem("from_booking", "true");
+      router.push("/login");
+    } else {
+      setFlippedId(stylistId);
+    }
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-800 text-gray-800 dark:text-white">
       <Navbar />
@@ -188,7 +205,7 @@ export default function FindStylists() {
                     <hr className="w-3/4 border-t border-white/20 dark:border-white/10 my-3" />
                     {/* Nút đặt hẹn */}
                     <button
-                      onClick={() => setFlippedId(s.id)}
+                      onClick={() => handleBookClick(s.id)}
                       className="mt-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-4 py-2 rounded-full shadow hover:scale-105 transition"
                     >
                       Book Appointment

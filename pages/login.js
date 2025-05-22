@@ -69,6 +69,25 @@ export default function Login() {
                         const updatedUserData = { ...userData, role: data.role };
                         localStorage.setItem("user", JSON.stringify(updatedUserData));
 
+                        // ✅ Nếu đến từ Book Appointment ➝ đăng ký khách hàng nếu cần
+                        const fromBooking = localStorage.getItem("from_booking") === "true";
+                        if (fromBooking) {
+                            try {
+                                const idToken = await user.getIdToken();
+                                await fetch("https://crypto-manager-backend.onrender.com/api/register-customer", {
+                                    method: "POST",
+                                    headers: {
+                                        Authorization: `Bearer ${idToken}`,
+                                    },
+                                });
+                                console.log("✅ Registered Salon_Customer");
+                            } catch (err) {
+                                console.error("❌ Failed to register Salon_Customer:", err.message);
+                            }
+                            localStorage.removeItem("from_booking"); // xoá để không gọi lại lần sau
+                        }
+
+
                         // ✅ Logic chuyển hướng theo role
                         if (role === "salon_freelancers") {
                             try {
