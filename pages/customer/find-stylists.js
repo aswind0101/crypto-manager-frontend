@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Navbar from "../../components/Navbar";
 import { getDistanceInKm } from "../../components/utils/distance"; // bạn sẽ tạo helper này ở bước sau.
 import { useRouter } from "next/router";
+import Head from "next/head";
 
 export default function FindStylists() {
   const [stylists, setStylists] = useState([]);
@@ -92,63 +93,55 @@ export default function FindStylists() {
     }
   };
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-800 text-gray-800 dark:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-[\'Dancing\_Script\',cursive]">
+      <Head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap"
+          rel="stylesheet"
+        />
+      </Head>
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-extrabold text-center mb-8 text-emerald-800 dark:text-emerald-300">
+        <h1 className="text-3xl font-extrabold text-center mb-8 text-emerald-300 font-[\'Dancing\_Script\',cursive]">
           ✨ Available Stylists Near You
         </h1>
+
         {geoError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-4 rounded-lg shadow-sm text-sm text-center max-w-xl mx-auto mb-6">
+          <div className="bg-red-100 border border-red-400 text-red-800 px-4 py-4 rounded-lg shadow-sm text-sm text-center max-w-xl mx-auto mb-6">
             <p className="font-semibold mb-2">📍 Location Access Required</p>
             <p className="mb-2">
               We couldn’t access your current location. Please enable location services to see nearby stylists.
             </p>
-
             <div className="text-left text-xs bg-white/60 text-gray-700 p-3 rounded-md mt-2">
               <p className="font-bold mb-1">📱 On Mobile:</p>
               <ul className="list-disc list-inside mb-2">
                 <li><strong>Android:</strong> Go to Settings → Apps → Browser → Permissions → Allow Location</li>
                 <li><strong>iOS:</strong> Go to <em>Settings → Privacy & Security → Location Services → Safari (or your browser)</em> → Allow Location Access.</li>
               </ul>
-
               <p className="font-bold mb-1">💻 On Desktop:</p>
               <p>Click the 🔒 icon near the address bar → Site settings → Location → Allow</p>
             </div>
-
             <p className="text-[11px] text-gray-500 mt-3">
               After enabling, please refresh this page.
             </p>
           </div>
         )}
+
         {loading ? (
           <p className="text-center">⏳ Loading stylists...</p>
         ) : stylists.length === 0 ? (
-          <p className="text-center text-gray-500">No stylist online nearby.</p>
+          <p className="text-center text-gray-400">No stylist online nearby.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div
-                key={s.id}
-                className="relative w-full h-[440px] perspective-[1500px]"
-              >
-                <div
-                  className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""
-                    }`}
-                >
+              <div key={s.id} className="relative w-full h-[440px] perspective-[1500px]">
+                <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full h-full rounded-2xl backface-hidden bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 p-4 shadow-md flex flex-col items-center justify-between text-center ">
-
-                    {/* ⭐ Góc trên phải: hiển thị 5 sao theo rating */}
+                  <div className="absolute w-full h-full rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
+                    {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 20 20"
-                          fill={i < Math.round(s.rating) ? "#facc15" : "#d1d5db"}
-                          className="w-4 h-4"
-                        >
+                        <svg key={i} viewBox="0 0 20 20" fill={i < Math.round(s.rating) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
                         </svg>
                       ))}
@@ -156,71 +149,42 @@ export default function FindStylists() {
 
                     {/* Avatar */}
                     <img
-                      src={
-                        s.avatar_url?.startsWith("http")
-                          ? s.avatar_url
-                          : `https://crypto-manager-backend.onrender.com${s.avatar_url}`
-                      }
-                      onError={(e) => {
-                        e.currentTarget.onerror = null; // tránh loop
-                        e.currentTarget.src = "/default-avatar.png";
-                      }}
+                      src={s.avatar_url?.startsWith("http") ? s.avatar_url : `https://crypto-manager-backend.onrender.com${s.avatar_url}`}
+                      onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
                       className="w-32 h-32 rounded-full object-cover border-2 border-white shadow mb-3"
                       alt={s.name}
                     />
 
-                    {/* Thông tin */}
                     <div className="w-full px-2 space-y-2">
-                      {/* Stylist Info */}
                       <div>
-                        <h2 className="text-xl font-bold text-pink-500">{s.name}</h2>
-                        <p className="text-sm italic text-gray-600 dark:text-gray-300">
-                          {Array.isArray(s.specialization)
-                            ? s.specialization.map(formatSpecialization).join(", ")
-                            : formatSpecialization(s.specialization)}
+                        <h2 className="text-xl font-bold text-pink-400">{s.name}</h2>
+                        <p className="text-sm italic text-pink-200">
+                          {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
                         </p>
-                        {/** 
-                        {s.description && (
-                          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 italic">
-                            {s.description}
-                          </p>
-                        )}
-                        */}
                       </div>
 
-                      {/* Salon Info */}
                       <div className="pt-2">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">--Salon--</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-300 font-medium">🏠 {s.salon_name}</p>
-                        <p className="text-[11px] text-gray-400">{s.salon_address}</p>
-                        <p className="text-xs text-emerald-500 mt-1">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
+                        <p className="text-[10px] text-pink-300 uppercase tracking-widest mb-1">--SALON--</p>
+                        <p className="text-sm text-yellow-300 font-medium">🏠 {s.salon_name}</p>
+                        <p className="text-xs text-gray-300">{s.salon_address}</p>
+                        <p className="text-xs text-emerald-300 mt-1">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
                       </div>
 
-                      {/* Trạng thái */}
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
-                        ✂️ Available for appointments now!
-                      </p>
                     </div>
 
-                    <hr className="w-3/4 border-t border-white/20 dark:border-white/10 my-3" />
-                    {/* Nút đặt hẹn */}
+                    <hr className="w-3/4 border-t border-white/20 my-3" />
                     <button
                       onClick={() => handleBookClick(s.id)}
-                      className="mt-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-4 py-2 rounded-full shadow hover:scale-105 transition"
+                      className="mt-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
                     >
                       Book Appointment
                     </button>
                   </div>
 
                   {/* Mặt sau */}
-                  <div className="absolute w-full h-full rounded-2xl backface-hidden rotate-y-180 bg-white/90 dark:bg-zinc-800/90 border border-white/20 p-4 shadow-md flex flex-col justify-center text-center">
-                    <h3 className="text-xl font-bold text-emerald-600 dark:text-emerald-300 mb-2">
-                      📅 Coming soon...
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Booking form will appear here soon!
-                    </p>
-
+                  <div className="absolute w-full h-full rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border border-white/20 p-4 shadow-md flex flex-col justify-center text-center">
+                    <h3 className="text-xl font-bold text-emerald-300 mb-2">📅 Coming soon...</h3>
+                    <p className="text-sm text-gray-300">Booking form will appear here soon!</p>
                     <button
                       onClick={() => setFlippedId(null)}
                       className="mt-6 bg-pink-500 text-white px-4 py-2 rounded-full shadow hover:bg-pink-600"
@@ -230,11 +194,11 @@ export default function FindStylists() {
                   </div>
                 </div>
               </div>
-
             ))}
           </div>
         )}
       </div>
     </div>
+
   );
 }
