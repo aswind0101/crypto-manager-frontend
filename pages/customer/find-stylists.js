@@ -68,6 +68,9 @@ export default function FindStylists() {
     };
 
     fetchStylists();
+    const interval = setInterval(fetchStylists, 10000); // gọi lại mỗi 10s
+
+    return () => clearInterval(interval); // dọn dẹp khi unmount
   }, [userLocation]);
 
   const formatSpecialization = (code) => {
