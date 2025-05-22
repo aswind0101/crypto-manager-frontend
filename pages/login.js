@@ -105,6 +105,8 @@ export default function Login() {
                             }
                         } else if (role === "salon_chu") {
                             router.push("/salon");
+                        } else if (role === "salon_customer") {
+                            router.push("/customer/find-stylists");
                         } else if (role === "salon_nhanvien") {
                             try {
                                 const checkRes = await fetch(`https://crypto-manager-backend.onrender.com/api/freelancers/check?email=${user.email}`);

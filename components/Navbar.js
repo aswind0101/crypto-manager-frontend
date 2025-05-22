@@ -23,9 +23,9 @@ export default function Navbar() {
     const [isSalonChu, setIsSalonChu] = useState(false);
     const [isSalonNhanVien, setIsSalonNhanVien] = useState(false);
     const [isFreelancer, setIsFreelancer] = useState(false);
+    const [isSalonCustomer, setIsSalonCustomer] = useState(false);
     const [isSalonAll, setIsSalonAll] = useState(false);
     const [isCrypto, setIsCrypto] = useState(false);
-    const [isSalonKhachHang, setIsSalonKhachHang] = useState(false);
     const [isSalonsOpen, setIsSalonsOpen] = useState(false);
     const [isAdminOpen, setIsAdminOpen] = useState(false);
     const [isFreelancerMenuOpen, setIsFreelancerMenuOpen] = useState(false);
@@ -44,7 +44,7 @@ export default function Navbar() {
             }
             if (parsedUser.role === "Salon_Chu") setIsSalonChu(true);
             if (parsedUser.role === "Salon_NhanVien") setIsSalonNhanVien(true);
-            if (parsedUser.role === "Salon_KhachHang") setIsSalonKhachHang(true);
+            if (parsedUser.role === "Salon_Customer") setIsSalonCustomer(true);
             if (parsedUser.role === "Salon_Freelancers") setIsFreelancer(true);
             if (parsedUser.role === "Salon_All") setIsSalonAll(true);
             if (parsedUser.role === "Crypto") setIsCrypto(true);
@@ -260,6 +260,11 @@ export default function Navbar() {
                                 </Link>
                             </div>
                         </div>
+                    )}
+                    {isSalonCustomer && (
+                        <Link href="/customer/find-stylists" className="hover:text-yellow-300 flex items-center gap-2">
+                            💇 Dashboard
+                        </Link>
                     )}
                     {isSalonAll && (
                         <div className="flex flex-col">
@@ -647,6 +652,15 @@ export default function Navbar() {
                                     </>
                                 )}
                             </>
+                        )}
+                        {isSalonCustomer && (
+                            <Link
+                                href="/customer/find-stylists"
+                                onClick={() => setMenuOpen(false)}
+                                className="hover:text-yellow-400 flex items-center gap-2"
+                            >
+                                💇 Dashboard
+                            </Link>
                         )}
                         {isSalonAll && (
                             <>
