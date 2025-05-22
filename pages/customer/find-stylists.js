@@ -93,16 +93,16 @@ export default function FindStylists() {
     }
   };
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-[\'Dancing\_Script\',cursive]">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
         <link
-          href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
           rel="stylesheet"
         />
       </Head>
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-extrabold text-center mb-8 text-emerald-300 font-[\'Dancing\_Script\',cursive]">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-emerald-300 font-mono sm:font-['Pacifico', cursive]">
           ✨ Available Stylists Near You
         </h1>
 
