@@ -101,6 +101,35 @@ export default function SalonServicesPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // ❗ Kiểm tra trùng tên tuyệt đối (same name + specialization)
+        const isExactDuplicate = services.some(
+            (s) =>
+                s.name.trim().toLowerCase() === form.name.trim().toLowerCase() &&
+                s.specialization === form.specialization &&
+                (!editingService || s.id !== editingService.id)
+        );
+
+        if (isExactDuplicate && !editingService) {
+            alert("❌ This service name already exists for the selected specialization.");
+            return;
+        }
+
+        // ⚠️ Kiểm tra tên gần giống (ví dụ: chứa chuỗi hoặc khớp gần đầu)
+        const similarService = services.find(
+            (s) =>
+                s.specialization === form.specialization &&
+                s.name.toLowerCase().includes(form.name.trim().toLowerCase().slice(0, 4)) &&
+                (!editingService || s.id !== editingService.id)
+        );
+
+        if (similarService && !editingService) {
+            const confirmSimilar = window.confirm(
+                `⚠️ A similar service "${similarService.name}" already exists.\nDo you still want to add this service?`
+            );
+            if (!confirmSimilar) return;
+        }
+
         try {
             const user = auth.currentUser;
             const token = await user.getIdToken();
@@ -118,6 +147,7 @@ export default function SalonServicesPage() {
                 },
                 body: JSON.stringify({
                     ...form,
+                    name: form.name.trim(), // đảm bảo không có khoảng trắng
                     price: parseFloat(form.price),
                     duration_minutes: parseInt(form.duration_minutes),
                 }),
@@ -149,6 +179,7 @@ export default function SalonServicesPage() {
             alert("❌ Network error");
         }
     };
+
 
     const startEdit = (service) => {
         setForm({ ...service });
@@ -282,7 +313,7 @@ export default function SalonServicesPage() {
                     <select
                         value={selectedSpecialization}
                         onChange={(e) => handleFilterChange(e.target.value)}
-                        className="rounded p-2 text-black"
+                        className="rounded p-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                     >
                         <option value="all">All</option>
                         {specializations.map((s) => (
