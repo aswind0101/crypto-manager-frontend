@@ -65,8 +65,10 @@ export default function FindStylists() {
           salon_address: salon.salon_address,
           lat: salon.latitude,
           lng: salon.longitude,
+          services: s.services || [] // 👈 QUAN TRỌNG!
         }))
       );
+
 
       flat.forEach((s) => {
         s.distance = getDistanceInKm(userLocation.lat, userLocation.lng, s.lat, s.lng);
@@ -74,6 +76,8 @@ export default function FindStylists() {
 
       flat.sort((a, b) => a.distance - b.distance);
       setStylists(flat);
+      console.log("✅ Stylists with services:", flat);
+
       setLoading(false);
     };
 
