@@ -206,7 +206,7 @@ export default function Navbar() {
                                 <Link href="/employees" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
                                     Employees
                                 </Link>
-                                <Link href="/services" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                <Link href="/salon/services" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
                                     Service
                                 </Link>
                                 <Link href="/salon/freelancers-approval" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
@@ -560,7 +560,7 @@ export default function Navbar() {
                                         👥 Employees
                                     </Link>
                                     <Link
-                                        href="/services"
+                                        href="/salon/services"
                                         onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
                                         className="hover:text-yellow-400 flex items-center gap-2 py-1"
                                     >
