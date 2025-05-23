@@ -20,12 +20,15 @@ export default function FindStylists() {
   const [form, setForm] = useState({
     service_ids: [],
     appointment_date: "",
+    dateOnly: "",
     duration_minutes: "",
     note: "",
   });
 
   const [availableServices, setAvailableServices] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState([]);
+
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -173,6 +176,65 @@ export default function FindStylists() {
       duration_minutes: totalDuration,
     });
   };
+  const fetchAvailableSlots = async (stylistId, selectedDate) => {
+    try {
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylistId}&date=${selectedDate}`
+      );
+      const data = await res.json();
+      const slots = getAvailableTimeSlots(data, selectedDate); // dùng hàm đã tạo ở bước 2
+      setAvailableSlots(slots);
+    } catch (err) {
+      console.error("❌ Error loading slots:", err.message);
+      setAvailableSlots([]);
+    }
+  };
+
+
+  function getAvailableTimeSlots(appointments, dateStr, interval = 30, workStart = "09:00", workEnd = "18:00") {
+    const slots = [];
+
+    const toMinutes = (time) => {
+      const [h, m] = time.split(":").map(Number);
+      return h * 60 + m;
+    };
+
+    const formatTime = (mins) => {
+      const h = String(Math.floor(mins / 60)).padStart(2, "0");
+      const m = String(mins % 60).padStart(2, "0");
+      return `${h}:${m}`;
+    };
+
+    const workStartMin = toMinutes(workStart);
+    const workEndMin = toMinutes(workEnd);
+
+    // 📅 Tạo danh sách các slot
+    for (let m = workStartMin; m + interval <= workEndMin; m += interval) {
+      slots.push({
+        time: formatTime(m),
+        startMin: m,
+        endMin: m + interval,
+        isBooked: false,
+      });
+    }
+
+    // ❌ Check và đánh dấu slot bị chiếm
+    for (const appt of appointments) {
+      const apptDate = new Date(appt.appointment_date);
+      const startMin = apptDate.getHours() * 60 + apptDate.getMinutes();
+      const endMin = startMin + appt.duration_minutes;
+
+      for (const slot of slots) {
+        if (
+          !(slot.endMin <= startMin || slot.startMin >= endMin)
+        ) {
+          slot.isBooked = true;
+        }
+      }
+    }
+
+    return slots;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
@@ -294,9 +356,17 @@ export default function FindStylists() {
                       <div>
                         <label>🕒 Date & Time:</label>
                         <input
-                          type="datetime-local"
-                          value={form.appointment_date}
-                          onChange={(e) => setForm({ ...form, appointment_date: e.target.value })}
+                          type="date"
+                          value={form.dateOnly}
+                          onChange={(e) => {
+                            const selectedDate = e.target.value;
+                            setForm({
+                              ...form,
+                              dateOnly: selectedDate,
+                              appointment_date: "", // reset ngày giờ cụ thể
+                            });
+                            fetchAvailableSlots(s.id, selectedDate); // ✅ gọi API lấy slot rảnh
+                          }}
                           className="w-full rounded p-1 text-black"
                         />
                       </div>
