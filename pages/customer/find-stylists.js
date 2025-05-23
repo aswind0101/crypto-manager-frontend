@@ -3,6 +3,9 @@ import Navbar from "../../components/Navbar";
 import { getDistanceInKm } from "../../components/utils/distance"; // bạn sẽ tạo helper này ở bước sau.
 import { useRouter } from "next/router";
 import Head from "next/head";
+import { getAuth } from "firebase/auth";
+const auth = getAuth(); // hoặc lấy từ firebase.js nếu đã export sẵn
+
 
 export default function FindStylists() {
   const [stylists, setStylists] = useState([]);
@@ -117,7 +120,14 @@ export default function FindStylists() {
 
     try {
       setSubmitting(true);
-      const token = localStorage.getItem("firebaseToken");
+
+      const user = auth.currentUser;
+      if (!user) {
+        alert("❌ Please login first.");
+        return;
+      }
+
+      const token = await user.getIdToken(); // ✅ chính xác
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments", {
         method: "POST",
         headers: {
