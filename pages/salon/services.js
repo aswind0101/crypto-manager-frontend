@@ -1,4 +1,4 @@
-// pages/salon/services.js
+// 📁 pages/salon/services.js
 import { useEffect, useState } from "react";
 import Navbar from "../../components/Navbar";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -6,15 +6,9 @@ import { auth } from "../../firebase";
 
 export default function SalonServicesPage() {
   const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
-    specialization: "nail_tech",
-    name: "",
-    description: "",
-    price: "",
-    duration_minutes: "",
-    promotion: "",
-  });
+  const [filteredServices, setFilteredServices] = useState([]);
+  const [selectedSpecialization, setSelectedSpecialization] = useState("all");
+  const [editingService, setEditingService] = useState(null);
 
   const specializations = [
     "nail_tech",
@@ -27,6 +21,17 @@ export default function SalonServicesPage() {
     "receptionist",
   ];
 
+  const defaultForm = {
+    specialization: "nail_tech",
+    name: "",
+    description: "",
+    price: "",
+    duration_minutes: "",
+    promotion: "",
+  };
+
+  const [form, setForm] = useState(defaultForm);
+
   const fetchServices = async (token) => {
     try {
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/services?me=1", {
@@ -34,10 +39,18 @@ export default function SalonServicesPage() {
       });
       const data = await res.json();
       setServices(data || []);
+      setFilteredServices(data || []);
     } catch (err) {
       console.error("❌ Error loading services:", err.message);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const handleFilterChange = (value) => {
+    setSelectedSpecialization(value);
+    if (value === "all") {
+      setFilteredServices(services);
+    } else {
+      setFilteredServices(services.filter((s) => s.specialization === value));
     }
   };
 
@@ -46,8 +59,14 @@ export default function SalonServicesPage() {
     try {
       const user = auth.currentUser;
       const token = await user.getIdToken();
-      const res = await fetch("https://crypto-manager-backend.onrender.com/api/services", {
-        method: "POST",
+
+      const method = editingService ? "PATCH" : "POST";
+      const url = editingService
+        ? `https://crypto-manager-backend.onrender.com/api/services/${editingService.id}`
+        : `https://crypto-manager-backend.onrender.com/api/services`;
+
+      const res = await fetch(url, {
+        method,
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -61,16 +80,20 @@ export default function SalonServicesPage() {
 
       const data = await res.json();
       if (res.ok) {
-        alert("✅ Service added!");
-        setServices((prev) => [data, ...prev]);
-        setForm({
-          specialization: "nail_tech",
-          name: "",
-          description: "",
-          price: "",
-          duration_minutes: "",
-          promotion: "",
-        });
+        const updatedList = editingService
+          ? services.map((s) => (s.id === data.id ? data : s))
+          : [data, ...services];
+
+        setServices(updatedList);
+        setFilteredServices(
+          selectedSpecialization === "all"
+            ? updatedList
+            : updatedList.filter((s) => s.specialization === selectedSpecialization)
+        );
+
+        setForm(defaultForm);
+        setEditingService(null);
+        alert(editingService ? "✅ Service updated!" : "✅ Service added!");
       } else {
         alert("❌ " + (data.error || "Something went wrong"));
       }
@@ -78,6 +101,12 @@ export default function SalonServicesPage() {
       console.error("❌ Error submitting service:", err.message);
       alert("❌ Network error");
     }
+  };
+
+  const startEdit = (service) => {
+    setForm({ ...service });
+    setEditingService(service);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -98,12 +127,14 @@ export default function SalonServicesPage() {
           💈 Salon Services
         </h1>
 
-        {/* Form thêm dịch vụ */}
+        {/* Form thêm/chỉnh sửa dịch vụ */}
         <form
           onSubmit={handleSubmit}
           className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-xl p-6 mb-8"
         >
-          <h2 className="text-xl font-bold mb-4 text-pink-100">➕ Add New Service</h2>
+          <h2 className="text-xl font-bold mb-4 text-pink-100">
+            {editingService ? "✏️ Edit Service" : "➕ Add New Service"}
+          </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <select
@@ -113,7 +144,9 @@ export default function SalonServicesPage() {
               className="rounded p-2 text-black"
             >
               {specializations.map((s) => (
-                <option key={s} value={s}>{s.replace("_", " ")}</option>
+                <option key={s} value={s}>
+                  {s.replace("_", " ")}
+                </option>
               ))}
             </select>
 
@@ -161,31 +194,77 @@ export default function SalonServicesPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            className="mt-4 bg-yellow-400 text-black px-6 py-2 rounded hover:bg-yellow-500 font-bold"
-          >
-            ➕ Add Service
-          </button>
+          <div className="mt-4 flex gap-4">
+            <button
+              type="submit"
+              className="bg-yellow-400 text-black px-6 py-2 rounded hover:bg-yellow-500 font-bold"
+            >
+              {editingService ? "✏️ Update Service" : "➕ Add Service"}
+            </button>
+            {editingService && (
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(defaultForm);
+                  setEditingService(null);
+                }}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              >
+                ❌ Cancel
+              </button>
+            )}
+          </div>
         </form>
+
+        {/* Bộ lọc specialization */}
+        <div className="mb-6">
+          <label className="font-semibold mr-3 text-white">
+            🔍 Filter by Specialization:
+          </label>
+          <select
+            value={selectedSpecialization}
+            onChange={(e) => handleFilterChange(e.target.value)}
+            className="rounded p-2 text-black"
+          >
+            <option value="all">All</option>
+            {specializations.map((s) => (
+              <option key={s} value={s}>
+                {s.replace("_", " ")}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Danh sách dịch vụ */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {loading ? (
-            <p className="text-center text-yellow-200 col-span-2">⏳ Loading services...</p>
-          ) : services.length === 0 ? (
-            <p className="text-center text-white col-span-2">No services added yet.</p>
+          {filteredServices.length === 0 ? (
+            <p className="text-center text-white col-span-2">
+              No services found.
+            </p>
           ) : (
-            services.map((s) => (
+            filteredServices.map((s) => (
               <div
                 key={s.id}
                 className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl shadow-xl"
               >
                 <h3 className="text-lg font-bold text-yellow-300">{s.name}</h3>
-                <p className="text-sm text-white/90 italic mb-1">{s.specialization.replace("_", " ")}</p>
+                <p className="text-sm text-white/90 italic mb-1">
+                  {s.specialization.replace("_", " ")}
+                </p>
                 <p className="text-sm">{s.description}</p>
-                <p className="text-sm mt-1">💲 <strong>${s.price}</strong> • ⏱ {s.duration_minutes} min</p>
-                {s.promotion && <p className="text-xs text-pink-300 mt-1">🎁 {s.promotion}</p>}
+                <p className="text-sm mt-1">
+                  💲 <strong>${s.price}</strong> • ⏱ {s.duration_minutes} min
+                </p>
+                {s.promotion && (
+                  <p className="text-xs text-pink-300 mt-1">🎁 {s.promotion}</p>
+                )}
+
+                <button
+                  onClick={() => startEdit(s)}
+                  className="mt-3 text-sm text-cyan-300 hover:underline"
+                >
+                  ✏️ Edit
+                </button>
               </div>
             ))
           )}
