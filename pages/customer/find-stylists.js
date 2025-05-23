@@ -369,6 +369,32 @@ export default function FindStylists() {
                           }}
                           className="w-full rounded p-1 text-black"
                         />
+                        {availableSlots.length > 0 && (
+                          <div className="mt-2">
+                            <label className="text-sm text-white mb-1 block">🕒 Select Time:</label>
+                            <div className="flex flex-wrap gap-2">
+                              {availableSlots.map((slot) => (
+                                <button
+                                  key={slot.time}
+                                  onClick={() =>
+                                    setForm({
+                                      ...form,
+                                      appointment_date: `${form.dateOnly}T${slot.time}:00`,
+                                    })
+                                  }
+                                  disabled={slot.isBooked}
+                                  className={`px-3 py-1 rounded-full text-sm ${slot.isBooked
+                                      ? "bg-gray-400 text-white cursor-not-allowed"
+                                      : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                                    }`}
+                                >
+                                  {slot.time}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                       </div>
 
                       <div>
