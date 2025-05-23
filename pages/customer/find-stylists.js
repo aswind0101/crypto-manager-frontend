@@ -158,6 +158,21 @@ export default function FindStylists() {
       setSubmitting(false);
     }
   };
+  const handleServiceChange = (e, stylist) => {
+    const selected = [...e.target.selectedOptions].map((opt) => parseInt(opt.value));
+    const selectedServices = stylist.services.filter((srv) => selected.includes(srv.id));
+
+    const totalDuration = selectedServices.reduce(
+      (sum, srv) => sum + (srv.duration_minutes || 30), // fallback 30 nếu không có duration
+      0
+    );
+
+    setForm({
+      ...form,
+      service_ids: selected,
+      duration_minutes: totalDuration,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
@@ -258,9 +273,7 @@ export default function FindStylists() {
                         <select
                           multiple
                           value={form.service_ids}
-                          onChange={(e) =>
-                            setForm({ ...form, service_ids: [...e.target.selectedOptions].map((opt) => parseInt(opt.value)) })
-                          }
+                          onChange={(e) => handleServiceChange(e, s)}
                           className="w-full rounded p-1 text-black"
                         >
                           {s.services?.map((srv) => (
@@ -269,7 +282,14 @@ export default function FindStylists() {
                             </option>
                           ))}
                         </select>
+
+                        {form.duration_minutes > 0 && (
+                          <p className="text-xs text-emerald-300 mt-1">
+                            ⏱ Estimated total time: {form.duration_minutes} minutes
+                          </p>
+                        )}
                       </div>
+
 
                       <div>
                         <label>🕒 Date & Time:</label>
