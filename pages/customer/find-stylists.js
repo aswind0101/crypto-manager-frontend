@@ -368,10 +368,10 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full h-[540px] perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[600px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full h-full rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
+                  <div className="absolute w-full min-h-full h-auto rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -416,7 +416,7 @@ export default function FindStylists() {
                   </div>
 
                   {/* Mặt sau */}
-                  <div className="absolute w-full h-full rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border-b-4 border-t-4 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
+                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border-b-4 border-t-4 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
                     <h3 className="text-lg font-bold text-yellow-300 mb-3">
                       ✨ Book Your Appointment
                     </h3>
@@ -432,7 +432,7 @@ export default function FindStylists() {
                             return (
                               <label
                                 key={srv.id}
-                                className={`flex items-center justify-between px-4 py-3 rounded-xl border cursor-pointer text-sm shadow-sm transition-all
+                                className={`flex items-center justify-between px-4 py-1 rounded-xl border cursor-pointer text-sm shadow-sm transition-all
                                   ${isSelected
                                     ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-400 shadow-lg"
                                     : "bg-white text-black border-gray-300 hover:bg-gray-100"}`}
@@ -459,7 +459,7 @@ export default function FindStylists() {
                                   />
                                   <div className="text-left">
                                     <span className="block font-bold">{srv.name}</span>
-                                    <span className="block text-xs text-emerald-800 font-semibold">${srv.price}</span>
+                                    <span className="block text-xs text-emerald-700 font-semibold">${srv.price}</span>
                                   </div>
                                 </div>
                               </label>
