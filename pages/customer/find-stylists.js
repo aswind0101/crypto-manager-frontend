@@ -184,26 +184,63 @@ export default function FindStylists() {
     const selectedServices = stylist.services.filter((srv) => selected.includes(srv.id));
 
     const totalDuration = selectedServices.reduce(
-      (sum, srv) => sum + (srv.duration_minutes || 30), // fallback 30 nếu không có duration
+      (sum, srv) => sum + (srv.duration_minutes || 30),
       0
     );
 
-    setForm({
-      ...form,
+    setForm((prev) => ({
+      ...prev,
       service_ids: selected,
       duration_minutes: totalDuration,
-    });
+    }));
+
+    // ✅ Gọi trực tiếp với giá trị mới — KHÔNG dùng form.duration_minutes
+    if (form.appointment_date) {
+      fetchAvailabilityWithDuration(stylist.id, form.appointment_date, totalDuration);
+    }
   };
-  const fetchAvailability = async (stylist_id, dateStr) => {
+  const fetchAvailabilityWithDuration = async (stylist_id, dateStr, duration) => {
     try {
-      const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylist_id}&date=${dateStr}`);
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylist_id}&date=${dateStr}`
+      );
       const data = await res.json();
 
       if (res.ok) {
-        // ⚠️ Chuyển đổi dữ liệu lịch thành slot
-        const slots = getAvailableTimeSlots(data, dateStr, 30); // 30 phút mỗi slot
-        const available = slots.filter(s => !s.isBooked); // ❌ lọc ra slot chưa bị chiếm
-        setTimeSlots(available);
+        console.log("🧾 Appointments:", data);
+        console.log("⏱️ Realtime duration passed in:", duration);
+
+        const slots = getAvailableTimeSlots(data, dateStr, 30, "09:00", "18:00", duration);
+        setTimeSlots(slots);
+      } else {
+        console.warn("⚠️ Failed to fetch availability:", data.error);
+        setTimeSlots([]);
+      }
+    } catch (err) {
+      console.error("❌ Error fetching availability:", err.message);
+      setTimeSlots([]);
+    }
+  };
+
+  const fetchAvailability = async (stylist_id, dateStr) => {
+    try {
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylist_id}&date=${dateStr}`
+      );
+      const data = await res.json();
+
+      if (res.ok) {
+        console.log("🧾 Appointments:", data);
+        const totalDuration = parseInt(form.duration_minutes || "30");
+        const slots = getAvailableTimeSlots(
+          data,
+          dateStr,
+          30,
+          "09:00",
+          "18:00",
+          totalDuration
+        );
+        setTimeSlots(slots);
       } else {
         console.warn("⚠️ Failed to fetch availability:", data.error);
         setTimeSlots([]);
@@ -215,8 +252,18 @@ export default function FindStylists() {
   };
 
 
+  function getAvailableTimeSlots(
+    appointments,
+    dateStr,
+    interval = 30,
+    workStart = "09:00",
+    workEnd = "18:00",
+    totalDuration = 30
+  ) {
+    console.log("📦 getAvailableTimeSlots called");
+    console.log("🧾 Appointments:", appointments);
+    console.log("⏱️ Total Duration:", totalDuration);
 
-  function getAvailableTimeSlots(appointments, dateStr, interval = 30, workStart = "09:00", workEnd = "18:00") {
     const slots = [];
 
     const toMinutes = (time) => {
@@ -233,31 +280,51 @@ export default function FindStylists() {
     const workStartMin = toMinutes(workStart);
     const workEndMin = toMinutes(workEnd);
 
-    for (let m = workStartMin; m + interval <= workEndMin; m += interval) {
+    for (let m = workStartMin; m + totalDuration <= workEndMin; m += interval) {
       slots.push({
         time: formatTime(m),
         startMin: m,
-        endMin: m + interval,
-        isBooked: false,
+        endMin: m + totalDuration,
       });
     }
 
-    for (const appt of appointments) {
-      const apptDate = new Date(appt.appointment_date);
-      const startMin = apptDate.getHours() * 60 + apptDate.getMinutes();
-      const duration = Number(appt.duration_minutes) || 30;
-      const endMin = startMin + duration;
+    console.log("🕒 All generated slots:", slots);
 
-      for (const slot of slots) {
-        if (!(slot.endMin <= startMin || slot.startMin >= endMin)) {
-          slot.isBooked = true;
+    const bookedRanges = appointments
+      .map((appt) => {
+        if (!appt || !appt.appointment_date || !appt.duration_minutes) return null;
+        const [_, timePart] = appt.appointment_date.split("T");
+        if (!timePart) return null;
+
+        const [hourStr, minStr] = timePart.split(":");
+        const start = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
+        const duration = parseInt(appt.duration_minutes, 10);
+        const end = start + duration;
+
+        return { start, end };
+      })
+      .filter(Boolean);
+
+    console.log("📌 Booked Ranges:", bookedRanges);
+
+    const filtered = slots.filter((slot) => {
+      const hasConflict = bookedRanges.some((br) => {
+        const conflict = !(slot.endMin <= br.start || slot.startMin >= br.end);
+        if (conflict) {
+          console.log(
+            `❌ Blocked slot ${slot.time} (${slot.startMin}–${slot.endMin}) because overlaps with booking ${br.start}–${br.end}`
+          );
         }
-      }
-    }
+        return conflict;
+      });
 
-    return slots;
+      return !hasConflict;
+    });
+
+    console.log("✅ Final Available Slots:", filtered.map(s => s.time));
+
+    return filtered;
   }
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
@@ -301,7 +368,7 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full h-[500px] perspective-[1500px]">
+              <div key={s.id} className="relative w-full h-[520px] perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
                   <div className="absolute w-full h-full rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
@@ -403,7 +470,9 @@ export default function FindStylists() {
                           >
                             <option value="">-- Select time --</option>
                             {timeSlots.map((slot) => (
-                              <option key={slot.time} value={slot.time}>{slot.time}</option>
+                              <option key={slot.time} value={slot.time}>
+                                {slot.time}
+                              </option>
                             ))}
                           </select>
                         </div>
@@ -431,7 +500,7 @@ export default function FindStylists() {
                     <button
                       disabled={submitting}
                       onClick={() => handleSubmitBooking(s)}
-                      className="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded"
+                      className="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded-3xl"
                     >
                       {submitting ? "Booking..." : "✅ Book Now"}
                     </button>
