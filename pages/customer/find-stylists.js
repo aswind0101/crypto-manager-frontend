@@ -385,7 +385,7 @@ export default function FindStylists() {
                     <img
                       src={s.avatar_url?.startsWith("http") ? s.avatar_url : `https://crypto-manager-backend.onrender.com${s.avatar_url}`}
                       onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
-                      className="w-42 h-42 rounded-full object-cover border-2 border-white shadow mb-3"
+                      className="w-42 h-42 rounded-full object-cover border-2 border-white shadow mb-3 mt-6"
                       alt={s.name}
                     />
 
@@ -409,7 +409,7 @@ export default function FindStylists() {
                     <hr className="w-3/4 border-t border-white/20 my-1" />
                     <button
                       onClick={() => handleBookClick(s.id)}
-                      className="mb-4 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
+                      className="mb-6 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
                     >
                       Book Appointment
                     </button>
@@ -473,7 +473,7 @@ export default function FindStylists() {
                                     className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
                                   />
                                   <div className="text-left">
-                                    <span className="block">{srv.name}</span>
+                                    <span className="block capitalize">{srv.name}</span>
                                     <span className="block text-xs text-yellow-500">
                                       ${srv.price}
                                     </span>
@@ -546,7 +546,7 @@ export default function FindStylists() {
 
                       {/* Thông tin đặt */}
                       {form.appointment_date && selectedTime && (
-                        <div className="mt-3 px-3 py-2 rounded-lg bg-pink-600/20 border border-pink-500 text-pink-200 text-sm font-semibold text-center shadow-sm">
+                        <div className="mt-3 px-2 py-2 rounded-lg bg-pink-600/20 border border-pink-500 text-pink-200 text-sm font-semibold text-center shadow-sm">
                           📌 You selected:
                           <span className="ml-1 text-yellow-300 font-bold">
                             {form.appointment_date}
