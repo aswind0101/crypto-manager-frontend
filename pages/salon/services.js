@@ -220,7 +220,7 @@ export default function SalonServicesPage() {
                                 name="specialization"
                                 value={form.specialization}
                                 onChange={(e) => setForm({ ...form, specialization: e.target.value })}
-                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
                             >
                                 {specializations.map((s) => (
                                     <option key={s} value={s}>{s.replace("_", " ")}</option>
@@ -235,7 +235,7 @@ export default function SalonServicesPage() {
                                 value={form.name}
                                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                                 required
-                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
                             />
                         </div>
 
@@ -313,7 +313,7 @@ export default function SalonServicesPage() {
                     <select
                         value={selectedSpecialization}
                         onChange={(e) => handleFilterChange(e.target.value)}
-                        className="rounded p-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                        className="rounded p-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
                     >
                         <option value="all">All</option>
                         {specializations.map((s) => (
@@ -336,8 +336,8 @@ export default function SalonServicesPage() {
                                 key={s.id}
                                 className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl shadow-xl"
                             >
-                                <h3 className="text-lg font-bold text-yellow-300">{s.name}</h3>
-                                <p className="text-sm text-white/90 italic mb-1">
+                                <h3 className="text-lg font-bold text-yellow-300 capitalize">{s.name}</h3>
+                                <p className="text-sm text-white/90 italic mb-1 capitalize">
                                     {s.specialization.replace("_", " ")}
                                 </p>
                                 <p className="text-sm">{s.description}</p>
