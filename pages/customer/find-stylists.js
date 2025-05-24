@@ -385,7 +385,7 @@ export default function FindStylists() {
                     <img
                       src={s.avatar_url?.startsWith("http") ? s.avatar_url : `https://crypto-manager-backend.onrender.com${s.avatar_url}`}
                       onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
-                      className="w-32 h-32 rounded-full object-cover border-2 border-white shadow mb-3"
+                      className="w-42 h-42 rounded-full object-cover border-2 border-white shadow mb-3"
                       alt={s.name}
                     />
 
@@ -425,18 +425,18 @@ export default function FindStylists() {
 
                       {/* Step 1: Chọn dịch vụ */}
                       <div>
-                        <p className="text-pink-300 font-bold mb-2">📋 Step 1: Select Services</p>
+                        <p className="text-pink-400 font-bold mb-2">📋 Step 1: Select Services</p>
 
                         {/* Scrollable list of services */}
-                        <div className="max-h-48 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-emerald-600 scrollbar-track-zinc-700 rounded-md">
+                        <div className="max-h-48 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
                           {s.services?.map((srv) => {
                             const isSelected = form.service_ids.includes(srv.id);
                             return (
                               <label
                                 key={srv.id}
-                                className={`flex items-center justify-between px-4 py-1 rounded-xl border cursor-pointer text-sm shadow-sm transition-all ${isSelected
-                                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-400 shadow-lg"
-                                    : "bg-zinc-800 text-emerald-50 border-zinc-600 hover:bg-zinc-700"
+                                className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs shadow-sm transition-all ${isSelected
+                                  ? "bg-gradient-to-r from-pink-400 to-pink-500 text-white border-pink-400 shadow-lg"
+                                  : "text-pink-100 border-pink-300 hover:bg-pink-400"
                                   }`}
                               >
                                 <div className="flex items-start gap-3">
@@ -473,8 +473,8 @@ export default function FindStylists() {
                                     className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
                                   />
                                   <div className="text-left">
-                                    <span className="block font-bold">{srv.name}</span>
-                                    <span className="block text-xs text-emerald-300 font-semibold">
+                                    <span className="block">{srv.name}</span>
+                                    <span className="block text-xs text-yellow-500">
                                       ${srv.price}
                                     </span>
                                   </div>
@@ -494,7 +494,7 @@ export default function FindStylists() {
 
                       {/* Step 2: Chọn ngày */}
                       <div>
-                        <p className="text-pink-300 font-bold mb-1">📆 Step 2: Pick a Date</p>
+                        <p className="text-pink-400 font-bold mb-1">📆 Step 2: Pick a Date</p>
                         <input
                           type="date"
                           value={form.appointment_date}
@@ -504,20 +504,20 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                          className="w-full rounded p-1 text-black"
+                          className="w-full rounded p-1 text-yellow-500 bg-gradient-to-r from-zinc-700 to-zinc-800 text-xs pl-2"
                         />
                       </div>
 
                       {/* Step 3: Chọn giờ */}
                       {timeSlots.length > 0 ? (
                         <div>
-                          <p className="text-pink-300 font-bold mb-1">🕒 Step 3: Choose Time</p>
+                          <p className="text-pink-400 font-bold mb-1">🕒 Step 3: Choose Time</p>
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="w-full rounded p-1 text-black"
+                            className="w-full rounded p-1 text-yellow-500 bg-gradient-to-r from-zinc-700 to-zinc-800 text-xs pl-2"
                           >
-                            <option value="">⏳ Select time...</option>
+                            <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
                               <option key={slot.time} value={slot.time}>
                                 🕒 {slot.time}
@@ -535,21 +535,27 @@ export default function FindStylists() {
 
                       {/* Step 4: Ghi chú */}
                       <div>
-                        <p className="text-pink-300 font-bold mb-1">💬 Step 4: Optional Notes</p>
+                        <p className="text-pink-400 font-bold mb-1">💬 Step 4: Optional Notes</p>
                         <textarea
                           value={form.note}
                           onChange={(e) => setForm({ ...form, note: e.target.value })}
-                          className="w-full rounded p-1 text-black"
+                          className="w-full rounded p-1 text-pink-100 text-xs"
                           placeholder="Anything specific?"
                         />
                       </div>
 
                       {/* Thông tin đặt */}
                       {form.appointment_date && selectedTime && (
-                        <p className="text-xs text-emerald-300">
-                          📌 You selected: {form.appointment_date} at {selectedTime}
-                        </p>
+                        <div className="mt-3 px-3 py-2 rounded-lg bg-pink-600/20 border border-pink-500 text-pink-200 text-sm font-semibold text-center shadow-sm">
+                          📌 You selected:
+                          <span className="ml-1 text-yellow-300 font-bold">
+                            {form.appointment_date}
+                          </span>
+                          <span className="mx-1">at</span>
+                          <span className="text-yellow-300 font-bold">{selectedTime}</span>
+                        </div>
                       )}
+
                     </div>
 
                     {/* Gửi lịch hẹn */}
