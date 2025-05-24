@@ -1,0 +1,40 @@
+export default function getAvailableTimeSlots(appointments, dateStr, interval = 30, workStart = "09:00", workEnd = "18:00") {
+  const slots = [];
+
+  const toMinutes = (time) => {
+    const [h, m] = time.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  const formatTime = (mins) => {
+    const h = String(Math.floor(mins / 60)).padStart(2, "0");
+    const m = String(mins % 60).padStart(2, "0");
+    return `${h}:${m}`;
+  };
+
+  const workStartMin = toMinutes(workStart);
+  const workEndMin = toMinutes(workEnd);
+
+  for (let m = workStartMin; m + interval <= workEndMin; m += interval) {
+    slots.push({
+      time: formatTime(m),
+      startMin: m,
+      endMin: m + interval,
+      isBooked: false,
+    });
+  }
+
+  for (const appt of appointments) {
+    const apptDate = new Date(appt.appointment_date);
+    const startMin = apptDate.getHours() * 60 + apptDate.getMinutes();
+    const endMin = startMin + appt.duration_minutes;
+
+    for (const slot of slots) {
+      if (!(slot.endMin <= startMin || slot.startMin >= endMin)) {
+        slot.isBooked = true;
+      }
+    }
+  }
+
+  return slots;
+}

@@ -17,17 +17,19 @@ export default function FindStylists() {
   const [user, setUser] = useState(null);
   const router = useRouter();
 
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [selectedTime, setSelectedTime] = useState(""); // HH:mm
+
+
   const [form, setForm] = useState({
     service_ids: [],
     appointment_date: "",
-    dateOnly: "",
     duration_minutes: "",
     note: "",
   });
 
   const [availableServices, setAvailableServices] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState([]);
 
 
   useEffect(() => {
@@ -116,8 +118,12 @@ export default function FindStylists() {
     }
   };
   const handleSubmitBooking = async (stylist) => {
-    if (form.service_ids.length === 0 || !form.appointment_date) {
-      alert("Please select service and date.");
+    if (
+      form.service_ids.length === 0 ||
+      !form.appointment_date ||
+      !selectedTime
+    ) {
+      alert("Please select service, date and time.");
       return;
     }
 
@@ -130,7 +136,11 @@ export default function FindStylists() {
         return;
       }
 
-      const token = await user.getIdToken(); // ✅ chính xác
+      const combinedDateTime = new Date(`${form.appointment_date}T${selectedTime}:00`);
+      const localDateTime = new Date(combinedDateTime.getTime() - combinedDateTime.getTimezoneOffset() * 60000);
+      const isoDate = localDateTime.toISOString();
+
+      const token = await user.getIdToken();
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments", {
         method: "POST",
         headers: {
@@ -141,7 +151,7 @@ export default function FindStylists() {
           stylist_id: stylist.id,
           salon_id: stylist.salon_id,
           service_ids: form.service_ids,
-          appointment_date: form.appointment_date,
+          appointment_date: isoDate,
           duration_minutes: parseInt(form.duration_minutes || "60"),
           note: form.note,
         }),
@@ -152,15 +162,18 @@ export default function FindStylists() {
         alert("✅ Appointment booked successfully!");
         setFlippedId(null);
         setForm({ service_ids: [], appointment_date: "", duration_minutes: "", note: "" });
+        setSelectedTime("");
       } else {
         alert("❌ " + (data.error || "Booking failed."));
       }
     } catch (err) {
       alert("❌ Network error");
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
   };
+
   const handleServiceChange = (e, stylist) => {
     const selected = [...e.target.selectedOptions].map((opt) => parseInt(opt.value));
     const selectedServices = stylist.services.filter((srv) => selected.includes(srv.id));
@@ -176,17 +189,22 @@ export default function FindStylists() {
       duration_minutes: totalDuration,
     });
   };
-  const fetchAvailableSlots = async (stylistId, selectedDate) => {
+  const fetchAvailability = async (stylist_id, dateStr) => {
     try {
-      const res = await fetch(
-        `https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylistId}&date=${selectedDate}`
-      );
+      const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylist_id}&date=${dateStr}`);
       const data = await res.json();
-      const slots = getAvailableTimeSlots(data, selectedDate); // dùng hàm đã tạo ở bước 2
-      setAvailableSlots(slots);
+
+      if (res.ok) {
+        const slots = getAvailableTimeSlots(data, dateStr, 30); // mỗi slot 30 phút
+        const freeSlots = slots.filter(slot => !slot.isBooked); // chỉ lấy giờ trống
+        setTimeSlots(freeSlots);
+      } else {
+        console.warn("⚠️ Error:", data.error);
+        setTimeSlots([]);
+      }
     } catch (err) {
-      console.error("❌ Error loading slots:", err.message);
-      setAvailableSlots([]);
+      console.error("❌ Error fetching availability:", err.message);
+      setTimeSlots([]);
     }
   };
 
@@ -208,7 +226,7 @@ export default function FindStylists() {
     const workStartMin = toMinutes(workStart);
     const workEndMin = toMinutes(workEnd);
 
-    // 📅 Tạo danh sách các slot
+    // 📅 Tạo danh sách slot rảnh mặc định
     for (let m = workStartMin; m + interval <= workEndMin; m += interval) {
       slots.push({
         time: formatTime(m),
@@ -218,16 +236,20 @@ export default function FindStylists() {
       });
     }
 
-    // ❌ Check và đánh dấu slot bị chiếm
+    // ❌ Đánh dấu slot bị trùng lịch
     for (const appt of appointments) {
       const apptDate = new Date(appt.appointment_date);
       const startMin = apptDate.getHours() * 60 + apptDate.getMinutes();
-      const endMin = startMin + appt.duration_minutes;
+      const duration = Number(appt.duration_minutes) || 30; // chống NaN
+      const endMin = startMin + duration;
 
       for (const slot of slots) {
-        if (
-          !(slot.endMin <= startMin || slot.startMin >= endMin)
-        ) {
+        const slotStart = slot.startMin;
+        const slotEnd = slot.endMin;
+
+        // Nếu slot và lịch hẹn có giao nhau
+        const isOverlap = !(slotEnd <= startMin || slotStart >= endMin);
+        if (isOverlap) {
           slot.isBooked = true;
         }
       }
@@ -235,6 +257,7 @@ export default function FindStylists() {
 
     return slots;
   }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
@@ -278,7 +301,7 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full h-[440px] perspective-[1500px]">
+              <div key={s.id} className="relative w-full h-[500px] perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
                   <div className="absolute w-full h-full rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
@@ -330,6 +353,7 @@ export default function FindStylists() {
                     <h3 className="text-lg font-bold text-yellow-300 mb-2">📅 Book Appointment</h3>
 
                     <div className="text-left space-y-2 text-sm">
+                      {/* Chọn dịch vụ */}
                       <div>
                         <label>📋 Services:</label>
                         <select
@@ -352,51 +376,47 @@ export default function FindStylists() {
                         )}
                       </div>
 
-
+                      {/* Chọn ngày */}
                       <div>
-                        <label>🕒 Date & Time:</label>
+                        <label>📅 Appointment Date:</label>
                         <input
                           type="date"
-                          value={form.dateOnly}
+                          value={form.appointment_date}
                           onChange={(e) => {
-                            const selectedDate = e.target.value;
-                            setForm({
-                              ...form,
-                              dateOnly: selectedDate,
-                              appointment_date: "", // reset ngày giờ cụ thể
-                            });
-                            fetchAvailableSlots(s.id, selectedDate); // ✅ gọi API lấy slot rảnh
+                            const dateOnly = e.target.value;
+                            setForm({ ...form, appointment_date: dateOnly });
+                            setSelectedTime("");
+                            if (dateOnly) fetchAvailability(s.id, dateOnly); // gọi API
                           }}
                           className="w-full rounded p-1 text-black"
                         />
-                        {availableSlots.length > 0 && (
-                          <div className="mt-2">
-                            <label className="text-sm text-white mb-1 block">🕒 Select Time:</label>
-                            <div className="flex flex-wrap gap-2">
-                              {availableSlots.map((slot) => (
-                                <button
-                                  key={slot.time}
-                                  onClick={() =>
-                                    setForm({
-                                      ...form,
-                                      appointment_date: `${form.dateOnly}T${slot.time}:00`,
-                                    })
-                                  }
-                                  disabled={slot.isBooked}
-                                  className={`px-3 py-1 rounded-full text-sm ${slot.isBooked
-                                      ? "bg-gray-400 text-white cursor-not-allowed"
-                                      : "bg-emerald-500 hover:bg-emerald-600 text-white"
-                                    }`}
-                                >
-                                  {slot.time}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
                       </div>
 
+                      {/* Chọn giờ từ slot */}
+                      {timeSlots.length > 0 && (
+                        <div className="mt-2">
+                          <label className="block text-sm mb-1">🕒 Select Time:</label>
+                          <select
+                            value={selectedTime}
+                            onChange={(e) => setSelectedTime(e.target.value)}
+                            className="w-full rounded p-1 text-black"
+                          >
+                            <option value="">-- Select time --</option>
+                            {timeSlots.map((slot) => (
+                              <option key={slot.time} value={slot.time}>{slot.time}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Hiển thị ngày + giờ */}
+                      {form.appointment_date && selectedTime && (
+                        <p className="text-xs text-emerald-300 mt-1">
+                          📌 Booking: {form.appointment_date} at {selectedTime}
+                        </p>
+                      )}
+
+                      {/* Ghi chú */}
                       <div>
                         <label>📝 Notes:</label>
                         <textarea
@@ -407,6 +427,7 @@ export default function FindStylists() {
                       </div>
                     </div>
 
+                    {/* Gửi hẹn */}
                     <button
                       disabled={submitting}
                       onClick={() => handleSubmitBooking(s)}
@@ -422,6 +443,7 @@ export default function FindStylists() {
                       🔙 Go back
                     </button>
                   </div>
+
                 </div>
               </div>
             ))}
