@@ -33,6 +33,10 @@
   }
 }
 
+input[type="checkbox"]:checked {
+  accent-color: #059669; /* emerald-600 */
+}
+
 .animate-fade-in {
   animation: fade-in 0.3s ease-in-out forwards;
 }
