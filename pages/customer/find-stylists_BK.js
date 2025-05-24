@@ -17,6 +17,10 @@ export default function FindStylists() {
   const [user, setUser] = useState(null);
   const router = useRouter();
 
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [selectedTime, setSelectedTime] = useState(""); // HH:mm
+
+
   const [form, setForm] = useState({
     service_ids: [],
     appointment_date: "",
@@ -114,8 +118,12 @@ export default function FindStylists() {
     }
   };
   const handleSubmitBooking = async (stylist) => {
-    if (form.service_ids.length === 0 || !form.appointment_date) {
-      alert("Please select service and date.");
+    if (
+      form.service_ids.length === 0 ||
+      !form.appointment_date ||
+      !selectedTime
+    ) {
+      alert("Please select service, date and time.");
       return;
     }
 
@@ -128,7 +136,11 @@ export default function FindStylists() {
         return;
       }
 
-      const token = await user.getIdToken(); // ✅ chính xác
+      const combinedDateTime = new Date(`${form.appointment_date}T${selectedTime}:00`);
+      const localDateTime = new Date(combinedDateTime.getTime() - combinedDateTime.getTimezoneOffset() * 60000);
+      const isoDate = localDateTime.toISOString();
+
+      const token = await user.getIdToken();
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments", {
         method: "POST",
         headers: {
@@ -139,42 +151,119 @@ export default function FindStylists() {
           stylist_id: stylist.id,
           salon_id: stylist.salon_id,
           service_ids: form.service_ids,
-          appointment_date: form.appointment_date,
+          appointment_date: isoDate,
           duration_minutes: parseInt(form.duration_minutes || "60"),
           note: form.note,
         }),
       });
 
       const data = await res.json();
+      if (res.status === 409) {
+        alert("❌ This time slot has just been taken by another customer. Please choose another.");
+        return;
+      }
+
       if (res.ok) {
         alert("✅ Appointment booked successfully!");
         setFlippedId(null);
         setForm({ service_ids: [], appointment_date: "", duration_minutes: "", note: "" });
+        setSelectedTime("");
       } else {
         alert("❌ " + (data.error || "Booking failed."));
       }
     } catch (err) {
       alert("❌ Network error");
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
   };
+
   const handleServiceChange = (e, stylist) => {
     const selected = [...e.target.selectedOptions].map((opt) => parseInt(opt.value));
     const selectedServices = stylist.services.filter((srv) => selected.includes(srv.id));
 
     const totalDuration = selectedServices.reduce(
-      (sum, srv) => sum + (srv.duration_minutes || 30), // fallback 30 nếu không có duration
+      (sum, srv) => sum + (srv.duration_minutes || 30),
       0
     );
 
-    setForm({
-      ...form,
+    setForm((prev) => ({
+      ...prev,
       service_ids: selected,
       duration_minutes: totalDuration,
-    });
+    }));
+
+    // ✅ Gọi trực tiếp với giá trị mới — KHÔNG dùng form.duration_minutes
+    if (form.appointment_date) {
+      fetchAvailabilityWithDuration(stylist.id, form.appointment_date, totalDuration);
+    }
   };
-  function getAvailableTimeSlots(appointments, dateStr, interval = 30, workStart = "09:00", workEnd = "18:00") {
+  const fetchAvailabilityWithDuration = async (stylist_id, dateStr, duration) => {
+    try {
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylist_id}&date=${dateStr}`
+      );
+      const data = await res.json();
+
+      if (res.ok) {
+        console.log("🧾 Appointments:", data);
+        console.log("⏱️ Realtime duration passed in:", duration);
+
+        const slots = getAvailableTimeSlots(data, dateStr, 30, "09:00", "18:00", duration);
+        setTimeSlots(slots);
+      } else {
+        console.warn("⚠️ Failed to fetch availability:", data.error);
+        setTimeSlots([]);
+      }
+    } catch (err) {
+      console.error("❌ Error fetching availability:", err.message);
+      setTimeSlots([]);
+    }
+  };
+
+  const fetchAvailability = async (stylist_id, dateStr) => {
+    try {
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylist_id}&date=${dateStr}`
+      );
+      const data = await res.json();
+
+      if (res.ok) {
+        console.log("🧾 Appointments:", data);
+        const totalDuration = parseInt(form.duration_minutes || "30");
+        const slots = getAvailableTimeSlots(
+          data,
+          dateStr,
+          30,
+          "09:00",
+          "18:00",
+          totalDuration
+        );
+        setTimeSlots(slots);
+      } else {
+        console.warn("⚠️ Failed to fetch availability:", data.error);
+        setTimeSlots([]);
+      }
+    } catch (err) {
+      console.error("❌ Error fetching availability:", err.message);
+      setTimeSlots([]);
+    }
+  };
+
+
+  function getAvailableTimeSlots(
+    appointments,
+    dateStr,
+    interval = 30,
+    workStart = "09:00",
+    workEnd = "18:00",
+    totalDuration = 30
+  ) {
+    console.log("📦 getAvailableTimeSlots called");
+    console.log("🧾 Appointments:", appointments);
+    console.log("⏱️ Total Duration:", totalDuration);
+
     const slots = [];
 
     const toMinutes = (time) => {
@@ -191,32 +280,50 @@ export default function FindStylists() {
     const workStartMin = toMinutes(workStart);
     const workEndMin = toMinutes(workEnd);
 
-    // 📅 Tạo danh sách các slot
-    for (let m = workStartMin; m + interval <= workEndMin; m += interval) {
+    for (let m = workStartMin; m + totalDuration <= workEndMin; m += interval) {
       slots.push({
         time: formatTime(m),
         startMin: m,
-        endMin: m + interval,
-        isBooked: false,
+        endMin: m + totalDuration,
       });
     }
 
-    // ❌ Check và đánh dấu slot bị chiếm
-    for (const appt of appointments) {
-      const apptDate = new Date(appt.appointment_date);
-      const startMin = apptDate.getHours() * 60 + apptDate.getMinutes();
-      const endMin = startMin + appt.duration_minutes;
+    console.log("🕒 All generated slots:", slots);
 
-      for (const slot of slots) {
-        if (
-          !(slot.endMin <= startMin || slot.startMin >= endMin)
-        ) {
-          slot.isBooked = true;
+    const bookedRanges = appointments
+      .map((appt) => {
+        if (!appt || !appt.appointment_date || !appt.duration_minutes) return null;
+        const [_, timePart] = appt.appointment_date.split("T");
+        if (!timePart) return null;
+
+        const [hourStr, minStr] = timePart.split(":");
+        const start = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
+        const duration = parseInt(appt.duration_minutes, 10);
+        const end = start + duration;
+
+        return { start, end };
+      })
+      .filter(Boolean);
+
+    console.log("📌 Booked Ranges:", bookedRanges);
+
+    const filtered = slots.filter((slot) => {
+      const hasConflict = bookedRanges.some((br) => {
+        const conflict = !(slot.endMin <= br.start || slot.startMin >= br.end);
+        if (conflict) {
+          console.log(
+            `❌ Blocked slot ${slot.time} (${slot.startMin}–${slot.endMin}) because overlaps with booking ${br.start}–${br.end}`
+          );
         }
-      }
-    }
+        return conflict;
+      });
 
-    return slots;
+      return !hasConflict;
+    });
+
+    console.log("✅ Final Available Slots:", filtered.map(s => s.time));
+
+    return filtered;
   }
 
   return (
@@ -261,7 +368,7 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full h-[440px] perspective-[1500px]">
+              <div key={s.id} className="relative w-full h-[520px] perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
                   <div className="absolute w-full h-full rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
@@ -313,6 +420,7 @@ export default function FindStylists() {
                     <h3 className="text-lg font-bold text-yellow-300 mb-2">📅 Book Appointment</h3>
 
                     <div className="text-left space-y-2 text-sm">
+                      {/* Chọn dịch vụ */}
                       <div>
                         <label>📋 Services:</label>
                         <select
@@ -335,17 +443,49 @@ export default function FindStylists() {
                         )}
                       </div>
 
-
+                      {/* Chọn ngày */}
                       <div>
-                        <label>🕒 Date & Time:</label>
+                        <label>📅 Appointment Date:</label>
                         <input
-                          type="datetime-local"
+                          type="date"
                           value={form.appointment_date}
-                          onChange={(e) => setForm({ ...form, appointment_date: e.target.value })}
+                          onChange={(e) => {
+                            const dateOnly = e.target.value;
+                            setForm({ ...form, appointment_date: dateOnly });
+                            setSelectedTime("");
+                            if (dateOnly) fetchAvailability(s.id, dateOnly); // gọi API
+                          }}
                           className="w-full rounded p-1 text-black"
                         />
                       </div>
 
+                      {/* Chọn giờ từ slot */}
+                      {timeSlots.length > 0 && (
+                        <div className="mt-2">
+                          <label className="block text-sm mb-1">🕒 Select Time:</label>
+                          <select
+                            value={selectedTime}
+                            onChange={(e) => setSelectedTime(e.target.value)}
+                            className="w-full rounded p-1 text-black"
+                          >
+                            <option value="">-- Select time --</option>
+                            {timeSlots.map((slot) => (
+                              <option key={slot.time} value={slot.time}>
+                                {slot.time}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Hiển thị ngày + giờ */}
+                      {form.appointment_date && selectedTime && (
+                        <p className="text-xs text-emerald-300 mt-1">
+                          📌 Booking: {form.appointment_date} at {selectedTime}
+                        </p>
+                      )}
+
+                      {/* Ghi chú */}
                       <div>
                         <label>📝 Notes:</label>
                         <textarea
@@ -356,10 +496,11 @@ export default function FindStylists() {
                       </div>
                     </div>
 
+                    {/* Gửi hẹn */}
                     <button
                       disabled={submitting}
                       onClick={() => handleSubmitBooking(s)}
-                      className="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded"
+                      className="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded-3xl"
                     >
                       {submitting ? "Booking..." : "✅ Book Now"}
                     </button>
@@ -371,6 +512,7 @@ export default function FindStylists() {
                       🔙 Go back
                     </button>
                   </div>
+
                 </div>
               </div>
             ))}
