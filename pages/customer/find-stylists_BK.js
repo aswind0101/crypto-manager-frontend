@@ -368,10 +368,10 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full h-[540px] perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[660px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full h-full rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
+                  <div className="absolute w-full min-h-full h-auto rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -385,7 +385,7 @@ export default function FindStylists() {
                     <img
                       src={s.avatar_url?.startsWith("http") ? s.avatar_url : `https://crypto-manager-backend.onrender.com${s.avatar_url}`}
                       onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
-                      className="w-32 h-32 rounded-full object-cover border-2 border-white shadow mb-3"
+                      className="w-42 h-42 rounded-full object-cover border-2 border-white shadow mb-3 mt-6"
                       alt={s.name}
                     />
 
@@ -409,14 +409,14 @@ export default function FindStylists() {
                     <hr className="w-3/4 border-t border-white/20 my-1" />
                     <button
                       onClick={() => handleBookClick(s.id)}
-                      className="mb-4 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
+                      className="mb-6 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
                     >
                       Book Appointment
                     </button>
                   </div>
 
                   {/* Mặt sau */}
-                  <div className="absolute w-full h-full rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border-b-4 border-t-4 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
+                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border-b-4 border-t-4 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
                     <h3 className="text-lg font-bold text-yellow-300 mb-3">
                       ✨ Book Your Appointment
                     </h3>
@@ -425,39 +425,66 @@ export default function FindStylists() {
 
                       {/* Step 1: Chọn dịch vụ */}
                       <div>
-                        <p className="text-pink-300 font-bold mb-1">📋 Step 1: Select Services</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <p className="text-pink-400 font-bold mb-2">📋 Step 1: Select Services</p>
+
+                        {/* Scrollable list of services */}
+                        <div className="max-h-48 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
                           {s.services?.map((srv) => {
                             const isSelected = form.service_ids.includes(srv.id);
                             return (
-                              <button
+                              <label
                                 key={srv.id}
-                                type="button"
-                                onClick={() => {
-                                  const selected = isSelected
-                                    ? form.service_ids.filter((id) => id !== srv.id)
-                                    : [...form.service_ids, srv.id];
-                                  const selectedServices = s.services.filter((s) => selected.includes(s.id));
-                                  const totalDuration = selectedServices.reduce(
-                                    (sum, s) => sum + (s.duration_minutes || 30),
-                                    0
-                                  );
-                                  setForm({ ...form, service_ids: selected, duration_minutes: totalDuration });
-                                  if (form.appointment_date) {
-                                    fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration);
-                                  }
-                                }}
-                                className={`flex justify-between items-center text-left px-3 py-2 rounded-lg border text-sm shadow-sm transition-all ${isSelected
-                                    ? "bg-emerald-600 text-white border-emerald-400"
-                                    : "bg-white text-black border-gray-300 hover:bg-gray-100"
+                                className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs shadow-sm transition-all ${isSelected
+                                  ? "bg-gradient-to-r from-pink-400 to-pink-500 text-white border-pink-400 shadow-lg"
+                                  : "text-pink-100 border-pink-300 hover:bg-pink-400"
                                   }`}
                               >
-                                <span>🛠 {srv.name}</span>
-                                <span className="font-semibold">${srv.price}</span>
-                              </button>
+                                <div className="flex items-start gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      const selected = isSelected
+                                        ? form.service_ids.filter((id) => id !== srv.id)
+                                        : [...form.service_ids, srv.id];
+
+                                      const selectedServices = s.services.filter((s) =>
+                                        selected.includes(s.id)
+                                      );
+                                      const totalDuration = selectedServices.reduce(
+                                        (sum, s) => sum + (s.duration_minutes || 30),
+                                        0
+                                      );
+
+                                      setForm({
+                                        ...form,
+                                        service_ids: selected,
+                                        duration_minutes: totalDuration,
+                                      });
+
+                                      if (form.appointment_date) {
+                                        fetchAvailabilityWithDuration(
+                                          s.id,
+                                          form.appointment_date,
+                                          totalDuration
+                                        );
+                                      }
+                                    }}
+                                    className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
+                                  />
+                                  <div className="text-left">
+                                    <span className="block capitalize">{srv.name}</span>
+                                    <span className="block text-xs text-yellow-500">
+                                      ${srv.price}
+                                    </span>
+                                  </div>
+                                </div>
+                              </label>
                             );
                           })}
                         </div>
+
+                        {/* Estimated duration */}
                         {form.duration_minutes > 0 && (
                           <p className="text-xs text-emerald-300 mt-2">
                             ⏱ Estimated total time: {form.duration_minutes} minutes
@@ -467,7 +494,7 @@ export default function FindStylists() {
 
                       {/* Step 2: Chọn ngày */}
                       <div>
-                        <p className="text-pink-300 font-bold mb-1">📆 Step 2: Pick a Date</p>
+                        <p className="text-pink-400 font-bold mb-1">📆 Step 2: Pick a Date</p>
                         <input
                           type="date"
                           value={form.appointment_date}
@@ -477,20 +504,20 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                          className="w-full rounded p-1 text-black"
+                          className="w-full rounded p-1 text-yellow-500 bg-gradient-to-r from-zinc-700 to-zinc-800 text-xs pl-2"
                         />
                       </div>
 
                       {/* Step 3: Chọn giờ */}
                       {timeSlots.length > 0 ? (
                         <div>
-                          <p className="text-pink-300 font-bold mb-1">🕒 Step 3: Choose Time</p>
+                          <p className="text-pink-400 font-bold mb-1">🕒 Step 3: Choose Time</p>
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="w-full rounded p-1 text-black"
+                            className="w-full rounded p-1 text-yellow-500 bg-gradient-to-r from-zinc-700 to-zinc-800 text-xs pl-2"
                           >
-                            <option value="">⏳ Select time...</option>
+                            <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
                               <option key={slot.time} value={slot.time}>
                                 🕒 {slot.time}
@@ -508,21 +535,27 @@ export default function FindStylists() {
 
                       {/* Step 4: Ghi chú */}
                       <div>
-                        <p className="text-pink-300 font-bold mb-1">💬 Step 4: Optional Notes</p>
+                        <p className="text-pink-400 font-bold mb-1">💬 Step 4: Optional Notes</p>
                         <textarea
                           value={form.note}
                           onChange={(e) => setForm({ ...form, note: e.target.value })}
-                          className="w-full rounded p-1 text-black"
+                          className="w-full rounded p-1 text-pink-100 text-xs"
                           placeholder="Anything specific?"
                         />
                       </div>
 
                       {/* Thông tin đặt */}
                       {form.appointment_date && selectedTime && (
-                        <p className="text-xs text-emerald-300">
-                          📌 You selected: {form.appointment_date} at {selectedTime}
-                        </p>
+                        <div className="mt-3 px-2 py-2 rounded-lg bg-pink-600/20 border border-pink-500 text-pink-200 text-sm font-semibold text-center shadow-sm">
+                          📌 You selected:
+                          <span className="ml-1 text-yellow-300 font-bold">
+                            {form.appointment_date}
+                          </span>
+                          <span className="mx-1">at</span>
+                          <span className="text-yellow-300 font-bold">{selectedTime}</span>
+                        </div>
                       )}
+
                     </div>
 
                     {/* Gửi lịch hẹn */}
