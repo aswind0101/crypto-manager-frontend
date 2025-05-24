@@ -158,6 +158,11 @@ export default function FindStylists() {
       });
 
       const data = await res.json();
+      if (res.status === 409) {
+        alert("❌ This time slot has just been taken by another customer. Please choose another.");
+        return;
+      }
+
       if (res.ok) {
         alert("✅ Appointment booked successfully!");
         setFlippedId(null);
