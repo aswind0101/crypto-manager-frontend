@@ -430,31 +430,37 @@ export default function FindStylists() {
                           {s.services?.map((srv) => {
                             const isSelected = form.service_ids.includes(srv.id);
                             return (
-                              <button
+                              <label
                                 key={srv.id}
-                                type="button"
-                                onClick={() => {
-                                  const selected = isSelected
-                                    ? form.service_ids.filter((id) => id !== srv.id)
-                                    : [...form.service_ids, srv.id];
-                                  const selectedServices = s.services.filter((s) => selected.includes(s.id));
-                                  const totalDuration = selectedServices.reduce(
-                                    (sum, s) => sum + (s.duration_minutes || 30),
-                                    0
-                                  );
-                                  setForm({ ...form, service_ids: selected, duration_minutes: totalDuration });
-                                  if (form.appointment_date) {
-                                    fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration);
-                                  }
-                                }}
-                                className={`flex justify-between items-center text-left px-3 py-2 rounded-lg border text-sm shadow-sm transition-all ${isSelected
+                                className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer text-sm shadow-sm transition-all ${isSelected
                                     ? "bg-emerald-600 text-white border-emerald-400"
                                     : "bg-white text-black border-gray-300 hover:bg-gray-100"
                                   }`}
                               >
-                                <span>🛠 {srv.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      const selected = isSelected
+                                        ? form.service_ids.filter((id) => id !== srv.id)
+                                        : [...form.service_ids, srv.id];
+                                      const selectedServices = s.services.filter((s) => selected.includes(s.id));
+                                      const totalDuration = selectedServices.reduce(
+                                        (sum, s) => sum + (s.duration_minutes || 30),
+                                        0
+                                      );
+                                      setForm({ ...form, service_ids: selected, duration_minutes: totalDuration });
+                                      if (form.appointment_date) {
+                                        fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration);
+                                      }
+                                    }}
+                                    className="form-checkbox h-4 w-4 text-emerald-600"
+                                  />
+                                  <span className="font-medium">{srv.name}</span>
+                                </div>
                                 <span className="font-semibold">${srv.price}</span>
-                              </button>
+                              </label>
                             );
                           })}
                         </div>
@@ -464,6 +470,7 @@ export default function FindStylists() {
                           </p>
                         )}
                       </div>
+
 
                       {/* Step 2: Chọn ngày */}
                       <div>
