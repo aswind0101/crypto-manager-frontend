@@ -368,7 +368,7 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[600px] h-auto perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[620px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
                   <div className="absolute w-full min-h-full h-auto rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
@@ -425,17 +425,19 @@ export default function FindStylists() {
 
                       {/* Step 1: Chọn dịch vụ */}
                       <div>
-                        <p className="text-pink-300 font-bold mb-1">📋 Step 1: Select Services</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <p className="text-pink-300 font-bold mb-2">📋 Step 1: Select Services</p>
+
+                        {/* Scrollable list of services */}
+                        <div className="max-h-48 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-emerald-600 scrollbar-track-zinc-700 rounded-md">
                           {s.services?.map((srv) => {
                             const isSelected = form.service_ids.includes(srv.id);
                             return (
                               <label
                                 key={srv.id}
-                                className={`flex items-center justify-between px-4 py-1 rounded-xl border cursor-pointer text-sm shadow-sm transition-all
-                                  ${isSelected
+                                className={`flex items-center justify-between px-4 py-1 rounded-xl border cursor-pointer text-sm shadow-sm transition-all ${isSelected
                                     ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-400 shadow-lg"
-                                    : "bg-white text-black border-gray-300 hover:bg-gray-100"}`}
+                                    : "bg-zinc-800 text-emerald-50 border-zinc-600 hover:bg-zinc-700"
+                                  }`}
                               >
                                 <div className="flex items-start gap-3">
                                   <input
@@ -445,35 +447,50 @@ export default function FindStylists() {
                                       const selected = isSelected
                                         ? form.service_ids.filter((id) => id !== srv.id)
                                         : [...form.service_ids, srv.id];
-                                      const selectedServices = s.services.filter((s) => selected.includes(s.id));
+
+                                      const selectedServices = s.services.filter((s) =>
+                                        selected.includes(s.id)
+                                      );
                                       const totalDuration = selectedServices.reduce(
                                         (sum, s) => sum + (s.duration_minutes || 30),
                                         0
                                       );
-                                      setForm({ ...form, service_ids: selected, duration_minutes: totalDuration });
+
+                                      setForm({
+                                        ...form,
+                                        service_ids: selected,
+                                        duration_minutes: totalDuration,
+                                      });
+
                                       if (form.appointment_date) {
-                                        fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration);
+                                        fetchAvailabilityWithDuration(
+                                          s.id,
+                                          form.appointment_date,
+                                          totalDuration
+                                        );
                                       }
                                     }}
                                     className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
                                   />
                                   <div className="text-left">
                                     <span className="block font-bold">{srv.name}</span>
-                                    <span className="block text-xs text-emerald-700 font-semibold">${srv.price}</span>
+                                    <span className="block text-xs text-emerald-300 font-semibold">
+                                      ${srv.price}
+                                    </span>
                                   </div>
                                 </div>
                               </label>
-
                             );
                           })}
                         </div>
+
+                        {/* Estimated duration */}
                         {form.duration_minutes > 0 && (
                           <p className="text-xs text-emerald-300 mt-2">
                             ⏱ Estimated total time: {form.duration_minutes} minutes
                           </p>
                         )}
                       </div>
-
 
                       {/* Step 2: Chọn ngày */}
                       <div>
