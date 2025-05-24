@@ -432,12 +432,12 @@ export default function FindStylists() {
                             return (
                               <label
                                 key={srv.id}
-                                className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer text-sm shadow-sm transition-all ${isSelected
-                                    ? "bg-emerald-600 text-white border-emerald-400"
-                                    : "bg-white text-black border-gray-300 hover:bg-gray-100"
-                                  }`}
+                                className={`flex items-center justify-between px-4 py-3 rounded-xl border cursor-pointer text-sm shadow-sm transition-all
+                                  ${isSelected
+                                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-400 shadow-lg"
+                                    : "bg-white text-black border-gray-300 hover:bg-gray-100"}`}
                               >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-start gap-3">
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
@@ -455,12 +455,15 @@ export default function FindStylists() {
                                         fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration);
                                       }
                                     }}
-                                    className="form-checkbox h-4 w-4 text-emerald-600"
+                                    className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
                                   />
-                                  <span className="font-medium">{srv.name}</span>
+                                  <div className="text-left">
+                                    <span className="block font-bold">{srv.name}</span>
+                                    <span className="block text-xs text-emerald-800 font-semibold">${srv.price}</span>
+                                  </div>
                                 </div>
-                                <span className="font-semibold">${srv.price}</span>
                               </label>
+
                             );
                           })}
                         </div>
