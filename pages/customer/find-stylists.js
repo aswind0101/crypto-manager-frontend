@@ -200,11 +200,12 @@ export default function FindStylists() {
       const data = await res.json();
 
       if (res.ok) {
-        const slots = getAvailableTimeSlots(data, dateStr, 30); // mỗi slot 30 phút
-        const freeSlots = slots.filter(slot => !slot.isBooked); // chỉ lấy giờ trống
-        setTimeSlots(freeSlots);
+        // ⚠️ Chuyển đổi dữ liệu lịch thành slot
+        const slots = getAvailableTimeSlots(data, dateStr, 30); // 30 phút mỗi slot
+        const available = slots.filter(s => !s.isBooked); // ❌ lọc ra slot chưa bị chiếm
+        setTimeSlots(available);
       } else {
-        console.warn("⚠️ Error:", data.error);
+        console.warn("⚠️ Failed to fetch availability:", data.error);
         setTimeSlots([]);
       }
     } catch (err) {
@@ -212,6 +213,7 @@ export default function FindStylists() {
       setTimeSlots([]);
     }
   };
+
 
 
   function getAvailableTimeSlots(appointments, dateStr, interval = 30, workStart = "09:00", workEnd = "18:00") {
@@ -231,7 +233,6 @@ export default function FindStylists() {
     const workStartMin = toMinutes(workStart);
     const workEndMin = toMinutes(workEnd);
 
-    // 📅 Tạo danh sách slot rảnh mặc định
     for (let m = workStartMin; m + interval <= workEndMin; m += interval) {
       slots.push({
         time: formatTime(m),
@@ -241,20 +242,14 @@ export default function FindStylists() {
       });
     }
 
-    // ❌ Đánh dấu slot bị trùng lịch
     for (const appt of appointments) {
       const apptDate = new Date(appt.appointment_date);
       const startMin = apptDate.getHours() * 60 + apptDate.getMinutes();
-      const duration = Number(appt.duration_minutes) || 30; // chống NaN
+      const duration = Number(appt.duration_minutes) || 30;
       const endMin = startMin + duration;
 
       for (const slot of slots) {
-        const slotStart = slot.startMin;
-        const slotEnd = slot.endMin;
-
-        // Nếu slot và lịch hẹn có giao nhau
-        const isOverlap = !(slotEnd <= startMin || slotStart >= endMin);
-        if (isOverlap) {
+        if (!(slot.endMin <= startMin || slot.startMin >= endMin)) {
           slot.isBooked = true;
         }
       }
