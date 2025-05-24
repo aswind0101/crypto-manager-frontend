@@ -262,9 +262,14 @@ export default function Navbar() {
                         </div>
                     )}
                     {isSalonCustomer && (
-                        <Link href="/customer/find-stylists" className="hover:text-yellow-300 flex items-center gap-2">
-                            💇 Dashboard
-                        </Link>
+                        <>
+                            <Link href="/customer/find-stylists" className="hover:text-yellow-300 flex items-center gap-2">
+                                📅 Book Appointment
+                            </Link>
+                            <Link href="/customer/me" className="hover:text-yellow-300 flex items-center gap-2">
+                                🧾 My Appoinments
+                            </Link>
+                        </>
                     )}
                     {isSalonAll && (
                         <div className="flex flex-col">
@@ -654,13 +659,22 @@ export default function Navbar() {
                             </>
                         )}
                         {isSalonCustomer && (
-                            <Link
-                                href="/customer/find-stylists"
-                                onClick={() => setMenuOpen(false)}
-                                className="hover:text-yellow-400 flex items-center gap-2"
-                            >
-                                💇 Dashboard
-                            </Link>
+                            <>
+                                <Link
+                                    href="/customer/find-stylists"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="hover:text-yellow-400 flex items-center gap-2"
+                                >
+                                    📅 Book Appoinment
+                                </Link>
+                                <Link
+                                    href="/customer/me"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="hover:text-yellow-400 flex items-center gap-2"
+                                >
+                                    🧾 My Appoinments
+                                </Link>
+                            </>
                         )}
                         {isSalonAll && (
                             <>

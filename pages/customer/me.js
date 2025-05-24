@@ -2,16 +2,20 @@
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
+import withAuthProtection from "../../hoc/withAuthProtection";
 
-export default function CustomerAppointmentsPage() {
+const auth = getAuth(); // ✅ Đặt ngoài component
+
+function CustomerAppointmentsPage() {
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
-    const auth = getAuth();
+    const [user, setUser] = useState(null); // ✅ lưu user để dùng khi huỷ
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (!user) return;
-            const token = await user.getIdToken();
+        const unsubscribe = onAuthStateChanged(auth, async (u) => {
+            if (!u) return;
+            setUser(u); // ✅ lưu lại user
+            const token = await u.getIdToken();
             const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/me", {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -22,6 +26,14 @@ export default function CustomerAppointmentsPage() {
 
         return () => unsubscribe();
     }, []);
+    function parseLocalTimestamp(str) {
+        // str = "2025-05-24 17:30:00" hoặc "2025-05-24T17:30:00"
+        const clean = str.replace("T", " ");
+        const [datePart, timePart] = clean.split(" ");
+        const [year, month, day] = datePart.split("-").map(Number);
+        const [hour, minute] = timePart.split(":").map(Number);
+        return new Date(year, month - 1, day, hour, minute);
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
@@ -48,7 +60,7 @@ export default function CustomerAppointmentsPage() {
                                     />
                                     <div>
                                         <h2 className="text-lg font-bold text-pink-300">{appt.stylist_name}</h2>
-                                        <p className="text-xs italic text-gray-200">{appt.stylist_specialization}</p>
+                                        <p className="text-xs italic text-gray-200 capitalize">{appt.stylist_specialization}</p>
                                     </div>
                                 </div>
 
@@ -56,7 +68,7 @@ export default function CustomerAppointmentsPage() {
                                 <p className="text-sm text-yellow-300 mb-2">🏠 {appt.salon_name}</p>
 
                                 {/* Dịch vụ */}
-                                <div className="text-xs text-pink-100 space-y-1 mb-2">
+                                <div className="text-xs text-pink-100 space-y-1 mb-2 capitalize">
                                     {appt.services?.map((srv) => (
                                         <div key={srv.id} className="flex justify-between">
                                             <span>💅 {srv.name}</span>
@@ -67,7 +79,7 @@ export default function CustomerAppointmentsPage() {
 
                                 {/* Ngày giờ */}
                                 <p className="text-sm text-emerald-300">
-                                    📅 {new Date(appt.appointment_date).toLocaleString()}
+                                    📅 {appt.appointment_date.replace("T", " ").slice(0, 16)}
                                 </p>
 
                                 {/* Thời lượng + ghi chú */}
@@ -80,14 +92,13 @@ export default function CustomerAppointmentsPage() {
                                 <p className="mt-3 text-sm font-semibold text-yellow-400 uppercase">
                                     📌 Status: {appt.status}
                                 </p>
-
-                                {/* Nếu đang pending và chưa đến giờ thì hiện nút huỷ */}
-                                {appt.status === "pending" &&
-                                    new Date(appt.appointment_date) > new Date() && (
+                                {/* Nút huỷ nếu điều kiện đúng */}
+                                {appt.status === "pending" && parseLocalTimestamp(appt.appointment_date) > new Date() &&
+                                    user && (
                                         <button
                                             onClick={async () => {
                                                 if (!confirm("Are you sure you want to cancel this appointment?")) return;
-                                                const token = await auth.currentUser.getIdToken();
+                                                const token = await user.getIdToken();
                                                 const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`, {
                                                     method: "DELETE",
                                                     headers: { Authorization: `Bearer ${token}` },
@@ -105,7 +116,6 @@ export default function CustomerAppointmentsPage() {
                                             ❌ Cancel Appointment
                                         </button>
                                     )}
-
                             </div>
                         ))}
                     </div>
@@ -114,3 +124,5 @@ export default function CustomerAppointmentsPage() {
         </div>
     );
 }
+
+export default withAuthProtection(CustomerAppointmentsPage);
