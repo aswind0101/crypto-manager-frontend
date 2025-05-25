@@ -26,74 +26,69 @@ export default function FreelancerDashboard() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        const token = await currentUser.getIdToken();
-        const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/onboarding", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        const data = await res.json();
-        setUser(currentUser);
-        setOnboarding(data);
-
-        // ✅ Gọi dữ liệu appointment của freelancer
-        const apptRes = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const apptData = await apptRes.json();
-        setAppointments(apptData || []);
-        const filtered = apptData.filter(appt => isTodayCalifornia(appt.appointment_date));
-        setAppointmentsToday(filtered);
-
-        const now = dayjs().tz("America/Los_Angeles");
-
-        const upcoming = apptData.filter((appt) => {
-          const apptTime = dayjs(appt.appointment_date).tz("America/Los_Angeles");
-          const valid = appt.status === "pending" || appt.status === "confirmed";
-          const future = apptTime.isAfter(now);
-          return valid && future;
-        });
-
-        console.log("✅ Filtered upcoming:", upcoming);
-
-        if (upcoming.length > 0) {
-          const sorted = upcoming.sort((a, b) =>
-            dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
-          );
-          setNextAppointment(sorted[0]);
-        } else {
-          setNextAppointment(null);
-        }
-
-
-        if (upcoming.length > 0) {
-          const sorted = upcoming.sort((a, b) =>
-            dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
-          );
-          setNextAppointment(sorted[0]);
-        } else {
-          setNextAppointment(null);
-        }
-
-
-        if (upcoming.length > 0) {
-          // Sắp xếp theo thời gian tăng dần
-          const sorted = upcoming.sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date));
-          setNextAppointment(sorted[0]);
-        } else {
-          setNextAppointment(null);
-        }
-
-
-        console.log("📅 Appointments:", appointments);
-        setLoading(false);
-      } else {
+      if (!currentUser) {
         router.push("/login");
+        return;
       }
+
+      const token = await currentUser.getIdToken();
+      setUser(currentUser);
+
+      // 1️⃣ Lấy thông tin onboarding
+      const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/onboarding", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setOnboarding(data);
+
+      // 2️⃣ Lấy danh sách lịch hẹn của freelancer
+      const apptRes = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const apptData = await apptRes.json();
+      setAppointments(apptData || []);
+
+      // 3️⃣ Lọc các lịch hôm nay theo giờ California
+      const todayFiltered = apptData.filter((appt) =>
+        isTodayCalifornia(appt.appointment_date)
+      );
+      setAppointmentsToday(todayFiltered);
+
+      // 4️⃣ Tìm lịch hẹn tiếp theo
+      const upcoming = apptData.filter((appt) => {
+        // ✅ Ép chuỗi timestamp về "local" theo định dạng thuần local
+        const apptTime = dayjs(`${appt.appointment_date.replace("Z", "")}`); // loại bỏ Z nếu có
+        const now = dayjs(); // local
+
+        const valid = appt.status === "pending" || appt.status === "confirmed";
+        const future = apptTime.isAfter(now);
+
+        console.log("⏰ Appt ID:", appt.id);
+        console.log("🕒 Appt Time (parsed):", apptTime.format("YYYY-MM-DD HH:mm"));
+        console.log("🆚 Now (local):", now.format("YYYY-MM-DD HH:mm"));
+        console.log("✅ Is upcoming:", valid && future);
+        console.log("------");
+
+        return valid && future;
+      });
+
+      // 5️⃣ Sắp xếp tăng dần và lấy lịch gần nhất
+      if (upcoming.length > 0) {
+        const sorted = upcoming.sort((a, b) =>
+          dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+        );
+        setNextAppointment(sorted[0]);
+      } else {
+        setNextAppointment(null);
+      }
+
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
+
+
   function isTodayCalifornia(isoDate) {
     const now = new Date();
     const appointmentDate = new Date(isoDate);
@@ -133,6 +128,16 @@ export default function FreelancerDashboard() {
       </div>
     );
   }
+  // 💡 Đặt đoạn xử lý biến phía trên phần return hoặc ngay trong render JSX nếu bạn dùng trong layout
+  const now = dayjs();
+
+  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
+
+  const upcomingToday = appointmentsToday.filter(a => {
+    const apptTime = dayjs(a.appointment_date.replace("Z", ""));
+    const isUpcoming = apptTime.isAfter(now) && (a.status === "pending" || a.status === "confirmed");
+    return isUpcoming;
+  }).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
@@ -153,9 +158,7 @@ export default function FreelancerDashboard() {
           title="Next Client"
           value={
             nextAppointment
-              ? dayjs(nextAppointment.appointment_date)
-                .tz("America/Los_Angeles")
-                .format("hh:mm A")
+              ? dayjs(nextAppointment.appointment_date.replace("Z", "")).format("hh:mm A")
               : "No upcoming"
           }
           sub={
@@ -168,7 +171,7 @@ export default function FreelancerDashboard() {
           icon={<FiCalendar />}
           title="Appointments"
           value={`${appointmentsToday.length} Today`}
-          sub={`${appointmentsToday.filter(a => a.status === "completed").length} completed, ${appointmentsToday.filter(a => a.status === "pending" || a.status === "confirmed").length} upcoming`}
+          sub={`${completedToday} completed, ${upcomingToday} upcoming`}
         />
 
         <Card icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
