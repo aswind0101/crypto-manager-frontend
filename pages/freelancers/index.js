@@ -8,6 +8,10 @@ export default function FreelancerDashboard() {
   const [user, setUser] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsToday, setAppointmentsToday] = useState([]);
+  const [nextAppointment, setNextAppointment] = useState(null);
+
 
   const auth = getAuth();
   const router = useRouter();
@@ -21,9 +25,30 @@ export default function FreelancerDashboard() {
         });
 
         const data = await res.json();
-
         setUser(currentUser);
         setOnboarding(data);
+
+        // ✅ Gọi dữ liệu appointment của freelancer
+        const apptRes = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const apptData = await apptRes.json();
+        setAppointments(apptData || []);
+        const filtered = apptData.filter(appt => isTodayCalifornia(appt.appointment_date));
+        setAppointmentsToday(filtered);
+        const now = new Date();
+        const upcoming = apptData.filter((a) => new Date(a.appointment_date) > now);
+
+        if (upcoming.length > 0) {
+          // Sắp xếp theo thời gian tăng dần
+          const sorted = upcoming.sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date));
+          setNextAppointment(sorted[0]);
+        } else {
+          setNextAppointment(null);
+        }
+
+
+        console.log("📅 Appointments:", appointments);
         setLoading(false);
       } else {
         router.push("/login");
@@ -32,6 +57,19 @@ export default function FreelancerDashboard() {
 
     return () => unsubscribe();
   }, []);
+  function isTodayCalifornia(isoDate) {
+    const now = new Date();
+    const appointmentDate = new Date(isoDate);
+
+    const nowLocal = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const apptLocal = new Date(appointmentDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+
+    return (
+      nowLocal.getFullYear() === apptLocal.getFullYear() &&
+      nowLocal.getMonth() === apptLocal.getMonth() &&
+      nowLocal.getDate() === apptLocal.getDate()
+    );
+  }
 
   const isComplete = onboarding?.isQualified === true || onboarding?.isqualified === true;
 
@@ -73,8 +111,31 @@ export default function FreelancerDashboard() {
         </div>
 
         <Card icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
-        <Card icon={<FiClock />} title="Next Client" value="2:00 PM" sub="Haircut - Lisa" />
-        <Card icon={<FiCalendar />} title="Appointments" value="6 Today" sub="2 completed, 4 upcoming" />
+        <Card
+          icon={<FiClock />}
+          title="Next Client"
+          value={
+            nextAppointment
+              ? new Date(nextAppointment.appointment_date).toLocaleTimeString("en-US", {
+                timeZone: "America/Los_Angeles",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+              : "No upcoming"
+          }
+          sub={
+            nextAppointment?.services?.[0]?.name
+              ? `${nextAppointment.services[0].name} - ${nextAppointment?.customer_name || "Client"}`
+              : "No info"
+          }
+        />
+        <Card
+          icon={<FiCalendar />}
+          title="Appointments"
+          value={`${appointmentsToday.length} Today`}
+          sub={`${appointmentsToday.filter(a => a.status === "completed").length} completed, ${appointmentsToday.filter(a => a.status === "pending" || a.status === "confirmed").length} upcoming`}
+        />
+
         <Card icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
 
         {/* Actions */}
