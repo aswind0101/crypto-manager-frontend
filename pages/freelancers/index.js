@@ -14,6 +14,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
+
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -29,9 +30,41 @@ export default function FreelancerDashboard() {
   const [newAppointment, setNewAppointment] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
   const soundRef = useRef(null);
+  const [isSliding, setIsSliding] = useState(false);
+  const [sliderX, setSliderX] = useState(0);
+  const [sliderValue, setSliderValue] = useState(0);
+
 
   const auth = getAuth();
   const router = useRouter();
+  const sliderRef = useRef(null);
+  const sliderMax = 200; // chiều dài vuốt tối đa (điều chỉnh theo giao diện)
+
+  const handleSlideStart = (e) => {
+    setIsSliding(true);
+  };
+
+  const handleSlideMove = (e) => {
+    if (!isSliding) return;
+
+    const clientX = e.type.includes("mouse")
+      ? e.clientX
+      : e.touches[0].clientX;
+
+    const rect = sliderRef.current.getBoundingClientRect();
+    let newX = clientX - rect.left - 25;
+    newX = Math.max(0, Math.min(newX, sliderMax));
+    setSliderX(newX);
+  };
+
+  const handleSlideEnd = () => {
+    setIsSliding(false);
+    if (sliderX >= sliderMax - 10) {
+      handleConfirmAppointment(newAppointment.id); // Gọi API xác nhận
+    } else {
+      setSliderX(0); // Reset
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -184,25 +217,37 @@ export default function FreelancerDashboard() {
           </p>
 
           {/* Slide to confirm */}
-          <div className="relative mt-3 bg-gray-200 rounded-full h-10 overflow-hidden">
-            <button
-              onClick={() => handleConfirmAppointment(newAppointment.id)}
-              className="absolute left-0 top-0 h-full px-4 text-white font-semibold bg-emerald-500 rounded-full hover:bg-emerald-600 transition-all"
-            >
-              ✅ Confirm
-            </button>
-            <div className="h-full flex items-center justify-center text-gray-500 text-sm">
-              Slide to confirm
-            </div>
+          <div className="mt-4">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={sliderValue}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                setSliderValue(value);
+                if (value === 100) {
+                  handleConfirmAppointment(newAppointment.id);
+                  setSliderValue(0); // Reset slider sau khi xác nhận
+                }
+              }}
+              className="w-full h-10 bg-gray-200 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #10b981 0%, #10b981 ${sliderValue}%, #e5e7eb ${sliderValue}%, #e5e7eb 100%)`,
+              }}
+            />
+            <p className="text-center text-sm text-gray-500 mt-2">Slide to Confirm</p>
           </div>
+
 
           {/* Cancel button */}
           <button
             onClick={() => handleCancelAppointment(newAppointment.id)}
-            className="text-sm text-red-500 underline mt-1"
+            className="text-sm text-red-500 underline mt-2"
           >
             ❌ Cancel Appointment
           </button>
+
         </div>
       )}
 
