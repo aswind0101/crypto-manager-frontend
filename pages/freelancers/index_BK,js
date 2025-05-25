@@ -161,15 +161,24 @@ export default function FreelancerDashboard() {
   }
 
   const now = dayjs();
-  const completedToday = appointmentsToday.filter((a) => a.status === "completed").length;
-  const upcomingToday = appointmentsToday.filter((a) => {
-    const apptTime = dayjs(a.appointment_date.replace("Z", ""));
-    return apptTime.isAfter(now) && (a.status === "pending" || a.status === "confirmed");
+  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
+
+  const pendingToday = appointmentsToday.filter(a => {
+    const time = dayjs(a.appointment_date.replace("Z", ""));
+    return a.status === "pending" && time.isAfter(now);
   }).length;
-  const missedToday = appointmentsToday.filter((a) => {
-    const apptTime = dayjs(a.appointment_date.replace("Z", ""));
-    return apptTime.isBefore(now) && (a.status === "pending" || a.status === "confirmed");
+
+  const upcomingToday = appointmentsToday.filter(a => {
+    const time = dayjs(a.appointment_date.replace("Z", ""));
+    return a.status === "confirmed" && time.isAfter(now);
   }).length;
+
+  const missedToday = appointmentsToday.filter(a => {
+    const time = dayjs(a.appointment_date.replace("Z", ""));
+    return (a.status === "pending" || a.status === "confirmed") && time.isBefore(now);
+  }).length;
+
+
   const handleConfirmAppointment = async (appointmentId) => {
     try {
       const token = await user.getIdToken();
@@ -323,7 +332,27 @@ export default function FreelancerDashboard() {
           icon={<FiCalendar />}
           title="Appointments"
           value={`${appointmentsToday.length} Today`}
-          sub={`✅ ${completedToday} completed • ⏳ ${upcomingToday} upcoming • ❌ ${missedToday} missed`}
+          sub={
+            <div className="space-y-1 text-sm mt-1">
+              <div className="flex items-center gap-2">
+                <span className="text-green-500">✅</span>
+                <span className="text-gray-800">{completedToday} Completed</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-yellow-500">🟡</span>
+                <span className="text-gray-800">{pendingToday} Pending</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-blue-500">⏳</span>
+                <span className="text-gray-800">{upcomingToday} Upcoming</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-red-500">❌</span>
+                <span className="text-gray-800">{missedToday} Missed</span>
+              </div>
+            </div>
+
+          }
         />
 
         <Card icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />

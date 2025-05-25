@@ -247,7 +247,7 @@ export default function FreelancerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-900 to-yellow-900 text-white px-4 py-6">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       {showPopup && pendingUpcomingAppointment && (
@@ -303,52 +303,66 @@ export default function FreelancerDashboard() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-        <div className="col-span-1 md:col-span-2 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
-          <h2 className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mb-2">
-            🌟 Welcome back, {user?.displayName || "Freelancer"}!
-          </h2>
-          <p className="text-gray-700 dark:text-gray-300">Let’s check your schedule and income today.</p>
-        </div>
-
-        <Card icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
-
-        <Card
-          icon={<FiClock />}
-          title="Next Client"
-          value={
-            confirmedNextClient
-              ? dayjs(confirmedNextClient.appointment_date.replace("Z", "")).format("hh:mm A")
-              : "No upcoming"
-          }
-          sub={
-            confirmedNextClient?.customer_name
-              ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` (${timeUntilNext})` : ""}`
-              : "No upcoming"
-          }
-        />
-
-        <Card
-          icon={<FiCalendar />}
-          title="Appointments"
-          value={`${appointmentsToday.length} Today`}
-          sub={`✅ ${completedToday} completed • 🟡 ${pendingToday} pending • ⏳ ${upcomingToday} upcoming • ❌ ${missedToday} missed`}
-        />
-
-        <Card icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
-
-        <div className="col-span-1 md:col-span-3">
-          <h3 className="text-xl font-bold mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <ActionButton label="📅 My Schedule" />
-            <ActionButton label="🧾 Appointments" />
-            <ActionButton label="💬 Chat with Client" />
-            <ActionButton label="💸 Withdraw" />
+      {/* 🟢 Header: Avatar + welcome */}
+      <div className="max-w-6xl mx-auto mb-6">
+        <div className="bg-white/10 border border-white/20 rounded-3xl shadow-lg p-6 flex flex-col sm:flex-row items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img
+              src={user?.photoURL || "/default-avatar.png"}
+              alt="Avatar"
+              className="w-16 h-16 rounded-full object-cover border-2 border-pink-400"
+            />
+            <div>
+              <h2 className="text-2xl font-bold text-pink-300">
+                🌟 Welcome back, {user?.displayName || "Freelancer"}!
+              </h2>
+              <p className="text-sm text-gray-300">
+                Let’s check your schedule and income today.
+              </p>
+            </div>
           </div>
+          <div className="mt-4 sm:mt-0 text-sm text-yellow-300 font-mono">
+            UID: {user?.uid}
+          </div>
+        </div>
+      </div>
+
+      {/* 🟣 Cards tổng quan */}
+      <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <Card icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
+        <Card icon={<FiClock />} title="Next Client" value={
+          confirmedNextClient
+            ? dayjs(confirmedNextClient.appointment_date.replace("Z", "")).format("hh:mm A")
+            : "No upcoming"
+        } sub={
+          confirmedNextClient?.customer_name
+            ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")} ${timeUntilNext}`
+            : "No client booked yet"
+        } />
+        <Card icon={<FiCalendar />} title="Appointments Today" value={`${appointmentsToday.length}`} sub={
+          <>
+            ✅ Completed: {completedToday} <br />
+            🟡 Pending: {pendingToday} <br />
+            ⏳ Upcoming: {upcomingToday} <br />
+            ❌ Missed: {missedToday}
+          </>
+        } />
+        <Card icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
+      </div>
+
+      {/* 🔵 Quick actions */}
+      <div className="max-w-6xl mx-auto mt-8">
+        <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <ActionButton label="📅 My Appointments" href="/appointments" />
+          <ActionButton label="💳 Payments" href="/freelancers/payments" />
+          <ActionButton label="👤 My Profile" href="/freelancers/me" />
+          <ActionButton label="💸 Withdraw" href="/withdraw" />
         </div>
       </div>
     </div>
   );
+
 }
 
 function Card({ icon, title, value, sub }) {
@@ -362,11 +376,11 @@ function Card({ icon, title, value, sub }) {
   );
 }
 
-function ActionButton({ label }) {
+function ActionButton({ label, href }) {
   return (
-    <button className="w-full py-3 rounded-2xl bg-gradient-to-r from-pink-400 via-amber-300 to-emerald-400 dark:from-pink-600 dark:via-yellow-500 dark:to-emerald-500 text-white font-semibold shadow-md hover:scale-105 transition">
+    <a href={href} className="w-full block py-3 rounded-2xl bg-gradient-to-r from-pink-400 via-yellow-400 to-emerald-400 text-white font-semibold text-center shadow-md hover:scale-105 transition">
       {label}
-    </button>
+    </a>
   );
 }
 
