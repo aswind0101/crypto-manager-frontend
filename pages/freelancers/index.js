@@ -124,16 +124,57 @@ export default function FreelancerDashboard() {
     const apptTime = dayjs(a.appointment_date.replace("Z", ""));
     return apptTime.isBefore(now) && (a.status === "pending" || a.status === "confirmed");
   }).length;
-  //Sound for new appointments
+  const handleConfirmAppointment = async (appointmentId) => {
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: "confirmed" }),
+        }
+      );
+      if (res.ok) {
+        setShowPopup(false);
+      }
+    } catch (err) {
+      console.error("❌ Error confirming appointment:", err.message);
+    }
+  };
 
+  const handleCancelAppointment = async (appointmentId) => {
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: "cancelled" }),
+        }
+      );
+      if (res.ok) {
+        setShowPopup(false);
+      }
+    } catch (err) {
+      console.error("❌ Error cancelling appointment:", err.message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       {showPopup && newAppointment && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white text-black rounded-xl px-5 py-4 shadow-xl border-l-8 border-emerald-500 animate-bounce-in max-w-sm w-[90%] sm:w-auto">
-          <h2 className="text-lg font-bold text-emerald-700 mb-1">📢 New Appointment</h2>
+        <div className="fixed bottom-6 right-6 z-50 bg-white text-black rounded-xl px-5 py-4 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
+          <h2 className="text-lg font-bold text-emerald-700">📢 New Appointment</h2>
           <p className="font-semibold text-pink-600">{newAppointment.customer_name}</p>
           <p className="text-sm text-gray-700">
             {dayjs(newAppointment.appointment_date.replace("Z", "")).format("MMM D, hh:mm A")}
@@ -141,8 +182,30 @@ export default function FreelancerDashboard() {
           <p className="text-sm text-emerald-600">
             Services: {newAppointment.services?.map(s => s.name).join(", ")}
           </p>
+
+          {/* Slide to confirm */}
+          <div className="relative mt-3 bg-gray-200 rounded-full h-10 overflow-hidden">
+            <button
+              onClick={() => handleConfirmAppointment(newAppointment.id)}
+              className="absolute left-0 top-0 h-full px-4 text-white font-semibold bg-emerald-500 rounded-full hover:bg-emerald-600 transition-all"
+            >
+              ✅ Confirm
+            </button>
+            <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+              Slide to confirm
+            </div>
+          </div>
+
+          {/* Cancel button */}
+          <button
+            onClick={() => handleCancelAppointment(newAppointment.id)}
+            className="text-sm text-red-500 underline mt-1"
+          >
+            ❌ Cancel Appointment
+          </button>
         </div>
       )}
+
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
         <div className="col-span-1 md:col-span-2 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
           <h2 className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mb-2">
@@ -225,9 +288,9 @@ async function loadAppointments(token, setAppointments, setAppointmentsToday, se
 
   const upcoming = apptData.filter((appt) => {
     const apptTime = dayjs(appt.appointment_date.replace("Z", ""));
-    const valid = appt.status === "pending" || appt.status === "confirmed";
-    return valid && apptTime.isAfter(now);
+    return appt.status === "pending" && apptTime.isAfter(now);
   });
+
 
   if (upcoming.length > 0) {
     const sorted = upcoming.sort((a, b) =>
