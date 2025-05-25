@@ -1,16 +1,21 @@
+// ✅ FULL FILE: freelancers/index.js
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
 import { useRouter } from "next/router";
-import { FiUser, FiDollarSign, FiClock, FiCalendar, FiMessageSquare } from "react-icons/fi";
-
+import {
+  FiUser,
+  FiDollarSign,
+  FiClock,
+  FiCalendar,
+  FiMessageSquare,
+} from "react-icons/fi";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-
 
 export default function FreelancerDashboard() {
   const [user, setUser] = useState(null);
@@ -20,8 +25,6 @@ export default function FreelancerDashboard() {
   const [appointmentsToday, setAppointmentsToday] = useState([]);
   const [nextAppointment, setNextAppointment] = useState(null);
   const [timeUntilNext, setTimeUntilNext] = useState("");
-
-
 
   const auth = getAuth();
   const router = useRouter();
@@ -36,73 +39,22 @@ export default function FreelancerDashboard() {
       const token = await currentUser.getIdToken();
       setUser(currentUser);
 
-      // 1️⃣ Lấy thông tin onboarding
-      const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/onboarding", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(
+        "https://crypto-manager-backend.onrender.com/api/freelancers/onboarding",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       const data = await res.json();
       setOnboarding(data);
 
-      // 2️⃣ Lấy danh sách lịch hẹn của freelancer
-      const apptRes = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const apptData = await apptRes.json();
-      setAppointments(apptData || []);
-
-      // 3️⃣ Lọc các lịch hôm nay theo giờ California
-      const todayFiltered = apptData.filter((appt) =>
-        isTodayCalifornia(appt.appointment_date)
+      await loadAppointments(
+        token,
+        setAppointments,
+        setAppointmentsToday,
+        setNextAppointment,
+        setTimeUntilNext
       );
-      setAppointmentsToday(todayFiltered);
-
-      // 4️⃣ Tìm lịch hẹn tiếp theo
-      const upcoming = apptData.filter((appt) => {
-        // ✅ Ép chuỗi timestamp về "local" theo định dạng thuần local
-        const apptTime = dayjs(`${appt.appointment_date.replace("Z", "")}`); // loại bỏ Z nếu có
-        const now = dayjs(); // local
-
-        const valid = appt.status === "pending" || appt.status === "confirmed";
-        const future = apptTime.isAfter(now);
-
-        console.log("⏰ Appt ID:", appt.id);
-        console.log("🕒 Appt Time (parsed):", apptTime.format("YYYY-MM-DD HH:mm"));
-        console.log("🆚 Now (local):", now.format("YYYY-MM-DD HH:mm"));
-        console.log("✅ Is upcoming:", valid && future);
-        console.log("------");
-
-        return valid && future;
-      });
-
-      // 5️⃣ Sắp xếp tăng dần và lấy lịch gần nhất
-      if (upcoming.length > 0) {
-        const sorted = upcoming.sort((a, b) =>
-          dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
-        );
-        setNextAppointment(sorted[0]);
-        // ✅ Tính thời gian đến lịch hẹn tiếp theo
-        const apptTime = dayjs(sorted[0].appointment_date.replace("Z", ""));
-        const now = dayjs();
-        const diffMinutes = apptTime.diff(now, "minute");
-
-        let timeUntil = "";
-        if (diffMinutes > 0) {
-          const hours = Math.floor(diffMinutes / 60);
-          const minutes = diffMinutes % 60;
-
-          if (hours > 0 && minutes > 0) {
-            timeUntil = `⏳ In ${hours}h ${minutes}m`;
-          } else if (hours > 0) {
-            timeUntil = `⏳ In ${hours} hour${hours > 1 ? "s" : ""}`;
-          } else {
-            timeUntil = `⏳ In ${minutes} minute${minutes > 1 ? "s" : ""}`;
-          }
-        }
-        setTimeUntilNext(timeUntil); // 👈 bước này cần thêm useState
-
-      } else {
-        setNextAppointment(null);
-      }
 
       setLoading(false);
     });
@@ -110,14 +62,33 @@ export default function FreelancerDashboard() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    const refresh = async () => {
+      const token = await user.getIdToken();
+      await loadAppointments(
+        token,
+        setAppointments,
+        setAppointmentsToday,
+        setNextAppointment,
+        setTimeUntilNext
+      );
+    };
+    const interval = setInterval(refresh, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   function isTodayCalifornia(isoDate) {
     const now = new Date();
     const appointmentDate = new Date(isoDate);
-
-    const nowLocal = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-    const apptLocal = new Date(appointmentDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-
+    const nowLocal = new Date(
+      now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
+    );
+    const apptLocal = new Date(
+      appointmentDate.toLocaleString("en-US", {
+        timeZone: "America/Los_Angeles",
+      })
+    );
     return (
       nowLocal.getFullYear() === apptLocal.getFullYear() &&
       nowLocal.getMonth() === apptLocal.getMonth() &&
@@ -131,39 +102,13 @@ export default function FreelancerDashboard() {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
   }
 
-  if (!isComplete) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-rose-200 via-yellow-100 to-emerald-200 dark:from-rose-900 dark:via-yellow-900 dark:to-emerald-800 px-4 py-6 text-gray-800 dark:text-white">
-        <Navbar />
-        <div className="max-w-xl mx-auto mt-20 bg-white/20 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-lg p-6 text-center">
-          <h2 className="text-2xl font-bold mb-2 text-red-500">⚠️ Onboarding Incomplete</h2>
-          <p className="mb-4 text-gray-700 dark:text-gray-300">
-            Please complete all onboarding steps before accessing the dashboard.
-          </p>
-          <button
-            onClick={() => router.push("/freelancers/me")}
-            className="bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-semibold px-6 py-2 rounded-full shadow-lg hover:scale-105 transition"
-          >
-            Go to Complete Onboarding
-          </button>
-        </div>
-      </div>
-    );
-  }
-  // 💡 Đặt đoạn xử lý biến phía trên phần return hoặc ngay trong render JSX nếu bạn dùng trong layout
   const now = dayjs();
-
-  // ✅ Completed: đã hoàn tất
-  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
-
-  // ✅ Upcoming: giờ còn trong tương lai
-  const upcomingToday = appointmentsToday.filter(a => {
+  const completedToday = appointmentsToday.filter((a) => a.status === "completed").length;
+  const upcomingToday = appointmentsToday.filter((a) => {
     const apptTime = dayjs(a.appointment_date.replace("Z", ""));
     return apptTime.isAfter(now) && (a.status === "pending" || a.status === "confirmed");
   }).length;
-
-  // ✅ Missed: giờ đã qua nhưng chưa xử lý
-  const missedToday = appointmentsToday.filter(a => {
+  const missedToday = appointmentsToday.filter((a) => {
     const apptTime = dayjs(a.appointment_date.replace("Z", ""));
     return apptTime.isBefore(now) && (a.status === "pending" || a.status === "confirmed");
   }).length;
@@ -171,9 +116,7 @@ export default function FreelancerDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
       <Navbar />
-
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-        {/* Welcome */}
         <div className="col-span-1 md:col-span-2 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
           <h2 className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mb-2">
             🌟 Welcome back, {user?.displayName || "Freelancer"}!
@@ -182,6 +125,7 @@ export default function FreelancerDashboard() {
         </div>
 
         <Card icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
+
         <Card
           icon={<FiClock />}
           title="Next Client"
@@ -196,6 +140,7 @@ export default function FreelancerDashboard() {
               : "No upcoming"
           }
         />
+
         <Card
           icon={<FiCalendar />}
           title="Appointments"
@@ -205,7 +150,6 @@ export default function FreelancerDashboard() {
 
         <Card icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
 
-        {/* Actions */}
         <div className="col-span-1 md:col-span-3">
           <h3 className="text-xl font-bold mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -237,4 +181,48 @@ function ActionButton({ label }) {
       {label}
     </button>
   );
+}
+
+async function loadAppointments(token, setAppointments, setAppointmentsToday, setNextAppointment, setTimeUntilNext) {
+  const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const apptData = await res.json();
+  setAppointments(apptData || []);
+
+  const now = dayjs();
+  const todayFiltered = apptData.filter((appt) =>
+    new Date(appt.appointment_date).toDateString() === new Date().toDateString()
+  );
+  setAppointmentsToday(todayFiltered);
+
+  const upcoming = apptData.filter((appt) => {
+    const apptTime = dayjs(appt.appointment_date.replace("Z", ""));
+    const valid = appt.status === "pending" || appt.status === "confirmed";
+    return valid && apptTime.isAfter(now);
+  });
+
+  if (upcoming.length > 0) {
+    const sorted = upcoming.sort((a, b) =>
+      dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+    );
+    const next = sorted[0];
+    setNextAppointment(next);
+
+    const apptTime = dayjs(next.appointment_date.replace("Z", ""));
+    const diffMinutes = apptTime.diff(now, "minute");
+
+    let timeUntil = "";
+    if (diffMinutes > 0) {
+      const hours = Math.floor(diffMinutes / 60);
+      const minutes = diffMinutes % 60;
+      timeUntil = hours > 0
+        ? `⏳ In ${hours}h ${minutes}m`
+        : `⏳ In ${minutes} minute${minutes > 1 ? "s" : ""}`;
+    }
+    setTimeUntilNext(timeUntil);
+  } else {
+    setNextAppointment(null);
+    setTimeUntilNext("");
+  }
 }

@@ -1,5 +1,5 @@
 // ✅ FULL FILE: freelancers/index.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
 import { useRouter } from "next/router";
@@ -17,6 +17,7 @@ import timezone from "dayjs/plugin/timezone";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+
 export default function FreelancerDashboard() {
   const [user, setUser] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
@@ -25,6 +26,9 @@ export default function FreelancerDashboard() {
   const [appointmentsToday, setAppointmentsToday] = useState([]);
   const [nextAppointment, setNextAppointment] = useState(null);
   const [timeUntilNext, setTimeUntilNext] = useState("");
+  const [newAppointment, setNewAppointment] = useState(null);
+  const [showPopup, setShowPopup] = useState(false);
+  const soundRef = useRef(null);
 
   const auth = getAuth();
   const router = useRouter();
@@ -53,7 +57,11 @@ export default function FreelancerDashboard() {
         setAppointments,
         setAppointmentsToday,
         setNextAppointment,
-        setTimeUntilNext
+        setTimeUntilNext,
+        nextAppointment,       // ✅ đối số 6
+        setShowPopup,          // ✅ đối số 7 — rất quan trọng!
+        setNewAppointment,     // ✅ đối số 8
+        soundRef               // ✅ đối số 9
       );
 
       setLoading(false);
@@ -71,7 +79,11 @@ export default function FreelancerDashboard() {
         setAppointments,
         setAppointmentsToday,
         setNextAppointment,
-        setTimeUntilNext
+        setTimeUntilNext,
+        nextAppointment,       // ✅ đối số 6
+        setShowPopup,          // ✅ đối số 7 — rất quan trọng!
+        setNewAppointment,     // ✅ đối số 8
+        soundRef               // ✅ đối số 9
       );
     };
     const interval = setInterval(refresh, 30000);
@@ -112,10 +124,25 @@ export default function FreelancerDashboard() {
     const apptTime = dayjs(a.appointment_date.replace("Z", ""));
     return apptTime.isBefore(now) && (a.status === "pending" || a.status === "confirmed");
   }).length;
+  //Sound for new appointments
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
       <Navbar />
+      <audio ref={soundRef} src="/notification.wav" preload="auto" />
+      {showPopup && newAppointment && (
+        <div className="fixed bottom-6 right-6 z-50 bg-white text-black rounded-xl px-5 py-4 shadow-xl border-l-8 border-emerald-500 animate-bounce-in max-w-sm w-[90%] sm:w-auto">
+          <h2 className="text-lg font-bold text-emerald-700 mb-1">📢 New Appointment</h2>
+          <p className="font-semibold text-pink-600">{newAppointment.customer_name}</p>
+          <p className="text-sm text-gray-700">
+            {dayjs(newAppointment.appointment_date.replace("Z", "")).format("MMM D, hh:mm A")}
+          </p>
+          <p className="text-sm text-emerald-600">
+            Services: {newAppointment.services?.map(s => s.name).join(", ")}
+          </p>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
         <div className="col-span-1 md:col-span-2 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
           <h2 className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mb-2">
@@ -170,7 +197,7 @@ function Card({ icon, title, value, sub }) {
       <div className="text-2xl text-emerald-500">{icon}</div>
       <h4 className="text-lg font-semibold">{title}</h4>
       <div className="text-2xl font-bold">{value}</div>
-      <p className="text-xs text-gray-600 dark:text-gray-400">{sub}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-400">{sub}</p>
     </div>
   );
 }
@@ -183,7 +210,7 @@ function ActionButton({ label }) {
   );
 }
 
-async function loadAppointments(token, setAppointments, setAppointmentsToday, setNextAppointment, setTimeUntilNext) {
+async function loadAppointments(token, setAppointments, setAppointmentsToday, setNextAppointment, setTimeUntilNext, prevNextAppointment, setShowPopup, setNewAppointment, soundRef) {
   const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -207,7 +234,26 @@ async function loadAppointments(token, setAppointments, setAppointmentsToday, se
       dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
     );
     const next = sorted[0];
+
+    // Nếu có appointment mới khác appointment hiện tại
+    if (!prevNextAppointment || prevNextAppointment.id !== next.id) {
+      setNewAppointment(next);
+      setShowPopup(true);                    // 1️⃣ Hiện popup ngay
+      soundRef.current?.play();             // 2️⃣ Phát tiếng ngay
+
+      const soundLoop = setInterval(() => { // 3️⃣ Phát lặp mỗi 3s
+        soundRef.current?.play();
+      }, 3000);
+
+      setTimeout(() => {                    // 4️⃣ Tắt popup + dừng âm
+        setShowPopup(false);
+        clearInterval(soundLoop);
+      }, 10000);
+
+    }
+
     setNextAppointment(next);
+
 
     const apptTime = dayjs(next.appointment_date.replace("Z", ""));
     const diffMinutes = apptTime.diff(now, "minute");
