@@ -30,6 +30,7 @@ export default function FreelancerDashboard() {
   const [newAppointment, setNewAppointment] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
   const soundRef = useRef(null);
+  const soundLoopRef = useRef(null); // ✅ để lưu vòng lặp âm thanh
   const [isSliding, setIsSliding] = useState(false);
   const [sliderX, setSliderX] = useState(0);
   const [sliderValue, setSliderValue] = useState(0);
@@ -94,7 +95,8 @@ export default function FreelancerDashboard() {
         nextAppointment,       // ✅ đối số 6
         setShowPopup,          // ✅ đối số 7 — rất quan trọng!
         setNewAppointment,     // ✅ đối số 8
-        soundRef               // ✅ đối số 9
+        soundRef,
+        soundLoopRef               // ✅ đối số 9
       );
 
       setLoading(false);
@@ -116,7 +118,8 @@ export default function FreelancerDashboard() {
         nextAppointment,       // ✅ đối số 6
         setShowPopup,          // ✅ đối số 7 — rất quan trọng!
         setNewAppointment,     // ✅ đối số 8
-        soundRef               // ✅ đối số 9
+        soundRef,
+        soundLoopRef               // ✅ đối số 9
       );
     };
     const interval = setInterval(refresh, 60000);
@@ -172,7 +175,11 @@ export default function FreelancerDashboard() {
         }
       );
       if (res.ok) {
-        setShowPopup(false);
+        if (soundLoopRef.current) {
+          clearInterval(soundLoopRef.current);      // ✅ Dừng âm thanh lặp
+          soundLoopRef.current = null;
+        }
+        setShowPopup(false);                         // ✅ Tắt popup
       }
     } catch (err) {
       console.error("❌ Error confirming appointment:", err.message);
@@ -194,7 +201,14 @@ export default function FreelancerDashboard() {
         }
       );
       if (res.ok) {
-        setShowPopup(false);
+        if (res.ok) {
+          if (soundLoopRef.current) {
+            clearInterval(soundLoopRef.current);
+            soundLoopRef.current = null;
+          }
+          setShowPopup(false);
+        }
+
       }
     } catch (err) {
       console.error("❌ Error cancelling appointment:", err.message);
@@ -318,7 +332,7 @@ function ActionButton({ label }) {
   );
 }
 
-async function loadAppointments(token, setAppointments, setAppointmentsToday, setNextAppointment, setTimeUntilNext, prevNextAppointment, setShowPopup, setNewAppointment, soundRef) {
+async function loadAppointments(token, setAppointments, setAppointmentsToday, setNextAppointment, setTimeUntilNext, prevNextAppointment, setShowPopup, setNewAppointment, soundRef, soundLoopRef) {
   const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -349,15 +363,20 @@ async function loadAppointments(token, setAppointments, setAppointmentsToday, se
       setShowPopup(true);
       soundRef.current?.play(); // Phát lần đầu
 
-      const soundLoop = setInterval(() => {
-        soundRef.current?.play(); // Phát mỗi 3s
+      soundLoopRef.current = setInterval(() => {
+        soundRef.current?.play();
       }, 3000);
+
 
       // Tắt popup cùng lúc với âm thanh
       setTimeout(() => {
-        clearInterval(soundLoop);
-        setShowPopup(false);
-      }, 15000); // Lặp ~3 lần là vừa
+        if (soundLoopRef.current) {
+          clearInterval(soundLoopRef.current); // ✅ Dừng vòng lặp đúng
+          soundLoopRef.current = null;
+        }
+        setShowPopup(false); // ✅ Đóng popup
+      }, 15000);
+
     }
 
 
