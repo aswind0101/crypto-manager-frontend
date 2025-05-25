@@ -93,29 +93,26 @@ function CustomerAppointmentsPage() {
                                     📌 Status: {appt.status}
                                 </p>
                                 {/* Nút huỷ nếu điều kiện đúng */}
-                                {appt.status === "pending" && parseLocalTimestamp(appt.appointment_date) > new Date() &&
-                                    user && (
-                                        <button
-                                            onClick={async () => {
-                                                if (!confirm("Are you sure you want to cancel this appointment?")) return;
-                                                const token = await user.getIdToken();
-                                                const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`, {
-                                                    method: "DELETE",
-                                                    headers: { Authorization: `Bearer ${token}` },
-                                                });
-                                                const data = await res.json();
-                                                if (res.ok) {
-                                                    alert("✅ Appointment cancelled.");
-                                                    setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
-                                                } else {
-                                                    alert("❌ " + (data.error || "Failed to cancel."));
-                                                }
-                                            }}
-                                            className="mt-3 text-xs bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full shadow transition"
-                                        >
-                                            ❌ Cancel Appointment
-                                        </button>
-                                    )}
+                                <button
+                                    onClick={async () => {
+                                        if (!confirm("Are you sure you want to cancel this appointment?")) return;
+                                        const token = await user.getIdToken();
+                                        const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`, {
+                                            method: "DELETE",
+                                            headers: { Authorization: `Bearer ${token}` },
+                                        });
+                                        const data = await res.json();
+                                        if (res.ok) {
+                                            alert("✅ Appointment cancelled.");
+                                            setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
+                                        } else {
+                                            alert("❌ " + (data.error || "Failed to cancel."));
+                                        }
+                                    }}
+                                    className="mt-3 text-xs bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full shadow transition"
+                                >
+                                    ❌ Cancel Appointment
+                                </button>
                             </div>
                         ))}
                     </div>
