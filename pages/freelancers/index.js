@@ -170,7 +170,7 @@ function Card({ icon, title, value, sub }) {
       <div className="text-2xl text-emerald-500">{icon}</div>
       <h4 className="text-lg font-semibold">{title}</h4>
       <div className="text-2xl font-bold">{value}</div>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{sub}</p>
+      <p className="text-xs text-gray-600 dark:text-gray-400">{sub}</p>
     </div>
   );
 }
