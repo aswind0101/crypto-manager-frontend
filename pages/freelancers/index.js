@@ -4,6 +4,14 @@ import Navbar from "../../components/Navbar";
 import { useRouter } from "next/router";
 import { FiUser, FiDollarSign, FiClock, FiCalendar, FiMessageSquare } from "react-icons/fi";
 
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+
 export default function FreelancerDashboard() {
   const [user, setUser] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
@@ -36,8 +44,37 @@ export default function FreelancerDashboard() {
         setAppointments(apptData || []);
         const filtered = apptData.filter(appt => isTodayCalifornia(appt.appointment_date));
         setAppointmentsToday(filtered);
-        const now = new Date();
-        const upcoming = apptData.filter((a) => new Date(a.appointment_date) > now);
+
+        const now = dayjs().tz("America/Los_Angeles");
+
+        const upcoming = apptData.filter((appt) => {
+          const apptTime = dayjs(appt.appointment_date).tz("America/Los_Angeles");
+          const valid = appt.status === "pending" || appt.status === "confirmed";
+          const future = apptTime.isAfter(now);
+          return valid && future;
+        });
+
+        console.log("✅ Filtered upcoming:", upcoming);
+
+        if (upcoming.length > 0) {
+          const sorted = upcoming.sort((a, b) =>
+            dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+          );
+          setNextAppointment(sorted[0]);
+        } else {
+          setNextAppointment(null);
+        }
+
+
+        if (upcoming.length > 0) {
+          const sorted = upcoming.sort((a, b) =>
+            dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+          );
+          setNextAppointment(sorted[0]);
+        } else {
+          setNextAppointment(null);
+        }
+
 
         if (upcoming.length > 0) {
           // Sắp xếp theo thời gian tăng dần
@@ -116,17 +153,15 @@ export default function FreelancerDashboard() {
           title="Next Client"
           value={
             nextAppointment
-              ? new Date(nextAppointment.appointment_date).toLocaleTimeString("en-US", {
-                timeZone: "America/Los_Angeles",
-                hour: "2-digit",
-                minute: "2-digit",
-              })
+              ? dayjs(nextAppointment.appointment_date)
+                .tz("America/Los_Angeles")
+                .format("hh:mm A")
               : "No upcoming"
           }
           sub={
-            nextAppointment?.services?.[0]?.name
-              ? `${nextAppointment.services[0].name} - ${nextAppointment?.customer_name || "Client"}`
-              : "No info"
+            nextAppointment?.customer_name
+              ? `${nextAppointment.customer_name} - ${nextAppointment.services?.map(s => s.name).join(", ")}`
+              : "No upcoming"
           }
         />
         <Card

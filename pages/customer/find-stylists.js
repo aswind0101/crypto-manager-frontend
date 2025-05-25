@@ -210,7 +210,7 @@ export default function FindStylists() {
         console.log("🧾 Appointments:", data);
         console.log("⏱️ Realtime duration passed in:", duration);
 
-        const slots = getAvailableTimeSlots(data, dateStr, 30, "09:00", "19:00", duration);
+        const slots = getAvailableTimeSlots(data, dateStr, 30, "09:00", "23:00", duration);
         setTimeSlots(slots);
       } else {
         console.warn("⚠️ Failed to fetch availability:", data.error);
@@ -237,7 +237,7 @@ export default function FindStylists() {
           dateStr,
           30,
           "09:00",
-          "19:00",
+          "23:00",
           totalDuration
         );
         setTimeSlots(slots);
@@ -257,7 +257,7 @@ export default function FindStylists() {
     dateStr,
     interval = 30,
     workStart = "09:00",
-    workEnd = "19:00",
+    workEnd = "23:00",
     totalDuration = 30
   ) {
     console.log("📦 getAvailableTimeSlots called");
