@@ -14,6 +14,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
+
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -29,9 +30,52 @@ export default function FreelancerDashboard() {
   const [newAppointment, setNewAppointment] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
   const soundRef = useRef(null);
+  const soundLoopRef = useRef(null); // ✅ để lưu vòng lặp âm thanh
+  const [isSliding, setIsSliding] = useState(false);
+  const [sliderX, setSliderX] = useState(0);
+  const [sliderValue, setSliderValue] = useState(0);
+  const clearSoundLoop = () => {
+    if (soundLoopRef.current) {
+      clearInterval(soundLoopRef.current);
+      soundLoopRef.current = null;
+    }
+  };
+
+  const [confirmedNextClient, setConfirmedNextClient] = useState(null); // 🟢 Next Client
+  const [pendingUpcomingAppointment, setPendingUpcomingAppointment] = useState(null); // 🔔 Popup
+
+
 
   const auth = getAuth();
   const router = useRouter();
+  const sliderRef = useRef(null);
+  const sliderMax = 200; // chiều dài vuốt tối đa (điều chỉnh theo giao diện)
+
+  const handleSlideStart = (e) => {
+    setIsSliding(true);
+  };
+
+  const handleSlideMove = (e) => {
+    if (!isSliding) return;
+
+    const clientX = e.type.includes("mouse")
+      ? e.clientX
+      : e.touches[0].clientX;
+
+    const rect = sliderRef.current.getBoundingClientRect();
+    let newX = clientX - rect.left - 25;
+    newX = Math.max(0, Math.min(newX, sliderMax));
+    setSliderX(newX);
+  };
+
+  const handleSlideEnd = () => {
+    setIsSliding(false);
+    if (sliderX >= sliderMax - 10) {
+      handleConfirmAppointment(newAppointment.id); // Gọi API xác nhận
+    } else {
+      setSliderX(0); // Reset
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -56,12 +100,13 @@ export default function FreelancerDashboard() {
         token,
         setAppointments,
         setAppointmentsToday,
-        setNextAppointment,
-        setTimeUntilNext,
-        nextAppointment,       // ✅ đối số 6
-        setShowPopup,          // ✅ đối số 7 — rất quan trọng!
-        setNewAppointment,     // ✅ đối số 8
-        soundRef               // ✅ đối số 9
+        setConfirmedNextClient,
+        setPendingUpcomingAppointment,
+        setTimeUntilNext,            // ✅ Đây!
+        setShowPopup,
+        setNewAppointment,
+        soundRef,
+        soundLoopRef
       );
 
       setLoading(false);
@@ -78,12 +123,13 @@ export default function FreelancerDashboard() {
         token,
         setAppointments,
         setAppointmentsToday,
-        setNextAppointment,
-        setTimeUntilNext,
-        nextAppointment,       // ✅ đối số 6
-        setShowPopup,          // ✅ đối số 7 — rất quan trọng!
-        setNewAppointment,     // ✅ đối số 8
-        soundRef               // ✅ đối số 9
+        setConfirmedNextClient,
+        setPendingUpcomingAppointment,
+        setTimeUntilNext,            // ✅ Đây!
+        setShowPopup,
+        setNewAppointment,
+        soundRef,
+        soundLoopRef            // ✅ đối số 9
       );
     };
     const interval = setInterval(refresh, 60000);
@@ -124,23 +170,130 @@ export default function FreelancerDashboard() {
     const apptTime = dayjs(a.appointment_date.replace("Z", ""));
     return apptTime.isBefore(now) && (a.status === "pending" || a.status === "confirmed");
   }).length;
+  const handleConfirmAppointment = async (appointmentId) => {
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: "confirmed" }),
+        }
+      );
+      if (res.ok) {
+        clearSoundLoop(soundLoopRef);
+
+        setShowPopup(false);                         // ✅ Tắt popup
+        await loadAppointments(
+          await user.getIdToken(),
+          setAppointments,
+          setAppointmentsToday,
+          setConfirmedNextClient,
+          setPendingUpcomingAppointment,
+          setTimeUntilNext,
+          setShowPopup,
+          setNewAppointment,
+          soundRef,
+          soundLoopRef
+        );
+
+
+      }
+    } catch (err) {
+      console.error("❌ Error confirming appointment:", err.message);
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId) => {
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: "cancelled" }),
+        }
+      );
+      if (res.ok) {
+        if (res.ok) {
+          if (soundLoopRef.current) {
+            clearInterval(soundLoopRef.current);
+            soundLoopRef.current = null;
+          }
+          setShowPopup(false);
+        }
+
+      }
+    } catch (err) {
+      console.error("❌ Error cancelling appointment:", err.message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
-      {showPopup && newAppointment && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white text-black rounded-xl px-5 py-4 shadow-xl border-l-8 border-emerald-500 animate-popup glow-effect max-w-sm w-[90%] sm:w-auto">
-          <h2 className="text-lg font-bold text-emerald-700 mb-1">📢 New Appointment</h2>
-          <p className="font-semibold text-pink-600">{newAppointment.customer_name}</p>
+      {showPopup && pendingUpcomingAppointment && (
+        <div className="fixed bottom-6 right-6 z-50 bg-white text-black rounded-xl px-5 py-4 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
+          <h2 className="text-lg font-bold text-emerald-700">📢 New Appointment</h2>
+          <p className="font-semibold text-pink-600">{pendingUpcomingAppointment.customer_name}</p>
           <p className="text-sm text-gray-700">
-            {dayjs(newAppointment.appointment_date.replace("Z", "")).format("MMM D, hh:mm A")}
+            {dayjs(pendingUpcomingAppointment.appointment_date.replace("Z", "")).format("MMM D, hh:mm A")}
           </p>
           <p className="text-sm text-emerald-600">
-            Services: {newAppointment.services?.map(s => s.name).join(", ")}
+            Services: {pendingUpcomingAppointment.services?.map(s => s.name).join(", ")}
           </p>
+
+          {/* Slide-to-confirm hoặc nút Confirm */}
+          <div className="mt-4">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={sliderValue}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                setSliderValue(value);
+                if (value === 100) {
+                  handleConfirmAppointment(pendingUpcomingAppointment.id);
+                  setSliderValue(0);
+                }
+              }}
+              className="w-full h-10 bg-gray-200 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #10b981 0%, #10b981 ${sliderValue}%, #e5e7eb ${sliderValue}%, #e5e7eb 100%)`,
+              }}
+            />
+            <p className="text-center text-sm text-gray-500 mt-2">Slide to Confirm</p>
+            <div className="w-full h-2 bg-gray-200 rounded overflow-hidden mt-2">
+              <div
+                className="h-full bg-emerald-500 origin-left"
+                style={{
+                  transform: "scaleX(0)",
+                  animation: "progressSlide 21s linear forwards"
+                }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Cancel */}
+          <button
+            onClick={() => handleCancelAppointment(pendingUpcomingAppointment.id)}
+            className="text-sm text-red-500 underline mt-2"
+          >
+            ❌ Cancel Appointment
+          </button>
         </div>
       )}
+
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
         <div className="col-span-1 md:col-span-2 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
           <h2 className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mb-2">
@@ -155,13 +308,13 @@ export default function FreelancerDashboard() {
           icon={<FiClock />}
           title="Next Client"
           value={
-            nextAppointment
-              ? dayjs(nextAppointment.appointment_date.replace("Z", "")).format("hh:mm A")
+            confirmedNextClient
+              ? dayjs(confirmedNextClient.appointment_date.replace("Z", "")).format("hh:mm A")
               : "No upcoming"
           }
           sub={
-            nextAppointment?.customer_name
-              ? `${nextAppointment.customer_name} – ${nextAppointment.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` (${timeUntilNext})` : ""}`
+            confirmedNextClient?.customer_name
+              ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` (${timeUntilNext})` : ""}`
               : "No upcoming"
           }
         />
@@ -208,7 +361,18 @@ function ActionButton({ label }) {
   );
 }
 
-async function loadAppointments(token, setAppointments, setAppointmentsToday, setNextAppointment, setTimeUntilNext, prevNextAppointment, setShowPopup, setNewAppointment, soundRef) {
+async function loadAppointments(
+  token,
+  setAppointments,
+  setAppointmentsToday,
+  setConfirmedNextClient,
+  setPendingUpcomingAppointment,
+  setTimeUntilNext,
+  setShowPopup,
+  setNewAppointment,
+  soundRef,
+  soundLoopRef,
+) {
   const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -216,44 +380,78 @@ async function loadAppointments(token, setAppointments, setAppointmentsToday, se
   setAppointments(apptData || []);
 
   const now = dayjs();
+
+  // 🔽 Lọc lịch hôm nay
   const todayFiltered = apptData.filter((appt) =>
     new Date(appt.appointment_date).toDateString() === new Date().toDateString()
   );
   setAppointmentsToday(todayFiltered);
 
-  const upcoming = apptData.filter((appt) => {
-    const apptTime = dayjs(appt.appointment_date.replace("Z", ""));
-    return appt.status === "pending" && apptTime.isAfter(now);
-  });
-
-
-  if (upcoming.length > 0) {
-    const sorted = upcoming.sort((a, b) =>
+  // 🔔 Lấy cuộc hẹn pending gần nhất trong tương lai → dùng cho popup
+  const pendingUpcoming = apptData
+    .filter((a) =>
+      a.status === "pending" &&
+      dayjs(a.appointment_date.replace("Z", "")).isAfter(now)
+    )
+    .sort((a, b) =>
       dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
     );
-    const next = sorted[0];
 
-    // Nếu có appointment mới khác appointment hiện tại
-    if (!prevNextAppointment || prevNextAppointment.id !== next.id) {
-      setNewAppointment(next);
-      setShowPopup(true);
-      soundRef.current?.play(); // Phát lần đầu
+  const nextPending = pendingUpcoming[0] || null;
+  setPendingUpcomingAppointment(nextPending);
 
-      const soundLoop = setInterval(() => {
-        soundRef.current?.play(); // Phát mỗi 3s
-      }, 3000);
-
-      // Tắt popup cùng lúc với âm thanh
-      setTimeout(() => {
-        clearInterval(soundLoop);
-        setShowPopup(false);
-      }, 15000); // Lặp ~3 lần là vừa
-    }
+  if (nextPending) {
+    setNewAppointment(nextPending);
+    setShowPopup(true);
 
 
-    setNextAppointment(next);
+    let elapsed = 0;
+    const interval = 200; // ms mỗi bước
+    const total = 21000; // tổng thời gian
 
-    const apptTime = dayjs(next.appointment_date.replace("Z", ""));
+    const progressTimer = setInterval(() => {
+      elapsed += interval;
+      const percent = Math.min(100, (elapsed / total) * 100);
+
+    }, interval);
+
+    setTimeout(() => {
+      clearInterval(progressTimer);
+      clearSoundLoop(soundLoopRef);
+      setShowPopup(false);
+
+    }, total);
+
+    clearSoundLoop(soundLoopRef);
+    soundRef.current?.play();
+    soundLoopRef.current = setInterval(() => {
+      soundRef.current?.play();
+    }, 3000);
+
+    setTimeout(() => {
+      if (soundLoopRef.current) {
+        clearInterval(soundLoopRef.current);
+        soundLoopRef.current = null;
+      }
+      setShowPopup(false);
+    }, 21000);
+  }
+
+  // 🟢 Lấy lịch đã confirmed gần nhất trong tương lai → dùng cho Next Client
+  const confirmedUpcoming = apptData
+    .filter((a) =>
+      a.status === "confirmed" &&
+      dayjs(a.appointment_date.replace("Z", "")).isAfter(now)
+    )
+    .sort((a, b) =>
+      dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+    );
+
+  setConfirmedNextClient(confirmedUpcoming[0] || null);
+
+  // ⏳ Cập nhật đồng hồ đếm thời gian tới lịch gần nhất (dành cho hiển thị next)
+  if (confirmedUpcoming[0]) {
+    const apptTime = dayjs(confirmedUpcoming[0].appointment_date.replace("Z", ""));
     const diffMinutes = apptTime.diff(now, "minute");
 
     let timeUntil = "";
@@ -266,7 +464,13 @@ async function loadAppointments(token, setAppointments, setAppointmentsToday, se
     }
     setTimeUntilNext(timeUntil);
   } else {
-    setNextAppointment(null);
     setTimeUntilNext("");
+  }
+}
+
+function clearSoundLoop(soundLoopRef) {
+  if (soundLoopRef.current) {
+    clearInterval(soundLoopRef.current);
+    soundLoopRef.current = null;
   }
 }

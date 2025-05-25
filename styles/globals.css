@@ -20,6 +20,10 @@
     cursor: pointer;
   }
 }
+@keyframes progressSlide {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
 
 @keyframes slideUpFadeIn {
   0% {
