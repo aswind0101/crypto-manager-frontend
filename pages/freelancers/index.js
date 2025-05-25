@@ -261,19 +261,8 @@ export default function FreelancerDashboard() {
             Services: {pendingUpcomingAppointment.services?.map(s => s.name).join(", ")}
           </p>
 
-          {/* Slide-to-confirm mới đẹp */}
-          <div className="mt-4 w-full max-w-xs mx-auto relative">
-            <div className="relative h-12 bg-zinc-700 rounded-full overflow-hidden shadow-inner">
-              <div
-                className="absolute h-full bg-emerald-500 transition-all duration-300 ease-out rounded-full"
-                style={{ width: `${sliderValue}%` }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center text-sm text-white font-semibold z-10">
-                {sliderValue < 100 ? "▶️ Slide to Confirm" : "✅ Confirmed"}
-              </div>
-            </div>
-
-            {/* Vùng kéo */}
+          {/* Slide-to-confirm hoặc nút Confirm */}
+          <div className="mt-4">
             <input
               type="range"
               min="0"
@@ -284,11 +273,15 @@ export default function FreelancerDashboard() {
                 setSliderValue(value);
                 if (value === 100) {
                   handleConfirmAppointment(pendingUpcomingAppointment.id);
-                  setSliderValue(0); // Reset
+                  setSliderValue(0);
                 }
               }}
-              className="absolute top-0 left-0 w-full h-12 opacity-0 cursor-pointer z-20"
+              className="w-full h-10 bg-gray-200 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #10b981 0%, #10b981 ${sliderValue}%, #e5e7eb ${sliderValue}%, #e5e7eb 100%)`,
+              }}
             />
+            <p className="text-center text-sm text-gray-500 mt-2">Slide to Confirm</p>
             <div className="w-full h-2 bg-gray-200 rounded overflow-hidden mt-2">
               <div
                 className="h-full bg-emerald-500 origin-left"
@@ -299,8 +292,6 @@ export default function FreelancerDashboard() {
               ></div>
             </div>
           </div>
-
-
 
           {/* Cancel */}
           <button
