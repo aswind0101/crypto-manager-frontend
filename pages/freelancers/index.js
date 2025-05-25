@@ -86,7 +86,7 @@ export default function FreelancerDashboard() {
         soundRef               // ✅ đối số 9
       );
     };
-    const interval = setInterval(refresh, 30000);
+    const interval = setInterval(refresh, 60000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -238,22 +238,22 @@ async function loadAppointments(token, setAppointments, setAppointmentsToday, se
     // Nếu có appointment mới khác appointment hiện tại
     if (!prevNextAppointment || prevNextAppointment.id !== next.id) {
       setNewAppointment(next);
-      setShowPopup(true);                    // 1️⃣ Hiện popup ngay
-      soundRef.current?.play();             // 2️⃣ Phát tiếng ngay
+      setShowPopup(true);
+      soundRef.current?.play(); // Phát lần đầu
 
-      const soundLoop = setInterval(() => { // 3️⃣ Phát lặp mỗi 3s
-        soundRef.current?.play();
+      const soundLoop = setInterval(() => {
+        soundRef.current?.play(); // Phát mỗi 3s
       }, 3000);
 
-      setTimeout(() => {                    // 4️⃣ Tắt popup + dừng âm
-        setShowPopup(false);
+      // Tắt popup cùng lúc với âm thanh
+      setTimeout(() => {
         clearInterval(soundLoop);
-      }, 10000);
-
+        setShowPopup(false);
+      }, 15000); // Lặp ~3 lần là vừa
     }
 
-    setNextAppointment(next);
 
+    setNextAppointment(next);
 
     const apptTime = dayjs(next.appointment_date.replace("Z", ""));
     const diffMinutes = apptTime.diff(now, "minute");
