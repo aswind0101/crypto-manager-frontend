@@ -261,7 +261,7 @@ export default function FreelancerDashboard() {
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       {showPopup && pendingUpcomingAppointment && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white text-black rounded-xl px-8 py-4 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
+        <div className="fixed bottom-4 right-4 z-50 bg-white text-black rounded-xl px-8 py-2 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
 
           {/* 💰 Tổng tiền góc trên phải */}
           <div className="absolute top-2 right-2 bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded-full shadow">
@@ -380,7 +380,7 @@ export default function FreelancerDashboard() {
         <Card
           icon={<FiCalendar />}
           title="Appointments"
-          value={`${appointmentsToday.length} Today`}
+          value={`${appointmentsToday.filter(a => a.status !== "cancelled").length} Today`}
           sub={
             <>
               ✅ Completed: {completedToday} <br />
