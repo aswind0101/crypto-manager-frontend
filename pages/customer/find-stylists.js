@@ -178,9 +178,13 @@ export default function FindStylists() {
 
       if (res.ok) {
         alert("✅ Appointment booked successfully!");
-        setFlippedId(null);
-        setForm({ service_ids: [], appointment_date: "", duration_minutes: "", note: "" });
-        setSelectedTime("");
+
+        // ✅ Đợi 1 giây rồi chuyển sang trang customer/me
+        setTimeout(() => {
+          router.push("/customer/me");
+        }, 1000);
+
+        return; // ✅ Không cần reset form nếu đã chuyển trang
       } else {
         alert("❌ " + (data.error || "Booking failed."));
       }
@@ -250,7 +254,7 @@ export default function FindStylists() {
           dateStr,
           30,
           "09:00",
-          "23:30",
+          "23:59",
           totalDuration
         );
         setTimeSlots(slots);
@@ -270,7 +274,7 @@ export default function FindStylists() {
     dateStr,
     interval = 30,
     workStart = "09:00",
-    workEnd = "23:30",
+    workEnd = "23:59",
     totalDuration = 30
   ) {
     console.log("📦 getAvailableTimeSlots called");
@@ -405,7 +409,7 @@ export default function FindStylists() {
                     <div className="w-full px-2 space-y-2">
                       <div>
                         <h2 className="text-xl font-bold text-pink-400">{s.name}</h2>
-                        <p className="text-sm italic text-pink-200">
+                        <p className="inline-block text-xs px-2 py-1 rounded-full bg-pink-600/50 text-white shadow">
                           {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
                         </p>
                       </div>

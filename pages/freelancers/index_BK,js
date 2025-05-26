@@ -9,6 +9,8 @@ import {
   FiClock,
   FiCalendar,
   FiMessageSquare,
+  FiExternalLink,
+  FiList
 } from "react-icons/fi";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -43,8 +45,7 @@ export default function FreelancerDashboard() {
 
   const [confirmedNextClient, setConfirmedNextClient] = useState(null); // 🟢 Next Client
   const [pendingUpcomingAppointment, setPendingUpcomingAppointment] = useState(null); // 🔔 Popup
-
-
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   const auth = getAuth();
   const router = useRouter();
@@ -76,6 +77,15 @@ export default function FreelancerDashboard() {
       setSliderX(0); // Reset
     }
   };
+  useEffect(() => {
+    if (sliderValue > 0 && sliderValue < 100) {
+      const timeout = setTimeout(() => {
+        setSliderValue(0);
+      }, 2000); // ⏳ Sau 2 giây không kéo tiếp thì reset
+
+      return () => clearTimeout(timeout); // Cleanup nếu user kéo tiếp
+    }
+  }, [sliderValue]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -261,6 +271,15 @@ export default function FreelancerDashboard() {
             Services: {pendingUpcomingAppointment.services?.map(s => s.name).join(", ")}
           </p>
 
+          <p className="text-sm text-blue-500">
+            ⏱ Estimated Time:{" "}
+            {pendingUpcomingAppointment.services?.reduce(
+              (total, s) => total + (s.duration || s.duration_minutes || 0),
+              0
+            )}{" "}
+            minutes
+          </p>
+
           {/* Slide-to-confirm hoặc nút Confirm */}
           <div className="mt-4">
             <input
@@ -271,9 +290,15 @@ export default function FreelancerDashboard() {
               onChange={(e) => {
                 const value = parseInt(e.target.value, 10);
                 setSliderValue(value);
+
                 if (value === 100) {
+                  setIsConfirmed(true);
                   handleConfirmAppointment(pendingUpcomingAppointment.id);
-                  setSliderValue(0);
+                  setTimeout(() => {
+                    setIsConfirmed(false);
+                    setSliderValue(0);
+                    setShowPopup(false); // ⏳ Đóng popup sau 2s
+                  }, 2000);
                 }
               }}
               className="w-full h-10 bg-gray-200 rounded-full appearance-none cursor-pointer"
@@ -281,13 +306,15 @@ export default function FreelancerDashboard() {
                 background: `linear-gradient(to right, #10b981 0%, #10b981 ${sliderValue}%, #e5e7eb ${sliderValue}%, #e5e7eb 100%)`,
               }}
             />
-            <p className="text-center text-sm text-gray-500 mt-2">Slide to Confirm</p>
+            <p className="text-center text-sm text-gray-500 mt-2">
+              {isConfirmed ? "✅ Confirmed!" : "Slide to Confirm"}
+            </p>
             <div className="w-full h-2 bg-gray-200 rounded overflow-hidden mt-2">
               <div
                 className="h-full bg-emerald-500 origin-left"
                 style={{
                   transform: "scaleX(0)",
-                  animation: "progressSlide 21s linear forwards"
+                  animation: "progressSlide 21s linear forwards",
                 }}
               ></div>
             </div>
@@ -323,37 +350,33 @@ export default function FreelancerDashboard() {
           }
           sub={
             confirmedNextClient?.customer_name
-              ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` (${timeUntilNext})` : ""}`
+              ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` ${timeUntilNext}` : ""}`
               : "No upcoming"
           }
         />
-
         <Card
           icon={<FiCalendar />}
           title="Appointments"
           value={`${appointmentsToday.length} Today`}
           sub={
-            <div className="space-y-1 text-sm mt-1">
-              <div className="flex items-center gap-2">
-                <span className="text-green-500">✅</span>
-                <span className="text-gray-800">{completedToday} Completed</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-yellow-500">🟡</span>
-                <span className="text-gray-800">{pendingToday} Pending</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-blue-500">⏳</span>
-                <span className="text-gray-800">{upcomingToday} Upcoming</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-red-500">❌</span>
-                <span className="text-gray-800">{missedToday} Missed</span>
-              </div>
-            </div>
-
+            <>
+              ✅ Completed: {completedToday} <br />
+              🟡 Pending: {pendingToday} <br />
+              ⏳ Upcoming: {upcomingToday} <br />
+              ❌ Missed: {missedToday}
+            </>
           }
-        />
+        >
+          {/* Icon điều hướng – nằm trong card */}
+          <button
+            onClick={() => router.push("/freelancers/appointments")}
+            className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
+            title="Manage Appointments"
+          >
+            <FiExternalLink />
+          </button>
+
+        </Card>
 
         <Card icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
 
@@ -371,9 +394,12 @@ export default function FreelancerDashboard() {
   );
 }
 
-function Card({ icon, title, value, sub }) {
+function Card({ icon, title, value, sub, children }) {
   return (
-    <div className="bg-white/30 dark:bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-md flex flex-col gap-2">
+    <div className="relative bg-white/30 dark:bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-md flex flex-col gap-2">
+      {/* Nếu có children (ví dụ nút điều hướng) sẽ render lên trên */}
+      {children}
+
       <div className="text-2xl text-emerald-500">{icon}</div>
       <h4 className="text-lg font-semibold">{title}</h4>
       <div className="text-2xl font-bold">{value}</div>
@@ -381,6 +407,7 @@ function Card({ icon, title, value, sub }) {
     </div>
   );
 }
+
 
 function ActionButton({ label }) {
   return (
