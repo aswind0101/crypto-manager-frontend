@@ -270,7 +270,7 @@ export default function FreelancerDashboard() {
           </div>
 
           {/* Tiêu đề */}
-          <h2 className="text-lg mt-4 font-bold text-emerald-700">📢 New Appointment</h2>
+          <h2 className="text-lg mt-6 font-bold text-emerald-700">📢 New Appointment</h2>
 
           {/* Tên khách */}
           <p className="font-semibold text-pink-600">{pendingUpcomingAppointment.customer_name}</p>
