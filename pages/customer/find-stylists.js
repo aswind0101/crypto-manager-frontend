@@ -22,6 +22,7 @@ export default function FindStylists() {
   const [user, setUser] = useState(null);
   const router = useRouter();
 
+
   const [timeSlots, setTimeSlots] = useState([]);
   const [selectedTime, setSelectedTime] = useState(""); // HH:mm
 
@@ -480,11 +481,7 @@ export default function FindStylists() {
                                       });
 
                                       if (form.appointment_date) {
-                                        fetchAvailabilityWithDuration(
-                                          s.id,
-                                          form.appointment_date,
-                                          totalDuration
-                                        );
+                                        fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration); // ✅ ở đây s là stylist, đúng!
                                       }
                                     }}
                                     className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"

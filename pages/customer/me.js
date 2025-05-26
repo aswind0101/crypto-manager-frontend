@@ -262,7 +262,7 @@ function CustomerAppointmentsPage() {
 
                                 {/* Ghi chú (nếu có) */}
                                 {appt.note && (
-                                    <p className="text-sm text-pink-100 mb-2">💬 Note: {appt.note}</p>
+                                    <p className="text-sm text-pink-100 mb-2 mt-4">💬 Note: {appt.note}</p>
                                 )}
 
                                 {/* Nút huỷ nếu điều kiện đúng */}

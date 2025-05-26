@@ -5,6 +5,11 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { getAuth } from "firebase/auth";
 const auth = getAuth(); // hoặc lấy từ firebase.js nếu đã export sẵn
+import dayjs from "dayjs";
+import timezone from "dayjs/plugin/timezone";
+import utc from "dayjs/plugin/utc";
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 
 export default function FindStylists() {
@@ -16,6 +21,7 @@ export default function FindStylists() {
   const [hasAskedLocation, setHasAskedLocation] = useState(false);
   const [user, setUser] = useState(null);
   const router = useRouter();
+  
 
   const [timeSlots, setTimeSlots] = useState([]);
   const [selectedTime, setSelectedTime] = useState(""); // HH:mm
@@ -136,9 +142,17 @@ export default function FindStylists() {
         return;
       }
 
-      const combinedDateTime = new Date(`${form.appointment_date}T${selectedTime}:00`);
-      const localDateTime = new Date(combinedDateTime.getTime() - combinedDateTime.getTimezoneOffset() * 60000);
-      const isoDate = localDateTime.toISOString();
+
+
+      const localTime = dayjs.tz(
+        `${form.appointment_date} ${selectedTime}`,
+        "YYYY-MM-DD HH:mm",
+        "America/Los_Angeles"
+      );
+
+      const appointment_date = localTime.format("YYYY-MM-DD HH:mm:ss");
+      console.log("📦 Đặt lịch lúc (giờ địa phương):", appointment_date);
+
 
       const token = await user.getIdToken();
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments", {
@@ -151,7 +165,7 @@ export default function FindStylists() {
           stylist_id: stylist.id,
           salon_id: stylist.salon_id,
           service_ids: form.service_ids,
-          appointment_date: isoDate,
+          appointment_date,
           duration_minutes: parseInt(form.duration_minutes || "60"),
           note: form.note,
         }),
@@ -165,9 +179,13 @@ export default function FindStylists() {
 
       if (res.ok) {
         alert("✅ Appointment booked successfully!");
-        setFlippedId(null);
-        setForm({ service_ids: [], appointment_date: "", duration_minutes: "", note: "" });
-        setSelectedTime("");
+
+        // ✅ Đợi 1 giây rồi chuyển sang trang customer/me
+        setTimeout(() => {
+          router.push("/customer/me");
+        }, 1000);
+
+        return; // ✅ Không cần reset form nếu đã chuyển trang
       } else {
         alert("❌ " + (data.error || "Booking failed."));
       }
@@ -210,7 +228,7 @@ export default function FindStylists() {
         console.log("🧾 Appointments:", data);
         console.log("⏱️ Realtime duration passed in:", duration);
 
-        const slots = getAvailableTimeSlots(data, dateStr, 30, "09:00", "18:00", duration);
+        const slots = getAvailableTimeSlots(data, dateStr, 30, "09:00", "23:30", duration);
         setTimeSlots(slots);
       } else {
         console.warn("⚠️ Failed to fetch availability:", data.error);
@@ -237,7 +255,7 @@ export default function FindStylists() {
           dateStr,
           30,
           "09:00",
-          "18:00",
+          "23:59",
           totalDuration
         );
         setTimeSlots(slots);
@@ -257,7 +275,7 @@ export default function FindStylists() {
     dateStr,
     interval = 30,
     workStart = "09:00",
-    workEnd = "18:00",
+    workEnd = "23:59",
     totalDuration = 30
   ) {
     console.log("📦 getAvailableTimeSlots called");
@@ -392,7 +410,7 @@ export default function FindStylists() {
                     <div className="w-full px-2 space-y-2">
                       <div>
                         <h2 className="text-xl font-bold text-pink-400">{s.name}</h2>
-                        <p className="text-sm italic text-pink-200">
+                        <p className="inline-block text-xs px-2 py-1 rounded-full bg-pink-600/50 text-white shadow">
                           {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
                         </p>
                       </div>
