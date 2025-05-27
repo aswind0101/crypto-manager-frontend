@@ -344,7 +344,7 @@ export default function FreelancerDashboard() {
   if (!isComplete) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="bg-white/10 border border-white/20 rounded-2xl p-8 max-w-lg w-full text-gray-100 shadow-lg">
+        <div className="bg-white/10 border border-white/20 rounded-2xl p-6 max-w-lg w-full text-gray-100 shadow-lg">
           <h2 className="text-2xl font-bold text-yellow-300 mb-4">🚧 Onboarding Not Completed</h2>
           <p className="text-sm mb-4">
             To access your dashboard, please complete all the following steps:
