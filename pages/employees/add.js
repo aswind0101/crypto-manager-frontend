@@ -3,6 +3,8 @@ import Navbar from "../../components/Navbar";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/router";
+import { AsYouType } from "libphonenumber-js";
+
 
 function AddEmployee() {
     const [name, setName] = useState("");
@@ -75,6 +77,39 @@ function AddEmployee() {
             setMsg("❌ Something went wrong.");
         }
     };
+    const handlePhoneChange = (value) => {
+        let digitsOnly = value.replace(/\D/g, "");
+        let hasCountryCode = digitsOnly.startsWith("1");
+
+        if (hasCountryCode) {
+            if (digitsOnly.length > 11) digitsOnly = digitsOnly.slice(0, 11);
+        } else {
+            if (digitsOnly.length > 10) digitsOnly = digitsOnly.slice(0, 10);
+        }
+
+        if (digitsOnly.length === 0) {
+            setPhone("");
+            return;
+        }
+
+        if (
+            (hasCountryCode && digitsOnly.length <= 4) ||
+            (!hasCountryCode && digitsOnly.length <= 3)
+        ) {
+            setPhone(digitsOnly);
+            return;
+        }
+
+        const formatter = new AsYouType("US");
+        formatter.input(digitsOnly);
+        let formatted = formatter.formattedOutput;
+
+        if (hasCountryCode && !formatted.startsWith("+")) {
+            formatted = `+${formatted}`;
+        }
+
+        setPhone(formatted);
+    };
 
     return (
         <div className="bg-[#1C1F26] min-h-screen text-white p-4 font-mono">
@@ -103,10 +138,11 @@ function AddEmployee() {
                         <input
                             type="text"
                             value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
+                            onChange={(e) => handlePhoneChange(e.target.value)}
                             className="w-full px-4 py-2 rounded-xl bg-[#1C1F26] border border-gray-700 outline-none"
-                            placeholder="e.g. +14085551234"
+                            placeholder="e.g. (408) 555-1234"
                         />
+
                     </div>
                 </div>
 

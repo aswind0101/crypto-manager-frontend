@@ -706,6 +706,10 @@ export default function FreelancerDashboard() {
                     <h1 className="text-3xl font-extrabold text-center text-emerald-700 dark:text-emerald-300 mb-6">
                         🌟 Welcome, Freelancer!
                     </h1>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 text-center mb-4">
+                        Please complete the following <strong>5 steps</strong> to get qualified as a stylist.
+                        Your license and ID need to be <strong>approved</strong> before you can go online.
+                    </p>
 
                     {user ? (
                         <>
@@ -723,10 +727,10 @@ export default function FreelancerDashboard() {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                {onboardingSteps.map((step) => (
+                                {onboardingSteps.map((step, index) => (
                                     <StepCard
                                         key={step.key}
-                                        title={step.title}
+                                        title={`Step ${index + 1}: ${step.title}`}
                                         description={step.description}
                                         completed={steps[step.key]}
                                         buttonLabel={step.button}
@@ -742,6 +746,7 @@ export default function FreelancerDashboard() {
                                     />
                                 ))}
                             </div>
+
                         </>
                     ) : (
                         <p className="text-center text-yellow-500">⏳ Loading user...</p>

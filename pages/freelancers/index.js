@@ -222,7 +222,7 @@ export default function FreelancerDashboard() {
     );
   }
 
-  const isComplete = onboarding?.isQualified === true || onboarding?.isqualified === true;
+  //const isComplete = onboarding?.isQualified === true || onboarding?.isqualified === true;
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
@@ -322,6 +322,66 @@ export default function FreelancerDashboard() {
       console.error("❌ Error cancelling appointment:", err.message);
     }
   };
+  const steps = {
+    has_avatar: onboarding?.avatar_url,
+    has_license: onboarding?.license_url && onboarding?.license_status === "Approved",
+    has_id: onboarding?.id_doc_url && onboarding?.id_doc_status === "Approved",
+    has_salon: onboarding?.salon_id,
+    has_payment: onboarding?.has_payment,
+  };
+
+  const allSteps = [
+    { key: "has_avatar", label: "Upload Avatar" },
+    { key: "has_license", label: "Upload License" },
+    { key: "has_id", label: "Upload ID Document" },
+    { key: "has_salon", label: "Select Salon" },
+    { key: "has_payment", label: "Connect Payment Method" },
+  ];
+
+  const isComplete = Object.values(steps).every(Boolean);
+  console.log("🔥 Payment Connected?", onboarding?.payment_connected);
+
+  if (!isComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="bg-white/10 border border-white/20 rounded-2xl p-8 max-w-lg w-full text-gray-100 shadow-lg">
+          <h2 className="text-2xl font-bold text-yellow-300 mb-4">🚧 Onboarding Not Completed</h2>
+          <p className="text-sm mb-4">
+            To access your dashboard, please complete all the following steps:
+          </p>
+          <ul className="text-left text-sm space-y-2 mb-6">
+            {allSteps.map((step, index) => {
+              const isCompleted = steps[step.key];
+              const isLicenseReview = step.key === "has_license" && onboarding?.license_status === "In Review";
+              const isIdReview = step.key === "has_id" && onboarding?.id_doc_status === "In Review";
+
+              return (
+                <li key={step.key} className="flex items-start gap-2">
+                  <span className="text-yellow-400 font-medium shrink-0">{`Step ${index + 1}`}</span>
+                  <div className="flex-1 flex flex-wrap items-center gap-1">
+                    <span className={isCompleted ? "text-green-400 font-medium" : "text-white"}>
+                      {step.label}
+                    </span>
+                    {(isLicenseReview || isIdReview) && (
+                      <span className="text-xs text-blue-300">(In Review)</span>
+                    )}
+                    {isCompleted && <span className="text-green-400 text-sm">✔️</span>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <button
+            onClick={() => router.push("/freelancers/me")}
+            className="bg-gradient-to-r from-yellow-400 to-pink-500 hover:to-pink-600 text-white font-semibold px-6 py-2 rounded-xl shadow transition"
+          >
+            👉 Go to Complete Onboarding
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
