@@ -48,8 +48,6 @@ function CustomerAppointmentsPage() {
         return () => clearInterval(interval); // dọn sạch khi unmount
     }, [user]);
 
-
-
     const fetchAppointments = async () => {
         if (!user) return;
         const token = await user.getIdToken();
@@ -60,14 +58,25 @@ function CustomerAppointmentsPage() {
         setAppointments(data || []);
 
         const now = dayjs();
-        const upcomingTarget = (data || [])
-            .filter((a) =>
-                ["confirmed", "cancelled"].includes(a.status) &&
+        // ✅ Ưu tiên confirmed trước
+        const confirmed = (data || []).filter(
+            (a) =>
+                a.status === "confirmed" &&
                 dayjs(a.appointment_date.replace("Z", "")).isAfter(now)
-            )
-            .sort((a, b) =>
-                dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
-            )[0];
+        ).sort((a, b) =>
+            dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+        );
+
+        const cancelled = (data || []).filter(
+            (a) =>
+                a.status === "cancelled" &&
+                dayjs(a.appointment_date.replace("Z", "")).isAfter(now)
+        ).sort((a, b) =>
+            dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+        );
+
+        // 👉 Hiển thị confirmed nếu có, ngược lại mới show cancelled
+        const upcomingTarget = confirmed[0] || cancelled[0];
 
         // ✅ Nếu chưa từng hiện thì mới show popup
         if (upcomingTarget && !shownAppointmentIdsRef.current.has(upcomingTarget.id)) {

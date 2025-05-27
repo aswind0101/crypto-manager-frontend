@@ -140,7 +140,7 @@ function FreelancerAppointmentsPage() {
                                     {dayjs(a.appointment_date.replace("Z", "")).format("MMM D, YYYY – hh:mm A")}
                                 </p>
                                 <p className="text-sm text-emerald-300 capitalize">⏱ {a.duration_minutes} min</p>
-                                <p className="text-sm text-pink-200 mt-1">
+                                <p className="text-sm text-pink-200 mt-1 capitalize">
                                     Services: {a.services.map((s) => s.name).join(", ")}
                                 </p>
                                 <p className="mt-2 text-sm">

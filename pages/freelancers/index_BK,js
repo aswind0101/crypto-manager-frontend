@@ -42,6 +42,9 @@ export default function FreelancerDashboard() {
       soundLoopRef.current = null;
     }
   };
+  const [availableServices, setAvailableServices] = useState([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState([]);
+  const [updatingServices, setUpdatingServices] = useState(false);
 
   const [confirmedNextClient, setConfirmedNextClient] = useState(null); // 🟢 Next Client
   const [pendingUpcomingAppointment, setPendingUpcomingAppointment] = useState(null); // 🔔 Popup
@@ -105,6 +108,26 @@ export default function FreelancerDashboard() {
       );
       const data = await res.json();
       setOnboarding(data);
+
+      if (data?.salon_id && data?.specialization?.length > 0) {
+        const fetchServices = async () => {
+          try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch(
+              `https://crypto-manager-backend.onrender.com/api/salons/${data.salon_id}/services-by-specialization?specialization=${data.specialization.join(",")}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            const list = await res.json();
+            setAvailableServices(list || []);
+            setSelectedServiceIds(data.services || []); // nếu bạn đã thêm cột services
+          } catch (err) {
+            console.error("❌ Failed to fetch services:", err.message);
+          }
+        };
+        fetchServices();
+      }
 
       await loadAppointments(
         token,
@@ -261,16 +284,32 @@ export default function FreelancerDashboard() {
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       {showPopup && pendingUpcomingAppointment && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white text-black rounded-xl px-5 py-4 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
-          <h2 className="text-lg font-bold text-emerald-700">📢 New Appointment</h2>
+        <div className="fixed bottom-4 right-4 z-50 bg-white text-black rounded-xl px-8 py-2 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
+
+          {/* 💰 Tổng tiền góc trên phải */}
+          <div className="absolute top-2 right-2 bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded-full shadow">
+            💰 $
+            {pendingUpcomingAppointment.services?.reduce((sum, s) => sum + (s.price || 0), 0)}
+          </div>
+
+          {/* Tiêu đề */}
+          <h2 className="text-lg mt-6 font-bold text-emerald-700">📢 New Appointment</h2>
+
+          {/* Tên khách */}
           <p className="font-semibold text-pink-600">{pendingUpcomingAppointment.customer_name}</p>
+
+          {/* Ngày giờ */}
           <p className="text-sm text-gray-700">
+            📅{" "}
             {dayjs(pendingUpcomingAppointment.appointment_date.replace("Z", "")).format("MMM D, hh:mm A")}
           </p>
+
+          {/* Dịch vụ */}
           <p className="text-sm text-emerald-600">
-            Services: {pendingUpcomingAppointment.services?.map(s => s.name).join(", ")}
+            💅 {pendingUpcomingAppointment.services?.map((s) => s.name).join(", ")}
           </p>
 
+          {/* Tổng thời gian */}
           <p className="text-sm text-blue-500">
             ⏱ Estimated Time:{" "}
             {pendingUpcomingAppointment.services?.reduce(
@@ -280,7 +319,14 @@ export default function FreelancerDashboard() {
             minutes
           </p>
 
-          {/* Slide-to-confirm hoặc nút Confirm */}
+          {/* Note từ khách hàng (nếu có) */}
+          {pendingUpcomingAppointment.note && (
+            <p className="text-sm text-gray-800">
+              💬 <span className="italic">{pendingUpcomingAppointment.note}</span>
+            </p>
+          )}
+
+          {/* Slide-to-confirm */}
           <div className="mt-4">
             <input
               type="range"
@@ -297,7 +343,7 @@ export default function FreelancerDashboard() {
                   setTimeout(() => {
                     setIsConfirmed(false);
                     setSliderValue(0);
-                    setShowPopup(false); // ⏳ Đóng popup sau 2s
+                    setShowPopup(false);
                   }, 2000);
                 }
               }}
@@ -320,7 +366,7 @@ export default function FreelancerDashboard() {
             </div>
           </div>
 
-          {/* Cancel */}
+          {/* Nút cancel */}
           <button
             onClick={() => handleCancelAppointment(pendingUpcomingAppointment.id)}
             className="text-sm text-red-500 underline mt-2"
@@ -354,10 +400,69 @@ export default function FreelancerDashboard() {
               : "No upcoming"
           }
         />
+        <div className="col-span-1 md:col-span-3 bg-white/30 dark:bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-5 shadow-lg">
+          <h3 className="text-xl font-bold text-yellow-300 mb-3">💈 Your Available Services</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            {availableServices.map((srv) => {
+              const checked = selectedServiceIds.includes(srv.id);
+              return (
+                <label key={srv.id} className="flex items-center gap-2 bg-white/10 p-2 rounded-lg shadow-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      const newIds = checked
+                        ? selectedServiceIds.filter((id) => id !== srv.id)
+                        : [...selectedServiceIds, srv.id];
+                      setSelectedServiceIds(newIds);
+                    }}
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-pink-300">{srv.name}</span>
+                    <span className="text-xs text-emerald-300">${srv.price} – {srv.duration_minutes} min</span>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          {/* Nút lưu */}
+          <button
+            disabled={updatingServices}
+            onClick={async () => {
+              setUpdatingServices(true);
+              try {
+                const token = await user.getIdToken();
+                const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/services", {
+                  method: "PATCH",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ service_ids: selectedServiceIds }),
+                });
+                if (res.ok) {
+                  alert("✅ Services updated successfully!");
+                } else {
+                  const data = await res.json();
+                  alert("❌ Failed: " + data.error);
+                }
+              } catch (err) {
+                console.error("❌ Update services error:", err.message);
+              } finally {
+                setUpdatingServices(false);
+              }
+            }}
+            className="mt-4 bg-gradient-to-r from-emerald-400 to-emerald-600 hover:to-emerald-700 text-white font-bold px-4 py-2 rounded-xl shadow transition"
+          >
+            {updatingServices ? "⏳ Saving..." : "💾 Save Available Services"}
+          </button>
+        </div>
+
         <Card
           icon={<FiCalendar />}
           title="Appointments"
-          value={`${appointmentsToday.length} Today`}
+          value={`${appointmentsToday.filter(a => a.status !== "cancelled").length} Today`}
           sub={
             <>
               ✅ Completed: {completedToday} <br />

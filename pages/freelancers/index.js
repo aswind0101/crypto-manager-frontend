@@ -42,6 +42,11 @@ export default function FreelancerDashboard() {
       soundLoopRef.current = null;
     }
   };
+  const [availableServices, setAvailableServices] = useState([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState([]);
+  const [updatingServices, setUpdatingServices] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(""); // "" | "saving" | "saved"
+  const hasMounted = useRef(false);
 
   const [confirmedNextClient, setConfirmedNextClient] = useState(null); // 🟢 Next Client
   const [pendingUpcomingAppointment, setPendingUpcomingAppointment] = useState(null); // 🔔 Popup
@@ -78,6 +83,39 @@ export default function FreelancerDashboard() {
     }
   };
   useEffect(() => {
+    if (!user || !Array.isArray(selectedServiceIds)) return;
+
+    // ⛔️ Bỏ qua lần chạy đầu tiên
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
+
+    const saveServices = async () => {
+      setSavingStatus("saving");
+      try {
+        const token = await user.getIdToken();
+        await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/services", {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ service_ids: selectedServiceIds }),
+        });
+        setSavingStatus("saved");
+        setTimeout(() => setSavingStatus(""), 2000);
+      } catch (err) {
+        console.error("❌ Auto-save error:", err.message);
+        setSavingStatus("error");
+        setTimeout(() => setSavingStatus(""), 3000);
+      }
+    };
+
+    saveServices();
+  }, [selectedServiceIds]);
+
+  useEffect(() => {
     if (sliderValue > 0 && sliderValue < 100) {
       const timeout = setTimeout(() => {
         setSliderValue(0);
@@ -105,6 +143,26 @@ export default function FreelancerDashboard() {
       );
       const data = await res.json();
       setOnboarding(data);
+
+      if (data?.salon_id && data?.specialization?.length > 0) {
+        const fetchServices = async () => {
+          try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch(
+              `https://crypto-manager-backend.onrender.com/api/salons/${data.salon_id}/services-by-specialization?specialization=${data.specialization.join(",")}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            const list = await res.json();
+            setAvailableServices(list || []);
+            setSelectedServiceIds(data.services || []); // nếu bạn đã thêm cột services
+          } catch (err) {
+            console.error("❌ Failed to fetch services:", err.message);
+          }
+        };
+        fetchServices();
+      }
 
       await loadAppointments(
         token,
@@ -241,15 +299,24 @@ export default function FreelancerDashboard() {
           body: JSON.stringify({ status: "cancelled" }),
         }
       );
-      if (res.ok) {
-        if (res.ok) {
-          if (soundLoopRef.current) {
-            clearInterval(soundLoopRef.current);
-            soundLoopRef.current = null;
-          }
-          setShowPopup(false);
-        }
 
+      if (res.ok) {
+        clearSoundLoop(soundLoopRef); // ✅ Tắt âm thanh nếu đang lặp
+        setShowPopup(false);          // ✅ Tắt popup
+
+        // ✅ Load lại lịch hẹn để cập nhật ngay UI
+        await loadAppointments(
+          token,
+          setAppointments,
+          setAppointmentsToday,
+          setConfirmedNextClient,
+          setPendingUpcomingAppointment,
+          setTimeUntilNext,
+          setShowPopup,
+          setNewAppointment,
+          soundRef,
+          soundLoopRef
+        );
       }
     } catch (err) {
       console.error("❌ Error cancelling appointment:", err.message);
@@ -282,7 +349,7 @@ export default function FreelancerDashboard() {
           </p>
 
           {/* Dịch vụ */}
-          <p className="text-sm text-emerald-600">
+          <p className="text-sm text-emerald-600 capitalize">
             💅 {pendingUpcomingAppointment.services?.map((s) => s.name).join(", ")}
           </p>
 
@@ -352,18 +419,56 @@ export default function FreelancerDashboard() {
           </button>
         </div>
       )}
-
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-        <div className="col-span-1 md:col-span-2 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
+        {/* Welcome Block */}
+        <div className="col-span-12 md:col-span-6 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
           <h2 className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mb-2">
             🌟 Welcome back, {user?.displayName || "Freelancer"}!
           </h2>
           <p className="text-gray-700 dark:text-gray-300">Let’s check your schedule and income today.</p>
         </div>
+        {/* Rating */}
+        <Card className="col-span-12 md:col-span-6" icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
+        {/* Your Available Services */}
+        <div className="col-span-12 bg-white/30 dark:bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-xl font-bold text-yellow-300">💈 Your Available Services</h3>
+            {savingStatus === "saving" && <span className="text-sm text-pink-200 animate-pulse">Saving...</span>}
+            {savingStatus === "saved" && <span className="text-sm text-emerald-300">✔️ Saved</span>}
+            {savingStatus === "error" && <span className="text-sm text-red-400">❌ Error</span>}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            {availableServices.map((srv) => {
+              const checked = selectedServiceIds.includes(srv.id);
+              return (
+                <label key={srv.id} className="flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      const newIds = checked
+                        ? selectedServiceIds.filter((id) => id !== srv.id)
+                        : [...selectedServiceIds, srv.id];
+                      setSelectedServiceIds(newIds);
+                    }}
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-pink-300">{srv.name}</span>
+                    <span className="text-xs text-emerald-300">${srv.price} – {srv.duration_minutes} min</span>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
 
-        <Card icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
+        </div>
 
+        {/* Earnings */}
+        <Card className="col-span-12 md:col-span-3" icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
+
+        {/* Next Client */}
         <Card
+          className="col-span-12 md:col-span-3 capitalize"
           icon={<FiClock />}
           title="Next Client"
           value={
@@ -377,7 +482,10 @@ export default function FreelancerDashboard() {
               : "No upcoming"
           }
         />
+
+        {/* Appointments */}
         <Card
+          className="col-span-12 md:col-span-6"
           icon={<FiCalendar />}
           title="Appointments"
           value={`${appointmentsToday.filter(a => a.status !== "cancelled").length} Today`}
@@ -390,7 +498,6 @@ export default function FreelancerDashboard() {
             </>
           }
         >
-          {/* Icon điều hướng – nằm trong card */}
           <button
             onClick={() => router.push("/freelancers/appointments")}
             className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
@@ -398,14 +505,14 @@ export default function FreelancerDashboard() {
           >
             <FiExternalLink />
           </button>
-
         </Card>
 
-        <Card icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
 
-        <div className="col-span-1 md:col-span-3">
-          <h3 className="text-xl font-bold mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        {/* Quick Actions */}
+        <div className="col-span-12">
+          <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <ActionButton label="📅 My Schedule" />
             <ActionButton label="🧾 Appointments" />
             <ActionButton label="💬 Chat with Client" />
@@ -413,16 +520,14 @@ export default function FreelancerDashboard() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }
-
-function Card({ icon, title, value, sub, children }) {
+function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className="relative bg-white/30 dark:bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-md flex flex-col gap-2">
-      {/* Nếu có children (ví dụ nút điều hướng) sẽ render lên trên */}
+    <div className={`relative ${className} bg-white/30 dark:bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-md flex flex-col gap-2`}>
       {children}
-
       <div className="text-2xl text-emerald-500">{icon}</div>
       <h4 className="text-lg font-semibold">{title}</h4>
       <div className="text-2xl font-bold">{value}</div>
@@ -430,7 +535,6 @@ function Card({ icon, title, value, sub, children }) {
     </div>
   );
 }
-
 
 function ActionButton({ label }) {
   return (

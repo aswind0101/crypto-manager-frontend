@@ -298,7 +298,13 @@ export default function FindStylists() {
     const workStartMin = toMinutes(workStart);
     const workEndMin = toMinutes(workEnd);
 
+    // ✅ Nếu là hôm nay, bỏ qua khung giờ đã qua (theo giờ California)
+    const now = dayjs().tz("America/Los_Angeles");
+    const isToday = now.format("YYYY-MM-DD") === dateStr;
+    const currentMinutes = now.hour() * 60 + now.minute();
+
     for (let m = workStartMin; m + totalDuration <= workEndMin; m += interval) {
+      if (isToday && m < currentMinutes) continue; // ❌ Bỏ qua giờ đã trôi qua hôm nay
       slots.push({
         time: formatTime(m),
         startMin: m,
@@ -339,10 +345,11 @@ export default function FindStylists() {
       return !hasConflict;
     });
 
-    console.log("✅ Final Available Slots:", filtered.map(s => s.time));
+    console.log("✅ Final Available Slots:", filtered.map((s) => s.time));
 
     return filtered;
   }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
