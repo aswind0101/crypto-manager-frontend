@@ -18,19 +18,18 @@ export default function VerifyPage() {
 
         if (res.ok) {
           setStatus("success");
-          setMessage(data.message);
-
-          // Đợi 2s để user đọc thông báo
-          setTimeout(async () => {
-            // 🟢 SIGN OUT khỏi Firebase để clear mọi session trước
+          setMessage("✅ Your account has been verified successfully!");
+          setTimeout(() => {
             const auth = getAuth();
-            await signOut(auth);
-
-            // 🟢 Xoá luôn user ở localStorage (nếu có)
-            localStorage.removeItem("user");
-
-            // ⏳ Sau đó chuyển về login
-            router.push("/login");
+            signOut(auth)
+              .catch(() => { }) // ignore error
+              .finally(() => {
+                try {
+                  localStorage.removeItem("user");
+                } catch (e) { }
+                // Sử dụng void để tránh cảnh báo promise
+                void router.push("/login");
+              });
           }, 2000);
         } else {
           setStatus("error");

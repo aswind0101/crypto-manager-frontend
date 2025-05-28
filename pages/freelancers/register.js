@@ -7,7 +7,7 @@ import { Briefcase } from "lucide-react";
 import { Leaf, Flower, Sparkles, Lotus, Spa } from "lucide-react";
 import { FaLeaf } from "react-icons/fa";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
-
+import { getAuth, signOut } from "firebase/auth";
 
 
 export default function FreelancerRegister() {
@@ -79,7 +79,11 @@ export default function FreelancerRegister() {
       const data = await res.json();
       if (res.ok) {
         setMsg(data.message);
-        setTimeout(() => router.push("/login"), 3000);
+        // Logout khỏi Firebase trước khi chuyển về login
+        const auth = getAuth();
+        await signOut(auth).catch(() => { });
+        localStorage.removeItem("user");
+        setTimeout(() => router.push("/login"), 2000);
       } else {
         setMsg(data.error || "❌ Đăng ký thất bại");
       }
