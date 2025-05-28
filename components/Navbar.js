@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
 import { FiHome, FiList, FiLogOut } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import { checkFreelancerExists } from "../components/utils/checkFreelancer";
+
 
 export default function Navbar() {
     const router = useRouter();
@@ -30,7 +32,7 @@ export default function Navbar() {
     const [isAdminOpen, setIsAdminOpen] = useState(false);
     const [isFreelancerMenuOpen, setIsFreelancerMenuOpen] = useState(false);
 
-
+    const [hasFreelancerProfile, setHasFreelancerProfile] = useState(null); // null = chưa load
 
 
     useEffect(() => {
@@ -48,7 +50,10 @@ export default function Navbar() {
             if (parsedUser.role === "Salon_Freelancers") setIsFreelancer(true);
             if (parsedUser.role === "Salon_All") setIsSalonAll(true);
             if (parsedUser.role === "Crypto") setIsCrypto(true);
-
+            if (parsedUser.role === "Salon_NhanVien") {
+                // Giả sử bạn đã có hàm checkFreelancerExists nhận object user hoặc uid
+                checkFreelancerExists(parsedUser).then(setHasFreelancerProfile);
+            }
         }
     }, []);
 
@@ -218,21 +223,32 @@ export default function Navbar() {
                             </div>
                         </>
                     )}
-
                     {isSalonNhanVien && (
-                        <>
-                            <button className="flex flex-col">
-                                👤 Account ▾
+                        <div className="flex flex-col">
+                            <button
+                                className="flex items-center gap-2 hover:text-cyan-300"
+                                onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
+                            >
+                                🧑‍🎨 Freelancer {isFreelancerMenuOpen ? "▴" : "▾"}
                             </button>
-                            <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
-                                <Link href="/employees/me" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                            <div
+                                className="ml-6 flex flex-col text-sm"
+                                style={{ display: isFreelancerMenuOpen ? "flex" : "none" }}
+                            >
+                                <Link href="/freelancers" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    🧾 Dashboard
+                                </Link>
+                                <Link href="/freelancers/me" className="hover:text-yellow-400 flex items-center gap-2 py-1">
                                     👤 My Profile
                                 </Link>
-                                <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                <Link href="/appointments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
                                     📅 Appointments
                                 </Link>
+                                <Link href="/freelancers/payments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    💳 Payments
+                                </Link>
                             </div>
-                        </>
+                        </div>
                     )}
                     {isFreelancer && (
                         <div className="flex flex-col">
@@ -252,7 +268,7 @@ export default function Navbar() {
                                 <Link href="/freelancers/me" className="hover:text-yellow-400 flex items-center gap-2 py-1">
                                     👤 My Profile
                                 </Link>
-                                <Link href="/appointments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                <Link href="/freelancers/appointments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
                                     📅 Appointments
                                 </Link>
                                 <Link href="/freelancers/payments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
@@ -581,27 +597,44 @@ export default function Navbar() {
                         {isSalonNhanVien && (
                             <>
                                 <button
+                                    onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
                                     className="flex items-center gap-2 hover:text-cyan-300"
-                                    onClick={() => setIsSalonsOpen(!isSalonsOpen)}
                                 >
-                                    👤 Account {isSalonsOpen ? "▴" : "▾"}
+                                    🧑‍🎨 Freelancer {isFreelancerMenuOpen ? "▴" : "▾"}
                                 </button>
-                                <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
-                                    <Link
-                                        href="/employees/me"
-                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
-                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
-                                    >
-                                        👤 My Profile
-                                    </Link>
-                                    <Link
-                                        href="/appointments"
-                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
-                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
-                                    >
-                                        📅 Appointments
-                                    </Link>
-                                </div>
+
+                                {isFreelancerMenuOpen && (
+                                    <>
+                                        <Link
+                                            href="/freelancers"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🧾 Dashboard
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/me"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            👤 My Profile
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/appointments"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📅 Appointments
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/payments"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            💳 Payments
+                                        </Link>
+                                    </>
+                                )}
                             </>
                         )}
                         {isFreelancer && (
@@ -630,7 +663,7 @@ export default function Navbar() {
                                             👤 My Profile
                                         </Link>
                                         <Link
-                                            href="/appointments"
+                                            href="/freelancers/appointments"
                                             onClick={() => setMenuOpen(false)}
                                             className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
                                         >

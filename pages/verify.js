@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { onAuthStateChanged, getAuth } from "firebase/auth";
-import { auth } from "../firebase"; // hoặc "@/firebase" nếu bạn dùng alias
-
+import { getAuth, signOut } from "firebase/auth"; // ⬅️ dùng getAuth, signOut từ Firebase
 
 export default function VerifyPage() {
   const router = useRouter();
@@ -21,7 +19,16 @@ export default function VerifyPage() {
         if (res.ok) {
           setStatus("success");
           setMessage(data.message);
-          setTimeout(() => router.push("/login"), 4000);
+
+          // 🟢 SIGN OUT khỏi Firebase để clear mọi session trước
+          const auth = getAuth();
+          await signOut(auth);
+
+          // 🟢 Xoá luôn user ở localStorage (nếu có)
+          localStorage.removeItem("user");
+
+          // ⏳ Chờ 2-3s rồi chuyển về login
+          setTimeout(() => router.push("/login"), 2500);
         } else {
           setStatus("error");
           setMessage(data.error || "Verification failed.");
@@ -50,7 +57,10 @@ export default function VerifyPage() {
         {status === "success" && (
           <>
             <p className="text-green-500 text-lg font-semibold mb-2">{message}</p>
-            <p className="text-sm text-gray-700 dark:text-gray-300">Redirecting to login...</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              You have been logged out for security.<br />
+              Redirecting to login...
+            </p>
           </>
         )}
 

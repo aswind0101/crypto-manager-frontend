@@ -15,7 +15,7 @@ import {
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-
+import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -23,6 +23,7 @@ dayjs.extend(timezone);
 
 export default function FreelancerDashboard() {
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState([]);
@@ -56,6 +57,8 @@ export default function FreelancerDashboard() {
   const router = useRouter();
   const sliderRef = useRef(null);
   const sliderMax = 200; // chiều dài vuốt tối đa (điều chỉnh theo giao diện)
+
+  const [hasFreelancerProfile, setHasFreelancerProfile] = useState(null);
 
   const handleSlideStart = (e) => {
     setIsSliding(true);
@@ -131,10 +134,48 @@ export default function FreelancerDashboard() {
         router.push("/login");
         return;
       }
-
-      const token = await currentUser.getIdToken();
       setUser(currentUser);
 
+      // 🟢 Lấy role CHUẨN
+      let role = null;
+      // 1. Thử lấy từ localStorage
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        role = parsedUser.role;
+      }
+      // 2. Nếu chưa có, fetch từ backend (làm 1 lần duy nhất)
+      if (!role) {
+        try {
+          const token = await currentUser.getIdToken();
+          const resRole = await fetch("https://crypto-manager-backend.onrender.com/api/user-role", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const dataRole = await resRole.json();
+          role = dataRole.role;
+        } catch (err) {
+          console.error("❌ Error fetch user role", err);
+        }
+      }
+
+      setUserRole(role);
+
+      // 🟢 Check freelancer profile
+      const exists = await checkFreelancerExists(currentUser);
+      setHasFreelancerProfile(exists);
+
+      // ⚠️ Thêm debug ở đây
+      console.log("DEBUG role =", role, "| hasFreelancerProfile =", exists);
+
+      // 🛑 Nếu là nhân viên salon chưa có freelancer profile, DỪNG!
+      if (role === "Salon_NhanVien" && !exists) {
+        setLoading(false);
+        setOnboarding(null);
+        return;
+      }
+
+      // 5. Nếu đã có profile, tiếp tục fetch onboarding, appointments
+      const token = await currentUser.getIdToken();
       const res = await fetch(
         "https://crypto-manager-backend.onrender.com/api/freelancers/onboarding",
         {
@@ -145,23 +186,19 @@ export default function FreelancerDashboard() {
       setOnboarding(data);
 
       if (data?.salon_id && data?.specialization?.length > 0) {
-        const fetchServices = async () => {
-          try {
-            const token = await currentUser.getIdToken();
-            const res = await fetch(
-              `https://crypto-manager-backend.onrender.com/api/salons/${data.salon_id}/services-by-specialization?specialization=${data.specialization.join(",")}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
-            const list = await res.json();
-            setAvailableServices(list || []);
-            setSelectedServiceIds(data.services || []); // nếu bạn đã thêm cột services
-          } catch (err) {
-            console.error("❌ Failed to fetch services:", err.message);
-          }
-        };
-        fetchServices();
+        try {
+          const res = await fetch(
+            `https://crypto-manager-backend.onrender.com/api/salons/${data.salon_id}/services-by-specialization?specialization=${data.specialization.join(",")}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          const list = await res.json();
+          setAvailableServices(list || []);
+          setSelectedServiceIds(data.services || []);
+        } catch (err) {
+          console.error("❌ Failed to fetch services:", err.message);
+        }
       }
 
       await loadAppointments(
@@ -170,7 +207,7 @@ export default function FreelancerDashboard() {
         setAppointmentsToday,
         setConfirmedNextClient,
         setPendingUpcomingAppointment,
-        setTimeUntilNext,            // ✅ Đây!
+        setTimeUntilNext,
         setShowPopup,
         setNewAppointment,
         soundRef,
@@ -187,6 +224,9 @@ export default function FreelancerDashboard() {
     if (!user) return;
     const refresh = async () => {
       const token = await user.getIdToken();
+      if (user && user.role === "Salon_NhanVien") {
+        checkFreelancerExists(user).then(setHasFreelancerProfile);
+      }
       await loadAppointments(
         token,
         setAppointments,
@@ -202,6 +242,7 @@ export default function FreelancerDashboard() {
     };
     const interval = setInterval(refresh, 60000);
     return () => clearInterval(interval);
+
   }, [user]);
 
   function isTodayCalifornia(isoDate) {
@@ -226,6 +267,29 @@ export default function FreelancerDashboard() {
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
+  }
+  if (userRole === "Salon_NhanVien" && hasFreelancerProfile === false) {
+    return (
+      <div className="min-h-screen flex flex-col justify-center items-center p-6 bg-[#23242a]">
+        <div className="flex flex-1 items-center justify-center w-full">
+          <div className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 mt-6 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center">
+            <h2 className="text-2xl font-bold text-yellow-300 mb-3 flex items-center gap-2">
+              <span className="text-3xl">⚠️</span>
+              You haven't registered a freelancer profile
+            </h2>
+            <p className="mb-6 text-center text-base text-gray-300">
+              To use the dashboard, please complete your freelancer profile.
+            </p>
+            <button
+              onClick={() => router.push("/freelancers/register")}
+              className="bg-yellow-400 text-black w-full px-6 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition text-lg shadow"
+            >
+              Register now
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const now = dayjs();
@@ -382,6 +446,9 @@ export default function FreelancerDashboard() {
       </div>
     );
   }
+  console.log("user", user);
+  console.log("hasFreelancerProfile", hasFreelancerProfile);
+  console.log("onboarding", onboarding);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
@@ -479,6 +546,7 @@ export default function FreelancerDashboard() {
           </button>
         </div>
       )}
+
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
         {/* Welcome Block */}
         <div className="col-span-12 md:col-span-6 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
@@ -620,7 +688,21 @@ async function loadAppointments(
     headers: { Authorization: `Bearer ${token}` },
   });
   const apptData = await res.json();
-  setAppointments(apptData || []);
+
+  // --- BỔ SUNG KIỂM TRA ĐÂY ---
+  if (!Array.isArray(apptData)) {
+    console.error("appointments API trả về không phải array:", apptData);
+    setAppointments([]);
+    setAppointmentsToday([]);
+    setConfirmedNextClient(null);
+    setPendingUpcomingAppointment(null);
+    setTimeUntilNext("");
+    setShowPopup(false);
+    setNewAppointment(null);
+    return;
+  }
+
+  setAppointments(apptData);
 
   const now = dayjs();
 
@@ -647,7 +729,6 @@ async function loadAppointments(
     setNewAppointment(nextPending);
     setShowPopup(true);
 
-
     let elapsed = 0;
     const interval = 200; // ms mỗi bước
     const total = 21000; // tổng thời gian
@@ -655,14 +736,12 @@ async function loadAppointments(
     const progressTimer = setInterval(() => {
       elapsed += interval;
       const percent = Math.min(100, (elapsed / total) * 100);
-
     }, interval);
 
     setTimeout(() => {
       clearInterval(progressTimer);
       clearSoundLoop(soundLoopRef);
       setShowPopup(false);
-
     }, total);
 
     clearSoundLoop(soundLoopRef);
@@ -710,6 +789,7 @@ async function loadAppointments(
     setTimeUntilNext("");
   }
 }
+
 
 function clearSoundLoop(soundLoopRef) {
   if (soundLoopRef.current) {

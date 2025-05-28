@@ -15,6 +15,7 @@ function FreelancerAppointmentsPage() {
     const [filter, setFilter] = useState("upcoming"); // all | upcoming
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
     const auth = getAuth();
 
@@ -27,7 +28,15 @@ function FreelancerAppointmentsPage() {
                 headers: { Authorization: `Bearer ${token}` },
             });
             const data = await res.json();
-            setAppointments(data);
+
+            if (Array.isArray(data)) {
+                setAppointments(data);
+                setError("");
+            } else {
+                setAppointments([]);
+                // Hiển thị thông báo chuyên nghiệp bằng tiếng Anh
+                setError("You must complete your freelancer profile before viewing appointments.");
+            }
             setLoading(false);
         });
 
@@ -94,6 +103,21 @@ function FreelancerAppointmentsPage() {
             alert("❌ " + (data.error || "Failed to cancel"));
         }
     };
+    {
+        error && (
+            <div className="text-center text-red-400 font-semibold py-10">
+                {error}
+                <div className="mt-4">
+                    <button
+                        onClick={() => window.location.href = "/freelancers/register"}
+                        className="bg-yellow-400 text-black px-6 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition"
+                    >
+                        Register Freelancer Profile
+                    </button>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-900 to-yellow-900 text-white px-4 py-6">
@@ -147,12 +171,12 @@ function FreelancerAppointmentsPage() {
                                     📌 Status:{" "}
                                     <span
                                         className={`font-semibold ${a.status === "pending"
-                                                ? "text-yellow-400"
-                                                : a.status === "confirmed"
-                                                    ? "text-green-400"
-                                                    : a.status === "cancelled"
-                                                        ? "text-red-400"
-                                                        : ""
+                                            ? "text-yellow-400"
+                                            : a.status === "confirmed"
+                                                ? "text-green-400"
+                                                : a.status === "cancelled"
+                                                    ? "text-red-400"
+                                                    : ""
                                             }`}
                                     >
                                         {a.status}
