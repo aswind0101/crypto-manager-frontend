@@ -105,7 +105,7 @@ export default function SalonFreelancerApproval() {
                                 {/* Avatar + Info */}
                                 <div className="flex items-center gap-4">
                                     <img
-                                        src={f.avatar_url ? `https://crypto-manager-backend.onrender.com${f.avatar_url}` : "/no-avatar.png"}
+                                        src={f.avatar_url ? f.avatar_url : "/no-avatar.png"}
                                         className="w-32 h-32 rounded-full object-cover border-2 border-white shadow"
                                         alt="avatar"
                                     />
@@ -122,67 +122,37 @@ export default function SalonFreelancerApproval() {
                                     <div className="rounded-xl">
                                         <div className="flex justify-between items-center mb-2">
                                             <p className="font-semibold">📄 License</p>
-                                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${f.certification_status === "Approved" ? "bg-green-500 text-white"
-                                                : f.certification_status === "Rejected" ? "bg-red-500 text-white"
-                                                    : "bg-yellow-400 text-black"
-                                                }`}>
-                                                {f.certification_status}
-                                            </span>
                                         </div>
                                         {f.certifications?.[0]?.endsWith(".pdf") ? (
-                                            <a href={`https://crypto-manager-backend.onrender.com${f.certifications[0]}`} target="_blank" className="text-blue-300 underline">📄 View PDF</a>
+                                            <a href={f.certifications[0]} target="_blank" className="text-blue-300 underline">📄 View PDF</a>
                                         ) : (
                                             <img
-                                                src={`https://crypto-manager-backend.onrender.com${f.certifications[0]}`}
+                                                src={f.certifications[0]}
                                                 alt="license"
                                                 className="w-full h-full rounded-xl border border-white/20 object-cover cursor-pointer transition hover:scale-105"
                                                 style={{ maxHeight: "180px" }}
-                                                onClick={() => window.open(`https://crypto-manager-backend.onrender.com${f.certifications[0]}`, "_blank")}
+                                                onClick={() => window.open(f.certifications[0], "_blank")}
                                             />
 
                                         )}
-                                        <select
-                                            value={f.certification_status}
-                                            onChange={e => handleDocumentStatusChange(f.id, "certification_status", e.target.value)}
-                                            className="w-full mt-2 rounded text-sm"
-                                        >
-                                            <option>In Review</option>
-                                            <option>Approved</option>
-                                            <option>Rejected</option>
-                                        </select>
                                     </div>
 
                                     {/* ID Document */}
                                     <div className="rounded-xl">
                                         <div className="flex justify-between items-center mb-2">
                                             <p className="font-semibold">🆔 ID Document</p>
-                                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${f.id_document_status === "Approved" ? "bg-green-500 text-white"
-                                                : f.id_document_status === "Rejected" ? "bg-red-500 text-white"
-                                                    : "bg-yellow-400 text-black"
-                                                }`}>
-                                                {f.id_document_status}
-                                            </span>
                                         </div>
                                         {f.id_documents?.[0]?.endsWith(".pdf") ? (
-                                            <a href={`https://crypto-manager-backend.onrender.com${f.id_documents[0]}`} target="_blank" className="text-blue-300 underline">📄 View PDF</a>
+                                            <a href={f.id_documents[0]} target="_blank" className="text-blue-300 underline">📄 View PDF</a>
                                         ) : (
                                             <img
-                                                src={`https://crypto-manager-backend.onrender.com${f.id_documents[0]}`}
+                                                src={f.id_documents[0]}
                                                 alt="id doc"
                                                 className="w-full h-full rounded-xl border border-white/20 object-cover cursor-pointer transition hover:scale-105"
                                                 style={{ maxHeight: "180px" }}
-                                                onClick={() => window.open(`https://crypto-manager-backend.onrender.com${f.id_documents[0]}`, "_blank")}
+                                                onClick={() => window.open(f.id_documents[0], "_blank")}
                                             />
                                         )}
-                                        <select
-                                            value={f.id_document_status}
-                                            onChange={e => handleDocumentStatusChange(f.id, "id_document_status", e.target.value)}
-                                            className="w-full mt-2 rounded text-sm"
-                                        >
-                                            <option>In Review</option>
-                                            <option>Approved</option>
-                                            <option>Rejected</option>
-                                        </select>
                                     </div>
                                 </div>
 

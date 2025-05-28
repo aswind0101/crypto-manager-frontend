@@ -536,7 +536,7 @@ export default function FreelancerDashboard() {
 
                 if (!readyToSelect) {
                     return (
-                        <div className="text-sm text-red-500">
+                        <div className="text-sm text-pink-300">
                             ⚠️ Please complete the following before selecting a salon:
                             <ul className="list-disc ml-6 mt-1">
                                 {!steps.has_avatar && <li>Upload Avatar</li>}
