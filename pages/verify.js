@@ -20,15 +20,18 @@ export default function VerifyPage() {
           setStatus("success");
           setMessage(data.message);
 
-          // 🟢 SIGN OUT khỏi Firebase để clear mọi session trước
-          const auth = getAuth();
-          await signOut(auth);
+          // Đợi 2s để user đọc thông báo
+          setTimeout(async () => {
+            // 🟢 SIGN OUT khỏi Firebase để clear mọi session trước
+            const auth = getAuth();
+            await signOut(auth);
 
-          // 🟢 Xoá luôn user ở localStorage (nếu có)
-          localStorage.removeItem("user");
+            // 🟢 Xoá luôn user ở localStorage (nếu có)
+            localStorage.removeItem("user");
 
-          // ⏳ Chờ 2-3s rồi chuyển về login
-          setTimeout(() => router.push("/login"), 2500);
+            // ⏳ Sau đó chuyển về login
+            router.push("/login");
+          }, 2000);
         } else {
           setStatus("error");
           setMessage(data.error || "Verification failed.");
