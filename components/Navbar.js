@@ -273,17 +273,6 @@ export default function Navbar() {
                     )}
                     {isSalonAll && (
                         <div className="flex flex-col">
-                            <button className="flex flex-col">
-                                👤 Account ▾
-                            </button>
-                            <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
-                                <Link href="/employees/me" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
-                                    👤 My Profile
-                                </Link>
-                                <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
-                                    📅 Appointments
-                                </Link>
-                            </div>
                             <button
                                 className="flex items-center gap-2 hover:text-cyan-300"
                                 onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
@@ -300,7 +289,7 @@ export default function Navbar() {
                                 <Link href="/freelancers/me" className="hover:text-yellow-400 flex items-center gap-2 py-1">
                                     👤 My Profile
                                 </Link>
-                                <Link href="/appointments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                <Link href="/freelancers/appointments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
                                     📅 Appointments
                                 </Link>
                                 <Link href="/freelancers/payments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
@@ -679,28 +668,6 @@ export default function Navbar() {
                         {isSalonAll && (
                             <>
                                 <button
-                                    className="flex items-center gap-2 hover:text-cyan-300"
-                                    onClick={() => setIsSalonsOpen(!isSalonsOpen)}
-                                >
-                                    👤 Account {isSalonsOpen ? "▴" : "▾"}
-                                </button>
-                                <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
-                                    <Link
-                                        href="/employees/me"
-                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
-                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
-                                    >
-                                        👤 My Profile
-                                    </Link>
-                                    <Link
-                                        href="/appointments"
-                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
-                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
-                                    >
-                                        📅 Appointments
-                                    </Link>
-                                </div>
-                                <button
                                     onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
                                     className="flex items-center gap-2 hover:text-cyan-300"
                                 >
@@ -724,7 +691,7 @@ export default function Navbar() {
                                             👤 My Profile
                                         </Link>
                                         <Link
-                                            href="/appointments"
+                                            href="/freelancers/appointments"
                                             onClick={() => setMenuOpen(false)}
                                             className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
                                         >

@@ -1,6 +1,6 @@
 // components/Navbar.js
 import Link from "next/link";
-import { signOut, getAuth } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
@@ -16,8 +16,22 @@ export default function Navbar() {
     const [expensesOpen, setExpensesOpen] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const menuRef = useRef();
-    const SUPER_ADMINS = ["D9nW6SLT2pbUuWbNVnCgf2uINok2"];  // 👈 Thay UID của bạn vào đây
-    const [isAdmin, setIsAdmin] = useState(false);
+
+    const SUPER_ADMINS = ["D9nW6SLT2pbUuWbNVnCgf2uINok2"];
+
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+    const [isSalonChu, setIsSalonChu] = useState(false);
+    const [isSalonNhanVien, setIsSalonNhanVien] = useState(false);
+    const [isFreelancer, setIsFreelancer] = useState(false);
+    const [isSalonCustomer, setIsSalonCustomer] = useState(false);
+    const [isSalonAll, setIsSalonAll] = useState(false);
+    const [isCrypto, setIsCrypto] = useState(false);
+    const [isSalonsOpen, setIsSalonsOpen] = useState(false);
+    const [isAdminOpen, setIsAdminOpen] = useState(false);
+    const [isFreelancerMenuOpen, setIsFreelancerMenuOpen] = useState(false);
+
+
+
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -26,8 +40,15 @@ export default function Navbar() {
             setUser(parsedUser);
 
             if (parsedUser.uid && SUPER_ADMINS.includes(parsedUser.uid)) {
-                setIsAdmin(true);
+                setIsSuperAdmin(true);
             }
+            if (parsedUser.role === "Salon_Chu") setIsSalonChu(true);
+            if (parsedUser.role === "Salon_NhanVien") setIsSalonNhanVien(true);
+            if (parsedUser.role === "Salon_Customer") setIsSalonCustomer(true);
+            if (parsedUser.role === "Salon_Freelancers") setIsFreelancer(true);
+            if (parsedUser.role === "Salon_All") setIsSalonAll(true);
+            if (parsedUser.role === "Crypto") setIsCrypto(true);
+
         }
     }, []);
 
@@ -37,16 +58,10 @@ export default function Navbar() {
                 setMenuOpen(false);
             }
         };
-
         if (menuOpen) {
             document.addEventListener("mousedown", handleClickOutside);
-        } else {
-            document.removeEventListener("mousedown", handleClickOutside);
         }
-
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [menuOpen]);
 
     const handleLogout = async () => {
@@ -73,12 +88,9 @@ export default function Navbar() {
     return (
         <>
             <nav className="w-full text-white px-4 py-3 flex justify-between items-center rounded-b-2xl z-50">
-
-                {/* Logo + App name */}
                 <Link href="/home" className="flex items-center gap-2 font-bold text-xl text-yellow-400 hover:text-yellow-300 transition cursor-pointer">
                     💰 <span className="tracking-wide">PFMS</span>
                 </Link>
-
 
                 {/* Desktop User Info */}
                 {user && (
@@ -94,64 +106,280 @@ export default function Navbar() {
 
                 {/* Desktop Menu */}
                 <div className="hidden items-center gap-6 font-medium">
-                    <Link href="/home" className="hover:text-cyan-300 transition flex items-center gap-1">
-                        <FiHome /> Home
-                    </Link>
-                    <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
-                        <FiList /> Transactions
-                    </Link>
-                    {isAdmin && (
-                        <Link href="/salons" className="hover:text-cyan-300 transition flex items-center gap-1">
-                            🏠 Salons
-                        </Link>
+
+                    {isSuperAdmin && (
+                        <>
+                            <Link href="/home" className="hover:text-cyan-300 transition flex items-center gap-1">
+                                <FiHome /> Home
+                            </Link>
+                            <Link href="/transactions" className="hover:text-cyan-300 transition flex items-center gap-1">
+                                <FiList /> Transactions
+                            </Link>
+
+                            <button className="flex flex-col">
+                                🏠 Salons ▾
+                            </button>
+                            <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-52 text-sm z-50 border border-gray-700">
+                                <Link href="/salons" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                                    View Salon
+                                </Link>
+                                <Link href="/employees" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                    Employees
+                                </Link>
+                                <Link href="/services" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                    Service
+                                </Link>
+                                <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                    Appointments
+                                </Link>
+                            </div>
+                            <button className="px-4 py-2 hover:text-yellow-400 font-semibold">
+                                Admin ▾
+                            </button>
+                            <div className="absolute hidden group-hover:block bg-white shadow-md rounded mt-1 z-50 min-w-[160px]">
+                                <Link
+                                    href="/admin/freelancers-review"
+                                    className="block px-4 py-2 text-sm text-gray-800 hover:bg-emerald-100"
+                                >
+                                    Freelancers
+                                </Link>
+                                {/* Có thể thêm các mục khác trong Admin tại đây */}
+                            </div>
+                            {/* 💰 Expenses (desktop) */}
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setExpensesOpen(!expensesOpen)}
+                                >
+                                    💰 Expenses {expensesOpen ? "▴" : "▾"}
+                                </button>
+                                <div
+                                    className="ml-6 flex flex-col text-sm"
+                                    style={{ display: expensesOpen ? 'flex' : 'none' }}
+                                >
+                                    <Link href="/expenses" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        📄 View Expenses
+                                    </Link>
+                                    <Link href="/expenses/categories" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        🗂 Categories
+                                    </Link>
+                                </div>
+                            </div>
+
+                            {/* 💳 Debts (desktop) */}
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setDebtsOpen(!debtsOpen)}
+                                >
+                                    💳 Debts {debtsOpen ? "▴" : "▾"}
+                                </button>
+                                <div
+                                    className="ml-6 flex flex-col text-sm"
+                                    style={{ display: debtsOpen ? 'flex' : 'none' }}
+                                >
+                                    <Link href="/debts" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        📄 View Debts
+                                    </Link>
+                                    <Link href="/debts/lenders" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        🙋‍♂️ Lenders
+                                    </Link>
+                                </div>
+                            </div>
+
+                            <Link href="/settings" className="hover:text-cyan-300 transition flex items-center gap-1">
+                                ⚙️ Settings
+                            </Link>
+                        </>
                     )}
-                    <div className="relative group">
-                        <button className="flex items-center gap-1 hover:text-cyan-300 transition">
-                            💳 Debts ▾
-                        </button>
-                        <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
-                            <Link href="/debts" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
-                                View Debts
-                            </Link>
-                            <Link href="/lenders" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
-                                Manage Lenders
-                            </Link>
-                        </div>
-                    </div>
 
-                    <div className="relative group">
-                        <button className="flex items-center gap-1 hover:text-cyan-300 transition">
-                            💸 Expenses ▾
-                        </button>
-                        <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
-                            <Link href="/expenses" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
-                                View Expenses
-                            </Link>
-                            <Link href="/categories" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
-                                Manage Categories
-                            </Link>
-                        </div>
-                    </div>
 
-                    <Link href="/settings" className="hover:text-cyan-300 transition flex items-center gap-1">
-                        ⚙️ Settings
-                    </Link>
+                    {isSalonChu && (
+                        <>
+                            <button className="flex flex-col">
+                                🏠 Salons ▾
+                            </button>
+                            <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-52 text-sm z-50 border border-gray-700">
+                                <Link href="/salons" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                                    View Salon
+                                </Link>
+                                <Link href="/employees" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                    Employees
+                                </Link>
+                                <Link href="/salon/services" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                    Service
+                                </Link>
+                                <Link href="/salon/freelancers-approval" className="px-4 py-2 hover:bg-yellow-400 hover:text-black">
+                                    Freelancers Approval
+                                </Link>
+                                <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                    Appointments
+                                </Link>
+                            </div>
+                        </>
+                    )}
+
+                    {isSalonNhanVien && (
+                        <>
+                            <button className="flex flex-col">
+                                👤 Account ▾
+                            </button>
+                            <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
+                                <Link href="/employees/me" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                                    👤 My Profile
+                                </Link>
+                                <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                    📅 Appointments
+                                </Link>
+                            </div>
+                        </>
+                    )}
+                    {isFreelancer && (
+                        <div className="flex flex-col">
+                            <button
+                                className="flex items-center gap-2 hover:text-cyan-300"
+                                onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
+                            >
+                                🧑‍🎨 Freelancer {isFreelancerMenuOpen ? "▴" : "▾"}
+                            </button>
+                            <div
+                                className="ml-6 flex flex-col text-sm"
+                                style={{ display: isFreelancerMenuOpen ? "flex" : "none" }}
+                            >
+                                <Link href="/freelancers" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    🧾 Dashboard
+                                </Link>
+                                <Link href="/freelancers/me" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    👤 My Profile
+                                </Link>
+                                <Link href="/appointments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    📅 Appointments
+                                </Link>
+                                <Link href="/freelancers/payments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    💳 Payments
+                                </Link>
+                            </div>
+                        </div>
+                    )}
+                    {isSalonCustomer && (
+                        <>
+                            <Link href="/customer/find-stylists" className="hover:text-yellow-300 flex items-center gap-2">
+                                📅 Book Appointment
+                            </Link>
+                            <Link href="/customer/me" className="hover:text-yellow-300 flex items-center gap-2">
+                                🧾 My Appoinments
+                            </Link>
+                        </>
+                    )}
+                    {isSalonAll && (
+                        <div className="flex flex-col">
+                            <button className="flex flex-col">
+                                👤 Account ▾
+                            </button>
+                            <div className="absolute hidden group-hover:flex flex-col bg-[#0e1628] shadow-md rounded-lg mt-2 w-48 text-sm z-50 border border-gray-700">
+                                <Link href="/employees/me" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-t">
+                                    👤 My Profile
+                                </Link>
+                                <Link href="/appointments" className="px-4 py-2 hover:bg-yellow-400 hover:text-black rounded-b">
+                                    📅 Appointments
+                                </Link>
+                            </div>
+                            <button
+                                className="flex items-center gap-2 hover:text-cyan-300"
+                                onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
+                            >
+                                🧑‍🎨 Freelancer {isFreelancerMenuOpen ? "▴" : "▾"}
+                            </button>
+                            <div
+                                className="ml-6 flex flex-col text-sm"
+                                style={{ display: isFreelancerMenuOpen ? "flex" : "none" }}
+                            >
+                                <Link href="/freelancers" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    🧾 Dashboard
+                                </Link>
+                                <Link href="/freelancers/me" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    👤 My Profile
+                                </Link>
+                                <Link href="/freelancers/appointments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    📅 Appointments
+                                </Link>
+                                <Link href="/freelancers/payments" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                    💳 Payments
+                                </Link>
+                            </div>
+                        </div>
+                    )}
+                    {isCrypto && (
+                        <>
+                            <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                🏠 Home
+                            </Link>
+                            <Link href="/transactions" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                📄 Transactions
+                            </Link>
+
+                            {/* 💰 Expenses (desktop) */}
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setExpensesOpen(!expensesOpen)}
+                                >
+                                    💰 Expenses {expensesOpen ? "▴" : "▾"}
+                                </button>
+                                <div
+                                    className="ml-6 flex flex-col text-sm"
+                                    style={{ display: expensesOpen ? 'flex' : 'none' }}
+                                >
+                                    <Link href="/expenses" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        📄 View Expenses
+                                    </Link>
+                                    <Link href="/expenses/categories" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        🗂 Categories
+                                    </Link>
+                                </div>
+                            </div>
+
+                            {/* 💳 Debts (desktop) */}
+                            <div className="flex flex-col">
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setDebtsOpen(!debtsOpen)}
+                                >
+                                    💳 Debts {debtsOpen ? "▴" : "▾"}
+                                </button>
+                                <div
+                                    className="ml-6 flex flex-col text-sm"
+                                    style={{ display: debtsOpen ? 'flex' : 'none' }}
+                                >
+                                    <Link href="/debts" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        📄 View Debts
+                                    </Link>
+                                    <Link href="/debts/lenders" className="hover:text-yellow-400 flex items-center gap-2 py-1">
+                                        🙋‍♂️ Lenders
+                                    </Link>
+                                </div>
+                            </div>
+
+
+                            <Link href="/settings" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                ⚙️ Settings
+                            </Link>
+                        </>
+                    )}
+
 
                     {user && (
-                        <button
-                            onClick={handleLogout}
-                            className="hover:text-red-400 transition flex items-center gap-1"
-                        >
+                        <button onClick={handleLogout} className="hover:text-red-400 transition flex items-center gap-1">
                             <FiLogOut /> Logout
                         </button>
                     )}
                 </div>
 
+
                 {/* Mobile Toggle */}
                 <button className="text-2xl" onClick={() => setMenuOpen(!menuOpen)}>
                     {menuOpen ? <FaTimes /> : <FaBars />}
                 </button>
-
             </nav>
 
             {/* Mobile Menu */}
@@ -171,85 +399,416 @@ export default function Navbar() {
                                 <div className="text-xs mt-1 font-mono">UID: {user.uid}</div>
                             </div>
                         )}
-                        <Link
-                            href="/home"
-                            onClick={() => setMenuOpen(false)}
-                            className="hover:text-cyan-300 flex items-center gap-2"
-                        >
-                            <FiHome /> Home
-                        </Link>
-                        <Link
-                            href="/transactions"
-                            onClick={() => setMenuOpen(false)}
-                            className="hover:text-cyan-300 flex items-center gap-2"
-                        >
-                            <FiList /> Transactions
-                        </Link>
-                        {isAdmin && (
-                            <Link
-                                href="/salons"
-                                onClick={() => setMenuOpen(false)}
-                                className="hover:text-cyan-300 flex items-center gap-2"
-                            >
-                                🏠 Salons
-                            </Link>
+
+                        {/* Salons dropdown */}
+                        {isSuperAdmin && (
+                            <>
+                                <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                    <FiHome /> Home
+                                </Link>
+                                <Link href="/transactions" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                    <FiList /> Transactions
+                                </Link>
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setIsSalonsOpen(!isSalonsOpen)}
+                                >
+                                    🏠 Salons {isSalonsOpen ? "▴" : "▾"}
+                                </button>
+                                <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
+                                    {isSuperAdmin && (
+                                        <Link
+                                            href="/salons"
+                                            onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                            className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                        >
+                                            📍 View Salon
+                                        </Link>
+                                    )}
+                                    <Link
+                                        href="/employees"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        👥 Employees
+                                    </Link>
+                                    <Link
+                                        href="/services"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        💈 Service
+                                    </Link>
+                                    <Link
+                                        href="/appointments"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        📅 Appointments
+                                    </Link>
+                                </div>
+                                {/* Admin - Freelancers */}
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setIsAdminOpen(!isAdminOpen)}
+                                >
+                                    🧑‍💼 Freelancers {isAdminOpen ? "▾" : "▸"}
+                                </button>
+
+                                <AnimatePresence>
+                                    {isAdminOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: "auto" }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="pl-4 flex flex-col gap-2 text-sm"
+                                        >
+                                            <Link
+                                                href="/admin/freelancers-review"
+                                                onClick={() => setMenuOpen(false)}
+                                                className="hover:text-yellow-300"
+                                            >
+                                                🧾 Review Documents
+                                            </Link>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                                {/* 💰 Expenses (mobile) */}
+                                <button
+                                    onClick={() => setExpensesOpen(!expensesOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    💰 Expenses {expensesOpen ? "▴" : "▾"}
+                                </button>
+                                {expensesOpen && (
+                                    <>
+                                        <Link
+                                            href="/expenses"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📄 View Expenses
+                                        </Link>
+                                        <Link
+                                            href="/expenses/categories"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🗂 Categories
+                                        </Link>
+                                    </>
+                                )}
+
+                                {/* 💳 Debts (mobile) */}
+                                <button
+                                    onClick={() => setDebtsOpen(!debtsOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    💳 Debts {debtsOpen ? "▴" : "▾"}
+                                </button>
+                                {debtsOpen && (
+                                    <>
+                                        <Link
+                                            href="/debts"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📄 View Debts
+                                        </Link>
+                                        <Link
+                                            href="/debts/lenders"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🙋‍♂️ Lenders
+                                        </Link>
+                                    </>
+                                )}
+
+                                <Link href="/settings" className="hover:text-cyan-300 flex items-center gap-2">
+                                    ⚙️ Settings
+                                </Link>
+                            </>
                         )}
-                        {/* Debts menu */}
-                        <button
-                            onClick={() => setDebtsOpen(!debtsOpen)}
-                            className="hover:text-cyan-300 flex items-center gap-2"
-                        >
-                            💳 Debts {debtsOpen ? "▾" : "▸"}
-                        </button>
-                        <AnimatePresence>
-                            {debtsOpen && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="pl-4 flex flex-col gap-2 text-sm"
+
+                        {isSalonChu && (
+                            <>
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setIsSalonsOpen(!isSalonsOpen)}
                                 >
-                                    <Link href="/debts" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
-                                        👁️ View Debts
+                                    🏠 Salons {isSalonsOpen ? "▴" : "▾"}
+                                </button>
+                                <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
+                                    <Link
+                                        href="/salon"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        📊 Dashboard
                                     </Link>
-                                    <Link href="/lenders" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
-                                        👥 Manage Lenders
+                                    {isSuperAdmin && (
+                                        <Link
+                                            href="/salons"
+                                            onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                            className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                        >
+                                            📍 View Salon
+                                        </Link>
+                                    )}
+                                    <Link
+                                        href="/employees"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        👥 Employees
                                     </Link>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                                    <Link
+                                        href="/salon/services"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        💈 Service
+                                    </Link>
+                                    <Link
+                                        href="/salon/freelancers-approval"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        🧾 Freelancers Approval
+                                    </Link>
+                                    <Link
+                                        href="/appointments"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        📅 Appointments
+                                    </Link>
+                                </div>
+                            </>
+                        )}
 
-                        {/* Expenses menu */}
-                        <button
-                            onClick={() => setExpensesOpen(!expensesOpen)}
-                            className="hover:text-cyan-300 flex items-center gap-2"
-                        >
-                            💸 Expenses {expensesOpen ? "▾" : "▸"}
-                        </button>
-                        <AnimatePresence>
-                            {expensesOpen && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="pl-4 flex flex-col gap-2 text-sm"
+                        {isSalonNhanVien && (
+                            <>
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setIsSalonsOpen(!isSalonsOpen)}
                                 >
-                                    <Link href="/expenses" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
-                                        👁️ View Expenses
+                                    👤 Account {isSalonsOpen ? "▴" : "▾"}
+                                </button>
+                                <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
+                                    <Link
+                                        href="/employees/me"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        👤 My Profile
                                     </Link>
-                                    <Link href="/categories" onClick={() => setMenuOpen(false)} className="hover:text-yellow-300">
-                                        🗂 Manage Categories
+                                    <Link
+                                        href="/appointments"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        📅 Appointments
                                     </Link>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                                </div>
+                            </>
+                        )}
+                        {isFreelancer && (
+                            <>
+                                <button
+                                    onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    🧑‍🎨 Freelancer {isFreelancerMenuOpen ? "▴" : "▾"}
+                                </button>
+
+                                {isFreelancerMenuOpen && (
+                                    <>
+                                        <Link
+                                            href="/freelancers"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🧾 Dashboard
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/me"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            👤 My Profile
+                                        </Link>
+                                        <Link
+                                            href="/appointments"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📅 Appointments
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/payments"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            💳 Payments
+                                        </Link>
+                                    </>
+                                )}
+                            </>
+                        )}
+                        {isSalonCustomer && (
+                            <>
+                                <Link
+                                    href="/customer/find-stylists"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="hover:text-yellow-400 flex items-center gap-2"
+                                >
+                                    📅 Book Appoinment
+                                </Link>
+                                <Link
+                                    href="/customer/me"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="hover:text-yellow-400 flex items-center gap-2"
+                                >
+                                    🧾 My Appoinments
+                                </Link>
+                            </>
+                        )}
+                        {isSalonAll && (
+                            <>
+                                <button
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                    onClick={() => setIsSalonsOpen(!isSalonsOpen)}
+                                >
+                                    👤 Account {isSalonsOpen ? "▴" : "▾"}
+                                </button>
+                                <div className="ml-6 flex flex-col text-sm" style={{ display: isSalonsOpen ? 'flex' : 'none' }}>
+                                    <Link
+                                        href="/employees/me"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        👤 My Profile
+                                    </Link>
+                                    <Link
+                                        href="/appointments"
+                                        onClick={() => { setMenuOpen(false); setIsSalonsOpen(false); }}
+                                        className="hover:text-yellow-400 flex items-center gap-2 py-1"
+                                    >
+                                        📅 Appointments
+                                    </Link>
+                                </div>
+                                <button
+                                    onClick={() => setIsFreelancerMenuOpen(!isFreelancerMenuOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    🧑‍🎨 Freelancer {isFreelancerMenuOpen ? "▴" : "▾"}
+                                </button>
+
+                                {isFreelancerMenuOpen && (
+                                    <>
+                                        <Link
+                                            href="/freelancers"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🧾 Dashboard
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/me"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            👤 My Profile
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/appointments"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📅 Appointments
+                                        </Link>
+                                        <Link
+                                            href="/freelancers/payments"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            💳 Payments
+                                        </Link>
+                                    </>
+                                )}
+                            </>
+                        )}
+
+                        {isCrypto && (
+                            <>
+                                <Link href="/home" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                    🏠 Home
+                                </Link>
+                                <Link href="/transactions" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                    📄 Transactions
+                                </Link>
+
+                                {/* 💰 Expenses (mobile) */}
+                                <button
+                                    onClick={() => setExpensesOpen(!expensesOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    💰 Expenses {expensesOpen ? "▴" : "▾"}
+                                </button>
+                                {expensesOpen && (
+                                    <>
+                                        <Link
+                                            href="/expenses"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📄 View Expenses
+                                        </Link>
+                                        <Link
+                                            href="/expenses/categories"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🗂 Categories
+                                        </Link>
+                                    </>
+                                )}
+
+                                {/* 💳 Debts (mobile) */}
+                                <button
+                                    onClick={() => setDebtsOpen(!debtsOpen)}
+                                    className="flex items-center gap-2 hover:text-cyan-300"
+                                >
+                                    💳 Debts {debtsOpen ? "▴" : "▾"}
+                                </button>
+                                {debtsOpen && (
+                                    <>
+                                        <Link
+                                            href="/debts"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            📄 View Debts
+                                        </Link>
+                                        <Link
+                                            href="/debts/lenders"
+                                            onClick={() => setMenuOpen(false)}
+                                            className="pl-6 py-1 hover:text-yellow-400 flex items-center gap-2"
+                                        >
+                                            🙋‍♂️ Lenders
+                                        </Link>
+                                    </>
+                                )}
 
 
-                        <Link href="/settings" className="hover:text-cyan-300 flex items-center gap-2">
-                            ⚙️ Settings
-                        </Link>
+                                <Link href="/settings" onClick={() => setMenuOpen(false)} className="hover:text-cyan-300 flex items-center gap-2">
+                                    ⚙️ Settings
+                                </Link>
+                            </>
+                        )}
                         {user && (
                             <button
                                 className="text-left flex items-center gap-2 hover:text-red-400"

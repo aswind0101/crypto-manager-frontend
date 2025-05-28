@@ -358,7 +358,7 @@ export default function FreelancerDashboard() {
                         onChange={uploadAvatar}
                         hidden
                     />
-                    <span className="inline-flex justify-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
+                    <span className="inline-flex justify-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-3xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
                         {uploading.avatar
                             ? "Uploading..."
                             : steps.has_avatar
@@ -414,7 +414,7 @@ export default function FreelancerDashboard() {
                         onChange={uploadLicense}
                         hidden
                     />
-                    <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
+                    <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-3xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
                         {uploading.license
                             ? "Uploading..."
                             : steps.has_license
@@ -471,7 +471,7 @@ export default function FreelancerDashboard() {
                         onChange={uploadId}
                         hidden
                     />
-                    <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
+                    <span className="inline-flex justify-center items-center w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-3xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition cursor-pointer">
                         {uploading.id
                             ? "Uploading..."
                             : steps.has_id
@@ -527,7 +527,7 @@ export default function FreelancerDashboard() {
                     return (
                         <button
                             disabled
-                            className="w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md cursor-default"
+                            className="w-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-3xl text-sm font-semibold shadow-md cursor-default"
                         >
                             {employeeStatus === "rejected" ? "Rejected ❌" : "Confirmed ✅"}
                         </button>
@@ -641,7 +641,7 @@ export default function FreelancerDashboard() {
                             alert("❌ Failed to save payment method");
                         }
                     }}
-                    className="w-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition"
+                    className="w-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 text-white py-2 rounded-3xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition"
                     disabled={steps.has_payment}
                 >
                     {steps.has_payment ? "Added ✅" : "Add Payment Method"}
@@ -761,12 +761,12 @@ export default function FreelancerDashboard() {
 function StepCard({ title, description, completed, buttonLabel, onClick, renderAction, badge, badgeColor, disabled }) {
     return (
         <div
-            className={`relative pt-8 pb-8 bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-xl flex flex-col justify-between transition ${disabled ? "opacity-50 pointer-events-none" : ""
+            className={`relative pt-8 pb-8 border-t border-b border-white/20 rounded-2xl p-5 flex flex-col justify-between transition ${disabled ? "opacity-50 pointer-events-none" : ""
                 }`}
         >
             {badge && (
                 <div className="absolute top-2 right-2">
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-xl ${badgeColor}`}>
+                    <span className={`text-[11px] font-semibold px-2 py-1 rounded-xl ${badgeColor}`}>
                         {badge}
                     </span>
                 </div>
