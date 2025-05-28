@@ -19,17 +19,21 @@ export default function VerifyPage() {
         if (res.ok) {
           setStatus("success");
           setMessage("✅ Your account has been verified successfully!");
-          setTimeout(() => {
-            const auth = getAuth();
-            signOut(auth)
-              .catch(() => { }) // ignore error
-              .finally(() => {
-                try {
-                  localStorage.removeItem("user");
-                } catch (e) { }
-                // Sử dụng void để tránh cảnh báo promise
-                void router.push("/login");
-              });
+          setTimeout(async () => {
+            try {
+              const auth = getAuth();
+              await signOut(auth);
+            } catch { }
+            try {
+              localStorage.removeItem("user");
+            } catch { }
+            // Cách 1: Next.js router
+            if (router && router.push) {
+              router.push("/login");
+            } else {
+              // Cách 2: fallback
+              window.location.href = "/login";
+            }
           }, 2000);
         } else {
           setStatus("error");
