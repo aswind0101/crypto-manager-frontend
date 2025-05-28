@@ -275,7 +275,7 @@ export default function FreelancerDashboard() {
           <div className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 mt-6 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center">
             <h2 className="text-2xl font-bold text-yellow-300 mb-3 flex items-center gap-2">
               <span className="text-3xl">⚠️</span>
-              You haven't registered a freelancer profile
+              You haven&apos;t registered a freelancer profile
             </h2>
             <p className="mb-6 text-center text-base text-gray-300">
               To use the dashboard, please complete your freelancer profile.
