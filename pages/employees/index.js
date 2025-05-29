@@ -209,7 +209,7 @@ function Employees() {
                                                         onClick={() => {
                                                             setPreviewFiles(
                                                                 emp.certifications.map((f) =>
-                                                                    `https://crypto-manager-backend.onrender.com${f}`
+                                                                    f
                                                                 )
                                                             );
                                                             setPreviewOpen(true);
@@ -258,7 +258,7 @@ function Employees() {
                                                         onClick={() => {
                                                             setPreviewFiles(
                                                                 emp.id_documents.map((f) =>
-                                                                    `https://crypto-manager-backend.onrender.com${f}`
+                                                                    f
                                                                 )
                                                             );
                                                             setPreviewOpen(true);

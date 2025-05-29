@@ -390,7 +390,7 @@ export default function FreelancerDashboard() {
     has_avatar: onboarding?.avatar_url,
     has_license: onboarding?.license_url && onboarding?.license_status === "Approved",
     has_id: onboarding?.id_doc_url && onboarding?.id_doc_status === "Approved",
-    has_salon: onboarding?.salon_id,
+    has_salon: onboarding?.salon_id && onboarding?.employee_status === "active",
     has_payment: onboarding?.has_payment,
   };
 

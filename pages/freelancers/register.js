@@ -79,9 +79,17 @@ export default function FreelancerRegister() {
       const data = await res.json();
       if (res.ok) {
         setMsg(data.message);
-        // Logout khỏi Firebase trước khi chuyển về login
-        const auth = getAuth();
-        await signOut(auth).catch(() => { });
+
+        // 🟢 Chỉ logout Firebase nếu đã initialize App
+        try {
+          if (getApps().length > 0) {
+            const auth = getAuth();
+            await signOut(auth).catch(() => { });
+          }
+        } catch (e) {
+          // Có thể log ra nếu cần
+          console.warn("Firebase signOut skipped: app chưa init");
+        }
         localStorage.removeItem("user");
         setTimeout(() => router.push("/login"), 2000);
       } else {

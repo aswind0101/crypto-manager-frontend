@@ -103,7 +103,7 @@ export default function FreelancersReviewPage() {
                                 {/* Avatar + Info */}
                                 <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
                                     <img
-                                        src={freelancer.avatar_url ? `https://crypto-manager-backend.onrender.com${freelancer.avatar_url}` : "/no-avatar.png"}
+                                        src={freelancer.avatar_url ? freelancer.avatar_url : "/no-avatar.png"}
                                         alt="avatar"
                                         className="w-14 h-14 rounded-full object-cover border-2 border-white"
                                     />
@@ -121,10 +121,10 @@ export default function FreelancersReviewPage() {
                                     <p className="text-xs mb-1">Status: <span className="font-semibold">{freelancer.license_status}</span></p>
                                     {freelancer.license_url && (
                                         <a
-                                            href={`https://crypto-manager-backend.onrender.com${freelancer.license_url}`}
+                                            href={freelancer.license_url}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="text-blue-500 underline text-xs inline-block mb-2"
+                                            className="text-blue-700 underline text-xs inline-block mb-2"
                                         >
                                             📄 View License
                                         </a>
@@ -151,10 +151,10 @@ export default function FreelancersReviewPage() {
                                     <p className="text-xs mb-1">Status: <span className="font-semibold">{freelancer.id_doc_status}</span></p>
                                     {freelancer.id_doc_url && (
                                         <a
-                                            href={`https://crypto-manager-backend.onrender.com${freelancer.id_doc_url}`}
+                                            href={freelancer.id_doc_url}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="text-blue-500 underline text-xs inline-block mb-2"
+                                            className="text-blue-700 underline text-xs inline-block mb-2"
                                         >
                                             🖼 View ID
                                         </a>
