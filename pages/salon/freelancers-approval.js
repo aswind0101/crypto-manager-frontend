@@ -129,7 +129,7 @@ export default function SalonFreelancerApproval() {
                                             <img
                                                 src={f.certifications[0]}
                                                 alt="license"
-                                                className="w-full h-full rounded-xl border border-white/20 object-cover cursor-pointer transition hover:scale-105"
+                                                className="w-full h-full rounded-xl border border-white/20 object-cover cursor-pointer transition hover:scale-105 mb-4"
                                                 style={{ maxHeight: "180px" }}
                                                 onClick={() => window.open(f.certifications[0], "_blank")}
                                             />

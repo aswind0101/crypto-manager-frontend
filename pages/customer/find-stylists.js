@@ -3,6 +3,7 @@ import Navbar from "../../components/Navbar";
 import { getDistanceInKm } from "../../components/utils/distance"; // bạn sẽ tạo helper này ở bước sau.
 import { useRouter } from "next/router";
 import Head from "next/head";
+import { FaMale, FaFemale, FaGenderless } from "react-icons/fa";
 import { getAuth } from "firebase/auth";
 const auth = getAuth(); // hoặc lấy từ firebase.js nếu đã export sẵn
 import dayjs from "dayjs";
@@ -21,7 +22,7 @@ export default function FindStylists() {
   const [hasAskedLocation, setHasAskedLocation] = useState(false);
   const [user, setUser] = useState(null);
   const router = useRouter();
-
+  const [aboutExpanded, setAboutExpanded] = useState({});
 
   const [timeSlots, setTimeSlots] = useState([]);
   const [selectedTime, setSelectedTime] = useState(""); // HH:mm
@@ -393,10 +394,10 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[660px] h-auto perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[560px] sm:min-h-[580px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-full h-auto rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
+                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden bg-white/10 backdrop-blur-md border border-white/10 p-5 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -405,39 +406,71 @@ export default function FindStylists() {
                         </svg>
                       ))}
                     </div>
+                    <div className="flex flex-col items-center gap-1 -mt-1 mb-2">
+                      {/* Avatar */}
+                      <img
+                        src={s.avatar_url?.startsWith("http") ? s.avatar_url : `https://crypto-manager-backend.onrender.com${s.avatar_url}`}
+                        onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
+                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-white shadow mb-2 mt-4"
+                      />
 
-                    {/* Avatar */}
-                    <img
-                      src={s.avatar_url?.startsWith("http") ? s.avatar_url : `https://crypto-manager-backend.onrender.com${s.avatar_url}`}
-                      onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
-                      className="w-42 h-42 rounded-full object-cover border-2 border-white shadow mb-3 mt-6"
-                      alt={s.name}
-                    />
+                      {/* Info */}
+                      <h2 className="text-lg font-semibold text-pink-300 mt-2 mb-1 flex items-center justify-center gap-2">
+                        {s.name}
+                        {s.gender === "Female" && (
+                          <FaFemale title="Female" className="text-pink-400 text-lg" />
+                        )}
+                        {s.gender === "Male" && (
+                          <FaMale title="Male" className="text-blue-400 text-lg" />
+                        )}
+                        {s.gender && !["Male", "Female"].includes(s.gender) && (
+                          <FaGenderless title="Other / Non-binary" className="text-purple-400 text-sm" />
+                        )}
+                      </h2>
 
-                    <div className="w-full px-2 space-y-2">
-                      <div>
-                        <h2 className="text-xl font-bold text-pink-400">{s.name}</h2>
-                        <p className="inline-block text-xs px-2 py-1 rounded-full bg-pink-600/50 text-white shadow">
-                          {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
-                        </p>
-                      </div>
-
-                      <div className="pt-2">
-                        <p className="text-[10px] text-pink-300 uppercase tracking-widest mb-1">--SALON--</p>
-                        <p className="text-sm text-yellow-300 font-medium">🏠 {s.salon_name}</p>
-                        <p className="text-xs text-gray-300">{s.salon_address}</p>
-                        <p className="text-xs text-emerald-300 mt-1">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
-                      </div>
-
+                      <p className="text-xs bg-pink-600/40 text-white px-3 py-[2px] rounded-full inline-block">
+                        {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
+                      </p>
                     </div>
-
-                    <hr className="w-3/4 border-t border-white/20 my-1" />
+                    <div className="text-xs mt-3 text-gray-300 space-y-1">
+                      <p className="text-yellow-300 font-semibold">{s.salon_name}</p>
+                      <p>{s.salon_address}</p>
+                      <p className="text-emerald-300">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
+                    </div>
+                    {/* About section nếu có */}
+                    {s.description && (
+                      <div className="mt-3 text-xs text-white/80 italic px-3">
+                        {aboutExpanded[s.id] ? (
+                          <>
+                            “{s.description}”
+                            <button
+                              onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}
+                              className="ml-2 text-emerald-300 underline text-[11px]"
+                            >
+                              Show less
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            “{s.description.slice(0, 140)}...”
+                            <button
+                              onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: true })}
+                              className="ml-2 text-yellow-300 underline text-[11px]"
+                            >
+                              Show more
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <hr className="w-full border-t border-white/20" />
                     <button
                       onClick={() => handleBookClick(s.id)}
-                      className="mb-6 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
+                      className="mt-4 mb-4 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 hover:brightness-110 transition-transform duration-200"
                     >
-                      Book Appointment
+                      📅 Book Appointment
                     </button>
+
                   </div>
 
                   {/* Mặt sau */}
@@ -454,56 +487,61 @@ export default function FindStylists() {
 
                         {/* Scrollable list of services */}
                         <div className="max-h-48 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
-                          {s.services?.map((srv) => {
-                            const isSelected = form.service_ids.includes(srv.id);
-                            return (
-                              <label
-                                key={srv.id}
-                                className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs shadow-sm transition-all ${isSelected
-                                  ? "bg-gradient-to-r from-pink-400 to-pink-500 text-white border-pink-400 shadow-lg"
-                                  : "text-pink-100 border-pink-300 hover:bg-pink-400"
-                                  }`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => {
-                                      const selected = isSelected
-                                        ? form.service_ids.filter((id) => id !== srv.id)
-                                        : [...form.service_ids, srv.id];
+                          {s.services?.length === 0 ? (
+                            <div className="text-sm text-red-400 italic px-2 py-2 bg-white/5 rounded-lg">
+                              ❌ This stylist has not selected any services yet.
+                            </div>
+                          ) : (
+                            s.services.map((srv) => {
+                              const isSelected = form.service_ids.includes(srv.id);
+                              return (
+                                <label
+                                  key={srv.id}
+                                  className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs shadow-sm transition-all ${isSelected
+                                    ? "bg-gradient-to-r from-pink-400 to-pink-500 text-white border-pink-400 shadow-lg"
+                                    : "text-pink-100 border-pink-300 hover:bg-pink-400"
+                                    }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {
+                                        const selected = isSelected
+                                          ? form.service_ids.filter((id) => id !== srv.id)
+                                          : [...form.service_ids, srv.id];
 
-                                      const selectedServices = s.services.filter((s) =>
-                                        selected.includes(s.id)
-                                      );
-                                      const totalDuration = selectedServices.reduce(
-                                        (sum, s) => sum + (s.duration_minutes || 30),
-                                        0
-                                      );
+                                        const selectedServices = s.services.filter((s) =>
+                                          selected.includes(s.id)
+                                        );
+                                        const totalDuration = selectedServices.reduce(
+                                          (sum, s) => sum + (s.duration_minutes || 30),
+                                          0
+                                        );
 
-                                      setForm({
-                                        ...form,
-                                        service_ids: selected,
-                                        duration_minutes: totalDuration,
-                                      });
+                                        setForm({
+                                          ...form,
+                                          service_ids: selected,
+                                          duration_minutes: totalDuration,
+                                        });
 
-                                      if (form.appointment_date) {
-                                        fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration); // ✅ ở đây s là stylist, đúng!
-                                      }
-                                    }}
-                                    className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
-                                  />
-                                  <div className="text-left">
-                                    <span className="block capitalize">{srv.name}</span>
-                                    <span className="block text-xs text-yellow-500">
-                                      ${srv.price}
-                                    </span>
+                                        if (form.appointment_date) {
+                                          fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration);
+                                        }
+                                      }}
+                                      className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
+                                    />
+                                    <div className="text-left">
+                                      <span className="block capitalize">{srv.name}</span>
+                                      <span className="block text-xs text-yellow-500">${srv.price}</span>
+                                    </div>
                                   </div>
-                                </div>
-                              </label>
-                            );
-                          })}
+                                </label>
+                              );
+                            })
+                          )}
                         </div>
+
 
                         {/* Estimated duration */}
                         {form.duration_minutes > 0 && (

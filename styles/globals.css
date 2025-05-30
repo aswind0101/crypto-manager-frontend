@@ -11,6 +11,11 @@
     --foreground: #ededed;
   }
 }
+@media (max-width: 640px) {
+  .glass-salon {
+    padding: 1.5rem !important;
+  }
+}
 
 /* 📅 Đổi màu icon date picker */
 @layer utilities {
@@ -115,7 +120,9 @@ input[type="checkbox"]:checked {
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
-
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
 .transform-style-preserve-3d {
   transform-style: preserve-3d;
 }
@@ -125,13 +132,13 @@ body {
   color: #ffffff;
   font-family: 'Poppins', sans-serif;
 }
-/* Glassmorphism box style */
-.glass-box {
-  background: rgba(255,255,255,0.22);
-  backdrop-filter: blur(10px);
-  border-radius: 1.5rem;
-  border: 1.5px solid rgba(255,255,255,0.20);
-  box-shadow: 0 6px 24px 0 rgba(16,30,54,0.09);
-  padding: 2rem;
+
+.spa-shadow {
+  box-shadow: 0 6px 28px rgba(255, 192, 203, 0.15), 0 8px 16px rgba(16, 185, 129, 0.1);
 }
+.card-animate-in {
+  animation: slideUpFadeIn 0.6s ease-out;
+}
+
+
 
