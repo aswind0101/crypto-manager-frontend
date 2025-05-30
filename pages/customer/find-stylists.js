@@ -353,7 +353,7 @@ export default function FindStylists() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800  text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
         <link
           href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
@@ -397,7 +397,7 @@ export default function FindStylists() {
               <div key={s.id} className="relative w-full min-h-[560px] sm:min-h-[580px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden bg-white/10 backdrop-blur-md border border-white/10 p-5 shadow-xl flex flex-col justify-between text-center glass-box">
+                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -406,16 +406,44 @@ export default function FindStylists() {
                         </svg>
                       ))}
                     </div>
-                    <div className="flex flex-col items-center gap-1 -mt-1 mb-2">
+                    <div className="flex flex-col items-center gap-1 mt-2 mb-2">
                       {/* Avatar */}
-                      <img
-                        src={s.avatar_url?.startsWith("http") ? s.avatar_url : `https://crypto-manager-backend.onrender.com${s.avatar_url}`}
-                        onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
-                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-white shadow mb-2 mt-4"
-                      />
+                      <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full p-[3px] bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 shadow-xl">
+                        <img
+                          src={s.avatar_url}
+                          alt={s.name}
+                          onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
+                          className="w-full h-full object-cover rounded-full border-4 border-white shadow-inner"
+                        />
+
+                        {/* 🌿 Icon trang trí – nằm đè góc trái */}
+                        <div className="absolute -top-3 -left-10 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                          🌸
+                        </div>
+                        <div className="absolute top-9 -right-12 text-white rounded-full p-[4px] text-3xl  rotate-12">
+                          ✨
+                        </div>
+                        <div className="absolute top-22 -left-8 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                          🌸
+                        </div>
+                        <div className="absolute top-43 -right-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                          🌟
+                        </div>
+                        <div className="absolute top-104 -left-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                          🌸
+                        </div>
+                        <div className="absolute top-120 -right-24 text-white rounded-full p-[4px] text-3xl  rotate-12">
+                          ✨
+                        </div>
+                        {/* ✨ Có thể thêm icon ở nhiều vị trí nếu muốn */}
+                        {/* <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-white rounded-full p-[4px] text-xs shadow-md rotate-12">
+    ✨
+  </div> */}
+                      </div>
+
 
                       {/* Info */}
-                      <h2 className="text-lg font-semibold text-pink-300 mt-2 mb-1 flex items-center justify-center gap-2">
+                      <h2 className="text-xl font-semibold text-pink-300 mt-2 mb-1 flex items-center justify-center gap-2">
                         {s.name}
                         {s.gender === "Female" && (
                           <FaFemale title="Female" className="text-pink-400 text-lg" />
@@ -432,16 +460,16 @@ export default function FindStylists() {
                         {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
                       </p>
                     </div>
-                    <div className="text-xs mt-3 text-gray-300 space-y-1">
+                    <div className="text-sm mt-3 text-gray-300 space-y-1">
                       <p className="text-yellow-300 font-semibold">{s.salon_name}</p>
                       <p>{s.salon_address}</p>
                       <p className="text-emerald-300">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
                     </div>
                     {/* About section nếu có */}
                     {s.description && (
-                      <div className="mt-3 text-xs text-white/80 italic px-3">
+                      <div className="mt-3 text-sm text-white/80 italic px-3">
                         {aboutExpanded[s.id] ? (
-                          <>
+                          <div className="max-h-[90px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 pr-1">
                             “{s.description}”
                             <button
                               onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}
@@ -449,7 +477,7 @@ export default function FindStylists() {
                             >
                               Show less
                             </button>
-                          </>
+                          </div>
                         ) : (
                           <>
                             “{s.description.slice(0, 140)}...”
@@ -463,13 +491,15 @@ export default function FindStylists() {
                         )}
                       </div>
                     )}
-                    <hr className="w-full border-t border-white/20" />
-                    <button
-                      onClick={() => handleBookClick(s.id)}
-                      className="mt-4 mb-4 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 hover:brightness-110 transition-transform duration-200"
-                    >
-                      📅 Book Appointment
-                    </button>
+
+                    <div className="mt-4 pt-4 border-t border-white/20 rounded-xl">
+                      <button
+                        onClick={() => handleBookClick(s.id)}
+                        className="mt-2 mb-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 hover:brightness-110 transition-transform duration-200"
+                      >
+                        📅 Book Appointment
+                      </button>
+                    </div>
 
                   </div>
 
@@ -486,7 +516,7 @@ export default function FindStylists() {
                         <p className="text-pink-400 font-bold mb-2">📋 Step 1: Select Services</p>
 
                         {/* Scrollable list of services */}
-                        <div className="max-h-48 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
+                        <div className="max-h-26 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
                           {s.services?.length === 0 ? (
                             <div className="text-sm text-red-400 italic px-2 py-2 bg-white/5 rounded-lg">
                               ❌ This stylist has not selected any services yet.
@@ -605,11 +635,9 @@ export default function FindStylists() {
 
                       {/* Thông tin đặt */}
                       {form.appointment_date && selectedTime && (
-                        <div className="mt-3 px-2 py-2 rounded-lg bg-pink-600/20 border border-pink-500 text-pink-200 text-sm font-semibold text-center shadow-sm">
+                        <div className="mt-3 px-2 py-2 rounded-lg bg-pink-600/20 border border-pink-500 text-pink-200 text-sm font-semibold text-center shadow-sm whitespace-nowrap overflow-x-auto">
                           📌 You selected:
-                          <span className="ml-1 text-yellow-300 font-bold">
-                            {form.appointment_date}
-                          </span>
+                          <span className="ml-1 text-yellow-300 font-bold">{form.appointment_date}</span>
                           <span className="mx-1">at</span>
                           <span className="text-yellow-300 font-bold">{selectedTime}</span>
                         </div>
