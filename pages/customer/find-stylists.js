@@ -472,7 +472,7 @@ export default function FindStylists() {
                           <>
                             <div
                               id={`about-scroll-${s.id}`}
-                              className="max-h-[100px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10"
+                              className="max-h-[100px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scrollbar-hide"
                               style={{
                                 WebkitOverflowScrolling: "touch",
                                 touchAction: "manipulation",
@@ -509,7 +509,7 @@ export default function FindStylists() {
                                   if (!el) return;
 
                                   let scrollPos = el.scrollTop;
-                                  const scrollSpeed = 0.1;
+                                  const scrollSpeed = 0.2;
 
                                   const step = () => {
                                     scrollPos += scrollSpeed;
