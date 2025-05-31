@@ -394,10 +394,10 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[600px] sm:min-h-[600px] h-auto perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[620px] sm:min-h-[600px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
+                  <div className="absolute w-full min-h-[620px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -429,10 +429,10 @@ export default function FindStylists() {
                         <div className="absolute top-43 -right-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
                           🌟
                         </div>
-                        <div className="absolute top-104 -left-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                        <div className="absolute top-110 -left-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
                           🌸
                         </div>
-                        <div className="absolute top-120 -right-24 text-white rounded-full p-[4px] text-3xl  rotate-12">
+                        <div className="absolute top-124 -right-24 text-white rounded-full p-[4px] text-3xl  rotate-12">
                           ✨
                         </div>
                         {/* ✨ Có thể thêm icon ở nhiều vị trí nếu muốn */}
@@ -467,24 +467,26 @@ export default function FindStylists() {
                     </div>
                     {/* About section nếu có */}
                     {s.description && (
-                      <div className="mt-1 text-sm text-white/80 italic px-3">
+                      <div className="mt-3 text-sm text-white/80 italic px-3">
                         {aboutExpanded[s.id] ? (
-                          <div
-                            className="max-h-[120px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 rounded-md"
-                            style={{
-                              WebkitOverflowScrolling: "touch",
-                              touchAction: "manipulation",
-                              overscrollBehavior: "contain",
-                            }}
-                          >
-                            “{s.description}”
+                          <>
+                            <div
+                              className="max-h-[100px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10"
+                              style={{
+                                WebkitOverflowScrolling: "touch",
+                                touchAction: "manipulation",
+                                overscrollBehavior: "contain",
+                              }}
+                            >
+                              <p className="whitespace-pre-line">{s.description}</p>
+                            </div>
                             <button
                               onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}
-                              className="ml-2 text-emerald-300 underline text-[11px]"
+                              className="mt-1 text-emerald-300 underline text-[11px]"
                             >
                               Show less
                             </button>
-                          </div>
+                          </>
                         ) : (
                           <>
                             “{s.description.slice(0, 140)}...”
@@ -497,16 +499,33 @@ export default function FindStylists() {
                           </>
                         )}
                       </div>
-                    )}
 
-                    <div className="mt-4 pt-4 border-t border-white/20 ">
-                      <button
-                        onClick={() => handleBookClick(s.id)}
-                        className="mt-2 mb-2 bg-pink-500 hover:bg-pink-600 text-white font-bold px-6 py-2 
-                        rounded-3xl shadow-lg transition-transform duration-200"
-                      >
-                        📅 Book Appointment
-                      </button>
+                    )}
+                    <div className="mt-4 pt-4 border-t border-white/20">
+                      <div className="flex justify-center">
+                        <button
+                          onClick={() => handleBookClick(s.id)}
+                          className="mt-2 mb-2 bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
+      rounded-3xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
+      flex items-center justify-center gap-2"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-5 h-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                          Book Appointment
+                        </button>
+                      </div>
                     </div>
 
                   </div>
@@ -521,7 +540,9 @@ export default function FindStylists() {
 
                       {/* Step 1: Chọn dịch vụ */}
                       <div>
-                        <p className="text-pink-400 font-bold mb-2">📋 Step 1: Select Services</p>
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
+                          Step 1: Select Services
+                        </p>
 
                         {/* Scrollable list of services */}
                         <div className="max-h-26 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
@@ -535,7 +556,7 @@ export default function FindStylists() {
                               return (
                                 <label
                                   key={srv.id}
-                                  className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs shadow-sm transition-all ${isSelected
+                                  className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs transition-all ${isSelected
                                     ? "text-white border-pink-400 shadow-lg"
                                     : "text-pink-100 border-pink-300 hover:bg-white/5"
                                     }`}
@@ -591,7 +612,7 @@ export default function FindStylists() {
 
                       {/* Step 2: Chọn ngày */}
                       <div>
-                        <p className="text-pink-400 font-bold mb-1">📆 Step 2: Pick a Date</p>
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400 ">Step 2: Pick a Date</p>
                         <input
                           type="date"
                           value={form.appointment_date}
@@ -601,18 +622,28 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                          className="w-full rounded p-1 text-yellow-500 text-xs pl-2"
+                          className="w-full rounded p-1 text-yellow-500 text-xs pl-2 bg-white/5 focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
                         />
                       </div>
 
-                      {/* Step 3: Chọn giờ */}
-                      {timeSlots.length > 0 ? (
-                        <div>
-                          <p className="text-pink-400 font-bold mb-1">🕒 Step 3: Choose Time</p>
+                      {/* Step 3: Choose Time */}
+                      <div className="mt-4">
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
+                          Step 3: Choose Time
+                        </p>
+
+                        {!form.appointment_date ? (
+                          <select
+                            disabled
+                            className="w-full rounded p-1 text-yellow-500 text-xs pl-2 bg-white/10 border border-white/10 cursor-not-allowed"
+                          >
+                            <option>Select a date first</option>
+                          </select>
+                        ) : timeSlots.length > 0 ? (
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="w-full rounded p-1 text-yellow-500 text-xs pl-2"
+                            className="w-full rounded p-1 text-yellow-500 text-xs pl-2 focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white/5 transition"
                           >
                             <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
@@ -621,22 +652,20 @@ export default function FindStylists() {
                               </option>
                             ))}
                           </select>
-                        </div>
-                      ) : (
-                        form.appointment_date && (
+                        ) : (
                           <p className="text-yellow-300 text-xs italic">
                             ⚠️ No available time slots for this date & duration.
                           </p>
-                        )
-                      )}
+                        )}
+                      </div>
 
                       {/* Step 4: Ghi chú */}
                       <div>
-                        <p className="text-pink-400 font-bold mb-1">💬 Step 4: Optional Notes</p>
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">Step 4: Optional Notes</p>
                         <textarea
                           value={form.note}
                           onChange={(e) => setForm({ ...form, note: e.target.value })}
-                          className="w-full rounded p-1 text-pink-100 text-xs"
+                          className="w-full rounded p-1 text-pink-100 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
                           placeholder="Anything specific?"
                         />
                       </div>
@@ -657,7 +686,7 @@ export default function FindStylists() {
                     <button
                       disabled={submitting}
                       onClick={() => handleSubmitBooking(s)}
-                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:to-emerald-700 text-white font-semibold py-2 rounded-3xl shadow-lg transition-all"
+                      className="mt-4 w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 rounded-3xl shadow-lg transition-all"
                     >
                       {submitting ? "⏳ Booking..." : "✅ Confirm Booking"}
                     </button>

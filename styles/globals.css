@@ -163,8 +163,8 @@ body {
 }
 .scroll-touch {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
   touch-action: manipulation;
+  overscroll-behavior: contain;
 }
 .scroll-about {
   -webkit-overflow-scrolling: touch;
