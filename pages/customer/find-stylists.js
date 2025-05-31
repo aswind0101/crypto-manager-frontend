@@ -397,7 +397,7 @@ export default function FindStylists() {
               <div key={s.id} className="relative w-full min-h-[600px] sm:min-h-[600px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden backdrop-blur-md border-b-2 border-t-2 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
+                  <div className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -469,7 +469,14 @@ export default function FindStylists() {
                     {s.description && (
                       <div className="mt-1 text-sm text-white/80 italic px-3">
                         {aboutExpanded[s.id] ? (
-                          <div className="max-h-[90px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 pr-1">
+                          <div
+                            className="max-h-[120px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 rounded-md"
+                            style={{
+                              WebkitOverflowScrolling: "touch",
+                              touchAction: "manipulation",
+                              overscrollBehavior: "contain",
+                            }}
+                          >
                             “{s.description}”
                             <button
                               onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}
@@ -495,8 +502,8 @@ export default function FindStylists() {
                     <div className="mt-4 pt-4 border-t border-white/20 ">
                       <button
                         onClick={() => handleBookClick(s.id)}
-                        className="mt-2 mb-2 bg-gradient-to-br from-emerald-200 via-pink-600 to-yellow-600 text-white font-bold px-6 py-2 
-                        rounded-3xl shadow-lg hover:scale-105 hover:brightness-110 transition-transform duration-200"
+                        className="mt-2 mb-2 bg-pink-500 hover:bg-pink-600 text-white font-bold px-6 py-2 
+                        rounded-3xl shadow-lg transition-transform duration-200"
                       >
                         📅 Book Appointment
                       </button>
@@ -505,7 +512,7 @@ export default function FindStylists() {
                   </div>
 
                   {/* Mặt sau */}
-                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden rotate-y-180 border-b-2 border-t-2 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
+                  <div className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
                     <h3 className="text-lg font-bold text-yellow-300 mb-3">
                       ✨ Book Your Appointment
                     </h3>
@@ -650,7 +657,7 @@ export default function FindStylists() {
                     <button
                       disabled={submitting}
                       onClick={() => handleSubmitBooking(s)}
-                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:to-emerald-700 text-white font-bold py-2 rounded-3xl shadow-lg transition-all"
+                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:to-emerald-700 text-white font-semibold py-2 rounded-3xl shadow-lg transition-all"
                     >
                       {submitting ? "⏳ Booking..." : "✅ Confirm Booking"}
                     </button>
@@ -658,7 +665,7 @@ export default function FindStylists() {
                     {/* Quay lại */}
                     <button
                       onClick={() => setFlippedId(null)}
-                      className="mt-4 bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 rounded-3xl px-4 shadow-lg"
+                      className="mt-4 bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 rounded-3xl px-4 shadow-lg transition-all"
                     >
                       🔙 Go back
                     </button>
