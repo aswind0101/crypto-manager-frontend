@@ -394,10 +394,10 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[620px] sm:min-h-[600px] h-auto perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[620px] sm:min-h-[620px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-[620px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
+                  <div className="absolute w-full min-h-[620px] max-h-[620px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -471,6 +471,7 @@ export default function FindStylists() {
                         {aboutExpanded[s.id] ? (
                           <>
                             <div
+                              id={`about-scroll-${s.id}`}
                               className="max-h-[100px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10"
                               style={{
                                 WebkitOverflowScrolling: "touch",
@@ -478,7 +479,7 @@ export default function FindStylists() {
                                 overscrollBehavior: "contain",
                               }}
                             >
-                              <p className="whitespace-pre-line">{s.description}</p>
+                              <p className="whitespace-pre-line reveal-anim">{s.description}</p>
                             </div>
                             <button
                               onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}
@@ -491,7 +492,27 @@ export default function FindStylists() {
                           <>
                             “{s.description.slice(0, 140)}...”
                             <button
-                              onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: true })}
+                              onClick={() => {
+                                setAboutExpanded({ ...aboutExpanded, [s.id]: true });
+
+                                setTimeout(() => {
+                                  const el = document.getElementById(`about-scroll-${s.id}`);
+                                  if (!el) return;
+
+                                  let current = el.scrollTop;
+                                  const target = el.scrollHeight;
+                                  const step = 0.1; // tốc độ càng nhỏ thì càng chậm
+                                  const interval = setInterval(() => {
+                                    current += step;
+                                    el.scrollTop = current;
+
+                                    if (current >= target - el.clientHeight) {
+                                      clearInterval(interval);
+                                    }
+                                  }, 10); // thời gian mỗi bước (ms)
+                                }, 100); // đợi render
+                              }}
+
                               className="ml-2 text-yellow-300 underline text-[11px]"
                             >
                               Show more
