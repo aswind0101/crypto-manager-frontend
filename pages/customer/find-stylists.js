@@ -669,7 +669,7 @@ export default function FindStylists() {
                       ✨ Book Your Appointment
                     </h3>
 
-                    <div className="text-left space-y-3 text-sm">
+                    <div className="text-left space-y-3 text-sm px-2 sm:px-3">
 
                       {/* Step 1: Chọn dịch vụ */}
                       <div>
