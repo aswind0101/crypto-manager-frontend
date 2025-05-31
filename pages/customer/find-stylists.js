@@ -34,6 +34,14 @@ export default function FindStylists() {
     duration_minutes: "",
     note: "",
   });
+  const [filter, setFilter] = useState({
+    specialization: "",
+    gender: "",
+    rating: "",
+    price: "",
+    duration: "",
+    distance: "", // mới thêm
+  });
 
   const [availableServices, setAvailableServices] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -351,6 +359,38 @@ export default function FindStylists() {
     return filtered;
   }
 
+  const filteredStylists = stylists
+    .filter((s) => {
+      if (filter.specialization && !s.specialization.includes(filter.specialization)) return false;
+      if (filter.gender && s.gender !== filter.gender) return false;
+      if (filter.rating && parseFloat(s.rating || 0) < parseFloat(filter.rating)) return false;
+
+      if (filter.price) {
+        const hasMatchingService = s.services?.some((srv) => {
+          const price = srv.price;
+          if (filter.price === "lt40") return price < 40;
+          if (filter.price === "40-60") return price >= 40 && price <= 60;
+          if (filter.price === "gt60") return price > 60;
+          return false;
+        });
+
+        if (!hasMatchingService) return false;
+      }
+
+      const avgDuration = s.services?.reduce((acc, srv) => acc + srv.duration_minutes, 0) / (s.services?.length || 1);
+      if (filter.duration === "lt30" && avgDuration >= 30) return false;
+      if (filter.duration === "30-60" && (avgDuration < 30 || avgDuration > 60)) return false;
+      if (filter.duration === "gt60" && avgDuration <= 60) return false;
+
+      if (filter.distance) {
+        const distanceInMiles = s.distance * 0.621371; // km -> mi
+        if (distanceInMiles > parseFloat(filter.distance)) return false;
+      }
+
+
+      return true;
+    })
+    .sort((a, b) => a.distance - b.distance); // sắp xếp stylist gần nhất lên đầu
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
@@ -386,17 +426,82 @@ export default function FindStylists() {
             </p>
           </div>
         )}
+        <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-sm text-yellow-500">
 
+          <select
+            className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, specialization: e.target.value })}
+          >
+            <option value="">All Specializations</option>
+            <option value="nail_tech">Nail Technician</option>
+            <option value="hair_stylist">Hair Stylist</option>
+            <option value="barber">Barber</option>
+            <option value="esthetician">Esthetician</option>
+            <option value="lash_tech">Lash Technician</option>
+            <option value="massage_therapist">Massage Therapist</option>
+            <option value="makeup_artist">Makeup Artist</option>
+            <option value="receptionist">Receptionist</option>
+          </select>
+
+
+          <select className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, gender: e.target.value })}>
+            <option value="">Any Gender</option>
+            <option value="Female">Female</option>
+            <option value="Male">Male</option>
+          </select>
+
+          <select className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, rating: e.target.value })}>
+            <option value="">Any Rating</option>
+            <option value="4">4★+</option>
+            <option value="4.5">4.5★+</option>
+            <option value="5">5★ Only</option>
+          </select>
+
+          <select className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, price: e.target.value })}>
+            <option value="">Any Price</option>
+            <option value="lt40">Under $40</option>
+            <option value="40-60">$40 - $60</option>
+            <option value="gt60">Above $60</option>
+          </select>
+
+          <select className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, duration: e.target.value })}>
+            <option value="">Any Duration</option>
+            <option value="lt30">Under 30 min</option>
+            <option value="30-60">30 - 60 min</option>
+            <option value="gt60">Above 60 min</option>
+          </select>
+
+          <select
+            className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none "
+            onChange={(e) => setFilter({ ...filter, distance: e.target.value })}
+          >
+            <option value="">Any Distance</option>
+            <option value="2">Within 2 mi</option>
+            <option value="5">Within 5 mi</option>
+            <option value="10">Within 10 mi</option>
+            <option value="15">Within 15 mi</option>
+          </select>
+
+        </div>
         {loading ? (
           <p className="text-center">⏳ Loading stylists...</p>
         ) : stylists.length === 0 ? (
           <p className="text-center text-gray-400">No stylist online nearby.</p>
         ) : (
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stylists.map((s) => (
+
+            {filteredStylists.map((s) => (
+
               <div key={s.id} className="relative w-full min-h-[620px] sm:min-h-[620px] h-auto perspective-[1500px]">
+
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
+
                   <div className="absolute w-full min-h-[620px] max-h-[620px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
