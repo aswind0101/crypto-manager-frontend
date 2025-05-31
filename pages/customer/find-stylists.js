@@ -437,8 +437,9 @@ export default function FindStylists() {
                         </div>
                         {/* ✨ Có thể thêm icon ở nhiều vị trí nếu muốn */}
                         {/* <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-white rounded-full p-[4px] text-xs shadow-md rotate-12">
-    ✨
-  </div> */}
+                            ✨
+                          </div> 
+                          */}
                       </div>
 
 
@@ -469,22 +470,17 @@ export default function FindStylists() {
                     {s.description && (
                       <div className="mt-3 text-sm text-white/80 italic px-3">
                         {aboutExpanded[s.id] ? (
-                          <div
-                            className="max-h-[90px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scroll-touch"
-                            style={{
-                              WebkitOverflowScrolling: "touch",
-                              touchAction: "pan-y",
-                              overscrollBehavior: "contain",
-                            }}
-                          >
-                            “{s.description}”
+                          <>
+                            <div className="relative max-h-[90px] overflow-y-auto pr-2 scroll-touch rounded-md bg-white/5 p-2 border border-white/10">
+                              <p className="whitespace-pre-line">{s.description}</p>
+                            </div>
                             <button
                               onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}
-                              className="ml-2 text-emerald-300 underline text-[11px]"
+                              className="mt-1 text-emerald-300 underline text-[11px]"
                             >
                               Show less
                             </button>
-                          </div>
+                          </>
                         ) : (
                           <>
                             “{s.description.slice(0, 140)}...”
@@ -498,7 +494,6 @@ export default function FindStylists() {
                         )}
                       </div>
                     )}
-
                     <div className="mt-4 pt-4 border-t border-white/20 rounded-xl">
                       <button
                         onClick={() => handleBookClick(s.id)}
