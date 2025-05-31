@@ -393,7 +393,7 @@ export default function FindStylists() {
     .sort((a, b) => a.distance - b.distance); // sắp xếp stylist gần nhất lên đầu
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
+    <div className="min-h-screen text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
         <link
           href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
@@ -402,8 +402,8 @@ export default function FindStylists() {
       </Head>
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-emerald-300 font-mono sm:font-['Pacifico', cursive]">
-          ✨ Available Stylists Near You
+        <h1 className="text-2xl sm:text-4xl font-bold text-center mb-8 text-emerald-300 font-mono sm:font-['Pacifico', cursive]">
+          ✨ Find Stylists Near You
         </h1>
 
         {geoError && (
@@ -490,18 +490,15 @@ export default function FindStylists() {
         {loading ? (
           <p className="text-center">⏳ Loading stylists...</p>
         ) : stylists.length === 0 ? (
-          <p className="text-center text-gray-400">No stylist online nearby.</p>
+          <p className="text-center text-gray-400">📍 No stylist online nearby.</p>
+        ) : filteredStylists.length === 0 ? (
+          <p className="text-center text-yellow-300 mt-6 text-sm">🔍 No stylist matches your filters. Please adjust your selection.</p>
         ) : (
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-
             {filteredStylists.map((s) => (
-
               <div key={s.id} className="relative w-full min-h-[620px] sm:min-h-[620px] h-auto perspective-[1500px]">
-
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-
                   <div className="absolute w-full min-h-[620px] max-h-[620px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
@@ -540,15 +537,11 @@ export default function FindStylists() {
                         <div className="absolute top-124 -right-24 text-white rounded-full p-[4px] text-3xl  rotate-12">
                           ✨
                         </div>
-                        {/* ✨ Có thể thêm icon ở nhiều vị trí nếu muốn */}
-                        {/* <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-white rounded-full p-[4px] text-xs shadow-md rotate-12">
-    ✨
-  </div> */}
                       </div>
 
 
                       {/* Info */}
-                      <h2 className="text-xl font-semibold text-pink-300 mt-2 mb-1 flex items-center justify-center gap-2">
+                      <h2 className="text-xl font-semibold text-pink-400 mt-2 mb-1 flex items-center justify-center gap-2">
                         {s.name}
                         {s.gender === "Female" && (
                           <FaFemale title="Female" className="text-pink-400 text-lg" />
@@ -826,7 +819,7 @@ export default function FindStylists() {
                     <button
                       disabled={submitting}
                       onClick={() => handleSubmitBooking(s)}
-                      className="mt-4 w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 rounded-3xl shadow-lg transition-all"
+                      className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-semibold py-2 rounded-3xl shadow-lg transition-all"
                     >
                       {submitting ? "⏳ Booking..." : "✅ Confirm Booking"}
                     </button>
@@ -834,7 +827,7 @@ export default function FindStylists() {
                     {/* Quay lại */}
                     <button
                       onClick={() => setFlippedId(null)}
-                      className="mt-4 bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 rounded-3xl px-4 shadow-lg transition-all"
+                      className="mt-4 bg-pink-500 hover:bg-pink-400 text-white font-semibold py-2 rounded-3xl px-4 shadow-lg transition-all"
                     >
                       🔙 Go back
                     </button>

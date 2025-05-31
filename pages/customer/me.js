@@ -119,7 +119,7 @@ function CustomerAppointmentsPage() {
                 )
                 : appointments.filter((a) => a.status === statusFilter);
     return (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
+        <div className="min-h-screen text-white px-4 py-6">
             <Navbar />
             <audio ref={soundConfirmRef} src="/confirmed.wav" preload="auto" />
             <audio ref={soundCancelRef} src="/cancelled.wav" preload="auto" />
@@ -196,7 +196,7 @@ function CustomerAppointmentsPage() {
                 ) : (
                     <div className="grid sm:grid-cols-2 gap-6">
                         {filteredAppointments.map((appt) => (
-                            <div key={appt.id} className="relative bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 shadow-lg">
+                            <div key={appt.id} className="relative bg-white/10 backdrop-blur-md border-t-2 border-pink-500 rounded-2xl p-5 pt-4 pb-12 shadow-lg">
                                 <span
                                     className={`absolute top-2 right-2 px-3 py-1 text-xs rounded-full font-semibold shadow ${appt.status === "pending"
                                         ? "bg-yellow-400 text-black"
@@ -292,9 +292,13 @@ function CustomerAppointmentsPage() {
                                                 alert("❌ " + (data.error || "Failed to cancel."));
                                             }
                                         }}
-                                        className="mt-4 w-full bg-gradient-to-r from-pink-500 via-pink-600 to-pink-700 hover:from-pink-600 hover:to-pink-800 text-white font-semibold text-sm py-2 rounded-2xl shadow-md transition-all"
+                                        className="absolute bottom-2 left-2 
+             hover:bg-red-500/20 
+             text-red-400 hover:text-white 
+             text-[9px] px-4 py-[4px] 
+             rounded-3xl transition-all duration-200 flex items-center gap-1"
                                     >
-                                        Cancel Appointment
+                                        ❌ Click here to cancel 
                                     </button>
                                 )}
 
