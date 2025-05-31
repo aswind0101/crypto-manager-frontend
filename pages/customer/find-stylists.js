@@ -482,7 +482,16 @@ export default function FindStylists() {
                               <p className="whitespace-pre-line reveal-anim">{s.description}</p>
                             </div>
                             <button
-                              onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}
+                              onClick={() => {
+                                setAboutExpanded({ ...aboutExpanded, [s.id]: false });
+
+                                const el = document.getElementById(`about-scroll-${s.id}`);
+                                if (el && el.dataset.rafId) {
+                                  cancelAnimationFrame(parseInt(el.dataset.rafId));
+                                  delete el.dataset.rafId;
+                                }
+                              }}
+
                               className="mt-1 text-emerald-300 underline text-[11px]"
                             >
                               Show less
@@ -499,20 +508,25 @@ export default function FindStylists() {
                                   const el = document.getElementById(`about-scroll-${s.id}`);
                                   if (!el) return;
 
-                                  let current = el.scrollTop;
-                                  const target = el.scrollHeight;
-                                  const step = 0.1; // tốc độ càng nhỏ thì càng chậm
-                                  const interval = setInterval(() => {
-                                    current += step;
-                                    el.scrollTop = current;
+                                  let scrollPos = el.scrollTop;
+                                  const scrollSpeed = 0.1;
 
-                                    if (current >= target - el.clientHeight) {
-                                      clearInterval(interval);
+                                  const step = () => {
+                                    scrollPos += scrollSpeed;
+                                    el.scrollTop = scrollPos;
+
+                                    // Nếu chạm đáy, cuộn lại đầu
+                                    if (el.scrollTop + el.clientHeight >= el.scrollHeight) {
+                                      scrollPos = 0;
                                     }
-                                  }, 10); // thời gian mỗi bước (ms)
-                                }, 100); // đợi render
-                              }}
 
+                                    const rafId = requestAnimationFrame(step);
+                                    el.dataset.rafId = rafId; // lưu để dừng khi cần
+                                  };
+
+                                  step(); // bắt đầu cuộn
+                                }, 100);
+                              }}
                               className="ml-2 text-yellow-300 underline text-[11px]"
                             >
                               Show more
