@@ -394,10 +394,10 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[560px] sm:min-h-[580px] h-auto perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[580px] sm:min-h-[580px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
+                  <div className="absolute w-full min-h-[580px] h-auto rounded-2xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -471,7 +471,13 @@ export default function FindStylists() {
                       <div className="mt-3 text-sm text-white/80 italic px-3">
                         {aboutExpanded[s.id] ? (
                           <>
-                            <div className="relative max-h-[90px] overflow-y-auto pr-2 scroll-touch rounded-md bg-white/5 p-2 border border-white/10">
+                            <div className="scroll-touch" style={{
+                              maxHeight: "100px",
+                              overflowY: "auto",
+                              WebkitOverflowScrolling: "touch",
+                              touchAction: "manipulation",
+                              overscrollBehavior: "contain"
+                            }}>
                               <p className="whitespace-pre-line">{s.description}</p>
                             </div>
                             <button
@@ -494,6 +500,7 @@ export default function FindStylists() {
                         )}
                       </div>
                     )}
+
                     <div className="mt-4 pt-4 border-t border-white/20 rounded-xl">
                       <button
                         onClick={() => handleBookClick(s.id)}
