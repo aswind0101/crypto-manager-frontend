@@ -161,6 +161,9 @@ body {
 .card-animate-in {
   animation: slideUpFadeIn 0.6s ease-out;
 }
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+}
 
 
 
