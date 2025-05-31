@@ -353,7 +353,7 @@ export default function FindStylists() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800  text-white font-mono sm:font-['Pacifico', cursive]">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
         <link
           href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
@@ -394,10 +394,10 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[580px] sm:min-h-[580px] h-auto perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[600px] sm:min-h-[600px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-[580px] h-auto rounded-2xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center">
+                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden backdrop-blur-md border-b-2 border-t-2 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-3 right-3 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -437,9 +437,8 @@ export default function FindStylists() {
                         </div>
                         {/* ✨ Có thể thêm icon ở nhiều vị trí nếu muốn */}
                         {/* <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-white rounded-full p-[4px] text-xs shadow-md rotate-12">
-                            ✨
-                          </div> 
-                          */}
+    ✨
+  </div> */}
                       </div>
 
 
@@ -461,32 +460,24 @@ export default function FindStylists() {
                         {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
                       </p>
                     </div>
-                    <div className="text-sm mt-3 text-gray-300 space-y-1">
+                    <div className="text-sm mt-3 text-white/80 space-y-1">
                       <p className="text-yellow-300 font-semibold">{s.salon_name}</p>
                       <p>{s.salon_address}</p>
                       <p className="text-emerald-300">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
                     </div>
                     {/* About section nếu có */}
                     {s.description && (
-                      <div className="mt-3 text-sm text-white/80 italic px-3">
+                      <div className="mt-1 text-sm text-white/80 italic px-3">
                         {aboutExpanded[s.id] ? (
-                          <>
-                            <div className="scroll-touch" style={{
-                              maxHeight: "100px",
-                              overflowY: "auto",
-                              WebkitOverflowScrolling: "touch",
-                              touchAction: "manipulation",
-                              overscrollBehavior: "contain"
-                            }}>
-                              <p className="whitespace-pre-line">{s.description}</p>
-                            </div>
+                          <div className="max-h-[90px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 pr-1">
+                            “{s.description}”
                             <button
                               onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}
-                              className="mt-1 text-emerald-300 underline text-[11px]"
+                              className="ml-2 text-emerald-300 underline text-[11px]"
                             >
                               Show less
                             </button>
-                          </>
+                          </div>
                         ) : (
                           <>
                             “{s.description.slice(0, 140)}...”
@@ -501,10 +492,11 @@ export default function FindStylists() {
                       </div>
                     )}
 
-                    <div className="mt-4 pt-4 border-t border-white/20 rounded-xl">
+                    <div className="mt-4 pt-4 border-t border-white/20 ">
                       <button
                         onClick={() => handleBookClick(s.id)}
-                        className="mt-2 mb-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 hover:brightness-110 transition-transform duration-200"
+                        className="mt-2 mb-2 bg-gradient-to-br from-emerald-200 via-pink-600 to-yellow-600 text-white font-bold px-6 py-2 
+                        rounded-3xl shadow-lg hover:scale-105 hover:brightness-110 transition-transform duration-200"
                       >
                         📅 Book Appointment
                       </button>
@@ -513,7 +505,7 @@ export default function FindStylists() {
                   </div>
 
                   {/* Mặt sau */}
-                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border-b-4 border-t-4 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
+                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden rotate-y-180 border-b-2 border-t-2 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
                     <h3 className="text-lg font-bold text-yellow-300 mb-3">
                       ✨ Book Your Appointment
                     </h3>
@@ -537,8 +529,8 @@ export default function FindStylists() {
                                 <label
                                   key={srv.id}
                                   className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs shadow-sm transition-all ${isSelected
-                                    ? "bg-gradient-to-r from-pink-400 to-pink-500 text-white border-pink-400 shadow-lg"
-                                    : "text-pink-100 border-pink-300 hover:bg-pink-400"
+                                    ? "text-white border-pink-400 shadow-lg"
+                                    : "text-pink-100 border-pink-300 hover:bg-white/5"
                                     }`}
                                 >
                                   <div className="flex items-start gap-3">
@@ -602,7 +594,7 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                          className="w-full rounded p-1 text-yellow-500 bg-gradient-to-r from-zinc-700 to-zinc-800 text-xs pl-2"
+                          className="w-full rounded p-1 text-yellow-500 text-xs pl-2"
                         />
                       </div>
 
@@ -613,7 +605,7 @@ export default function FindStylists() {
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="w-full rounded p-1 text-yellow-500 bg-gradient-to-r from-zinc-700 to-zinc-800 text-xs pl-2"
+                            className="w-full rounded p-1 text-yellow-500 text-xs pl-2"
                           >
                             <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
@@ -644,7 +636,7 @@ export default function FindStylists() {
 
                       {/* Thông tin đặt */}
                       {form.appointment_date && selectedTime && (
-                        <div className="mt-3 px-2 py-2 rounded-lg bg-pink-600/20 border border-pink-500 text-pink-200 text-sm font-semibold text-center shadow-sm whitespace-nowrap overflow-x-auto">
+                        <div className="mt-3 px-2 py-2 rounded-lg text-pink-200 text-sm font-semibold text-center whitespace-nowrap overflow-x-auto">
                           📌 You selected:
                           <span className="ml-1 text-yellow-300 font-bold">{form.appointment_date}</span>
                           <span className="mx-1">at</span>
@@ -658,7 +650,7 @@ export default function FindStylists() {
                     <button
                       disabled={submitting}
                       onClick={() => handleSubmitBooking(s)}
-                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:to-emerald-700 text-white font-bold py-2 rounded-2xl shadow-md transition-all"
+                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:to-emerald-700 text-white font-bold py-2 rounded-3xl shadow-lg transition-all"
                     >
                       {submitting ? "⏳ Booking..." : "✅ Confirm Booking"}
                     </button>
@@ -666,7 +658,7 @@ export default function FindStylists() {
                     {/* Quay lại */}
                     <button
                       onClick={() => setFlippedId(null)}
-                      className="mt-4 bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 rounded-full px-4 shadow"
+                      className="mt-4 bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 rounded-3xl px-4 shadow-lg"
                     >
                       🔙 Go back
                     </button>
