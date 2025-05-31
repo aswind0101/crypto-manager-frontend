@@ -469,7 +469,7 @@ export default function FindStylists() {
                     {s.description && (
                       <div className="mt-3 text-sm text-white/80 italic px-3">
                         {aboutExpanded[s.id] ? (
-                          <div className="max-h-[90px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scroll-touch">
+                          <div className="max-h-[90px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scroll-about">
                             “{s.description}”
                             <button
                               onClick={() => setAboutExpanded({ ...aboutExpanded, [s.id]: false })}

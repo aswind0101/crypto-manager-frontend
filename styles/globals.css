@@ -165,5 +165,10 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+.scroll-about {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
 
 
