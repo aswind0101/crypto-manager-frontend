@@ -509,7 +509,7 @@ export default function FindStylists() {
                                   if (!el) return;
 
                                   let scrollPos = el.scrollTop;
-                                  const scrollSpeed = 0.2;
+                                  const scrollSpeed = 0.13;
 
                                   const step = () => {
                                     scrollPos += scrollSpeed;
