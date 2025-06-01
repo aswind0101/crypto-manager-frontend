@@ -581,7 +581,7 @@ export default function FindStylists() {
                     </div>
                     {/* About section nếu có */}
                     {s.description && (
-                      <div className="mt-1 text-sm text-pink-300 italic px-3">
+                      <div className="mt-1 text-xs text-pink-300 italic px-3">
                         {aboutExpanded[s.id] ? (
                           <>
                             <div
@@ -652,7 +652,7 @@ export default function FindStylists() {
                     )}
                     <button
                       onClick={() => handleBookClick(s.id)}
-                      className="bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
+                      className="mt-2 bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
                           rounded-2xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
                           flex items-center justify-center gap-2"
                     >
