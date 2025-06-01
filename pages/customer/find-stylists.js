@@ -756,13 +756,12 @@ export default function FindStylists() {
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
                           className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
-  px-3 py-2 border border-white/20 
+  px-3 h-[22px] border border-white/20 
   focus:outline-none focus:ring-2 focus:ring-pink-300 
   transition-all appearance-none box-border"
 
                         />
                       </div>
-
                       {/* Step 3: Choose Time */}
                       <div className="mt-4">
                         <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
@@ -773,7 +772,7 @@ export default function FindStylists() {
                           <select
                             disabled
                             className="block w-full bg-white/10 rounded-xl text-yellow-400 text-xs 
-                          px-3 py-[9px] border border-white/10 cursor-not-allowed"
+                          px-3 h-[22px] border border-white/10 appearance-none cursor-not-allowed"
                           >
                             <option>Select a date first</option>
                           </select>
@@ -782,9 +781,9 @@ export default function FindStylists() {
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
                             className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
-             px-3 py-[8px] border border-white/20 
-             focus:outline-none focus:ring-2 focus:ring-pink-300 
-             transition-all box-border"
+  px-3 h-[22px] border border-white/20 
+  focus:outline-none focus:ring-2 focus:ring-pink-300 
+  transition-all appearance-none box-border"
                           >
                             <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
