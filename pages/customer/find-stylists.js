@@ -755,7 +755,8 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                          className="w-full bg-white/5 rounded p-1 pl-3 mt-1 text-yellow-500 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300"
+                           className="w-full bg-white/5 rounded-xl p-2 pl-3 text-yellow-500 text-xs 
+             focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
 
                         />
                       </div>
@@ -769,7 +770,7 @@ export default function FindStylists() {
                         {!form.appointment_date ? (
                           <select
                             disabled
-                            className="w-full rounded p-1 text-yellow-500 text-xs pl-2 bg-white/10 cursor-not-allowed"
+                            className="w-full rounded p-2 text-yellow-500 text-xs pl-2 bg-white/10 rounded-xl cursor-not-allowed"
                           >
                             <option>Select a date first</option>
                           </select>
@@ -777,7 +778,11 @@ export default function FindStylists() {
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="w-full rounded p-1 text-yellow-500 text-xs pl-2 focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white/5 transition"
+                            className="w-full bg-white/5 rounded-xl p-2 text-yellow-500 text-xs 
+           border border-white/20 
+           focus:outline-none focus:ring-2 focus:ring-pink-300 
+           transition duration-200"
+
                           >
                             <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
