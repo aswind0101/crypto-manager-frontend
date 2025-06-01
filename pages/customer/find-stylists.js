@@ -501,16 +501,16 @@ export default function FindStylists() {
                   {/* Mặt trước */}
                   <div className="absolute w-full min-h-[620px] max-h-[620px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
-                    <div className="absolute top-3 right-3 flex gap-[1px]">
+                    <div className="absolute top-4 right-4 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
                         <svg key={i} viewBox="0 0 20 20" fill={i < Math.round(s.rating) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
                         </svg>
                       ))}
                     </div>
-                    <div className="flex flex-col items-center gap-1 mt-2 mb-2">
+                    <div className="flex flex-col items-center gap-1 mt-1 mb-1">
                       {/* Avatar */}
-                      <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full p-[3px] bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 shadow-xl">
+                      <div className="relative w-32 h-32 sm:w-32 sm:h-32 rounded-full p-[3px] bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 shadow-xl">
                         <img
                           src={s.avatar_url}
                           alt={s.name}
@@ -531,17 +531,11 @@ export default function FindStylists() {
                         <div className="absolute top-43 -right-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
                           🌟
                         </div>
-                        <div className="absolute top-110 -left-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
-                          🌸
-                        </div>
-                        <div className="absolute top-124 -right-24 text-white rounded-full p-[4px] text-3xl  rotate-12">
-                          ✨
-                        </div>
                       </div>
 
 
                       {/* Info */}
-                      <h2 className="text-xl font-semibold text-pink-400 mt-2 mb-1 flex items-center justify-center gap-2">
+                      <h2 className="text-xl font-semibold text-pink-500 mt-2 mb-1 flex items-center justify-center gap-2">
                         {s.name}
                         {s.gender === "Female" && (
                           <FaFemale title="Female" className="text-pink-400 text-lg" />
@@ -554,23 +548,45 @@ export default function FindStylists() {
                         )}
                       </h2>
 
-                      <p className="text-xs bg-pink-600/40 text-white px-3 py-[2px] rounded-full inline-block">
+                      <p className="text-xs bg-white/10 text-pink-300 px-3 py-[2px] rounded-full inline-block">
                         {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
                       </p>
+                      {/* Danh sách dịch vụ hiển thị ngắn gọn */}
+                      {Array.isArray(s.services) && s.services.length > 0 && (
+                        <div className="mt-2 w-full">
+                          <p className="text-[13px] font-semibold text-emerald-300 mb-1 text-left pl-2">✨ Services:</p>
+                          <div className="max-h-[92px] overflow-y-auto px-1 py-1 bg-white/5 rounded-md text-[11px] text-pink-100 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-transparent grid grid-cols-2 gap-2">
+                            {s.services.slice(0, 6).map((srv) => (
+                              <div
+                                key={srv.id}
+                                className="bg-white/5 rounded-lg px-2 py-[3px] flex flex-col justify-between h-full"
+                              >
+                                <span className="truncate block capitalize">💅 {srv.name}</span>
+                              </div>
+                            ))}
+                            {s.services.length > 6 && (
+                              <div className="col-span-2 text-right text-[10px] italic text-yellow-200 mt-1 pr-1">
+                                +{s.services.length - 6} more
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                     </div>
-                    <div className="text-sm mt-3 text-white/80 space-y-1">
+                    <div className="text-sm text-white/80 space-y-1">
                       <p className="text-yellow-300 font-semibold">{s.salon_name}</p>
                       <p>{s.salon_address}</p>
                       <p className="text-emerald-300">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
                     </div>
                     {/* About section nếu có */}
                     {s.description && (
-                      <div className="mt-3 text-sm text-white/80 italic px-3">
+                      <div className="mt-1 text-sm text-pink-300 italic px-3">
                         {aboutExpanded[s.id] ? (
                           <>
                             <div
                               id={`about-scroll-${s.id}`}
-                              className="max-h-[100px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scrollbar-hide"
+                              className="max-h-[50px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scrollbar-hide"
                               style={{
                                 WebkitOverflowScrolling: "touch",
                                 touchAction: "manipulation",
@@ -634,32 +650,28 @@ export default function FindStylists() {
                       </div>
 
                     )}
-                    <div className="mt-4 pt-4 border-t border-white/20">
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => handleBookClick(s.id)}
-                          className="mt-2 mb-2 bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
-      rounded-3xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
-      flex items-center justify-center gap-2"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="w-5 h-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                          Book Appointment
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      onClick={() => handleBookClick(s.id)}
+                      className="bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
+                          rounded-2xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
+                          flex items-center justify-center gap-2"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      Book Appointment
+                    </button>
 
                   </div>
 
@@ -689,9 +701,9 @@ export default function FindStylists() {
                               return (
                                 <label
                                   key={srv.id}
-                                  className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs transition-all ${isSelected
-                                    ? "text-white border-pink-400"
-                                    : "text-pink-100 border-pink-300 hover:bg-white/5"
+                                  className={`flex items-center justify-between px-4 py-1 rounded-sm border-b cursor-pointer text-xs transition-all ${isSelected
+                                    ? "text-white border-pink-300"
+                                    : "text-pink-100 border-pink-400 hover:bg-white/5"
                                     }`}
                                 >
                                   <div className="flex items-start gap-3">
