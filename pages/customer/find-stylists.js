@@ -755,9 +755,10 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                           className="w-full bg-white/10 rounded-xl text-yellow-400 text-xs px-3 py-[9px] 
-             focus:outline-none focus:ring-2 focus:ring-pink-300 transition-all"
-
+                          className="w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
+             px-3 py-2 border border-white/20 
+             focus:outline-none focus:ring-2 focus:ring-pink-300 
+             transition duration-200"
                         />
                       </div>
 
@@ -770,7 +771,8 @@ export default function FindStylists() {
                         {!form.appointment_date ? (
                           <select
                             disabled
-                            className="w-full rounded p-2 text-yellow-500 text-xs pl-2 bg-white/10 rounded-xl cursor-not-allowed"
+                            className="w-full bg-white/10 rounded-xl text-yellow-400 text-xs 
+             px-3 py-2 border border-white/10 cursor-not-allowed"
                           >
                             <option>Select a date first</option>
                           </select>
@@ -778,10 +780,10 @@ export default function FindStylists() {
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="w-full bg-white/5 rounded-xl p-2 text-yellow-500 text-xs 
-           border border-white/20 
-           focus:outline-none focus:ring-2 focus:ring-pink-300 
-           transition duration-200"
+                            className="w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
+             px-3 py-2 border border-white/20 
+             focus:outline-none focus:ring-2 focus:ring-pink-300 
+             transition duration-200"
 
                           >
                             <option value="">Select time...</option>
