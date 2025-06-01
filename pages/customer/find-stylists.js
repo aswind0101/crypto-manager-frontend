@@ -755,10 +755,10 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                          className="w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
-             px-3 py-2 border border-white/20 
+                          className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
+             px-3 py-[9px] border border-white/20 
              focus:outline-none focus:ring-2 focus:ring-pink-300 
-             transition duration-200"
+             transition-all appearance-none box-border"
                         />
                       </div>
 
@@ -772,7 +772,7 @@ export default function FindStylists() {
                           <select
                             disabled
                             className="w-full bg-white/10 rounded-xl text-yellow-400 text-xs 
-             px-3 py-2 border border-white/10 cursor-not-allowed"
+                          px-3 py-2 border border-white/10 cursor-not-allowed"
                           >
                             <option>Select a date first</option>
                           </select>
@@ -780,11 +780,10 @@ export default function FindStylists() {
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
-             px-3 py-2 border border-white/20 
+                             className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
+             px-3 py-[9px] border border-white/20 
              focus:outline-none focus:ring-2 focus:ring-pink-300 
-             transition duration-200"
-
+             transition-all box-border"
                           >
                             <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
