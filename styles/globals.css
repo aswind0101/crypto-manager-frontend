@@ -178,5 +178,8 @@ body {
 .reveal-anim {
   animation: revealScroll 0.4s ease-out;
 }
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
 
 

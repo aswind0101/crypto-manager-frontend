@@ -755,8 +755,8 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                           className="w-full bg-white/5 rounded-xl p-2 pl-3 text-yellow-500 text-xs 
-             focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
+                           className="w-full bg-white/10 rounded-xl text-yellow-400 text-xs px-3 py-[9px] 
+             focus:outline-none focus:ring-2 focus:ring-pink-300 transition-all"
 
                         />
                       </div>
