@@ -771,8 +771,8 @@ export default function FindStylists() {
                         {!form.appointment_date ? (
                           <select
                             disabled
-                            className="w-full bg-white/10 rounded-xl text-yellow-400 text-xs 
-                          px-3 py-2 border border-white/10 cursor-not-allowed"
+                            className="block w-full bg-white/10 rounded-xl text-yellow-400 text-xs 
+                          px-3 py-[9px] border border-white/10 cursor-not-allowed"
                           >
                             <option>Select a date first</option>
                           </select>
