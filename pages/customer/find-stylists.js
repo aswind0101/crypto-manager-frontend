@@ -690,7 +690,7 @@ export default function FindStylists() {
                                 <label
                                   key={srv.id}
                                   className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs transition-all ${isSelected
-                                    ? "text-white border-pink-400 shadow-lg"
+                                    ? "text-white border-pink-400"
                                     : "text-pink-100 border-pink-300 hover:bg-white/5"
                                     }`}
                                 >
@@ -756,7 +756,7 @@ export default function FindStylists() {
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
                           className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400
-  px-3 h-[26px] border border-white/20 
+  px-3 h-[28px] border border-white/20 
   focus:outline-none focus:ring-2 focus:ring-pink-300 
   transition-all appearance-none box-border"
 
@@ -772,7 +772,7 @@ export default function FindStylists() {
                           <select
                             disabled
                             className="block w-full bg-white/10 rounded-xl text-yellow-400 
-                          px-3 h-[26px] border border-white/10 appearance-none cursor-not-allowed"
+                          px-3 h-[28px] border border-white/10 appearance-none cursor-not-allowed"
                           >
                             <option>Select a date first</option>
                           </select>
@@ -781,7 +781,7 @@ export default function FindStylists() {
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
                             className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400 
-  px-3 h-[26px] border border-white/20 
+  px-3 h-[28px] border border-white/20 
   focus:outline-none focus:ring-2 focus:ring-pink-300 
   transition-all appearance-none box-border"
                           >
