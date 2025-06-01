@@ -16,6 +16,8 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
+import { Eye, EyeOff } from "lucide-react";
+
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -45,6 +47,9 @@ export default function FreelancerDashboard() {
   };
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
+  const [showServiceDetails, setShowServiceDetails] = useState(false);
+
+  // 🟢 State để lưu trạng thái cập nhật dịch vụ
   const [updatingServices, setUpdatingServices] = useState(false);
   const [savingStatus, setSavingStatus] = useState(""); // "" | "saving" | "saved"
   const hasMounted = useRef(false);
@@ -451,7 +456,7 @@ export default function FreelancerDashboard() {
   console.log("onboarding", onboarding);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-pink-300 to-yellow-200 dark:from-emerald-900 dark:via-pink-800 dark:to-yellow-700 text-gray-800 dark:text-white px-4 py-6">
+    <div className="min-h-screen text-gray-800 dark:text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       {showPopup && pendingUpcomingAppointment && (
@@ -546,7 +551,6 @@ export default function FreelancerDashboard() {
           </button>
         </div>
       )}
-
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
         {/* Welcome Block */}
         <div className="col-span-12 md:col-span-6 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
@@ -559,36 +563,63 @@ export default function FreelancerDashboard() {
         <Card className="col-span-12 md:col-span-6" icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
         {/* Your Available Services */}
         <div className="col-span-12 bg-white/30 dark:bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-5 shadow-lg">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-xl font-bold text-yellow-300">💈 Your Available Services</h3>
-            {savingStatus === "saving" && <span className="text-sm text-pink-200 animate-pulse">Saving...</span>}
-            {savingStatus === "saved" && <span className="text-sm text-emerald-300">✔️ Saved</span>}
-            {savingStatus === "error" && <span className="text-sm text-red-400">❌ Error</span>}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-            {availableServices.map((srv) => {
-              const checked = selectedServiceIds.includes(srv.id);
-              return (
-                <label key={srv.id} className="flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => {
-                      const newIds = checked
-                        ? selectedServiceIds.filter((id) => id !== srv.id)
-                        : [...selectedServiceIds, srv.id];
-                      setSelectedServiceIds(newIds);
-                    }}
-                  />
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-pink-300">{srv.name}</span>
-                    <span className="text-xs text-emerald-300">${srv.price} – {srv.duration_minutes} min</span>
-                  </div>
-                </label>
-              );
-            })}
+            <button
+              className="text-pink-300 hover:text-pink-200 transition"
+              onClick={() => setShowServiceDetails((prev) => !prev)}
+              title={showServiceDetails ? "Hide details" : "View selected services"}
+            >
+              {showServiceDetails ? (
+                <EyeOff className="w-5 h-5" />
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Eye className="w-5 h-5" />
+                  <span className="text-xs text-yellow-300 font-semibold">
+                    {selectedServiceIds.length}
+                  </span>
+                </div>
+              )}
+            </button>
+
           </div>
 
+          {!showServiceDetails ? (
+            <p className="text-sm text-white/80">
+              You have selected <span className="font-semibold text-emerald-300">{selectedServiceIds.length}</span> service{selectedServiceIds.length !== 1 ? "s" : ""}.
+            </p>
+          ) : (
+            <>
+              {availableServices.length === 0 ? (
+                <p className="text-sm text-red-300 italic">No services found for your specialization.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  {availableServices.map((srv) => {
+                    const checked = selectedServiceIds.includes(srv.id);
+                    return (
+                      <label key={srv.id} className="flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const newIds = checked
+                              ? selectedServiceIds.filter((id) => id !== srv.id)
+                              : [...selectedServiceIds, srv.id];
+                            setSelectedServiceIds(newIds);
+                          }}
+                          className="accent-pink-500 mt-1"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-pink-300">{srv.name}</span>
+                          <span className="text-xs text-emerald-300">${srv.price} – {srv.duration_minutes} min</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Earnings */}
@@ -641,7 +672,7 @@ export default function FreelancerDashboard() {
         <div className="col-span-12">
           <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <ActionButton label="📅 My Schedule" />
+            <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
             <ActionButton label="🧾 Appointments" />
             <ActionButton label="💬 Chat with Client" />
             <ActionButton label="💸 Withdraw" />
@@ -654,19 +685,22 @@ export default function FreelancerDashboard() {
 }
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className={`relative ${className} bg-white/30 dark:bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-md flex flex-col gap-2`}>
+    <div className={`relative ${className} bg-white/10 dark:bg-white/5 backdrop-blur-lg border border-white/20 rounded-2xl p-5 shadow-xl transition-all`}>
+      <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
+      <h4 className="text-lg font-bold text-pink-300">{title}</h4>
+      <div className="text-2xl font-extrabold text-white">{value}</div>
+      <p className="text-sm text-white/80">{sub}</p>
       {children}
-      <div className="text-2xl text-emerald-500">{icon}</div>
-      <h4 className="text-lg font-semibold">{title}</h4>
-      <div className="text-2xl font-bold">{value}</div>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{sub}</p>
     </div>
   );
 }
 
-function ActionButton({ label }) {
+function ActionButton({ label, onClick }) {
   return (
-    <button className="w-full py-3 rounded-2xl bg-gradient-to-r from-pink-400 via-amber-300 to-emerald-400 dark:from-pink-600 dark:via-yellow-500 dark:to-emerald-500 text-white font-semibold shadow-md hover:scale-105 transition">
+    <button
+      onClick={onClick}
+      className="w-full py-3 rounded-2xl bg-gradient-to-r from-pink-400 via-amber-300 to-emerald-400 dark:from-pink-600 dark:via-yellow-500 dark:to-emerald-500 text-white font-semibold shadow-md hover:scale-105 transition"
+    >
       {label}
     </button>
   );
