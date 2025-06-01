@@ -53,7 +53,7 @@ function FreelancerAppointmentsPage() {
                 apptTime.format("YYYY-MM-DD HH:mm").includes(searchTerm);
 
             const isFuture = apptTime.isSameOrAfter(now);
-            const matchesFilter = filter === "all" || (filter === "upcoming" && isFuture && a.status === "pending");
+            const matchesFilter = filter === "all" || (filter === "upcoming" && isFuture && (a.status === "pending" || a.status === "confirmed"));
 
             return matchesSearch && matchesFilter;
         });
@@ -128,7 +128,7 @@ function FreelancerAppointmentsPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
                     <input
                         type="text"
-                        placeholder="Search by name or date..."
+                        placeholder="🔍 Search by customer name or date"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="px-4 py-2 rounded-full bg-white/20 border border-white/30 text-white placeholder-gray-300 w-full sm:w-1/2"
@@ -184,25 +184,26 @@ function FreelancerAppointmentsPage() {
                                 </p>
 
                                 {/* ✅ Nút Confirm & Cancel giãn cách đều nhau */}
-                                {(a.status === "pending" || a.status === "confirmed") && (
-                                    <div className="mt-3 flex flex-wrap gap-3 justify-center sm:justify-start">
-                                        {a.status === "pending" && (
-                                            <button
-                                                onClick={() => handleConfirm(a.id)}
-                                                className="text-sm bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded-full min-w-[100px]"
-                                            >
-                                                ✅ Confirm
-                                            </button>
-                                        )}
+                                {(a.status === "pending" || a.status === "confirmed") &&
+                                    dayjs(a.appointment_date.replace("Z", "")).isSameOrAfter(dayjs()) && (
+                                        <div className="mt-3 flex flex-wrap gap-3 justify-center sm:justify-start">
+                                            {a.status === "pending" && (
+                                                <button
+                                                    onClick={() => handleConfirm(a.id)}
+                                                    className="text-sm bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded-full min-w-[100px]"
+                                                >
+                                                    ✅ Confirm
+                                                </button>
+                                            )}
 
-                                        <button
-                                            onClick={() => handleCancel(a.id)}
-                                            className="text-sm bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full min-w-[100px]"
-                                        >
-                                            ❌ Cancel
-                                        </button>
-                                    </div>
-                                )}
+                                            <button
+                                                onClick={() => handleCancel(a.id)}
+                                                className="text-sm bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full min-w-[100px]"
+                                            >
+                                                ❌ Cancel
+                                            </button>
+                                        </div>
+                                    )}
                             </div>
                         ))}
                     </div>

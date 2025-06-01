@@ -275,32 +275,33 @@ function CustomerAppointmentsPage() {
                                 )}
 
                                 {/* Nút huỷ nếu điều kiện đúng */}
-                                {!["cancelled", "completed"].includes(appt.status) && (
-                                    <button
-                                        onClick={async () => {
-                                            if (!confirm("Are you sure you want to cancel this appointment?")) return;
-                                            const token = await user.getIdToken();
-                                            const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`, {
-                                                method: "DELETE",
-                                                headers: { Authorization: `Bearer ${token}` },
-                                            });
-                                            const data = await res.json();
-                                            if (res.ok) {
-                                                alert("✅ Appointment cancelled.");
-                                                setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
-                                            } else {
-                                                alert("❌ " + (data.error || "Failed to cancel."));
-                                            }
-                                        }}
-                                        className="absolute bottom-2 left-2 
-             hover:bg-red-500/20 
-             text-red-400 hover:text-white 
-             text-[9px] px-4 py-[4px] 
-             rounded-3xl transition-all duration-200 flex items-center gap-1"
-                                    >
-                                        ❌ Click here to cancel 
-                                    </button>
-                                )}
+                                {["pending", "confirmed"].includes(appt.status) &&
+                                    dayjs(appt.appointment_date.replace("Z", "")).isAfter(dayjs()) && (
+                                        <button
+                                            onClick={async () => {
+                                                if (!confirm("Are you sure you want to cancel this appointment?")) return;
+                                                const token = await user.getIdToken();
+                                                const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`, {
+                                                    method: "DELETE",
+                                                    headers: { Authorization: `Bearer ${token}` },
+                                                });
+                                                const data = await res.json();
+                                                if (res.ok) {
+                                                    alert("✅ Appointment cancelled.");
+                                                    setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
+                                                } else {
+                                                    alert("❌ " + (data.error || "Failed to cancel."));
+                                                }
+                                            }}
+                                            className="absolute bottom-2 left-2 
+                                            hover:bg-red-500/20 
+                                            text-red-400 hover:text-white 
+                                            text-[9px] px-4 py-[4px] 
+                                            rounded-3xl transition-all duration-200 flex items-center gap-1"
+                                        >
+                                            ❌ Click here to cancel
+                                        </button>
+                                    )}
 
                             </div>
                         ))}
