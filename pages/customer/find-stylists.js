@@ -756,9 +756,10 @@ export default function FindStylists() {
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
                           className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
-             px-3 py-[8px] border border-white/20 
-             focus:outline-none focus:ring-2 focus:ring-pink-300 
-             transition-all appearance-none box-border"
+  px-3 py-2 border border-white/20 
+  focus:outline-none focus:ring-2 focus:ring-pink-300 
+  transition-all appearance-none box-border"
+
                         />
                       </div>
 
@@ -780,7 +781,7 @@ export default function FindStylists() {
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                             className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
+                            className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400 text-xs 
              px-3 py-[8px] border border-white/20 
              focus:outline-none focus:ring-2 focus:ring-pink-300 
              transition-all box-border"
