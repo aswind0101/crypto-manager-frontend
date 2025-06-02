@@ -155,7 +155,9 @@ export default function SchedulePage() {
                 <div className="text-right mb-4">
                     <button
                         onClick={saveAll}
-                        className="bg-green-500 hover:bg-green-600 text-white font-bold px-4 py-2 rounded-lg shadow"
+                        className="bg-gradient-to-r from-green-400 to-emerald-500 hover:from-emerald-500 hover:to-green-400 
+text-white font-semibold px-4 py-1 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
+
                     >
                         💾 Save All
                     </button>
