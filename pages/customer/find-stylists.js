@@ -26,6 +26,8 @@ export default function FindStylists() {
 
   const [timeSlots, setTimeSlots] = useState([]);
   const [selectedTime, setSelectedTime] = useState(""); // HH:mm
+  const [stylistSchedule, setStylistSchedule] = useState({});
+
 
 
   const [form, setForm] = useState({
@@ -104,7 +106,7 @@ export default function FindStylists() {
       setLoading(false);
     };
 
-    fetchStylists();
+    fetchSchedule(); // gọi ngay khi có vị trí người dùng
     const interval = setInterval(fetchStylists, 10000); // gọi lại mỗi 10s
 
     return () => clearInterval(interval); // dọn dẹp khi unmount
@@ -129,6 +131,7 @@ export default function FindStylists() {
       localStorage.setItem("from_booking", "true");
       router.push("/login");
     } else {
+      fetchSchedule(stylistId);
       setFlippedId(stylistId);
     }
   };
@@ -221,12 +224,34 @@ export default function FindStylists() {
       duration_minutes: totalDuration,
     }));
 
-    // ✅ Gọi trực tiếp với giá trị mới — KHÔNG dùng form.duration_minutes
+    // ✅ Nếu đã chọn ngày → kiểm tra xem stylist có làm hôm đó không
     if (form.appointment_date) {
-      fetchAvailabilityWithDuration(stylist.id, form.appointment_date, totalDuration);
+      const schedule = stylistSchedule[stylist.id] || [];
+      const weekday = dayjs(form.appointment_date).day();
+      const workDay = schedule.find((s) => s.weekday === weekday);
+
+      if (workDay) {
+        fetchAvailabilityWithDuration(
+          stylist.id,
+          form.appointment_date,
+          totalDuration,
+          workDay.start_time,
+          workDay.end_time
+        );
+      } else {
+        console.warn("❌ Stylist does not work on this date");
+        setTimeSlots([]);
+      }
     }
   };
-  const fetchAvailabilityWithDuration = async (stylist_id, dateStr, duration) => {
+
+  const fetchAvailabilityWithDuration = async (
+    stylist_id,
+    dateStr,
+    duration,
+    workStart = "09:00",
+    workEnd = "23:30"
+  ) => {
     try {
       const res = await fetch(
         `https://crypto-manager-backend.onrender.com/api/appointments/availability?stylist_id=${stylist_id}&date=${dateStr}`
@@ -236,8 +261,9 @@ export default function FindStylists() {
       if (res.ok) {
         console.log("🧾 Appointments:", data);
         console.log("⏱️ Realtime duration passed in:", duration);
+        console.log("🕰️ Work range:", workStart, "→", workEnd);
 
-        const slots = getAvailableTimeSlots(data, dateStr, 30, "09:00", "23:30", duration);
+        const slots = getAvailableTimeSlots(data, dateStr, 30, workStart, workEnd, duration);
         setTimeSlots(slots);
       } else {
         console.warn("⚠️ Failed to fetch availability:", data.error);
@@ -246,6 +272,18 @@ export default function FindStylists() {
     } catch (err) {
       console.error("❌ Error fetching availability:", err.message);
       setTimeSlots([]);
+    }
+  };
+
+  const fetchSchedule = async (stylistId) => {
+    try {
+      const res = await fetch(`https://crypto-manager-backend.onrender.com/api/public/freelancer-schedule?freelancer_id=${stylistId}`);
+      const data = await res.json();
+      if (res.ok) {
+        setStylistSchedule((prev) => ({ ...prev, [stylistId]: data }));
+      }
+    } catch (err) {
+      console.error("❌ Error fetching schedule:", err);
     }
   };
 
@@ -283,15 +321,18 @@ export default function FindStylists() {
     appointments,
     dateStr,
     interval = 30,
-    workStart = "09:00",
-    workEnd = "23:59",
+    workStart,
+    workEnd,
     totalDuration = 30
   ) {
     console.log("📦 getAvailableTimeSlots called");
     console.log("🧾 Appointments:", appointments);
     console.log("⏱️ Total Duration:", totalDuration);
 
-    const slots = [];
+    if (!workStart || !workEnd) {
+      console.error("❌ Missing workStart or workEnd!");
+      return [];
+    }
 
     const toMinutes = (time) => {
       const [h, m] = time.split(":").map(Number);
@@ -307,13 +348,14 @@ export default function FindStylists() {
     const workStartMin = toMinutes(workStart);
     const workEndMin = toMinutes(workEnd);
 
-    // ✅ Nếu là hôm nay, bỏ qua khung giờ đã qua (theo giờ California)
     const now = dayjs().tz("America/Los_Angeles");
     const isToday = now.format("YYYY-MM-DD") === dateStr;
     const currentMinutes = now.hour() * 60 + now.minute();
 
+    const slots = [];
+
     for (let m = workStartMin; m + totalDuration <= workEndMin; m += interval) {
-      if (isToday && m < currentMinutes) continue; // ❌ Bỏ qua giờ đã trôi qua hôm nay
+      if (isToday && m < currentMinutes) continue;
       slots.push({
         time: formatTime(m),
         startMin: m,
@@ -331,22 +373,16 @@ export default function FindStylists() {
 
         const [hourStr, minStr] = timePart.split(":");
         const start = parseInt(hourStr, 10) * 60 + parseInt(minStr, 10);
-        const duration = parseInt(appt.duration_minutes, 10);
-        const end = start + duration;
-
+        const end = start + parseInt(appt.duration_minutes, 10);
         return { start, end };
       })
       .filter(Boolean);
-
-    console.log("📌 Booked Ranges:", bookedRanges);
 
     const filtered = slots.filter((slot) => {
       const hasConflict = bookedRanges.some((br) => {
         const conflict = !(slot.endMin <= br.start || slot.startMin >= br.end);
         if (conflict) {
-          console.log(
-            `❌ Blocked slot ${slot.time} (${slot.startMin}–${slot.endMin}) because overlaps with booking ${br.start}–${br.end}`
-          );
+          console.log(`❌ Blocked slot ${slot.time} (${slot.startMin}–${slot.endMin}) due to booking ${br.start}–${br.end}`);
         }
         return conflict;
       });
@@ -358,6 +394,7 @@ export default function FindStylists() {
 
     return filtered;
   }
+
 
   const filteredStylists = stylists
     .filter((s) => {
@@ -723,18 +760,46 @@ export default function FindStylists() {
                                           0
                                         );
 
+                                        // ✅ Nếu KHÔNG chọn dịch vụ nào → reset ngày + giờ + slot
+                                        if (selected.length === 0) {
+                                          setForm((prev) => ({
+                                            ...prev,
+                                            service_ids: [],
+                                            duration_minutes: 0,
+                                            appointment_date: "",
+                                          }));
+                                          setSelectedTime("");
+                                          setTimeSlots([]);
+                                          return;
+                                        }
+
+                                        // ✅ Nếu vẫn còn dịch vụ được chọn → cập nhật như thường
                                         setForm({
                                           ...form,
                                           service_ids: selected,
                                           duration_minutes: totalDuration,
                                         });
 
+                                        // ✅ Nếu đã chọn ngày → gọi lại availability với giờ làm
                                         if (form.appointment_date) {
-                                          fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration);
+                                          const schedule = stylistSchedule[s.id] || [];
+                                          const weekday = dayjs(form.appointment_date).day();
+                                          const workDay = schedule.find((s) => s.weekday === weekday);
+
+                                          if (workDay) {
+                                            fetchAvailabilityWithDuration(
+                                              s.id,
+                                              form.appointment_date,
+                                              totalDuration,
+                                              workDay.start_time,
+                                              workDay.end_time
+                                            );
+                                          }
                                         }
                                       }}
                                       className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
                                     />
+
                                     <div className="text-left">
                                       <span className="block capitalize">{srv.name}</span>
                                       <span className="block text-xs text-yellow-500">${srv.price}</span>
@@ -754,25 +819,54 @@ export default function FindStylists() {
                           </p>
                         )}
                       </div>
+                      {form.service_ids.length === 0 && (
+                        <p className="text-sm text-red-400 mt-1">⚠️ Please select at least one service to choose a date</p>
+                      )}
 
                       {/* Step 2: Chọn ngày */}
                       <div>
                         <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400 ">Step 2: Pick a Date</p>
                         <input
                           type="date"
+                          disabled={form.service_ids.length === 0}
                           value={form.appointment_date}
                           onChange={(e) => {
                             const dateOnly = e.target.value;
-                            setForm({ ...form, appointment_date: dateOnly });
+                            setForm((prev) => ({ ...prev, appointment_date: dateOnly }));
                             setSelectedTime("");
-                            if (dateOnly) fetchAvailability(s.id, dateOnly);
+
+                            const selectedServices = s.services.filter((srv) =>
+                              form.service_ids.includes(srv.id)
+                            );
+                            const totalDuration = selectedServices.reduce(
+                              (sum, srv) => sum + (srv.duration_minutes || 30),
+                              0
+                            );
+
+                            const schedule = stylistSchedule[s.id] || [];
+                            const weekday = dayjs(dateOnly).day();
+                            const workDay = schedule.find((s) => s.weekday === weekday);
+
+                            if (workDay && form.service_ids.length > 0) {
+                              fetchAvailabilityWithDuration(
+                                s.id,
+                                dateOnly,
+                                totalDuration,
+                                workDay.start_time,
+                                workDay.end_time
+                              );
+                            } else {
+                              console.warn("❌ Invalid date or no schedule");
+                              setTimeSlots([]);
+                            }
                           }}
                           className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400
-  px-3 py-1 h-[28px] leading-tight appearance-none border border-white/20 
-  focus:outline-none focus:ring-2 focus:ring-pink-300 
-  transition-all appearance-none box-border"
-
+                            px-3 py-1 h-[28px] leading-tight appearance-none border border-white/20 
+                            focus:outline-none focus:ring-2 focus:ring-pink-300 
+                            transition-all appearance-none box-border disabled:cursor-not-allowed"
                         />
+
+
                       </div>
                       {/* Step 3: Choose Time */}
                       <div className="mt-4">

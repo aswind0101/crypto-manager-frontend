@@ -3,6 +3,7 @@ import Navbar from "../../components/Navbar";
 import { getDistanceInKm } from "../../components/utils/distance"; // bạn sẽ tạo helper này ở bước sau.
 import { useRouter } from "next/router";
 import Head from "next/head";
+import { FaMale, FaFemale, FaGenderless } from "react-icons/fa";
 import { getAuth } from "firebase/auth";
 const auth = getAuth(); // hoặc lấy từ firebase.js nếu đã export sẵn
 import dayjs from "dayjs";
@@ -21,10 +22,12 @@ export default function FindStylists() {
   const [hasAskedLocation, setHasAskedLocation] = useState(false);
   const [user, setUser] = useState(null);
   const router = useRouter();
-
+  const [aboutExpanded, setAboutExpanded] = useState({});
 
   const [timeSlots, setTimeSlots] = useState([]);
   const [selectedTime, setSelectedTime] = useState(""); // HH:mm
+  const [scheduleMap, setScheduleMap] = useState({});
+  // Form đặt lịch
 
 
   const [form, setForm] = useState({
@@ -32,6 +35,14 @@ export default function FindStylists() {
     appointment_date: "",
     duration_minutes: "",
     note: "",
+  });
+  const [filter, setFilter] = useState({
+    specialization: "",
+    gender: "",
+    rating: "",
+    price: "",
+    duration: "",
+    distance: "", // mới thêm
   });
 
   const [availableServices, setAvailableServices] = useState([]);
@@ -350,9 +361,41 @@ export default function FindStylists() {
     return filtered;
   }
 
+  const filteredStylists = stylists
+    .filter((s) => {
+      if (filter.specialization && !s.specialization.includes(filter.specialization)) return false;
+      if (filter.gender && s.gender !== filter.gender) return false;
+      if (filter.rating && parseFloat(s.rating || 0) < parseFloat(filter.rating)) return false;
+
+      if (filter.price) {
+        const hasMatchingService = s.services?.some((srv) => {
+          const price = srv.price;
+          if (filter.price === "lt40") return price < 40;
+          if (filter.price === "40-60") return price >= 40 && price <= 60;
+          if (filter.price === "gt60") return price > 60;
+          return false;
+        });
+
+        if (!hasMatchingService) return false;
+      }
+
+      const avgDuration = s.services?.reduce((acc, srv) => acc + srv.duration_minutes, 0) / (s.services?.length || 1);
+      if (filter.duration === "lt30" && avgDuration >= 30) return false;
+      if (filter.duration === "30-60" && (avgDuration < 30 || avgDuration > 60)) return false;
+      if (filter.duration === "gt60" && avgDuration <= 60) return false;
+
+      if (filter.distance) {
+        const distanceInMiles = s.distance * 0.621371; // km -> mi
+        if (distanceInMiles > parseFloat(filter.distance)) return false;
+      }
+
+
+      return true;
+    })
+    .sort((a, b) => a.distance - b.distance); // sắp xếp stylist gần nhất lên đầu
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-pink-800 to-yellow-800 text-white font-mono sm:font-['Pacifico', cursive]">
+    <div className="min-h-screen text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
         <link
           href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
@@ -361,8 +404,8 @@ export default function FindStylists() {
       </Head>
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-emerald-300 font-mono sm:font-['Pacifico', cursive]">
-          ✨ Available Stylists Near You
+        <h1 className="text-xl sm:text-4xl font-bold text-center mb-8 text-emerald-300 font-mono sm:font-['Pacifico', cursive]">
+          ✨ Find Stylists Near You
         </h1>
 
         {geoError && (
@@ -385,125 +428,326 @@ export default function FindStylists() {
             </p>
           </div>
         )}
+        <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-sm text-yellow-500">
 
+          <select
+            className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, specialization: e.target.value })}
+          >
+            <option value="">All Specializations</option>
+            <option value="nail_tech">Nail Technician</option>
+            <option value="hair_stylist">Hair Stylist</option>
+            <option value="barber">Barber</option>
+            <option value="esthetician">Esthetician</option>
+            <option value="lash_tech">Lash Technician</option>
+            <option value="massage_therapist">Massage Therapist</option>
+            <option value="makeup_artist">Makeup Artist</option>
+            <option value="receptionist">Receptionist</option>
+          </select>
+
+
+          <select className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, gender: e.target.value })}>
+            <option value="">Any Gender</option>
+            <option value="Female">Female</option>
+            <option value="Male">Male</option>
+          </select>
+
+          <select className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, rating: e.target.value })}>
+            <option value="">Any Rating</option>
+            <option value="4">4★+</option>
+            <option value="4.5">4.5★+</option>
+            <option value="5">5★ Only</option>
+          </select>
+
+          <select className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, price: e.target.value })}>
+            <option value="">Any Price</option>
+            <option value="lt40">Under $40</option>
+            <option value="40-60">$40 - $60</option>
+            <option value="gt60">Above $60</option>
+          </select>
+
+          <select className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none"
+            onChange={(e) => setFilter({ ...filter, duration: e.target.value })}>
+            <option value="">Any Duration</option>
+            <option value="lt30">Under 30 min</option>
+            <option value="30-60">30 - 60 min</option>
+            <option value="gt60">Above 60 min</option>
+          </select>
+
+          <select
+            className="bg-white/10 p-2 rounded border border-white/20 focus:outline-none "
+            onChange={(e) => setFilter({ ...filter, distance: e.target.value })}
+          >
+            <option value="">Any Distance</option>
+            <option value="2">Within 2 mi</option>
+            <option value="5">Within 5 mi</option>
+            <option value="10">Within 10 mi</option>
+            <option value="15">Within 15 mi</option>
+          </select>
+
+        </div>
         {loading ? (
           <p className="text-center">⏳ Loading stylists...</p>
         ) : stylists.length === 0 ? (
-          <p className="text-center text-gray-400">No stylist online nearby.</p>
+          <p className="text-center text-gray-400">📍 No stylist online nearby.</p>
+        ) : filteredStylists.length === 0 ? (
+          <p className="text-center text-yellow-300 mt-6 text-sm">🔍 No stylist matches your filters. Please adjust your selection.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[660px] h-auto perspective-[1500px]">
+            {filteredStylists.map((s) => (
+              <div key={s.id} className="relative w-full min-h-[620px] sm:min-h-[620px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-full h-auto rounded-3xl backface-hidden bg-white/5 backdrop-blur-md border-b-4 border-t-4 border-pink-500 p-4 shadow-xl flex flex-col items-center justify-between text-center">
+                  <div className="absolute w-full min-h-[620px] max-h-[620px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
-                    <div className="absolute top-3 right-3 flex gap-[1px]">
+                    <div className="absolute top-4 right-4 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
                         <svg key={i} viewBox="0 0 20 20" fill={i < Math.round(s.rating) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
                         </svg>
                       ))}
                     </div>
+                    <div className="flex flex-col items-center gap-1 mt-1 mb-1">
+                      {/* Avatar */}
+                      <div className="relative w-32 h-32 sm:w-32 sm:h-32 rounded-full p-[3px] bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 shadow-xl">
+                        <img
+                          src={s.avatar_url}
+                          alt={s.name}
+                          onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
+                          className="w-full h-full object-cover rounded-full border-4 border-white shadow-inner"
+                        />
 
-                    {/* Avatar */}
-                    <img
-                      src={s.avatar_url?.startsWith("http") ? s.avatar_url : `https://crypto-manager-backend.onrender.com${s.avatar_url}`}
-                      onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
-                      className="w-42 h-42 rounded-full object-cover border-2 border-white shadow mb-3 mt-6"
-                      alt={s.name}
-                    />
-
-                    <div className="w-full px-2 space-y-2">
-                      <div>
-                        <h2 className="text-xl font-bold text-pink-400">{s.name}</h2>
-                        <p className="inline-block text-xs px-2 py-1 rounded-full bg-pink-600/50 text-white shadow">
-                          {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
-                        </p>
+                        {/* 🌿 Icon trang trí – nằm đè góc trái */}
+                        <div className="absolute -top-3 -left-10 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                          🌸
+                        </div>
+                        <div className="absolute top-9 -right-12 text-white rounded-full p-[4px] text-3xl  rotate-12">
+                          ✨
+                        </div>
+                        <div className="absolute top-22 -left-8 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                          🌸
+                        </div>
+                        <div className="absolute top-43 -right-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                          🌟
+                        </div>
                       </div>
 
-                      <div className="pt-2">
-                        <p className="text-[10px] text-pink-300 uppercase tracking-widest mb-1">--SALON--</p>
-                        <p className="text-sm text-yellow-300 font-medium">🏠 {s.salon_name}</p>
-                        <p className="text-xs text-gray-300">{s.salon_address}</p>
-                        <p className="text-xs text-emerald-300 mt-1">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
-                      </div>
+
+                      {/* Info */}
+                      <h2 className="text-xl font-semibold text-pink-500 mt-2 mb-1 flex items-center justify-center gap-2">
+                        {s.name}
+                        {s.gender === "Female" && (
+                          <FaFemale title="Female" className="text-pink-400 text-lg" />
+                        )}
+                        {s.gender === "Male" && (
+                          <FaMale title="Male" className="text-blue-400 text-lg" />
+                        )}
+                        {s.gender && !["Male", "Female"].includes(s.gender) && (
+                          <FaGenderless title="Other / Non-binary" className="text-purple-400 text-sm" />
+                        )}
+                      </h2>
+
+                      <p className="text-xs bg-white/10 text-pink-300 px-3 py-[2px] rounded-full inline-block">
+                        {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
+                      </p>
+                      {/* Danh sách dịch vụ hiển thị ngắn gọn */}
+                      {Array.isArray(s.services) && s.services.length > 0 && (
+                        <div className="mt-2 w-full">
+                          <p className="text-[13px] font-semibold text-emerald-300 mb-1 text-left pl-2">✨ Services:</p>
+                          <div className="max-h-[92px] overflow-y-auto px-1 py-1 bg-white/5 rounded-md text-[11px] text-pink-100 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-transparent grid grid-cols-2 gap-2">
+                            {s.services.slice(0, 6).map((srv) => (
+                              <div
+                                key={srv.id}
+                                className="bg-white/5 rounded-lg px-2 py-[3px] flex flex-col justify-between h-full"
+                              >
+                                <span className="truncate block capitalize">💅 {srv.name}</span>
+                              </div>
+                            ))}
+                            {s.services.length > 6 && (
+                              <div className="col-span-2 text-right text-[10px] italic text-yellow-200 mt-1 pr-1">
+                                +{s.services.length - 6} more
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                     </div>
+                    <div className="text-sm text-white/80 space-y-1">
+                      <p className="text-yellow-300 font-semibold">{s.salon_name}</p>
+                      <p>{s.salon_address}</p>
+                      <p className="text-emerald-300">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
+                    </div>
+                    {/* About section nếu có */}
+                    {s.description && (
+                      <div className="mt-1 text-xs text-pink-300 italic px-3">
+                        {aboutExpanded[s.id] ? (
+                          <>
+                            <div
+                              id={`about-scroll-${s.id}`}
+                              className="max-h-[50px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scrollbar-hide"
+                              style={{
+                                WebkitOverflowScrolling: "touch",
+                                touchAction: "manipulation",
+                                overscrollBehavior: "contain",
+                              }}
+                            >
+                              <p className="whitespace-pre-line reveal-anim">{s.description}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setAboutExpanded({ ...aboutExpanded, [s.id]: false });
 
-                    <hr className="w-3/4 border-t border-white/20 my-1" />
+                                const el = document.getElementById(`about-scroll-${s.id}`);
+                                if (el && el.dataset.rafId) {
+                                  cancelAnimationFrame(parseInt(el.dataset.rafId));
+                                  delete el.dataset.rafId;
+                                }
+                              }}
+
+                              className="mt-1 text-emerald-300 underline text-[11px]"
+                            >
+                              Show less
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            “{s.description.slice(0, 140)}...”
+                            <button
+                              onClick={() => {
+                                setAboutExpanded({ ...aboutExpanded, [s.id]: true });
+
+                                setTimeout(() => {
+                                  const el = document.getElementById(`about-scroll-${s.id}`);
+                                  if (!el) return;
+
+                                  let scrollPos = el.scrollTop;
+                                  const scrollSpeed = 0.13;
+
+                                  const step = () => {
+                                    scrollPos += scrollSpeed;
+                                    el.scrollTop = scrollPos;
+
+                                    // Nếu chạm đáy, cuộn lại đầu
+                                    if (el.scrollTop + el.clientHeight >= el.scrollHeight) {
+                                      scrollPos = 0;
+                                    }
+
+                                    const rafId = requestAnimationFrame(step);
+                                    el.dataset.rafId = rafId; // lưu để dừng khi cần
+                                  };
+
+                                  step(); // bắt đầu cuộn
+                                }, 100);
+                              }}
+                              className="ml-2 text-yellow-300 underline text-[11px]"
+                            >
+                              Show more
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                    )}
                     <button
                       onClick={() => handleBookClick(s.id)}
-                      className="mb-6 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 text-white font-bold px-6 py-2 rounded-full shadow hover:scale-105 transition"
+                      className="mt-2 bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
+                          rounded-2xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
+                          flex items-center justify-center gap-2"
                     >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
                       Book Appointment
                     </button>
+
                   </div>
 
                   {/* Mặt sau */}
-                  <div className="absolute w-full min-h-full h-auto rounded-2xl backface-hidden rotate-y-180 bg-zinc-800/90 border-b-4 border-t-4 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
+                  <div className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col justify-center text-center">
                     <h3 className="text-lg font-bold text-yellow-300 mb-3">
                       ✨ Book Your Appointment
                     </h3>
 
-                    <div className="text-left space-y-3 text-sm">
+                    <div className="text-left space-y-3 text-sm px-2 sm:px-3">
 
                       {/* Step 1: Chọn dịch vụ */}
                       <div>
-                        <p className="text-pink-400 font-bold mb-2">📋 Step 1: Select Services</p>
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
+                          Step 1: Select Services
+                        </p>
 
                         {/* Scrollable list of services */}
-                        <div className="max-h-48 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
-                          {s.services?.map((srv) => {
-                            const isSelected = form.service_ids.includes(srv.id);
-                            return (
-                              <label
-                                key={srv.id}
-                                className={`flex items-center justify-between px-4 py-1 rounded-lg border-b cursor-pointer text-xs shadow-sm transition-all ${isSelected
-                                  ? "bg-gradient-to-r from-pink-400 to-pink-500 text-white border-pink-400 shadow-lg"
-                                  : "text-pink-100 border-pink-300 hover:bg-pink-400"
-                                  }`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => {
-                                      const selected = isSelected
-                                        ? form.service_ids.filter((id) => id !== srv.id)
-                                        : [...form.service_ids, srv.id];
+                        <div className="max-h-26 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
+                          {s.services?.length === 0 ? (
+                            <div className="text-sm text-red-400 italic px-2 py-2 bg-white/5 rounded-lg">
+                              ❌ This stylist has not selected any services yet.
+                            </div>
+                          ) : (
+                            s.services.map((srv) => {
+                              const isSelected = form.service_ids.includes(srv.id);
+                              return (
+                                <label
+                                  key={srv.id}
+                                  className={`flex items-center justify-between px-4 py-1 rounded-sm border-b cursor-pointer text-xs transition-all ${isSelected
+                                    ? "text-white border-pink-300"
+                                    : "text-pink-100 border-pink-400 hover:bg-white/5"
+                                    }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {
+                                        const selected = isSelected
+                                          ? form.service_ids.filter((id) => id !== srv.id)
+                                          : [...form.service_ids, srv.id];
 
-                                      const selectedServices = s.services.filter((s) =>
-                                        selected.includes(s.id)
-                                      );
-                                      const totalDuration = selectedServices.reduce(
-                                        (sum, s) => sum + (s.duration_minutes || 30),
-                                        0
-                                      );
+                                        const selectedServices = s.services.filter((s) =>
+                                          selected.includes(s.id)
+                                        );
+                                        const totalDuration = selectedServices.reduce(
+                                          (sum, s) => sum + (s.duration_minutes || 30),
+                                          0
+                                        );
 
-                                      setForm({
-                                        ...form,
-                                        service_ids: selected,
-                                        duration_minutes: totalDuration,
-                                      });
+                                        setForm({
+                                          ...form,
+                                          service_ids: selected,
+                                          duration_minutes: totalDuration,
+                                        });
 
-                                      if (form.appointment_date) {
-                                        fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration); // ✅ ở đây s là stylist, đúng!
-                                      }
-                                    }}
-                                    className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
-                                  />
-                                  <div className="text-left">
-                                    <span className="block capitalize">{srv.name}</span>
-                                    <span className="block text-xs text-yellow-500">
-                                      ${srv.price}
-                                    </span>
+                                        if (form.appointment_date) {
+                                          fetchAvailabilityWithDuration(s.id, form.appointment_date, totalDuration);
+                                        }
+                                      }}
+                                      className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
+                                    />
+                                    <div className="text-left">
+                                      <span className="block capitalize">{srv.name}</span>
+                                      <span className="block text-xs text-yellow-500">${srv.price}</span>
+                                    </div>
                                   </div>
-                                </div>
-                              </label>
-                            );
-                          })}
+                                </label>
+                              );
+                            })
+                          )}
                         </div>
+
 
                         {/* Estimated duration */}
                         {form.duration_minutes > 0 && (
@@ -515,7 +759,7 @@ export default function FindStylists() {
 
                       {/* Step 2: Chọn ngày */}
                       <div>
-                        <p className="text-pink-400 font-bold mb-1">📆 Step 2: Pick a Date</p>
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400 ">Step 2: Pick a Date</p>
                         <input
                           type="date"
                           value={form.appointment_date}
@@ -525,18 +769,35 @@ export default function FindStylists() {
                             setSelectedTime("");
                             if (dateOnly) fetchAvailability(s.id, dateOnly);
                           }}
-                          className="w-full rounded p-1 text-yellow-500 bg-gradient-to-r from-zinc-700 to-zinc-800 text-xs pl-2"
+                          className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400
+  px-3 py-1 h-[28px] leading-tight appearance-none border border-white/20 
+  focus:outline-none focus:ring-2 focus:ring-pink-300 
+  transition-all appearance-none box-border"
+
                         />
                       </div>
+                      {/* Step 3: Choose Time */}
+                      <div className="mt-4">
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
+                          Step 3: Choose Time
+                        </p>
 
-                      {/* Step 3: Chọn giờ */}
-                      {timeSlots.length > 0 ? (
-                        <div>
-                          <p className="text-pink-400 font-bold mb-1">🕒 Step 3: Choose Time</p>
+                        {!form.appointment_date ? (
+                          <select
+                            disabled
+                            className="block w-full bg-white/10 rounded-xl text-yellow-400 
+                          px-3 py-1 h-[28px] leading-tight appearance-none border border-white/10 appearance-none cursor-not-allowed"
+                          >
+                            <option>Select a date first</option>
+                          </select>
+                        ) : timeSlots.length > 0 ? (
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="w-full rounded p-1 text-yellow-500 bg-gradient-to-r from-zinc-700 to-zinc-800 text-xs pl-2"
+                            className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400
+  px-3 py-1 h-[28px] leading-tight appearance-none border border-white/20 
+  focus:outline-none focus:ring-2 focus:ring-pink-300 
+  transition-all appearance-none box-border"
                           >
                             <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
@@ -545,33 +806,29 @@ export default function FindStylists() {
                               </option>
                             ))}
                           </select>
-                        </div>
-                      ) : (
-                        form.appointment_date && (
+                        ) : (
                           <p className="text-yellow-300 text-xs italic">
                             ⚠️ No available time slots for this date & duration.
                           </p>
-                        )
-                      )}
+                        )}
+                      </div>
 
                       {/* Step 4: Ghi chú */}
                       <div>
-                        <p className="text-pink-400 font-bold mb-1">💬 Step 4: Optional Notes</p>
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">Step 4: Optional Notes</p>
                         <textarea
                           value={form.note}
                           onChange={(e) => setForm({ ...form, note: e.target.value })}
-                          className="w-full rounded p-1 text-pink-100 text-xs"
+                          className="w-full rounded p-1 text-pink-100 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
                           placeholder="Anything specific?"
                         />
                       </div>
 
                       {/* Thông tin đặt */}
                       {form.appointment_date && selectedTime && (
-                        <div className="mt-3 px-2 py-2 rounded-lg bg-pink-600/20 border border-pink-500 text-pink-200 text-sm font-semibold text-center shadow-sm">
+                        <div className="mt-3 px-2 py-2 rounded-lg text-pink-200 text-sm font-semibold text-center whitespace-nowrap overflow-x-auto">
                           📌 You selected:
-                          <span className="ml-1 text-yellow-300 font-bold">
-                            {form.appointment_date}
-                          </span>
+                          <span className="ml-1 text-yellow-300 font-bold">{form.appointment_date}</span>
                           <span className="mx-1">at</span>
                           <span className="text-yellow-300 font-bold">{selectedTime}</span>
                         </div>
@@ -583,7 +840,7 @@ export default function FindStylists() {
                     <button
                       disabled={submitting}
                       onClick={() => handleSubmitBooking(s)}
-                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:to-emerald-700 text-white font-bold py-2 rounded-2xl shadow-md transition-all"
+                      className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-semibold py-2 rounded-3xl shadow-lg transition-all"
                     >
                       {submitting ? "⏳ Booking..." : "✅ Confirm Booking"}
                     </button>
@@ -591,7 +848,7 @@ export default function FindStylists() {
                     {/* Quay lại */}
                     <button
                       onClick={() => setFlippedId(null)}
-                      className="mt-4 bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 rounded-full px-4 shadow"
+                      className="mt-4 bg-pink-500 hover:bg-pink-400 text-white font-semibold py-2 rounded-3xl px-4 shadow-lg transition-all"
                     >
                       🔙 Go back
                     </button>
