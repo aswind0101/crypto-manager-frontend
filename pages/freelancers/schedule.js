@@ -1,5 +1,5 @@
 // Đã cập nhật: Auto-save chính xác khi chọn giờ bằng cách truyền dữ liệu mới vào save
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/router";
 import Navbar from "../../components/Navbar";
@@ -13,6 +13,7 @@ export default function SchedulePage() {
     const [user, setUser] = useState(null);
     const [statusMessage, setStatusMessage] = useState({});
     const router = useRouter();
+    const tableRef = useRef(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -64,6 +65,10 @@ export default function SchedulePage() {
             });
             await res.json();
             setStatusMessage((prev) => ({ ...prev, [item.weekday]: "saved" }));
+            setTimeout(() => {
+                scrollToStatus();
+            }, 100);
+            // Tự động xoá thông báo sau 1.5 giây
             setTimeout(() => setStatusMessage((prev) => ({ ...prev, [item.weekday]: "" })), 1500);
         } catch (err) {
             setStatusMessage((prev) => ({ ...prev, [item.weekday]: "error" }));
@@ -119,6 +124,10 @@ export default function SchedulePage() {
 
             setSchedule((prev) => prev.filter((s) => s.weekday !== day));
             setStatusMessage((prev) => ({ ...prev, [day]: "cleared" }));
+            setTimeout(() => {
+                scrollToStatus();
+            }, 100);
+            // Tự động xoá thông báo sau 2 giây
             setTimeout(() => setStatusMessage((prev) => ({ ...prev, [day]: "" })), 2000);
         } catch (err) {
             console.error("❌ Clear error:", err);
@@ -141,12 +150,21 @@ export default function SchedulePage() {
         }));
         setSchedule(newSchedule);
         setStatusMessage({});
+        setTimeout(() => {
+            scrollToStatus();
+        }, 100);
     };
     const saveAll = () => {
         schedule.forEach((item) => {
             if (item.start_time && item.end_time) saveDayDirect(item);
         });
     };
+    const scrollToStatus = () => {
+        if (tableRef.current) {
+            tableRef.current.scrollTo({ left: 1000, behavior: "smooth" });
+        }
+    };
+
     return (
         <div className="bg-[#1C1F26] min-h-screen text-yellow-500 font-mono">
             <Navbar />
@@ -156,13 +174,13 @@ export default function SchedulePage() {
                     <button
                         onClick={saveAll}
                         className="bg-gradient-to-r from-green-400 to-emerald-500 hover:from-emerald-500 hover:to-green-400 
-text-white font-semibold px-4 py-1 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
+                        text-white font-semibold px-4 py-1 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
 
                     >
                         💾 Save All
                     </button>
                 </div>
-                <div className="overflow-x-auto rounded-xl border border-white/10 shadow">
+                <div ref={tableRef} className="overflow-x-auto rounded-xl border border-white/10 shadow">
                     <table className="min-w-[600px] w-full text-xs sm:text-sm text-center border-collapse">
                         <thead>
                             <tr className="bg-white/10 text-amber-300">
