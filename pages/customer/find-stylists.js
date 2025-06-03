@@ -792,7 +792,7 @@ export default function FindStylists() {
 
                   {/* Mặt sau */}
                   <div
-                    className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
+                    className="w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
                     style={{
                       overflow: 'visible',
                       contain: 'layout paint',
