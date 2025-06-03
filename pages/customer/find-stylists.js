@@ -21,6 +21,10 @@ dayjs.extend(timezone);
 export default function FindStylists() {
   const [stylists, setStylists] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPercentFake, setLoadingPercentFake] = useState(0);
+  const [loadingPercentReal, setLoadingPercentReal] = useState(0);
+
+
   const [userLocation, setUserLocation] = useState(null);
   const [flippedId, setFlippedId] = useState(null);
   const [geoError, setGeoError] = useState(false);
@@ -33,8 +37,7 @@ export default function FindStylists() {
   const [selectedTime, setSelectedTime] = useState(""); // HH:mm
   const [stylistSchedule, setStylistSchedule] = useState({});
 
-
-
+  // Form đặt lịch
   const [form, setForm] = useState({
     service_ids: [],
     appointment_date: "",
@@ -84,39 +87,85 @@ export default function FindStylists() {
   useEffect(() => {
     if (!userLocation) return;
 
-    const fetchStylists = async () => {
+    fetchSchedule();
+    fetchStylists(true); // lần đầu có loading
+
+    const interval = setInterval(() => {
+      fetchStylists(false); // các lần sau không show loading
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [userLocation]);
+
+
+  useEffect(() => {
+    if (!loading) return;
+
+    let fake = 0;
+    setLoadingPercentFake(0);
+    setLoadingPercentReal(0);
+
+    const interval = setInterval(() => {
+      fake += Math.floor(Math.random() * 8) + 3;
+      if (fake >= 90) {
+        clearInterval(interval);
+      } else {
+        setLoadingPercentFake(fake);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, [loading]);
+
+
+  const fetchStylists = async (showLoading = false) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/stylists/online");
       const data = await res.json();
 
-      const flat = data.flatMap((salon) =>
-        salon.stylists.map((s) => ({
-          ...s,
-          salon_name: salon.salon_name,
-          salon_address: salon.salon_address,
-          lat: salon.latitude,
-          lng: salon.longitude,
-          services: s.services || [] // 👈 QUAN TRỌNG!
-        }))
-      );
+      const totalStylists = data.reduce((acc, salon) => acc + salon.stylists.length, 0) || 1;
+      let processed = 0;
+      const flat = [];
 
+      for (const salon of data) {
+        for (const s of salon.stylists) {
+          const stylist = {
+            ...s,
+            salon_name: salon.salon_name,
+            salon_address: salon.salon_address,
+            lat: salon.latitude,
+            lng: salon.longitude,
+            services: s.services || [],
+          };
 
-      flat.forEach((s) => {
-        s.distance = getDistanceInKm(userLocation.lat, userLocation.lng, s.lat, s.lng);
-      });
+          stylist.distance = getDistanceInKm(userLocation.lat, userLocation.lng, stylist.lat, stylist.lng);
+          flat.push(stylist);
+
+          processed++;
+          if (showLoading) {
+            setLoadingPercentReal(Math.floor((processed / totalStylists) * 100));
+          }
+        }
+      }
 
       flat.sort((a, b) => a.distance - b.distance);
       setStylists(flat);
-      console.log("✅ Stylists with services:", flat);
 
-      setLoading(false);
-    };
+      if (showLoading) {
+        setLoadingPercentFake(100);
+        setLoadingPercentReal(100);
+        setTimeout(() => setLoading(false), 300);
+      }
 
-    fetchSchedule(); // gọi ngay khi có vị trí người dùng
-    const interval = setInterval(fetchStylists, 10000); // gọi lại mỗi 10s
-
-    return () => clearInterval(interval); // dọn dẹp khi unmount
-  }, [userLocation]);
-
+    } catch (err) {
+      console.error("❌ Error fetching stylists:", err);
+      if (showLoading) setLoading(false);
+    }
+  };
   const formatSpecialization = (code) => {
     const map = {
       nail_tech: "Nail Technician",
@@ -433,7 +482,6 @@ export default function FindStylists() {
       return true;
     })
     .sort((a, b) => a.distance - b.distance); // sắp xếp stylist gần nhất lên đầu
-
   return (
     <div className="min-h-screen text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
@@ -529,19 +577,45 @@ export default function FindStylists() {
           </select>
 
         </div>
+
         {loading ? (
-          <p className="text-center">⏳ Loading stylists...</p>
-        ) : stylists.length === 0 ? (
-          <p className="text-center text-gray-400">📍 No stylist online nearby.</p>
-        ) : filteredStylists.length === 0 ? (
-          <p className="text-center text-yellow-300 mt-6 text-sm">🔍 No stylist matches your filters. Please adjust your selection.</p>
+          <div className="flex flex-col items-center justify-center min-h-[200px] py-6">
+            <div className="relative w-24 h-24">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="50%"
+                  cy="50%"
+                  r="40%"
+                  stroke="#ffffff33"
+                  strokeWidth="8"
+                  fill="transparent"
+                />
+                <circle
+                  cx="50%"
+                  cy="50%"
+                  r="40%"
+                  stroke="#f472b6"
+                  strokeWidth="8"
+                  strokeDasharray="251"
+                  strokeDashoffset={251 - (251 * Math.max(loadingPercentFake, loadingPercentReal)) / 100}
+                  strokeLinecap="round"
+                  fill="transparent"
+                  className="transition-all duration-300 ease-in-out"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center text-yellow-300 font-bold text-lg">
+                {Math.max(loadingPercentFake, loadingPercentReal)}%
+              </div>
+            </div>
+            <p className="text-sm text-yellow-300 mt-4 italic">Loading stylists…</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredStylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[620px] sm:min-h-[620px] h-auto perspective-[1500px]">
+              <div key={s.id} className="relative w-full min-h-[630px] sm:min-h-[630px] h-auto perspective-[1500px]">
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
-                  <div className="absolute w-full min-h-[620px] max-h-[620px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
+                  <div className="absolute w-full min-h-[630px] max-h-[630px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                     {/* ⭐ Rating */}
                     <div className="absolute top-4 right-4 flex gap-[1px]">
                       {[...Array(5)].map((_, i) => (
@@ -831,14 +905,14 @@ export default function FindStylists() {
                         </p>
 
                         {form.service_ids.length === 0 ? (
-                          <div className="text-sm text-red-400 italic px-3 py-2 bg-white/10 rounded-lg">
+                          <div className="text-xs text-red-400 italic px-3 py-1 bg-white/10 rounded-lg">
                             ⚠️ Please select at least one service before choosing a date.
                           </div>
                         ) : (() => {
                           const schedule = stylistSchedule[s.id] || [];
                           if (schedule.length === 0) {
                             return (
-                              <div className="text-sm text-red-400 italic px-3 py-2 bg-white/10 rounded-lg">
+                              <div className="text-xs text-red-400 italic px-3 py-1 bg-white/10 rounded-lg">
                                 ❌ This stylist does not have any work schedule set up yet.
                               </div>
                             );
@@ -876,10 +950,10 @@ export default function FindStylists() {
                                 customInput={
                                   <button className="w-full text-left text-yellow-400 px-4 py-1 h-[20px] flex items-center gap-2 transition">
                                     <CalendarDays className="w-4 h-4 text-yellow-300" />
-                                    <span className={form.appointment_date ? "" : "text-yellow-400 italic"}>
+                                    <span className={form.appointment_date ? "" : "text-yellow-500 opacity-70"}>
                                       {form.appointment_date
                                         ? dayjs(form.appointment_date).format("MMMM D, YYYY")
-                                        : ""}
+                                        : " Select a date..."}
                                     </span>
                                   </button>
                                 }
