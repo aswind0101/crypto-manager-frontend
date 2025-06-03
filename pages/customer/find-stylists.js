@@ -611,7 +611,16 @@ export default function FindStylists() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredStylists.map((s) => (
-              <div key={s.id} className="relative w-full min-h-[630px] sm:min-h-[630px] h-auto perspective-[1500px]">
+              <div
+                key={s.id}
+                className="relative w-full min-h-[630px] sm:min-h-[630px] h-auto perspective-[1500px]"
+                style={{
+                  overflow: 'visible',
+                  touchAction: 'manipulation',
+                  WebkitOverflowScrolling: 'touch',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
                 <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                   {/* Mặt trước */}
                   <div className="absolute w-full min-h-[630px] max-h-[630px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
@@ -792,12 +801,13 @@ export default function FindStylists() {
 
                   {/* Mặt sau */}
                   <div
-                    className="w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
+                    className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
                     style={{
                       overflow: 'visible',
+                      pointerEvents: 'auto',
                       contain: 'layout paint',
-                      WebkitBackfaceVisibility: 'hidden',
                       backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden',
                     }}
                   >
 
@@ -815,7 +825,7 @@ export default function FindStylists() {
 
                         {/* Scrollable list of services */}
                         <div
-                          className="max-h-24 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md relative z-10"
+                          className="max-h-24 overflow-scroll pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md relative z-10"
                           style={{
                             WebkitOverflowScrolling: 'touch',
                             overscrollBehavior: 'contain',
@@ -823,7 +833,6 @@ export default function FindStylists() {
                             scrollBehavior: 'smooth',
                           }}
                         >
-
 
                           {s.services?.length === 0 ? (
                             <div className="text-sm text-red-400 italic px-2 py-2 bg-white/5 rounded-lg">
