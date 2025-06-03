@@ -5,6 +5,8 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { CalendarDays } from "lucide-react"; // hoặc dùng react-icons
+
 // Thêm các icon từ react-icons
 import { FaMale, FaFemale, FaGenderless } from "react-icons/fa";
 import { getAuth } from "firebase/auth";
@@ -693,7 +695,7 @@ export default function FindStylists() {
                     <button
                       onClick={() => handleBookClick(s.id)}
                       className="mt-2 bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
-                          rounded-2xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
+                          rounded-3xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
                           flex items-center justify-center gap-2"
                     >
                       <svg
@@ -822,17 +824,17 @@ export default function FindStylists() {
                           </p>
                         )}
                       </div>
-                      {form.service_ids.length === 0 && (
-                        <p className="text-sm text-red-400 mt-1">⚠️ Please select at least one service to choose a date</p>
-                      )}
-
                       {/* Step 2: Chọn ngày */}
                       <div>
                         <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400 ">
                           Step 2: Pick a Date
                         </p>
 
-                        {(() => {
+                        {form.service_ids.length === 0 ? (
+                          <div className="text-sm text-red-400 italic px-3 py-2 bg-white/10 rounded-lg">
+                            ⚠️ Please select at least one service before choosing a date.
+                          </div>
+                        ) : (() => {
                           const schedule = stylistSchedule[s.id] || [];
                           if (schedule.length === 0) {
                             return (
@@ -871,11 +873,22 @@ export default function FindStylists() {
                                   return schedule.some((s) => s.weekday === weekday);
                                 }}
                                 minDate={new Date()}
-                                placeholderText="Select a working day"
+                                customInput={
+                                  <button className="w-full text-left text-yellow-400 px-4 py-1 h-[20px] flex items-center gap-2 transition">
+                                    <CalendarDays className="w-4 h-4 text-yellow-300" />
+                                    <span className={form.appointment_date ? "" : "text-yellow-400 italic"}>
+                                      {form.appointment_date
+                                        ? dayjs(form.appointment_date).format("MMMM D, YYYY")
+                                        : ""}
+                                    </span>
+                                  </button>
+                                }
                                 dateFormat="MMMM d, yyyy"
-                                className="w-full rounded px-2 py-1 h-[20px] text-yellow-400 outline-none"
-                                calendarClassName="!bg-white/90 !text-black rounded-xl shadow-lg overflow-hidden"
-                                dayClassName={() => "text-sm"}
+                                className="w-full px-4 py-1 h-[20px] text-yellow-200 placeholder:text-yellow-400"
+                                calendarClassName="!bg-white !text-black rounded-xl shadow-lg"
+                                dayClassName={() =>
+                                  "text-sm text-gray-800 hover:bg-pink-200 hover:text-black rounded-lg transition-all"
+                                }
                               />
                             </div>
                           );
@@ -890,8 +903,8 @@ export default function FindStylists() {
                         {!form.appointment_date ? (
                           <select
                             disabled
-                            className="block w-full bg-white/5 rounded-xl text-yellow-500 opacity-70 
-                          px-3 py-1 h-[28px] leading-tight appearance-none appearance-none cursor-not-allowed"
+                            className="block w-full bg-white/5 rounded-2xl text-yellow-500 opacity-70 
+                          px-3 py-1 h-[30px] leading-tight appearance-none cursor-not-allowed"
                           >
                             <option>Select a date first</option>
                           </select>
@@ -899,10 +912,7 @@ export default function FindStylists() {
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400
-  px-3 py-1 h-[28px] leading-tight appearance-none
-  focus:outline-none focus:ring-2 focus:ring-pink-300 
-  transition-all appearance-none box-border"
+                            className="block w-full max-w-full bg-white/5 rounded-2xl text-yellow-400 px-3 py-1 h-[30px] pl-5 leading-tight appearance-none focus:outline-none"
                           >
                             <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
