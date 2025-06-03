@@ -827,6 +827,8 @@ export default function FindStylists() {
                         <div
                           className="max-h-24 overflow-scroll pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md relative z-10"
                           style={{
+                            height: 100,
+                            overflowY: 'auto',
                             WebkitOverflowScrolling: 'touch',
                             overscrollBehavior: 'contain',
                             touchAction: 'manipulation',
