@@ -912,12 +912,12 @@ export default function FindStylists() {
                           <select
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
-                            className="block w-full max-w-full bg-white/5 rounded-2xl text-yellow-400 px-3 py-1 h-[30px] pl-5 leading-tight appearance-none focus:outline-none"
+                            className="block w-full max-w-full bg-white/5 rounded-2xl text-yellow-400 px-3 py-1 h-[30px] pl-6 leading-tight appearance-none focus:outline-none"
                           >
                             <option value="">Select time...</option>
                             {timeSlots.map((slot) => (
                               <option key={slot.time} value={slot.time}>
-                                🕒 {slot.time}
+                                ⏱ {slot.time}
                               </option>
                             ))}
                           </select>
