@@ -24,7 +24,6 @@ export default function FindStylists() {
   const [loadingPercentFake, setLoadingPercentFake] = useState(0);
   const [loadingPercentReal, setLoadingPercentReal] = useState(0);
 
-
   const [userLocation, setUserLocation] = useState(null);
   const [flippedId, setFlippedId] = useState(null);
   const [geoError, setGeoError] = useState(false);
@@ -806,7 +805,14 @@ export default function FindStylists() {
                         </p>
 
                         {/* Scrollable list of services */}
-                        <div className="max-h-26 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md">
+                        <div
+                          className="max-h-24 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md"
+                          style={{
+                            WebkitOverflowScrolling: 'touch',
+                            overscrollBehavior: 'contain',
+                            touchAction: 'manipulation',
+                          }}
+                        >
                           {s.services?.length === 0 ? (
                             <div className="text-sm text-red-400 italic px-2 py-2 bg-white/5 rounded-lg">
                               ❌ This stylist has not selected any services yet.
