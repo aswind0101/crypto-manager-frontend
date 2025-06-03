@@ -3,6 +3,9 @@ import Navbar from "../../components/Navbar";
 import { getDistanceInKm } from "../../components/utils/distance"; // bạn sẽ tạo helper này ở bước sau.
 import { useRouter } from "next/router";
 import Head from "next/head";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+// Thêm các icon từ react-icons
 import { FaMale, FaFemale, FaGenderless } from "react-icons/fa";
 import { getAuth } from "firebase/auth";
 const auth = getAuth(); // hoặc lấy từ firebase.js nếu đã export sẵn
@@ -825,48 +828,58 @@ export default function FindStylists() {
 
                       {/* Step 2: Chọn ngày */}
                       <div>
-                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400 ">Step 2: Pick a Date</p>
-                        <input
-                          type="date"
-                          disabled={form.service_ids.length === 0}
-                          value={form.appointment_date}
-                          onChange={(e) => {
-                            const dateOnly = e.target.value;
-                            setForm((prev) => ({ ...prev, appointment_date: dateOnly }));
-                            setSelectedTime("");
+                        <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400 ">
+                          Step 2: Pick a Date
+                        </p>
 
-                            const selectedServices = s.services.filter((srv) =>
-                              form.service_ids.includes(srv.id)
+                        {(() => {
+                          const schedule = stylistSchedule[s.id] || [];
+                          if (schedule.length === 0) {
+                            return (
+                              <div className="text-sm text-red-400 italic px-3 py-2 bg-white/10 rounded-lg">
+                                ❌ This stylist does not have any work schedule set up yet.
+                              </div>
                             );
-                            const totalDuration = selectedServices.reduce(
-                              (sum, srv) => sum + (srv.duration_minutes || 30),
-                              0
-                            );
+                          }
 
-                            const schedule = stylistSchedule[s.id] || [];
-                            const weekday = dayjs(dateOnly).day();
-                            const workDay = schedule.find((s) => s.weekday === weekday);
+                          return (
+                            <div className="rounded-2xl bg-white/5 px-2 py-1 text-yellow-200">
+                              <DatePicker
+                                selected={form.appointment_date ? dayjs(form.appointment_date).toDate() : null}
+                                onChange={(date) => {
+                                  const dateStr = dayjs(date).format("YYYY-MM-DD");
+                                  const weekday = dayjs(date).day();
+                                  const workDay = schedule.find((s) => s.weekday === weekday);
 
-                            if (workDay && form.service_ids.length > 0) {
-                              fetchAvailabilityWithDuration(
-                                s.id,
-                                dateOnly,
-                                totalDuration,
-                                workDay.start_time,
-                                workDay.end_time
-                              );
-                            } else {
-                              console.warn("❌ Invalid date or no schedule");
-                              setTimeSlots([]);
-                            }
-                          }}
-                          className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400
-                            px-3 py-1 h-[28px] leading-tight appearance-none border border-white/20 
-                            focus:outline-none focus:ring-2 focus:ring-pink-300 
-                            transition-all appearance-none box-border disabled:cursor-not-allowed"
-                        />
+                                  if (workDay) {
+                                    fetchAvailabilityWithDuration(
+                                      s.id,
+                                      dateStr,
+                                      parseInt(form.duration_minutes || "60"),
+                                      workDay.start_time,
+                                      workDay.end_time
+                                    );
+                                  } else {
+                                    setTimeSlots([]);
+                                  }
 
-
+                                  setForm((prev) => ({ ...prev, appointment_date: dateStr }));
+                                  setSelectedTime("");
+                                }}
+                                filterDate={(date) => {
+                                  const weekday = dayjs(date).day();
+                                  return schedule.some((s) => s.weekday === weekday);
+                                }}
+                                minDate={new Date()}
+                                placeholderText="Select a working day"
+                                dateFormat="MMMM d, yyyy"
+                                className="w-full rounded px-2 py-1 h-[20px] text-yellow-400 outline-none"
+                                calendarClassName="!bg-white/90 !text-black rounded-xl shadow-lg overflow-hidden"
+                                dayClassName={() => "text-sm"}
+                              />
+                            </div>
+                          );
+                        })()}
                       </div>
                       {/* Step 3: Choose Time */}
                       <div className="mt-4">
@@ -877,8 +890,8 @@ export default function FindStylists() {
                         {!form.appointment_date ? (
                           <select
                             disabled
-                            className="block w-full bg-white/10 rounded-xl text-yellow-400 
-                          px-3 py-1 h-[28px] leading-tight appearance-none border border-white/10 appearance-none cursor-not-allowed"
+                            className="block w-full bg-white/5 rounded-xl text-yellow-500 opacity-70 
+                          px-3 py-1 h-[28px] leading-tight appearance-none appearance-none cursor-not-allowed"
                           >
                             <option>Select a date first</option>
                           </select>
@@ -887,7 +900,7 @@ export default function FindStylists() {
                             value={selectedTime}
                             onChange={(e) => setSelectedTime(e.target.value)}
                             className="block w-full max-w-full bg-white/5 rounded-xl text-yellow-400
-  px-3 py-1 h-[28px] leading-tight appearance-none border border-white/20 
+  px-3 py-1 h-[28px] leading-tight appearance-none
   focus:outline-none focus:ring-2 focus:ring-pink-300 
   transition-all appearance-none box-border"
                           >
