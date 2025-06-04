@@ -827,7 +827,7 @@ export default function FindStylists() {
                         <div
                           className="scroll-services-mobile"
                           style={{
-                            maxHeight: 120,
+                            maxHeight: 60,
                             overflowY: "auto",
                             WebkitOverflowScrolling: "touch",
                             overscrollBehavior: "contain",
