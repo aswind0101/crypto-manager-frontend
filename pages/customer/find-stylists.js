@@ -37,6 +37,7 @@ export default function FindStylists() {
   const [stylistSchedule, setStylistSchedule] = useState({});
   const [showAll, setShowAll] = useState(false);
   const [visibleCount, setVisibleCount] = useState(3);
+  const [gridKey, setGridKey] = useState(0);
 
   // Form đặt lịch
   const [form, setForm] = useState({
@@ -68,7 +69,7 @@ export default function FindStylists() {
       setUser(JSON.parse(storedUser));
     }
   }, []);
-  
+
   useEffect(() => {
     setVisibleCount(3);
   }, [filter]);
@@ -624,7 +625,7 @@ export default function FindStylists() {
                 {Math.max(loadingPercentFake, loadingPercentReal)}%
               </div>
             </div>
-            <p className="text-sm text-yellow-300 mt-4 italic">Loading stylists…</p>
+            <p className="text-sm text-yellow-300 mt-4 italic">Finding stylists…</p>
           </div>
         ) : (
           <>
@@ -639,7 +640,7 @@ export default function FindStylists() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div key={gridKey} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {visibleStylists.map((s) => (
                     <div
                       key={s.id}
@@ -1121,7 +1122,10 @@ export default function FindStylists() {
                     <button
                       className="bg-gradient-to-r from-pink-400 to-emerald-400 hover:from-emerald-400 hover:to-pink-400 text-white font-semibold px-8 py-2 rounded-full shadow-md transition-all duration-200"
                       style={{ minWidth: 180 }}
-                      onClick={() => setVisibleCount(3)}
+                      onClick={() => {
+                        setVisibleCount(3);
+                        setGridKey((k) => k + 1); // Ép render lại grid
+                      }}
                     >
                       View Less
                     </button>
