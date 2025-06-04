@@ -801,7 +801,7 @@ export default function FindStylists() {
 
                   {/* Mặt sau */}
                   <div
-                    className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
+                    className="w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
                     style={{
                       overflow: 'visible',
                       pointerEvents: 'auto',
@@ -828,7 +828,6 @@ export default function FindStylists() {
                           className="max-h-24 overflow-scroll pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md relative z-10"
                           style={{
                             height: 100,
-                            overflowY: 'auto',
                             WebkitOverflowScrolling: 'touch',
                             overscrollBehavior: 'contain',
                             touchAction: 'manipulation',
