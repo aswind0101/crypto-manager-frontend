@@ -36,6 +36,7 @@ export default function FindStylists() {
   const [selectedTime, setSelectedTime] = useState(""); // HH:mm
   const [stylistSchedule, setStylistSchedule] = useState({});
   const [showAll, setShowAll] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(3);
 
   // Form đặt lịch
   const [form, setForm] = useState({
@@ -67,6 +68,11 @@ export default function FindStylists() {
       setUser(JSON.parse(storedUser));
     }
   }, []);
+  
+  useEffect(() => {
+    setVisibleCount(3);
+  }, [filter]);
+
 
   useEffect(() => {
     if (hasAskedLocation) return;
@@ -490,7 +496,8 @@ export default function FindStylists() {
     })
     .sort((a, b) => a.distance - b.distance); // sắp xếp stylist gần nhất lên đầu
 
-  const visibleStylists = showAll ? filteredStylists : filteredStylists.slice(0, 3);
+
+  const visibleStylists = filteredStylists.slice(0, visibleCount);
   return (
     <div className="min-h-screen text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
@@ -631,481 +638,496 @@ export default function FindStylists() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {visibleStylists.map((s) => (
-                  <div
-                    key={s.id}
-                    className="relative w-full min-h-[630px] sm:min-h-[630px] h-auto perspective-[1500px]"
-                    style={{
-                      overflow: 'visible',
-                      touchAction: 'manipulation',
-                      WebkitOverflowScrolling: 'touch',
-                      WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >
-                    <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
-                      {/* Mặt trước */}
-                      <div className="absolute w-full min-h-[630px] max-h-[630px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
-                        {/* ⭐ Rating */}
-                        <div className="absolute top-4 right-4 flex gap-[1px]">
-                          {[...Array(5)].map((_, i) => (
-                            <svg key={i} viewBox="0 0 20 20" fill={i < Math.round(s.rating) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
-                            </svg>
-                          ))}
-                        </div>
-                        <div className="flex flex-col items-center gap-1 mt-1 mb-1">
-                          {/* Avatar */}
-                          <div className="relative w-32 h-32 sm:w-32 sm:h-32 rounded-full p-[3px] bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 shadow-xl">
-                            <img
-                              src={s.avatar_url}
-                              alt={s.name}
-                              onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
-                              className="w-full h-full object-cover rounded-full border-4 border-white shadow-inner"
-                            />
-
-                            {/* 🌿 Icon trang trí – nằm đè góc trái */}
-                            <div className="absolute -top-3 -left-10 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
-                              🌸
-                            </div>
-                            <div className="absolute top-9 -right-12 text-white rounded-full p-[4px] text-3xl  rotate-12">
-                              ✨
-                            </div>
-                            <div className="absolute top-22 -left-8 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
-                              🌸
-                            </div>
-                            <div className="absolute top-43 -right-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
-                              🌟
-                            </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {visibleStylists.map((s) => (
+                    <div
+                      key={s.id}
+                      className="relative w-full min-h-[630px] sm:min-h-[630px] h-auto perspective-[1500px]"
+                      style={{
+                        overflow: 'visible',
+                        touchAction: 'manipulation',
+                        WebkitOverflowScrolling: 'touch',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
+                        {/* Mặt trước */}
+                        <div className="absolute w-full min-h-[630px] max-h-[630px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
+                          {/* ⭐ Rating */}
+                          <div className="absolute top-4 right-4 flex gap-[1px]">
+                            {[...Array(5)].map((_, i) => (
+                              <svg key={i} viewBox="0 0 20 20" fill={i < Math.round(s.rating) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
+                              </svg>
+                            ))}
                           </div>
+                          <div className="flex flex-col items-center gap-1 mt-1 mb-1">
+                            {/* Avatar */}
+                            <div className="relative w-32 h-32 sm:w-32 sm:h-32 rounded-full p-[3px] bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 shadow-xl">
+                              <img
+                                src={s.avatar_url}
+                                alt={s.name}
+                                onError={(e) => { e.currentTarget.src = "/default-avatar.png"; }}
+                                className="w-full h-full object-cover rounded-full border-4 border-white shadow-inner"
+                              />
 
-
-                          {/* Info */}
-                          <h2 className="text-xl font-semibold text-pink-500 mt-2 mb-1 flex items-center justify-center gap-2">
-                            {s.name}
-                            {s.gender === "Female" && (
-                              <FaFemale title="Female" className="text-pink-400 text-lg" />
-                            )}
-                            {s.gender === "Male" && (
-                              <FaMale title="Male" className="text-blue-400 text-lg" />
-                            )}
-                            {s.gender && !["Male", "Female"].includes(s.gender) && (
-                              <FaGenderless title="Other / Non-binary" className="text-purple-400 text-sm" />
-                            )}
-                          </h2>
-
-                          <p className="text-xs bg-white/10 text-pink-300 px-3 py-[2px] rounded-full inline-block">
-                            {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
-                          </p>
-                          {/* Danh sách dịch vụ hiển thị ngắn gọn */}
-                          {Array.isArray(s.services) && s.services.length > 0 && (
-                            <div className="mt-2 w-full">
-                              <p className="text-[13px] font-semibold text-emerald-300 mb-1 text-left pl-2">✨ Services:</p>
-                              <div className="max-h-[92px] overflow-y-auto px-1 py-1 bg-white/5 rounded-md text-[11px] text-pink-100 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-transparent grid grid-cols-2 gap-2">
-                                {s.services.slice(0, 6).map((srv) => (
-                                  <div
-                                    key={srv.id}
-                                    className="bg-white/5 rounded-lg px-2 py-[3px] flex flex-col justify-between h-full"
-                                  >
-                                    <span className="truncate block capitalize">💅 {srv.name}</span>
-                                  </div>
-                                ))}
-                                {s.services.length > 6 && (
-                                  <div className="col-span-2 text-right text-[10px] italic text-yellow-200 mt-1 pr-1">
-                                    +{s.services.length - 6} more
-                                  </div>
-                                )}
+                              {/* 🌿 Icon trang trí – nằm đè góc trái */}
+                              <div className="absolute -top-3 -left-10 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                                🌸
+                              </div>
+                              <div className="absolute top-9 -right-12 text-white rounded-full p-[4px] text-3xl  rotate-12">
+                                ✨
+                              </div>
+                              <div className="absolute top-22 -left-8 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                                🌸
+                              </div>
+                              <div className="absolute top-43 -right-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                                🌟
                               </div>
                             </div>
-                          )}
 
-                        </div>
-                        <div className="text-sm text-white/80 space-y-1">
-                          <p className="text-yellow-300 font-semibold">{s.salon_name}</p>
-                          <p>{s.salon_address}</p>
-                          <p className="text-emerald-300">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
-                        </div>
-                        {/* About section nếu có */}
-                        {s.description && (
-                          <div className="mt-1 text-xs text-pink-300 italic px-3">
-                            {aboutExpanded[s.id] ? (
-                              <>
-                                <div
-                                  id={`about-scroll-${s.id}`}
-                                  className="max-h-[50px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scrollbar-hide"
-                                  style={{
-                                    WebkitOverflowScrolling: "touch",
-                                    touchAction: "manipulation",
-                                    overscrollBehavior: "contain",
-                                  }}
-                                >
-                                  <p className="whitespace-pre-line reveal-anim">{s.description}</p>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setAboutExpanded({ ...aboutExpanded, [s.id]: false });
 
-                                    const el = document.getElementById(`about-scroll-${s.id}`);
-                                    if (el && el.dataset.rafId) {
-                                      cancelAnimationFrame(parseInt(el.dataset.rafId));
-                                      delete el.dataset.rafId;
-                                    }
-                                  }}
+                            {/* Info */}
+                            <h2 className="text-xl font-semibold text-pink-500 mt-2 mb-1 flex items-center justify-center gap-2">
+                              {s.name}
+                              {s.gender === "Female" && (
+                                <FaFemale title="Female" className="text-pink-400 text-lg" />
+                              )}
+                              {s.gender === "Male" && (
+                                <FaMale title="Male" className="text-blue-400 text-lg" />
+                              )}
+                              {s.gender && !["Male", "Female"].includes(s.gender) && (
+                                <FaGenderless title="Other / Non-binary" className="text-purple-400 text-sm" />
+                              )}
+                            </h2>
 
-                                  className="mt-1 text-emerald-300 underline text-[11px]"
-                                >
-                                  Show less
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                “{s.description.slice(0, 140)}...”
-                                <button
-                                  onClick={() => {
-                                    setAboutExpanded({ ...aboutExpanded, [s.id]: true });
-
-                                    setTimeout(() => {
-                                      const el = document.getElementById(`about-scroll-${s.id}`);
-                                      if (!el) return;
-
-                                      let scrollPos = el.scrollTop;
-                                      const scrollSpeed = 0.13;
-
-                                      const step = () => {
-                                        scrollPos += scrollSpeed;
-                                        el.scrollTop = scrollPos;
-
-                                        // Nếu chạm đáy, cuộn lại đầu
-                                        if (el.scrollTop + el.clientHeight >= el.scrollHeight) {
-                                          scrollPos = 0;
-                                        }
-
-                                        const rafId = requestAnimationFrame(step);
-                                        el.dataset.rafId = rafId; // lưu để dừng khi cần
-                                      };
-
-                                      step(); // bắt đầu cuộn
-                                    }, 100);
-                                  }}
-                                  className="ml-2 text-yellow-300 underline text-[11px]"
-                                >
-                                  Show more
-                                </button>
-                              </>
-                            )}
-                          </div>
-
-                        )}
-                        <button
-                          onClick={() => handleBookClick(s.id)}
-                          className="mt-2 bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
-                          rounded-3xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
-                          flex items-center justify-center gap-2"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="w-5 h-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                          Book Appointment
-                        </button>
-
-                      </div>
-
-                      {/* Mặt sau */}
-                      <div
-                        className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
-                        style={{
-                          overflow: 'visible',
-                          pointerEvents: 'auto',
-                          contain: 'layout paint',
-                          backfaceVisibility: 'hidden',
-                          WebkitBackfaceVisibility: 'hidden',
-                        }}
-                      >
-
-                        <h3 className="text-lg font-bold text-yellow-300 mb-3">
-                          ✨ Book Your Appointment
-                        </h3>
-
-                        <div className="text-left space-y-3 text-sm px-2 sm:px-3">
-
-                          {/* Step 1: Chọn dịch vụ */}
-                          <div>
-                            <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
-                              Step 1: Select Services
+                            <p className="text-xs bg-white/10 text-pink-300 px-3 py-[2px] rounded-full inline-block">
+                              {Array.isArray(s.specialization) ? s.specialization.map(formatSpecialization).join(", ") : formatSpecialization(s.specialization)}
                             </p>
-
-                            {/* Scrollable list of services */}
-                            <div
-                              className="scroll-services-mobile"
-                              style={{
-                                maxHeight: 100,
-                                overflowY: "auto",
-                                WebkitOverflowScrolling: "touch",
-                                overscrollBehavior: "contain",
-                                touchAction: "pan-y",
-                                scrollbarWidth: "thin"
-                              }}
-                            >
-                              {s.services?.length === 0 ? (
-                                <div className="text-sm text-red-400 italic px-2 py-2 bg-white/5 rounded-lg">
-                                  ❌ This stylist has not selected any services yet.
-                                </div>
-                              ) : (
-                                s.services.map((srv) => {
-                                  const isSelected = form.service_ids.includes(srv.id);
-                                  return (
-                                    <label
+                            {/* Danh sách dịch vụ hiển thị ngắn gọn */}
+                            {Array.isArray(s.services) && s.services.length > 0 && (
+                              <div className="mt-2 w-full">
+                                <p className="text-[13px] font-semibold text-emerald-300 mb-1 text-left pl-2">✨ Services:</p>
+                                <div className="max-h-[92px] overflow-y-auto px-1 py-1 bg-white/5 rounded-md text-[11px] text-pink-100 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-transparent grid grid-cols-2 gap-2">
+                                  {s.services.slice(0, 6).map((srv) => (
+                                    <div
                                       key={srv.id}
-                                      className={`flex items-center justify-between px-4 py-1 rounded-sm border-b cursor-pointer text-xs transition-all ${isSelected
-                                        ? "text-white border-pink-300"
-                                        : "text-pink-100 border-pink-400 hover:bg-white/5"
-                                        }`}
+                                      className="bg-white/5 rounded-lg px-2 py-[3px] flex flex-col justify-between h-full"
                                     >
-                                      <div className="flex items-start gap-3">
-                                        <input
-                                          type="checkbox"
-                                          checked={isSelected}
-                                          onChange={() => {
-                                            const selected = isSelected
-                                              ? form.service_ids.filter((id) => id !== srv.id)
-                                              : [...form.service_ids, srv.id];
+                                      <span className="truncate block capitalize">💅 {srv.name}</span>
+                                    </div>
+                                  ))}
+                                  {s.services.length > 6 && (
+                                    <div className="col-span-2 text-right text-[10px] italic text-yellow-200 mt-1 pr-1">
+                                      +{s.services.length - 6} more
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
 
-                                            const selectedServices = s.services.filter((s) =>
-                                              selected.includes(s.id)
-                                            );
-                                            const totalDuration = selectedServices.reduce(
-                                              (sum, s) => sum + (s.duration_minutes || 30),
-                                              0
-                                            );
+                          </div>
+                          <div className="text-sm text-white/80 space-y-1">
+                            <p className="text-yellow-300 font-semibold">{s.salon_name}</p>
+                            <p>{s.salon_address}</p>
+                            <p className="text-emerald-300">📍 {(s.distance * 0.621371).toFixed(2)} mi away</p>
+                          </div>
+                          {/* About section nếu có */}
+                          {s.description && (
+                            <div className="mt-1 text-xs text-pink-300 italic px-3">
+                              {aboutExpanded[s.id] ? (
+                                <>
+                                  <div
+                                    id={`about-scroll-${s.id}`}
+                                    className="max-h-[50px] overflow-y-auto pr-1 rounded-md scroll-touch scrollbar-thin scrollbar-thumb-white/40 scrollbar-track-white/10 scrollbar-hide"
+                                    style={{
+                                      WebkitOverflowScrolling: "touch",
+                                      touchAction: "manipulation",
+                                      overscrollBehavior: "contain",
+                                    }}
+                                  >
+                                    <p className="whitespace-pre-line reveal-anim">{s.description}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setAboutExpanded({ ...aboutExpanded, [s.id]: false });
 
-                                            // ✅ Nếu KHÔNG chọn dịch vụ nào → reset ngày + giờ + slot
-                                            if (selected.length === 0) {
-                                              setForm((prev) => ({
-                                                ...prev,
-                                                service_ids: [],
-                                                duration_minutes: 0,
-                                                appointment_date: "",
-                                              }));
-                                              setSelectedTime("");
-                                              setTimeSlots([]);
-                                              return;
-                                            }
+                                      const el = document.getElementById(`about-scroll-${s.id}`);
+                                      if (el && el.dataset.rafId) {
+                                        cancelAnimationFrame(parseInt(el.dataset.rafId));
+                                        delete el.dataset.rafId;
+                                      }
+                                    }}
 
-                                            // ✅ Nếu vẫn còn dịch vụ được chọn → cập nhật như thường
-                                            setForm({
-                                              ...form,
-                                              service_ids: selected,
-                                              duration_minutes: totalDuration,
-                                            });
+                                    className="mt-1 text-emerald-300 underline text-[11px]"
+                                  >
+                                    Show less
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  “{s.description.slice(0, 140)}...”
+                                  <button
+                                    onClick={() => {
+                                      setAboutExpanded({ ...aboutExpanded, [s.id]: true });
 
-                                            // ✅ Nếu đã chọn ngày → gọi lại availability với giờ làm
-                                            if (form.appointment_date) {
-                                              const schedule = stylistSchedule[s.id] || [];
-                                              const weekday = dayjs(form.appointment_date).day();
-                                              const workDay = schedule.find((s) => s.weekday === weekday);
+                                      setTimeout(() => {
+                                        const el = document.getElementById(`about-scroll-${s.id}`);
+                                        if (!el) return;
 
-                                              if (workDay) {
-                                                fetchAvailabilityWithDuration(
-                                                  s.id,
-                                                  form.appointment_date,
-                                                  totalDuration,
-                                                  workDay.start_time,
-                                                  workDay.end_time
-                                                );
-                                              }
-                                            }
-                                          }}
-                                          className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
-                                        />
+                                        let scrollPos = el.scrollTop;
+                                        const scrollSpeed = 0.13;
 
-                                        <div className="text-left">
-                                          <span className="block capitalize">{srv.name}</span>
-                                          <span className="block text-xs text-yellow-500">${srv.price}</span>
-                                        </div>
-                                      </div>
-                                    </label>
-                                  );
-                                })
+                                        const step = () => {
+                                          scrollPos += scrollSpeed;
+                                          el.scrollTop = scrollPos;
+
+                                          // Nếu chạm đáy, cuộn lại đầu
+                                          if (el.scrollTop + el.clientHeight >= el.scrollHeight) {
+                                            scrollPos = 0;
+                                          }
+
+                                          const rafId = requestAnimationFrame(step);
+                                          el.dataset.rafId = rafId; // lưu để dừng khi cần
+                                        };
+
+                                        step(); // bắt đầu cuộn
+                                      }, 100);
+                                    }}
+                                    className="ml-2 text-yellow-300 underline text-[11px]"
+                                  >
+                                    Show more
+                                  </button>
+                                </>
                               )}
                             </div>
 
-
-                            {/* Estimated duration */}
-                            {form.duration_minutes > 0 && (
-                              <p className="text-xs text-emerald-300 mt-2">
-                                ⏱ Estimated total time: {form.duration_minutes} minutes
-                              </p>
-                            )}
-                          </div>
-                          {/* Step 2: Chọn ngày */}
-                          <div>
-                            <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400 ">
-                              Step 2: Pick a Date
-                            </p>
-
-                            {form.service_ids.length === 0 ? (
-                              <div className="text-xs text-red-400 italic px-3 py-1 bg-white/10 rounded-lg">
-                                ⚠️ Please select at least one service before choosing a date.
-                              </div>
-                            ) : (() => {
-                              const schedule = stylistSchedule[s.id] || [];
-                              if (schedule.length === 0) {
-                                return (
-                                  <div className="text-xs text-red-400 italic px-3 py-1 bg-white/10 rounded-lg">
-                                    ❌ This stylist does not have any work schedule set up yet.
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <div className="rounded-2xl bg-white/5 px-2 py-1 text-yellow-200">
-                                  <DatePicker
-                                    selected={form.appointment_date ? dayjs(form.appointment_date).toDate() : null}
-                                    onChange={(date) => {
-                                      const dateStr = dayjs(date).format("YYYY-MM-DD");
-                                      const weekday = dayjs(date).day();
-                                      const workDay = schedule.find((s) => s.weekday === weekday);
-
-                                      if (workDay) {
-                                        fetchAvailabilityWithDuration(
-                                          s.id,
-                                          dateStr,
-                                          parseInt(form.duration_minutes || "60"),
-                                          workDay.start_time,
-                                          workDay.end_time
-                                        );
-                                      } else {
-                                        setTimeSlots([]);
-                                      }
-
-                                      setForm((prev) => ({ ...prev, appointment_date: dateStr }));
-                                      setSelectedTime("");
-                                    }}
-                                    filterDate={(date) => {
-                                      const weekday = dayjs(date).day();
-                                      return schedule.some((s) => s.weekday === weekday);
-                                    }}
-                                    minDate={new Date()}
-                                    customInput={
-                                      <button className="w-full text-left text-yellow-400 px-4 py-1 h-[20px] flex items-center gap-2 transition">
-                                        <CalendarDays className="w-4 h-4 text-yellow-300" />
-                                        <span className={form.appointment_date ? "" : "text-yellow-500 opacity-70"}>
-                                          {form.appointment_date
-                                            ? dayjs(form.appointment_date).format("MMMM D, YYYY")
-                                            : " Select a date..."}
-                                        </span>
-                                      </button>
-                                    }
-                                    dateFormat="MMMM d, yyyy"
-                                    className="w-full px-4 py-1 h-[20px] text-yellow-200 placeholder:text-yellow-400"
-                                    calendarClassName="!bg-white !text-black rounded-xl shadow-lg"
-                                    dayClassName={() =>
-                                      "text-sm text-gray-800 hover:bg-pink-200 hover:text-black rounded-lg transition-all"
-                                    }
-                                  />
-                                </div>
-                              );
-                            })()}
-                          </div>
-                          {/* Step 3: Choose Time */}
-                          <div className="mt-4">
-                            <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
-                              Step 3: Choose Time
-                            </p>
-
-                            {!form.appointment_date ? (
-                              <select
-                                disabled
-                                className="block w-full bg-white/5 rounded-2xl text-yellow-500 opacity-70 
-                          px-3 py-1 h-[30px] leading-tight appearance-none cursor-not-allowed"
-                              >
-                                <option>Select a date first</option>
-                              </select>
-                            ) : timeSlots.length > 0 ? (
-                              <select
-                                value={selectedTime}
-                                onChange={(e) => setSelectedTime(e.target.value)}
-                                className="block w-full max-w-full bg-white/5 rounded-2xl text-yellow-400 px-3 py-1 h-[30px] pl-6 leading-tight appearance-none focus:outline-none"
-                              >
-                                <option value="">Select time...</option>
-                                {timeSlots.map((slot) => (
-                                  <option key={slot.time} value={slot.time}>
-                                    ⏱ {slot.time}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <p className="text-yellow-300 text-xs italic">
-                                ⚠️ No available time slots for this date & duration.
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Step 4: Ghi chú */}
-                          <div>
-                            <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">Step 4: Optional Notes</p>
-                            <textarea
-                              value={form.note}
-                              onChange={(e) => setForm({ ...form, note: e.target.value })}
-                              className="w-full rounded p-1 text-pink-100 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
-                              placeholder="Anything specific?"
-                            />
-                          </div>
-
-                          {/* Thông tin đặt */}
-                          {form.appointment_date && selectedTime && (
-                            <div className="mt-3 px-2 py-2 rounded-lg text-pink-200 text-sm font-semibold text-center whitespace-nowrap overflow-x-auto">
-                              📌 You selected:
-                              <span className="ml-1 text-yellow-300 font-bold">{form.appointment_date}</span>
-                              <span className="mx-1">at</span>
-                              <span className="text-yellow-300 font-bold">{selectedTime}</span>
-                            </div>
                           )}
+                          <button
+                            onClick={() => handleBookClick(s.id)}
+                            className="mt-2 bg-gradient-to-r from-pink-500 via-pink-500 to-rose-400 hover:brightness-110 text-white font-bold px-6 py-2
+                          rounded-3xl shadow-md hover:shadow-pink-500/40 transition-transform duration-200 transform hover:scale-105 
+                          flex items-center justify-center gap-2"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="w-5 h-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                            Book Appointment
+                          </button>
 
                         </div>
 
-                        {/* Gửi lịch hẹn */}
-                        <button
-                          disabled={submitting}
-                          onClick={() => handleSubmitBooking(s)}
-                          className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-semibold py-2 rounded-3xl shadow-lg transition-all"
+                        {/* Mặt sau */}
+                        <div
+                          className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
+                          style={{
+                            overflow: 'visible',
+                            pointerEvents: 'auto',
+                            contain: 'layout paint',
+                            backfaceVisibility: 'hidden',
+                            WebkitBackfaceVisibility: 'hidden',
+                          }}
                         >
-                          {submitting ? "⏳ Booking..." : "✅ Confirm Booking"}
-                        </button>
 
-                        {/* Quay lại */}
-                        <button
-                          onClick={() => setFlippedId(null)}
-                          className="mt-4 bg-pink-500 hover:bg-pink-400 text-white font-semibold py-2 rounded-3xl px-4 shadow-lg transition-all"
-                        >
-                          🔙 Go back
-                        </button>
+                          <h3 className="text-lg font-bold text-yellow-300 mb-3">
+                            ✨ Book Your Appointment
+                          </h3>
+
+                          <div className="text-left space-y-3 text-sm px-2 sm:px-3">
+
+                            {/* Step 1: Chọn dịch vụ */}
+                            <div>
+                              <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
+                                Step 1: Select Services
+                              </p>
+
+                              {/* Scrollable list of services */}
+                              <div
+                                className="scroll-services-mobile"
+                                style={{
+                                  maxHeight: 100,
+                                  overflowY: "auto",
+                                  WebkitOverflowScrolling: "touch",
+                                  overscrollBehavior: "contain",
+                                  touchAction: "pan-y",
+                                  scrollbarWidth: "thin"
+                                }}
+                              >
+                                {s.services?.length === 0 ? (
+                                  <div className="text-sm text-red-400 italic px-2 py-2 bg-white/5 rounded-lg">
+                                    ❌ This stylist has not selected any services yet.
+                                  </div>
+                                ) : (
+                                  s.services.map((srv) => {
+                                    const isSelected = form.service_ids.includes(srv.id);
+                                    return (
+                                      <label
+                                        key={srv.id}
+                                        className={`flex items-center justify-between px-4 py-1 rounded-sm border-b cursor-pointer text-xs transition-all ${isSelected
+                                          ? "text-white border-pink-300"
+                                          : "text-pink-100 border-pink-400 hover:bg-white/5"
+                                          }`}
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => {
+                                              const selected = isSelected
+                                                ? form.service_ids.filter((id) => id !== srv.id)
+                                                : [...form.service_ids, srv.id];
+
+                                              const selectedServices = s.services.filter((s) =>
+                                                selected.includes(s.id)
+                                              );
+                                              const totalDuration = selectedServices.reduce(
+                                                (sum, s) => sum + (s.duration_minutes || 30),
+                                                0
+                                              );
+
+                                              // ✅ Nếu KHÔNG chọn dịch vụ nào → reset ngày + giờ + slot
+                                              if (selected.length === 0) {
+                                                setForm((prev) => ({
+                                                  ...prev,
+                                                  service_ids: [],
+                                                  duration_minutes: 0,
+                                                  appointment_date: "",
+                                                }));
+                                                setSelectedTime("");
+                                                setTimeSlots([]);
+                                                return;
+                                              }
+
+                                              // ✅ Nếu vẫn còn dịch vụ được chọn → cập nhật như thường
+                                              setForm({
+                                                ...form,
+                                                service_ids: selected,
+                                                duration_minutes: totalDuration,
+                                              });
+
+                                              // ✅ Nếu đã chọn ngày → gọi lại availability với giờ làm
+                                              if (form.appointment_date) {
+                                                const schedule = stylistSchedule[s.id] || [];
+                                                const weekday = dayjs(form.appointment_date).day();
+                                                const workDay = schedule.find((s) => s.weekday === weekday);
+
+                                                if (workDay) {
+                                                  fetchAvailabilityWithDuration(
+                                                    s.id,
+                                                    form.appointment_date,
+                                                    totalDuration,
+                                                    workDay.start_time,
+                                                    workDay.end_time
+                                                  );
+                                                }
+                                              }
+                                            }}
+                                            className="form-checkbox mt-1 h-4 w-4 text-emerald-500 accent-emerald-600"
+                                          />
+
+                                          <div className="text-left">
+                                            <span className="block capitalize">{srv.name}</span>
+                                            <span className="block text-xs text-yellow-500">${srv.price}</span>
+                                          </div>
+                                        </div>
+                                      </label>
+                                    );
+                                  })
+                                )}
+                              </div>
+
+
+                              {/* Estimated duration */}
+                              {form.duration_minutes > 0 && (
+                                <p className="text-xs text-emerald-300 mt-2">
+                                  ⏱ Estimated total time: {form.duration_minutes} minutes
+                                </p>
+                              )}
+                            </div>
+                            {/* Step 2: Chọn ngày */}
+                            <div>
+                              <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400 ">
+                                Step 2: Pick a Date
+                              </p>
+
+                              {form.service_ids.length === 0 ? (
+                                <div className="text-xs text-red-400 italic px-3 py-1 bg-white/10 rounded-lg">
+                                  ⚠️ Please select at least one service before choosing a date.
+                                </div>
+                              ) : (() => {
+                                const schedule = stylistSchedule[s.id] || [];
+                                if (schedule.length === 0) {
+                                  return (
+                                    <div className="text-xs text-red-400 italic px-3 py-1 bg-white/10 rounded-lg">
+                                      ❌ This stylist does not have any work schedule set up yet.
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="rounded-2xl bg-white/5 px-2 py-1 text-yellow-200">
+                                    <DatePicker
+                                      selected={form.appointment_date ? dayjs(form.appointment_date).toDate() : null}
+                                      onChange={(date) => {
+                                        const dateStr = dayjs(date).format("YYYY-MM-DD");
+                                        const weekday = dayjs(date).day();
+                                        const workDay = schedule.find((s) => s.weekday === weekday);
+
+                                        if (workDay) {
+                                          fetchAvailabilityWithDuration(
+                                            s.id,
+                                            dateStr,
+                                            parseInt(form.duration_minutes || "60"),
+                                            workDay.start_time,
+                                            workDay.end_time
+                                          );
+                                        } else {
+                                          setTimeSlots([]);
+                                        }
+
+                                        setForm((prev) => ({ ...prev, appointment_date: dateStr }));
+                                        setSelectedTime("");
+                                      }}
+                                      filterDate={(date) => {
+                                        const weekday = dayjs(date).day();
+                                        return schedule.some((s) => s.weekday === weekday);
+                                      }}
+                                      minDate={new Date()}
+                                      customInput={
+                                        <button className="w-full text-left text-yellow-400 px-4 py-1 h-[20px] flex items-center gap-2 transition">
+                                          <CalendarDays className="w-4 h-4 text-yellow-300" />
+                                          <span className={form.appointment_date ? "" : "text-yellow-500 opacity-70"}>
+                                            {form.appointment_date
+                                              ? dayjs(form.appointment_date).format("MMMM D, YYYY")
+                                              : " Select a date..."}
+                                          </span>
+                                        </button>
+                                      }
+                                      dateFormat="MMMM d, yyyy"
+                                      className="w-full px-4 py-1 h-[20px] text-yellow-200 placeholder:text-yellow-400"
+                                      calendarClassName="!bg-white !text-black rounded-xl shadow-lg"
+                                      dayClassName={() =>
+                                        "text-sm text-gray-800 hover:bg-pink-200 hover:text-black rounded-lg transition-all"
+                                      }
+                                    />
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                            {/* Step 3: Choose Time */}
+                            <div className="mt-4">
+                              <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
+                                Step 3: Choose Time
+                              </p>
+
+                              {!form.appointment_date ? (
+                                <select
+                                  disabled
+                                  className="block w-full bg-white/5 rounded-2xl text-yellow-500 opacity-70 
+                          px-3 py-1 h-[30px] leading-tight appearance-none cursor-not-allowed"
+                                >
+                                  <option>Select a date first</option>
+                                </select>
+                              ) : timeSlots.length > 0 ? (
+                                <select
+                                  value={selectedTime}
+                                  onChange={(e) => setSelectedTime(e.target.value)}
+                                  className="block w-full max-w-full bg-white/5 rounded-2xl text-yellow-400 px-3 py-1 h-[30px] pl-6 leading-tight appearance-none focus:outline-none"
+                                >
+                                  <option value="">Select time...</option>
+                                  {timeSlots.map((slot) => (
+                                    <option key={slot.time} value={slot.time}>
+                                      ⏱ {slot.time}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <p className="text-yellow-300 text-xs italic">
+                                  ⚠️ No available time slots for this date & duration.
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Step 4: Ghi chú */}
+                            <div>
+                              <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">Step 4: Optional Notes</p>
+                              <textarea
+                                value={form.note}
+                                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                                className="w-full rounded p-1 text-pink-100 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
+                                placeholder="Anything specific?"
+                              />
+                            </div>
+
+                            {/* Thông tin đặt */}
+                            {form.appointment_date && selectedTime && (
+                              <div className="mt-3 px-2 py-2 rounded-lg text-pink-200 text-sm font-semibold text-center whitespace-nowrap overflow-x-auto">
+                                📌 You selected:
+                                <span className="ml-1 text-yellow-300 font-bold">{form.appointment_date}</span>
+                                <span className="mx-1">at</span>
+                                <span className="text-yellow-300 font-bold">{selectedTime}</span>
+                              </div>
+                            )}
+
+                          </div>
+
+                          {/* Gửi lịch hẹn */}
+                          <button
+                            disabled={submitting}
+                            onClick={() => handleSubmitBooking(s)}
+                            className="mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-white font-semibold py-2 rounded-3xl shadow-lg transition-all"
+                          >
+                            {submitting ? "⏳ Booking..." : "✅ Confirm Booking"}
+                          </button>
+
+                          {/* Quay lại */}
+                          <button
+                            onClick={() => setFlippedId(null)}
+                            className="mt-4 bg-pink-500 hover:bg-pink-400 text-white font-semibold py-2 rounded-3xl px-4 shadow-lg transition-all"
+                          >
+                            🔙 Go back
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-                {filteredStylists.length > 3 && (
-                  <div className="flex justify-center mt-4">
+                  ))}
+                </div>
+                {filteredStylists.length > visibleCount && (
+                  <div className="w-full flex justify-center mt-4">
                     <button
-                      className="bg-gradient-to-r from-emerald-400 to-pink-400 hover:from-pink-400 hover:to-emerald-400 text-white font-semibold px-6 py-2 rounded-full shadow-md transition"
-                      onClick={() => setShowAll((prev) => !prev)}
+                      className="bg-gradient-to-r from-emerald-400 to-pink-400 hover:from-pink-400 hover:to-emerald-400 text-white font-semibold px-8 py-2 rounded-full shadow-md transition-all duration-200"
+                      style={{ minWidth: 180 }}
+                      onClick={() => setVisibleCount((prev) => Math.min(prev + 3, filteredStylists.length))}
                     >
-                      {showAll ? "View Less" : `View More (${filteredStylists.length - 3} more)`}
+                      {`View More (${filteredStylists.length - visibleCount} more)`}
                     </button>
                   </div>
                 )}
-              </div>
+
+                {filteredStylists.length > 3 && visibleCount >= filteredStylists.length && (
+                  <div className="w-full flex justify-center mt-4">
+                    <button
+                      className="bg-gradient-to-r from-pink-400 to-emerald-400 hover:from-emerald-400 hover:to-pink-400 text-white font-semibold px-8 py-2 rounded-full shadow-md transition-all duration-200"
+                      style={{ minWidth: 180 }}
+                      onClick={() => setVisibleCount(3)}
+                    >
+                      View Less
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
