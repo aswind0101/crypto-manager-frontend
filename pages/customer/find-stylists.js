@@ -825,16 +825,13 @@ export default function FindStylists() {
 
                         {/* Scrollable list of services */}
                         <div
-                          className="max-h-24 overflow-scroll pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md relative z-10"
+                          className="max-h-24 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md scroll-fix"
                           style={{
-                            height: 100,
-                            WebkitOverflowScrolling: 'touch',
-                            overscrollBehavior: 'contain',
-                            touchAction: 'manipulation',
-                            scrollBehavior: 'smooth',
+                            WebkitOverflowScrolling: "touch",
+                            touchAction: "pan-y",
+                            overscrollBehavior: "contain",
                           }}
                         >
-
                           {s.services?.length === 0 ? (
                             <div className="text-sm text-red-400 italic px-2 py-2 bg-white/5 rounded-lg">
                               ❌ This stylist has not selected any services yet.

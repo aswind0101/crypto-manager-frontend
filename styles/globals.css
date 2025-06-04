@@ -183,5 +183,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 1;
   cursor: pointer;
 }
+.scroll-fix {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
 
 
