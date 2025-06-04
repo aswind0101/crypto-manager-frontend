@@ -35,6 +35,7 @@ export default function FindStylists() {
   const [timeSlots, setTimeSlots] = useState([]);
   const [selectedTime, setSelectedTime] = useState(""); // HH:mm
   const [stylistSchedule, setStylistSchedule] = useState({});
+  const [showAll, setShowAll] = useState(false);
 
   // Form đặt lịch
   const [form, setForm] = useState({
@@ -488,6 +489,8 @@ export default function FindStylists() {
       return true;
     })
     .sort((a, b) => a.distance - b.distance); // sắp xếp stylist gần nhất lên đầu
+
+  const visibleStylists = showAll ? filteredStylists : filteredStylists.slice(0, 3);
   return (
     <div className="min-h-screen text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
@@ -629,7 +632,7 @@ export default function FindStylists() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredStylists.map((s) => (
+                {visibleStylists.map((s) => (
                   <div
                     key={s.id}
                     className="relative w-full min-h-[630px] sm:min-h-[630px] h-auto perspective-[1500px]"
@@ -1092,6 +1095,16 @@ export default function FindStylists() {
                     </div>
                   </div>
                 ))}
+                {filteredStylists.length > 3 && (
+                  <div className="flex justify-center mt-4">
+                    <button
+                      className="bg-gradient-to-r from-emerald-400 to-pink-400 hover:from-pink-400 hover:to-emerald-400 text-white font-semibold px-6 py-2 rounded-full shadow-md transition"
+                      onClick={() => setShowAll((prev) => !prev)}
+                    >
+                      {showAll ? "View Less" : `View More (${filteredStylists.length - 3} more)`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </>
