@@ -801,7 +801,7 @@ export default function FindStylists() {
 
                   {/* Mặt sau */}
                   <div
-                    className="w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
+                    className="absolute w-full min-h-full h-auto bg-white/10 rounded-2xl backface-hidden rotate-y-180 border-b-8 border-t-8 border-pink-500 p-4 shadow-md flex flex-col text-center"
                     style={{
                       overflow: 'visible',
                       pointerEvents: 'auto',
@@ -825,11 +825,14 @@ export default function FindStylists() {
 
                         {/* Scrollable list of services */}
                         <div
-                          className="max-h-24 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-zinc-700 rounded-md scroll-fix"
+                          className="scroll-services-mobile"
                           style={{
+                            maxHeight: 120,
+                            overflowY: "auto",
                             WebkitOverflowScrolling: "touch",
-                            touchAction: "pan-y",
                             overscrollBehavior: "contain",
+                            touchAction: "pan-y",
+                            scrollbarWidth: "thin"
                           }}
                         >
                           {s.services?.length === 0 ? (

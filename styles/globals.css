@@ -161,11 +161,7 @@ body {
 .card-animate-in {
   animation: slideUpFadeIn 0.6s ease-out;
 }
-.scroll-touch {
-  -webkit-overflow-scrolling: touch;
-  touch-action: manipulation;
-  overscroll-behavior: contain;
-}
+
 .scroll-about {
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -183,11 +179,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 1;
   cursor: pointer;
 }
-.scroll-fix {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
+.scroll-services-mobile {
+  max-height: 120px;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important;
+  scrollbar-width: thin;
+  scrollbar-color: #f472b6 #18181b;
 }
+
+
 
 
 
