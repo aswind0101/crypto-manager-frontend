@@ -877,7 +877,7 @@ export default function FindStylists() {
                                         key={srv.id}
                                         className={`flex items-center justify-between px-4 py-1 rounded-sm border-b cursor-pointer text-xs transition-all ${isSelected
                                           ? "text-white border-pink-300"
-                                          : "text-pink-100 border-pink-400 hover:bg-white/5"
+                                          : "text-pink-100 border-pink-300 hover:bg-white/5"
                                           }`}
                                       >
                                         <div className="flex items-start gap-3">
