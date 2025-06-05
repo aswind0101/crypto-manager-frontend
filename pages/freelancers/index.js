@@ -569,7 +569,7 @@ export default function FreelancerDashboard() {
         </div>
       )}
       <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-6">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-1">
           {/* Welcome Block */}
           <div className="col-span-12 md:col-span-12 flex flex-col md:flex-row md:items-center gap-2 p-1 pb-2">
             {/* Avatar */}
@@ -594,7 +594,7 @@ export default function FreelancerDashboard() {
               <div className="absolute top-14 -right-12 text-white rounded-full p-[4px] text-2xl  rotate-12">
                 ✨
               </div>
-              <div className="absolute top-22 -right-40 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+              <div className="absolute top-22 -right-55 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
                 ✨
               </div>
               <div className="absolute top-1 -right-40 text-white rounded-full p-[6px] text-xl rotate-[-10deg]">
