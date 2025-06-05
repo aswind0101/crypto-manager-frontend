@@ -639,7 +639,7 @@ export default function FreelancerDashboard() {
 
           <div className="col-span-12 border-t border-b border-pink-400 shadow-lg rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xl font-bold text-yellow-300">💈 Your Available Services</h3>
+              <h3 className="text-xl font-bold text-yellow-300">💈 Available Services</h3>
               <button
                 className="text-pink-300 hover:text-pink-200 transition"
                 onClick={() => setShowServiceDetails((prev) => !prev)}
