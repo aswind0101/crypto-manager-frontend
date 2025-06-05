@@ -555,14 +555,45 @@ export default function FreelancerDashboard() {
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
           {/* Welcome Block */}
           <div className="col-span-12 md:col-span-6 p-6">
-            <h2 className="text-2xl font-bold text-emerald-300 mb-2">
-              🌟 Welcome back, {user?.displayName || "Freelancer"}!
-            </h2>
-            <p className="text-gray-300">Let’s check your schedule and income today.</p>
+            {/* Welcome & Avatar */}
+            <div className="flex flex-col sm:flex-row items-center gap-5 mb-8 bg-gradient-to-br from-pink-900/30 via-emerald-800/30 to-yellow-800/10 p-5 rounded-2xl shadow-lg">
+              {/* Avatar */}
+              <div className="w-20 h-20 min-w-[80px] min-h-[80px] max-w-[80px] max-h-[80px] rounded-full border-4 border-white/80 shadow-lg overflow-hidden bg-gray-100 mb-3 sm:mb-0">
+                <img
+                  src={onboarding?.avatar_url || "/default-avatar.png"}
+                  alt="Freelancer Avatar"
+                  className="w-full h-full object-cover rounded-full aspect-square"
+                  onError={e => { e.currentTarget.src = "/default-avatar.png"; }}
+                />
+              </div>
+              {/* Info + Rating */}
+              <div className="flex-1 flex flex-col items-center sm:items-start">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-bold text-emerald-300">Welcome back, {user?.displayName || "Freelancer"}!</h2>
+                  {/* Badge rating số sao */}
+                  <div className="flex items-center gap-1 ml-3 bg-emerald-400/90 px-2 py-[2px] rounded-full shadow-sm">
+                    {/* Dùng react-icons hoặc tự svg như bên dưới */}
+                    {[...Array(5)].map((_, i) => (
+                      <svg key={i} viewBox="0 0 20 20" fill={i < (onboarding?.rating || 0) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
+                      </svg>
+                    ))}
+                    <span className="ml-1 font-bold text-yellow-100">{onboarding?.rating?.toFixed(1) || "0.0"}</span>
+                  </div>
+                </div>
+                <p className="text-gray-300 mt-1 text-sm">Let’s check your schedule and income today.</p>
+                {/* Tổng số review */}
+                <div className="mt-1 flex items-center gap-2 text-xs text-pink-200">
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-yellow-300"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" /></svg>
+                  {onboarding?.review_count ? (
+                    <span>{onboarding.review_count} reviews</span>
+                  ) : (
+                    <span>No reviews yet</span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-          {/* Rating */}
-          <Card className="col-span-12 md:col-span-6" icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
-          {/* Your Available Services */}
           <div className="col-span-12 border-t border-b border-pink-400 shadow-lg rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xl font-bold text-yellow-300">💈 Your Available Services</h3>
@@ -577,7 +608,7 @@ export default function FreelancerDashboard() {
                   <div className="flex items-center gap-1">
                     <Eye className="w-5 h-5" />
                     <span className="text-xs text-yellow-300 font-semibold">
-                      {selectedServiceIds.length}
+                      {availableServices.length}
                     </span>
                   </div>
                 )}
