@@ -17,7 +17,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
 import { Eye, EyeOff } from "lucide-react";
-
+import { Loader2 } from "lucide-react";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -28,6 +28,7 @@ export default function FreelancerDashboard() {
   const [userRole, setUserRole] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
   const [loading, setLoading] = useState(true);
+
   const [appointments, setAppointments] = useState([]);
   const [appointmentsToday, setAppointmentsToday] = useState([]);
   const [nextAppointment, setNextAppointment] = useState(null);
@@ -50,8 +51,10 @@ export default function FreelancerDashboard() {
   const [showServiceDetails, setShowServiceDetails] = useState(false);
 
   // 🟢 State để lưu trạng thái cập nhật dịch vụ
-  const [updatingServices, setUpdatingServices] = useState(false);
-  const [savingStatus, setSavingStatus] = useState(""); // "" | "saving" | "saved"
+  const [savingStatus, setSavingStatus] = useState(""); // '' | 'saving' | 'saved' | 'error'
+  const [updatingServiceId, setUpdatingServiceId] = useState(null); // service đang loading
+
+
   const hasMounted = useRef(false);
 
   const [confirmedNextClient, setConfirmedNextClient] = useState(null); // 🟢 Next Client
@@ -598,7 +601,7 @@ export default function FreelancerDashboard() {
                 ✨
               </div>
               <div className="absolute top-1 -right-40 text-white rounded-full p-[6px] text-xl rotate-[-10deg]">
-                ✨ 
+                ✨
               </div>
             </div>
             <div className="text-base font-bold text-emerald-300">{user?.displayName || onboarding?.name || "Freelancer"}</div>
@@ -646,9 +649,9 @@ export default function FreelancerDashboard() {
 
           </div>
 
-          <div className="col-span-12 border-t border-b border-pink-400 shadow-lg rounded-2xl p-5">
+          <div className="col-span-12 border-t-4 border-b-4 border-pink-400 shadow-lg rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold text-yellow-300">💈 Services</h3>
+              <h3 className="text-lg font-bold text-pink-300">💈 Services</h3>
               <button
                 className="text-pink-300 hover:text-pink-200 transition"
                 onClick={() => setShowServiceDetails((prev) => !prev)}
@@ -681,25 +684,70 @@ export default function FreelancerDashboard() {
                     {availableServices.map((srv) => {
                       const checked = selectedServiceIds.includes(srv.id);
                       return (
-                        <label key={srv.id} className="flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize">
+                        <label
+                          key={srv.id}
+                          className={`flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize relative`}
+                        >
                           <input
                             type="checkbox"
                             checked={checked}
-                            onChange={(e) => {
+                            disabled={savingStatus === "saving" || updatingServiceId === srv.id}
+                            onChange={async (e) => {
+                              const checked = e.target.checked;
                               const newIds = checked
-                                ? selectedServiceIds.filter((id) => id !== srv.id)
-                                : [...selectedServiceIds, srv.id];
+                                ? [...selectedServiceIds, srv.id]
+                                : selectedServiceIds.filter((id) => id !== srv.id);
+
+                              setUpdatingServiceId(srv.id);
+                              setSavingStatus("saving");
                               setSelectedServiceIds(newIds);
+
+                              try {
+                                const token = await user.getIdToken();
+                                const res = await fetch(
+                                  "https://crypto-manager-backend.onrender.com/api/freelancers/services",
+                                  {
+                                    method: "PATCH",
+                                    headers: {
+                                      Authorization: `Bearer ${token}`,
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ service_ids: newIds }),
+                                  }
+                                );
+                                if (!res.ok) throw new Error("Failed to update services");
+                                setSavingStatus("saved");
+                                setTimeout(() => setSavingStatus(""), 1200);
+                              } catch (err) {
+                                setSavingStatus("error");
+                                setTimeout(() => setSavingStatus(""), 1500);
+                              }
+                              setUpdatingServiceId(null);
                             }}
                             className="accent-pink-500 mt-1"
                           />
                           <div className="flex flex-col">
-                            <span className="font-semibold text-pink-300">{srv.name}</span>
-                            <span className="text-xs text-emerald-300">${srv.price} – {srv.duration_minutes} min</span>
+                            <span className="font-semibold text-pink-300 flex items-center gap-2">
+                              {srv.name}
+                              {updatingServiceId === srv.id && savingStatus === "saving" && (
+                                <Loader2 className="animate-spin w-4 h-4 text-yellow-400 ml-1" />
+                              )}
+                              {checked && savingStatus === "saved" && updatingServiceId === null && (
+                                <span className="ml-1 text-emerald-400 text-sm">✔️</span>
+                              )}
+                            </span>
+                            <span className="text-xs text-emerald-300">
+                              ${srv.price} – {srv.duration_minutes} min
+                            </span>
                           </div>
                         </label>
                       );
                     })}
+                    {savingStatus === "error" && (
+                      <div className="text-red-400 text-sm mt-2 animate-bounce-in">
+                        Save failed! Please try again.
+                      </div>
+                    )}
                   </div>
                 )}
               </>
@@ -764,7 +812,7 @@ export default function FreelancerDashboard() {
 }
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className={`relative ${className} border-t border-b border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
+    <div className={`relative ${className} border-t-4 border-b-4 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-xl font-extrabold text-white">{value}</div>

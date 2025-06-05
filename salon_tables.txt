@@ -1,0 +1,305 @@
+-- Table: public.appointments
+
+-- DROP TABLE IF EXISTS public.appointments;
+
+CREATE TABLE IF NOT EXISTS public.appointments
+(
+    id integer NOT NULL DEFAULT nextval('appointments_id_seq'::regclass),
+    customer_uid text COLLATE pg_catalog."default" NOT NULL,
+    stylist_id integer NOT NULL,
+    salon_id integer NOT NULL,
+    service_ids integer[] NOT NULL,
+    appointment_date timestamp without time zone NOT NULL,
+    duration_minutes integer,
+    note text COLLATE pg_catalog."default",
+    status text COLLATE pg_catalog."default" DEFAULT 'pending'::text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT appointments_pkey PRIMARY KEY (id),
+    CONSTRAINT appointments_salon_id_fkey FOREIGN KEY (salon_id)
+        REFERENCES public.salons (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT appointments_stylist_id_fkey FOREIGN KEY (stylist_id)
+        REFERENCES public.freelancers (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.appointments
+    OWNER to crypto_manager_user;
+========================================================================
+-- Table: public.customers
+
+-- DROP TABLE IF EXISTS public.customers;
+
+CREATE TABLE IF NOT EXISTS public.customers
+(
+    id integer NOT NULL DEFAULT nextval('customers_id_seq'::regclass),
+    firebase_uid character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    name character varying(100) COLLATE pg_catalog."default",
+    email character varying(100) COLLATE pg_catalog."default",
+    phone character varying(20) COLLATE pg_catalog."default",
+    status character varying(20) COLLATE pg_catalog."default" DEFAULT 'active'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT customers_pkey PRIMARY KEY (id),
+    CONSTRAINT customers_email_key UNIQUE (email),
+    CONSTRAINT customers_firebase_uid_key UNIQUE (firebase_uid)
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.customers
+    OWNER to crypto_manager_user;
+
+============================================================================
+
+-- Table: public.employees
+
+-- DROP TABLE IF EXISTS public.employees;
+
+CREATE TABLE IF NOT EXISTS public.employees
+(
+    id integer NOT NULL DEFAULT nextval('employees_id_seq'::regclass),
+    salon_id integer NOT NULL,
+    firebase_uid character varying(128) COLLATE pg_catalog."default",
+    name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    phone character varying(20) COLLATE pg_catalog."default",
+    email character varying(255) COLLATE pg_catalog."default",
+    role character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    status character varying(50) COLLATE pg_catalog."default" DEFAULT 'active'::character varying,
+    avatar_url text COLLATE pg_catalog."default",
+    certifications text[] COLLATE pg_catalog."default",
+    id_documents text[] COLLATE pg_catalog."default",
+    rating_avg numeric(3,2) DEFAULT 0,
+    rating_count integer DEFAULT 0,
+    total_customers integer DEFAULT 0,
+    commission_percent numeric(5,2) DEFAULT 0,
+    is_freelancer boolean DEFAULT false,
+    payment_verified boolean DEFAULT false,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    certification_status character varying(50) COLLATE pg_catalog."default" DEFAULT 'In Review'::character varying,
+    id_document_status character varying(50) COLLATE pg_catalog."default" DEFAULT 'In Review'::character varying,
+    description text COLLATE pg_catalog."default",
+    freelancers_system boolean DEFAULT false,
+    CONSTRAINT employees_pkey PRIMARY KEY (id),
+    CONSTRAINT employees_firebase_uid_fkey FOREIGN KEY (firebase_uid)
+        REFERENCES public.users (firebase_uid) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT employees_salon_id_fkey FOREIGN KEY (salon_id)
+        REFERENCES public.salons (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    CONSTRAINT employees_status_check CHECK (status::text = ANY (ARRAY['active'::character varying, 'inactive'::character varying, 'pending_approval'::character varying, 'rejected'::character varying]::text[]))
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.employees
+    OWNER to crypto_manager_user;
+-- Index: idx_employees_firebase_uid
+
+-- DROP INDEX IF EXISTS public.idx_employees_firebase_uid;
+
+CREATE INDEX IF NOT EXISTS idx_employees_firebase_uid
+    ON public.employees USING btree
+    (firebase_uid COLLATE pg_catalog."default" ASC NULLS LAST)
+    TABLESPACE pg_default;
+-- Index: idx_employees_role
+
+-- DROP INDEX IF EXISTS public.idx_employees_role;
+
+CREATE INDEX IF NOT EXISTS idx_employees_role
+    ON public.employees USING btree
+    (role COLLATE pg_catalog."default" ASC NULLS LAST)
+    TABLESPACE pg_default;
+-- Index: idx_employees_salon_id
+
+-- DROP INDEX IF EXISTS public.idx_employees_salon_id;
+
+CREATE INDEX IF NOT EXISTS idx_employees_salon_id
+    ON public.employees USING btree
+    (salon_id ASC NULLS LAST)
+    TABLESPACE pg_default;
+-- Index: idx_employees_status
+
+-- DROP INDEX IF EXISTS public.idx_employees_status;
+
+CREATE INDEX IF NOT EXISTS idx_employees_status
+    ON public.employees USING btree
+    (status COLLATE pg_catalog."default" ASC NULLS LAST)
+    TABLESPACE pg_default;
+======================================================================
+-- Table: public.freelancer_schedule
+
+-- DROP TABLE IF EXISTS public.freelancer_schedule;
+
+CREATE TABLE IF NOT EXISTS public.freelancer_schedule
+(
+    id integer NOT NULL DEFAULT nextval('freelancer_schedule_id_seq'::regclass),
+    freelancer_id integer NOT NULL,
+    weekday integer NOT NULL,
+    start_time time without time zone NOT NULL,
+    end_time time without time zone NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT freelancer_schedule_pkey PRIMARY KEY (id),
+    CONSTRAINT freelancer_schedule_freelancer_id_fkey FOREIGN KEY (freelancer_id)
+        REFERENCES public.freelancers (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    CONSTRAINT freelancer_schedule_weekday_check CHECK (weekday >= 0 AND weekday <= 6)
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.freelancer_schedule
+    OWNER to crypto_manager_user;
+-- Index: idx_schedule_freelancer
+
+-- DROP INDEX IF EXISTS public.idx_schedule_freelancer;
+
+CREATE INDEX IF NOT EXISTS idx_schedule_freelancer
+    ON public.freelancer_schedule USING btree
+    (freelancer_id ASC NULLS LAST, weekday ASC NULLS LAST)
+    TABLESPACE pg_default;
+=======================================================================
+-- Table: public.freelancers
+
+-- DROP TABLE IF EXISTS public.freelancers;
+
+CREATE TABLE IF NOT EXISTS public.freelancers
+(
+    id integer NOT NULL DEFAULT nextval('freelancers_id_seq'::regclass),
+    name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    email character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    password text COLLATE pg_catalog."default" NOT NULL,
+    phone character varying(20) COLLATE pg_catalog."default",
+    address text COLLATE pg_catalog."default",
+    gender character varying(10) COLLATE pg_catalog."default",
+    birthday date,
+    about text COLLATE pg_catalog."default",
+    experience integer,
+    is_freelancer boolean DEFAULT true,
+    salon_id integer,
+    temp_salon_name character varying(255) COLLATE pg_catalog."default",
+    temp_salon_address text COLLATE pg_catalog."default",
+    temp_salon_phone character varying(20) COLLATE pg_catalog."default",
+    is_verified boolean DEFAULT false,
+    verify_token character varying(128) COLLATE pg_catalog."default",
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    avatar_url text COLLATE pg_catalog."default",
+    license_url text COLLATE pg_catalog."default",
+    id_doc_url text COLLATE pg_catalog."default",
+    payment_info text COLLATE pg_catalog."default",
+    firebase_uid text COLLATE pg_catalog."default",
+    license_status character varying(20) COLLATE pg_catalog."default" DEFAULT 'Pending'::character varying,
+    id_doc_status character varying(20) COLLATE pg_catalog."default" DEFAULT 'Pending'::character varying,
+    specialization text[] COLLATE pg_catalog."default",
+    status character varying(20) COLLATE pg_catalog."default" DEFAULT 'active'::character varying,
+    payment_connected boolean DEFAULT false,
+    rating double precision DEFAULT 5.0,
+    isqualified boolean DEFAULT false,
+    services integer[],
+    CONSTRAINT freelancers_pkey PRIMARY KEY (id),
+    CONSTRAINT freelancers_email_key UNIQUE (email),
+    CONSTRAINT freelancers_firebase_uid_key UNIQUE (firebase_uid),
+    CONSTRAINT freelancers_salon_id_fkey FOREIGN KEY (salon_id)
+        REFERENCES public.salons (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE SET NULL
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.freelancers
+    OWNER to crypto_manager_user;
+-- Index: idx_freelancers_email
+
+-- DROP INDEX IF EXISTS public.idx_freelancers_email;
+
+CREATE INDEX IF NOT EXISTS idx_freelancers_email
+    ON public.freelancers USING btree
+    (email COLLATE pg_catalog."default" ASC NULLS LAST)
+    TABLESPACE pg_default;
+=================================================================================
+-- Table: public.salon_services
+
+-- DROP TABLE IF EXISTS public.salon_services;
+
+CREATE TABLE IF NOT EXISTS public.salon_services
+(
+    id integer NOT NULL DEFAULT nextval('salon_services_id_seq'::regclass),
+    salon_id integer NOT NULL,
+    specialization text COLLATE pg_catalog."default" NOT NULL,
+    name text COLLATE pg_catalog."default" NOT NULL,
+    description text COLLATE pg_catalog."default",
+    price numeric(10,2) NOT NULL,
+    duration_minutes integer NOT NULL,
+    promotion text COLLATE pg_catalog."default",
+    is_active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT salon_services_pkey PRIMARY KEY (id),
+    CONSTRAINT salon_services_salon_id_fkey FOREIGN KEY (salon_id)
+        REFERENCES public.salons (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT salon_services_specialization_check CHECK (specialization = ANY (ARRAY['nail_tech'::text, 'hair_stylist'::text, 'barber'::text, 'esthetician'::text, 'lash_tech'::text, 'massage_therapist'::text, 'makeup_artist'::text, 'receptionist'::text]))
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.salon_services
+    OWNER to crypto_manager_user;
+==================================================================================
+
+-- Table: public.salons
+
+-- DROP TABLE IF EXISTS public.salons;
+
+CREATE TABLE IF NOT EXISTS public.salons
+(
+    id integer NOT NULL DEFAULT nextval('salons_id_seq'::regclass),
+    name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    address text COLLATE pg_catalog."default",
+    phone character varying(20) COLLATE pg_catalog."default",
+    owner_user_id character varying(255) COLLATE pg_catalog."default",
+    status character varying(50) COLLATE pg_catalog."default" DEFAULT 'active'::character varying,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    email character varying(255) COLLATE pg_catalog."default",
+    latitude double precision,
+    longitude double precision,
+    CONSTRAINT salons_pkey PRIMARY KEY (id),
+    CONSTRAINT unique_email UNIQUE (email)
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.salons
+    OWNER to crypto_manager_user;
+
+========================================================================================
+
+-- Table: public.users
+
+-- DROP TABLE IF EXISTS public.users;
+
+CREATE TABLE IF NOT EXISTS public.users
+(
+    id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+    firebase_uid character varying(128) COLLATE pg_catalog."default",
+    email character varying(255) COLLATE pg_catalog."default",
+    role character varying(50) COLLATE pg_catalog."default" NOT NULL DEFAULT 'KhachHang'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT users_pkey PRIMARY KEY (id),
+    CONSTRAINT users_email_key UNIQUE (email),
+    CONSTRAINT users_firebase_uid_key UNIQUE (firebase_uid)
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.users
+    OWNER to crypto_manager_user;
