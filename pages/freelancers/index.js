@@ -551,10 +551,10 @@ export default function FreelancerDashboard() {
           </button>
         </div>
       )}
-      <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8">
+      <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
           {/* Welcome Block */}
-          <div className="col-span-12 md:col-span-6 bg-white/5 backdrop-blur-md border-t-4 border-pink-500 rounded-3xl shadow-lg p-6">
+          <div className="col-span-12 md:col-span-6 p-6">
             <h2 className="text-2xl font-bold text-emerald-300 mb-2">
               🌟 Welcome back, {user?.displayName || "Freelancer"}!
             </h2>
