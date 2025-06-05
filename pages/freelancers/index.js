@@ -571,9 +571,9 @@ export default function FreelancerDashboard() {
       <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
           {/* Welcome Block */}
-          <div className="col-span-12 md:col-span-12 flex flex-col md:flex-row md:items-center gap-4 p-1 pb-2">
+          <div className="col-span-12 md:col-span-12 flex flex-col md:flex-row md:items-center gap-2 p-1 pb-2">
             {/* Avatar */}
-            <div className="relative w-24 h-24 flex-shrink-0 flex items-center justify-center mb-2 md:mb-0">
+            <div className="relative w-24 h-24 flex-shrink-0 flex items-center justify-center mb-1 md:mb-0">
               {/* Viền ngoài gradient 2 lớp */}
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400 via-pink-400 to-yellow-400"></div>
               {/* Viền trắng trong */}
@@ -616,13 +616,13 @@ export default function FreelancerDashboard() {
               </span>
             </div>
             {/* Thông tin + Total earning */}
-            <div className="flex-1 flex flex-col items-center justify-center gap-1 mt-2">
+            <div className="flex-1 flex flex-col items-center justify-center gap-1 mt-8 mb-8">
               {/* Tên + Rating + Review */}
               <div className="flex flex-col items-center">
 
               </div>
               {/* Tổng tiền hôm nay */}
-              <div className="flex items-center justify-center gap-2 mb-1 mt-2">
+              <div className="flex items-center justify-center gap-2 mb-2 mt-2">
                 <div className="relative inline-flex items-center justify-center px-6 py-2 rounded-2xl bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 shadow-xl border-2 border-yellow-400">
                   <FiDollarSign className="text-2xl text-emerald-700 drop-shadow-lg" />
                   <span className="text-3xl font-extrabold text-emerald-700 drop-shadow-lg tracking-wider" style={{ textShadow: "0 2px 12px #fde68a" }}>
