@@ -316,6 +316,23 @@ export default function FreelancerDashboard() {
   }).length;
 
 
+  const completedAppointmentsToday = appointmentsToday.filter(a => a.status === "completed");
+
+  const todayEarnings = completedAppointmentsToday.reduce((sum, a) =>
+    sum + (a.services?.reduce((s, srv) => s + (srv.price || 0), 0) || 0),
+    0
+  );
+
+  const totalAppointmentsToday = completedAppointmentsToday.length;
+
+  const totalMinutesToday = completedAppointmentsToday.reduce(
+    (sum, a) => sum + (a.duration_minutes || 0),
+    0
+  );
+
+  const totalHoursToday = (totalMinutesToday / 60).toFixed(1);
+
+
   const handleConfirmAppointment = async (appointmentId) => {
     try {
       const token = await user.getIdToken();
@@ -554,46 +571,72 @@ export default function FreelancerDashboard() {
       <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
           {/* Welcome Block */}
-          <div className="col-span-12 md:col-span-6 p-6">
-            {/* Welcome & Avatar */}
-            <div className="flex flex-col sm:flex-row items-center gap-5 mb-8 bg-gradient-to-br from-pink-900/30 via-emerald-800/30 to-yellow-800/10 p-5 rounded-2xl shadow-lg">
+          <div className="col-span-12 md:col-span-12 flex flex-col md:flex-row md:items-center gap-4 p-1 pb-2">
+            {/* Avatar */}
+            <div className="relative w-24 h-24 flex-shrink-0 flex items-center justify-center mb-2 md:mb-0">
+              {/* Viền ngoài gradient 2 lớp */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400 via-pink-400 to-yellow-400"></div>
+              {/* Viền trắng trong */}
+              <div className="absolute inset-1 rounded-full bg-white shadow-lg"></div>
               {/* Avatar */}
-              <div className="w-20 h-20 min-w-[80px] min-h-[80px] max-w-[80px] max-h-[80px] rounded-full border-4 border-white/80 shadow-lg overflow-hidden bg-gray-100 mb-3 sm:mb-0">
-                <img
-                  src={onboarding?.avatar_url || "/default-avatar.png"}
-                  alt="Freelancer Avatar"
-                  className="w-full h-full object-cover rounded-full aspect-square"
-                  onError={e => { e.currentTarget.src = "/default-avatar.png"; }}
-                />
+              <img
+                src={onboarding?.avatar_url || "/default-avatar.png"}
+                alt="Freelancer Avatar"
+                className="relative w-20 h-20 rounded-full object-cover aspect-square border-2 border-white shadow-xl z-10"
+                onError={e => { e.currentTarget.src = "/default-avatar.png"; }}
+              />
+              {/* Icon crown hoặc icon xịn nổi góc nếu muốn */}
+              <div className="absolute bottom-2 right-2 bg-yellow-300 rounded-full shadow p-1">
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-emerald-800">
+                  <path d="M2.5 13.5L5 7l5 7 5-7 2.5 6.5-7.5 5z" />
+                </svg>
               </div>
-              {/* Info + Rating */}
-              <div className="flex-1 flex flex-col items-center sm:items-start">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold text-emerald-300">Welcome back, {user?.displayName || "Freelancer"}!</h2>
-                  {/* Badge rating số sao */}
-                  <div className="flex items-center gap-1 ml-3 bg-emerald-400/90 px-2 py-[2px] rounded-full shadow-sm">
-                    {/* Dùng react-icons hoặc tự svg như bên dưới */}
-                    {[...Array(5)].map((_, i) => (
-                      <svg key={i} viewBox="0 0 20 20" fill={i < (onboarding?.rating || 0) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
-                      </svg>
-                    ))}
-                    <span className="ml-1 font-bold text-yellow-100">{onboarding?.rating?.toFixed(1) || "0.0"}</span>
-                  </div>
+            </div>
+            <div className="text-base font-bold text-emerald-300">{user?.displayName || onboarding?.name || "Freelancer"}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center bg-emerald-400/80 px-2 py-[2px] rounded-sm shadow text-yellow-100 font-bold text-sm">
+                {[...Array(5)].map((_, i) => (
+                  <svg key={i} viewBox="0 0 20 20" fill={i < Number(onboarding?.rating || 0) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
+                  </svg>
+                ))}
+                <span className="ml-1">{(Number(onboarding?.rating) || 0).toFixed(1)}</span>
+              </div>
+              <span className="text-xs text-yellow-300 font-semibold ml-2">
+                ⭐ {onboarding?.review_count || 0} reviews
+              </span>
+            </div>
+            {/* Thông tin + Total earning */}
+            <div className="flex-1 flex flex-col items-center justify-center gap-1 mt-2">
+              {/* Tên + Rating + Review */}
+              <div className="flex flex-col items-center">
+
+              </div>
+              {/* Tổng tiền hôm nay */}
+              <div className="flex items-center justify-center gap-2 mb-1 mt-2">
+                <div className="relative inline-flex items-center justify-center px-6 py-2 rounded-2xl bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 shadow-xl border-2 border-yellow-400">
+                  <FiDollarSign className="text-2xl text-emerald-700 drop-shadow-lg" />
+                  <span className="text-3xl font-extrabold text-emerald-700 drop-shadow-lg tracking-wider" style={{ textShadow: "0 2px 12px #fde68a" }}>
+                    {todayEarnings.toLocaleString()}
+                  </span>
                 </div>
-                <p className="text-gray-300 mt-1 text-sm">Let’s check your schedule and income today.</p>
-                {/* Tổng số review */}
-                <div className="mt-1 flex items-center gap-2 text-xs text-pink-200">
-                  <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-yellow-300"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" /></svg>
-                  {onboarding?.review_count ? (
-                    <span>{onboarding.review_count} reviews</span>
-                  ) : (
-                    <span>No reviews yet</span>
-                  )}
+              </div>
+
+              {/* Thống kê appointments hôm nay */}
+              <div className="flex gap-6 mt-2 w-full justify-center">
+                <div className="text-xs font-medium text-white/90">
+                  <FiCalendar className="inline-block mr-1 text-yellow-300" />
+                  {totalAppointmentsToday} Appointment(s) Today
+                </div>
+                <div className="text-xs font-medium text-white/90">
+                  <FiClock className="inline-block mr-1 text-emerald-300" />
+                  {totalHoursToday} Working hours
                 </div>
               </div>
             </div>
+
           </div>
+
           <div className="col-span-12 border-t border-b border-pink-400 shadow-lg rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xl font-bold text-yellow-300">💈 Your Available Services</h3>
@@ -653,13 +696,9 @@ export default function FreelancerDashboard() {
               </>
             )}
           </div>
-
-          {/* Earnings */}
-          <Card className="col-span-12 md:col-span-3" icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
-
           {/* Next Client */}
           <Card
-            className="col-span-12 md:col-span-3 capitalize"
+            className="col-span-12 md:col-span-6 capitalize"
             icon={<FiClock />}
             title="Next Client"
             value={
