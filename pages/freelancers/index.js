@@ -16,8 +16,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
-import { Eye, EyeOff } from "lucide-react";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -733,7 +732,7 @@ export default function FreelancerDashboard() {
                                 <Loader2 className="animate-spin w-4 h-4 text-yellow-400 ml-1" />
                               )}
                               {checked && savingStatus === "saved" && updatingServiceId === null && (
-                                <span className="ml-1 text-emerald-400 text-sm">✔️</span>
+                                <CheckCircle className="ml-1 w-4 h-4 text-emerald-400 drop-shadow" />
                               )}
                             </span>
                             <span className="text-xs text-emerald-300">
