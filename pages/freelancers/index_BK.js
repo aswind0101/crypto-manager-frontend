@@ -49,7 +49,7 @@ export default function FreelancerDashboard() {
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
   const [showServiceDetails, setShowServiceDetails] = useState(false);
 
-
+  // 🟢 State để lưu trạng thái cập nhật dịch vụ
   const [updatingServices, setUpdatingServices] = useState(false);
   const [savingStatus, setSavingStatus] = useState(""); // "" | "saving" | "saved"
   const hasMounted = useRef(false);
@@ -456,7 +456,7 @@ export default function FreelancerDashboard() {
   console.log("onboarding", onboarding);
 
   return (
-    <div className="min-h-screen text-gray-800 dark:text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
+    <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       {showPopup && pendingUpcomingAppointment && (
@@ -553,16 +553,16 @@ export default function FreelancerDashboard() {
       )}
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
         {/* Welcome Block */}
-        <div className="col-span-12 md:col-span-6 bg-white/20 backdrop-blur-md border border-white/20 rounded-3xl shadow-lg p-6">
-          <h2 className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mb-2">
+        <div className="col-span-12 md:col-span-6 bg-white/10 backdrop-blur-md border-t-4 border-pink-500 rounded-3xl shadow-lg p-6">
+          <h2 className="text-2xl font-bold text-emerald-300 mb-2">
             🌟 Welcome back, {user?.displayName || "Freelancer"}!
           </h2>
-          <p className="text-gray-700 dark:text-gray-300">Let’s check your schedule and income today.</p>
+          <p className="text-gray-300">Let’s check your schedule and income today.</p>
         </div>
         {/* Rating */}
         <Card className="col-span-12 md:col-span-6" icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
         {/* Your Available Services */}
-        <div className="col-span-12 bg-white/30 dark:bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-5 shadow-lg">
+        <div className="col-span-12 bg-white/5 backdrop-blur-lg border-t-4 border-pink-500 rounded-2xl p-5 shadow-lg">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xl font-bold text-yellow-300">💈 Your Available Services</h3>
             <button
@@ -672,7 +672,7 @@ export default function FreelancerDashboard() {
         <div className="col-span-12">
           <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <ActionButton label="📅 My Schedule" />
+            <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
             <ActionButton label="🧾 Appointments" />
             <ActionButton label="💬 Chat with Client" />
             <ActionButton label="💸 Withdraw" />
@@ -685,7 +685,7 @@ export default function FreelancerDashboard() {
 }
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className={`relative ${className} bg-white/10 dark:bg-white/5 backdrop-blur-lg border border-white/20 rounded-2xl p-5 shadow-xl transition-all`}>
+    <div className={`relative ${className} bg-white/5 backdrop-blur-lg border-t-4 border-pink-500 rounded-2xl p-5 shadow-xl transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-2xl font-extrabold text-white">{value}</div>
@@ -695,14 +695,16 @@ function Card({ icon, title, value, sub, children, className = "" }) {
   );
 }
 
-function ActionButton({ label }) {
+function ActionButton({ label, onClick }) {
   return (
-    <button className="w-full py-3 rounded-2xl bg-gradient-to-r from-pink-400 via-amber-300 to-emerald-400 dark:from-pink-600 dark:via-yellow-500 dark:to-emerald-500 text-white font-semibold shadow-lg hover:scale-105 transition-all text-sm">
+    <button
+      onClick={onClick}
+      className="w-full py-3 rounded-2xl bg-gradient-to-r from-pink-600 via-yellow-500 to-emerald-500 text-white font-semibold shadow-md hover:scale-105 transition"
+    >
       {label}
     </button>
   );
 }
-
 
 async function loadAppointments(
   token,

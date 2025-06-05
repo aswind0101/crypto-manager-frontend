@@ -551,131 +551,131 @@ export default function FreelancerDashboard() {
           </button>
         </div>
       )}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
-        {/* Welcome Block */}
-        <div className="col-span-12 md:col-span-6 bg-white/10 backdrop-blur-md border-t-4 border-pink-500 rounded-3xl shadow-lg p-6">
-          <h2 className="text-2xl font-bold text-emerald-300 mb-2">
-            🌟 Welcome back, {user?.displayName || "Freelancer"}!
-          </h2>
-          <p className="text-gray-300">Let’s check your schedule and income today.</p>
-        </div>
-        {/* Rating */}
-        <Card className="col-span-12 md:col-span-6" icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
-        {/* Your Available Services */}
-        <div className="col-span-12 bg-white/5 backdrop-blur-lg border-t-4 border-pink-500 rounded-2xl p-5 shadow-lg">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xl font-bold text-yellow-300">💈 Your Available Services</h3>
-            <button
-              className="text-pink-300 hover:text-pink-200 transition"
-              onClick={() => setShowServiceDetails((prev) => !prev)}
-              title={showServiceDetails ? "Hide details" : "View selected services"}
-            >
-              {showServiceDetails ? (
-                <EyeOff className="w-5 h-5" />
-              ) : (
-                <div className="flex items-center gap-1">
-                  <Eye className="w-5 h-5" />
-                  <span className="text-xs text-yellow-300 font-semibold">
-                    {selectedServiceIds.length}
-                  </span>
-                </div>
-              )}
-            </button>
+      <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-8">
+          {/* Welcome Block */}
+          <div className="col-span-12 md:col-span-6 bg-white/5 backdrop-blur-md border-t-4 border-pink-500 rounded-3xl shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-emerald-300 mb-2">
+              🌟 Welcome back, {user?.displayName || "Freelancer"}!
+            </h2>
+            <p className="text-gray-300">Let’s check your schedule and income today.</p>
+          </div>
+          {/* Rating */}
+          <Card className="col-span-12 md:col-span-6" icon={<FiMessageSquare />} title="Rating" value="4.8 ⭐" sub="124 reviews" />
+          {/* Your Available Services */}
+          <div className="col-span-12 border-t border-b border-pink-400 shadow-lg rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xl font-bold text-yellow-300">💈 Your Available Services</h3>
+              <button
+                className="text-pink-300 hover:text-pink-200 transition"
+                onClick={() => setShowServiceDetails((prev) => !prev)}
+                title={showServiceDetails ? "Hide details" : "View selected services"}
+              >
+                {showServiceDetails ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Eye className="w-5 h-5" />
+                    <span className="text-xs text-yellow-300 font-semibold">
+                      {selectedServiceIds.length}
+                    </span>
+                  </div>
+                )}
+              </button>
 
+            </div>
+
+            {!showServiceDetails ? (
+              <p className="text-sm text-white/80">
+                You have selected <span className="font-semibold text-emerald-300">{selectedServiceIds.length}</span> service{selectedServiceIds.length !== 1 ? "s" : ""}.
+              </p>
+            ) : (
+              <>
+                {availableServices.length === 0 ? (
+                  <p className="text-sm text-red-300 italic">No services found for your specialization.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                    {availableServices.map((srv) => {
+                      const checked = selectedServiceIds.includes(srv.id);
+                      return (
+                        <label key={srv.id} className="flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const newIds = checked
+                                ? selectedServiceIds.filter((id) => id !== srv.id)
+                                : [...selectedServiceIds, srv.id];
+                              setSelectedServiceIds(newIds);
+                            }}
+                            className="accent-pink-500 mt-1"
+                          />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-pink-300">{srv.name}</span>
+                            <span className="text-xs text-emerald-300">${srv.price} – {srv.duration_minutes} min</span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          {!showServiceDetails ? (
-            <p className="text-sm text-white/80">
-              You have selected <span className="font-semibold text-emerald-300">{selectedServiceIds.length}</span> service{selectedServiceIds.length !== 1 ? "s" : ""}.
-            </p>
-          ) : (
-            <>
-              {availableServices.length === 0 ? (
-                <p className="text-sm text-red-300 italic">No services found for your specialization.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  {availableServices.map((srv) => {
-                    const checked = selectedServiceIds.includes(srv.id);
-                    return (
-                      <label key={srv.id} className="flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            const newIds = checked
-                              ? selectedServiceIds.filter((id) => id !== srv.id)
-                              : [...selectedServiceIds, srv.id];
-                            setSelectedServiceIds(newIds);
-                          }}
-                          className="accent-pink-500 mt-1"
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-pink-300">{srv.name}</span>
-                          <span className="text-xs text-emerald-300">${srv.price} – {srv.duration_minutes} min</span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+          {/* Earnings */}
+          <Card className="col-span-12 md:col-span-3" icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
 
-        {/* Earnings */}
-        <Card className="col-span-12 md:col-span-3" icon={<FiDollarSign />} title="Today's Earnings" value="$145.00" sub="3 appointments" />
+          {/* Next Client */}
+          <Card
+            className="col-span-12 md:col-span-3 capitalize"
+            icon={<FiClock />}
+            title="Next Client"
+            value={
+              confirmedNextClient
+                ? dayjs(confirmedNextClient.appointment_date.replace("Z", "")).format("hh:mm A")
+                : "No upcoming"
+            }
+            sub={
+              confirmedNextClient?.customer_name
+                ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` ${timeUntilNext}` : ""}`
+                : "No upcoming"
+            }
+          />
 
-        {/* Next Client */}
-        <Card
-          className="col-span-12 md:col-span-3 capitalize"
-          icon={<FiClock />}
-          title="Next Client"
-          value={
-            confirmedNextClient
-              ? dayjs(confirmedNextClient.appointment_date.replace("Z", "")).format("hh:mm A")
-              : "No upcoming"
-          }
-          sub={
-            confirmedNextClient?.customer_name
-              ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` ${timeUntilNext}` : ""}`
-              : "No upcoming"
-          }
-        />
-
-        {/* Appointments */}
-        <Card
-          className="col-span-12 md:col-span-6"
-          icon={<FiCalendar />}
-          title="Appointments"
-          value={`${appointmentsToday.filter(a => a.status !== "cancelled").length} Today`}
-          sub={
-            <>
-              ✅ Completed: {completedToday} <br />
-              🟡 Pending: {pendingToday} <br />
-              ⏳ Upcoming: {upcomingToday} <br />
-              ❌ Missed: {missedToday}
-            </>
-          }
-        >
-          <button
-            onClick={() => router.push("/freelancers/appointments")}
-            className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
-            title="Manage Appointments"
+          {/* Appointments */}
+          <Card
+            className="col-span-12 md:col-span-6"
+            icon={<FiCalendar />}
+            title="Appointments"
+            value={`${appointmentsToday.filter(a => a.status !== "cancelled").length} Today`}
+            sub={
+              <>
+                ✅ Completed: {completedToday} <br />
+                🟡 Pending: {pendingToday} <br />
+                ⏳ Upcoming: {upcomingToday} <br />
+                ❌ Missed: {missedToday}
+              </>
+            }
           >
-            <FiExternalLink />
-          </button>
-        </Card>
+            <button
+              onClick={() => router.push("/freelancers/appointments")}
+              className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
+              title="Manage Appointments"
+            >
+              <FiExternalLink />
+            </button>
+          </Card>
 
-
-
-        {/* Quick Actions */}
-        <div className="col-span-12">
-          <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
-            <ActionButton label="🧾 Appointments" />
-            <ActionButton label="💬 Chat with Client" />
-            <ActionButton label="💸 Withdraw" />
+          {/* Quick Actions */}
+          <div className="col-span-12">
+            <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
+              <ActionButton label="🧾 Appointments" onClick={() => router.push("/freelancers/appointments")} />
+              <ActionButton label="💬 Chat with Client" onClick={() => router.push("/freelancers/chat")} />
+              <ActionButton label="💸 Withdraw" onClick={() => router.push("/freelancers/withdraw")} />
+            </div>
           </div>
         </div>
       </div>
@@ -685,7 +685,7 @@ export default function FreelancerDashboard() {
 }
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className={`relative ${className} bg-white/5 backdrop-blur-lg border-t-4 border-pink-500 rounded-2xl p-5 shadow-xl transition-all`}>
+    <div className={`relative ${className} border-t border-b border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-2xl font-extrabold text-white">{value}</div>

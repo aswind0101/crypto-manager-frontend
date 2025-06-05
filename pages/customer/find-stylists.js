@@ -1049,7 +1049,7 @@ export default function FindStylists() {
                                   <option value="">Select time...</option>
                                   {timeSlots.map((slot) => (
                                     <option key={slot.time} value={slot.time}>
-                                      ⏱ {slot.time}
+                                      ⏰ {slot.time}
                                     </option>
                                   ))}
                                 </select>
