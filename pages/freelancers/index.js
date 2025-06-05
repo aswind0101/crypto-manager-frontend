@@ -591,6 +591,15 @@ export default function FreelancerDashboard() {
                   <path d="M2.5 13.5L5 7l5 7 5-7 2.5 6.5-7.5 5z" />
                 </svg>
               </div>
+              <div className="absolute top-14 -right-12 text-white rounded-full p-[4px] text-2xl  rotate-12">
+                ✨
+              </div>
+              <div className="absolute top-22 -right-40 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                ✨
+              </div>
+              <div className="absolute top-1 -right-40 text-white rounded-full p-[6px] text-xl rotate-[-10deg]">
+                ✨ 
+              </div>
             </div>
             <div className="text-base font-bold text-emerald-300">{user?.displayName || onboarding?.name || "Freelancer"}</div>
             <div className="flex items-center gap-2 mt-1">
@@ -626,11 +635,11 @@ export default function FreelancerDashboard() {
               <div className="flex gap-6 mt-2 w-full justify-center">
                 <div className="text-xs font-medium text-white/90">
                   <FiCalendar className="inline-block mr-1 text-yellow-300" />
-                  {totalAppointmentsToday} Appointment(s) Today
+                  {totalAppointmentsToday} Appointment(s)
                 </div>
                 <div className="text-xs font-medium text-white/90">
                   <FiClock className="inline-block mr-1 text-emerald-300" />
-                  {totalHoursToday} Working hours
+                  {totalHoursToday} Hours
                 </div>
               </div>
             </div>
@@ -639,7 +648,7 @@ export default function FreelancerDashboard() {
 
           <div className="col-span-12 border-t border-b border-pink-400 shadow-lg rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xl font-bold text-yellow-300">💈 Available Services</h3>
+              <h3 className="text-lg font-bold text-yellow-300">💈 Available Services</h3>
               <button
                 className="text-pink-300 hover:text-pink-200 transition"
                 onClick={() => setShowServiceDetails((prev) => !prev)}
@@ -758,7 +767,7 @@ function Card({ icon, title, value, sub, children, className = "" }) {
     <div className={`relative ${className} border-t border-b border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
-      <div className="text-2xl font-extrabold text-white">{value}</div>
+      <div className="text-xl font-extrabold text-white">{value}</div>
       <p className="text-sm text-white/80">{sub}</p>
       {children}
     </div>
