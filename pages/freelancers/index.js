@@ -616,7 +616,7 @@ export default function FreelancerDashboard() {
               </span>
             </div>
             {/* Thông tin + Total earning */}
-            <div className="flex-1 flex flex-col items-center justify-center gap-1 mt-1 mb-1">
+            <div className="flex-1 flex flex-col items-center justify-center gap-1 mt-4 mb-1">
               {/* Tên + Rating + Review */}
               <div className="flex flex-col items-center">
 
