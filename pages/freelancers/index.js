@@ -17,7 +17,10 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
 import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeftCircle, ArrowRightCircle } from "lucide-react";
 
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -33,7 +36,16 @@ export default function FreelancerDashboard() {
   const [nextAppointment, setNextAppointment] = useState(null);
   const [timeUntilNext, setTimeUntilNext] = useState("");
   const [newAppointment, setNewAppointment] = useState(null);
+
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
+  const [nextClientIndex, setNextClientIndex] = useState(0);
+
   const [showPopup, setShowPopup] = useState(false);
+  const [latePopup, setLatePopup] = useState(null); // chứa appointment & logic chờ
+  const [waitMinutes, setWaitMinutes] = useState(5); // mặc định 5 phút chờ
+  const waitingTimeout = useRef(null);
+  const [hideLatePopupUntil, setHideLatePopupUntil] = useState(null);
+
   const soundRef = useRef(null);
   const soundLoopRef = useRef(null); // ✅ để lưu vòng lặp âm thanh
   const [isSliding, setIsSliding] = useState(false);
@@ -92,6 +104,41 @@ export default function FreelancerDashboard() {
       setSliderX(0); // Reset
     }
   };
+
+  // Hàm kiểm tra và show popup late
+  useEffect(() => {
+    if (!appointments || appointments.length === 0) return;
+
+    const now = dayjs();
+    // Nếu đang trong thời gian chờ, không show popup
+    if (hideLatePopupUntil && now.isBefore(hideLatePopupUntil)) return;
+
+    const lateAppt = appointments.find(
+      (a) =>
+        a.status === "confirmed" &&
+        now.isSameOrAfter(dayjs(a.appointment_date.replace("Z", ""))) && // CHỈ popup nếu ĐÃ đến hoặc QUA giờ hẹn
+        !a.started_at
+    );
+
+    if (lateAppt && !latePopup) {
+      setLatePopup(lateAppt);
+    }
+    if (!lateAppt && latePopup) {
+      setLatePopup(null);
+    }
+  }, [appointments]);
+
+
+  // Hàm clear timeout khi cần
+  const clearWaitingTimeout = () => {
+    if (waitingTimeout.current) {
+      clearTimeout(waitingTimeout.current);
+      waitingTimeout.current = null;
+    }
+  };
+
+
+
   useEffect(() => {
     if (!user || !Array.isArray(selectedServiceIds)) return;
 
@@ -218,7 +265,9 @@ export default function FreelancerDashboard() {
         setShowPopup,
         setNewAppointment,
         soundRef,
-        soundLoopRef
+        soundLoopRef,
+        setUpcomingAppointments,    // Thêm dòng này
+        setNextClientIndex          // Thêm dòng này
       );
 
       setLoading(false);
@@ -244,7 +293,9 @@ export default function FreelancerDashboard() {
         setShowPopup,
         setNewAppointment,
         soundRef,
-        soundLoopRef            // ✅ đối số 9
+        soundLoopRef,
+        setUpcomingAppointments,    // Thêm dòng này
+        setNextClientIndex          // Thêm dòng này            // ✅ đối số 9
       );
     };
     const interval = setInterval(refresh, 60000);
@@ -302,19 +353,23 @@ export default function FreelancerDashboard() {
   const now = dayjs();
   const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
 
+  // Tính các appointments theo workflow mới
   const pendingToday = appointmentsToday.filter(a => {
-    const time = dayjs(a.appointment_date.replace("Z", ""));
-    return a.status === "pending" && time.isAfter(now);
+    return a.status === "pending";
   }).length;
 
   const upcomingToday = appointmentsToday.filter(a => {
-    const time = dayjs(a.appointment_date.replace("Z", ""));
-    return a.status === "confirmed" && time.isAfter(now);
+    // upcoming: status = "confirmed", chưa started, và CHƯA QUA GIỜ HẸN
+    return a.status === "confirmed" &&
+      !a.started_at &&
+      dayjs(a.appointment_date.replace("Z", "")).isAfter(now);
   }).length;
 
   const missedToday = appointmentsToday.filter(a => {
-    const time = dayjs(a.appointment_date.replace("Z", ""));
-    return (a.status === "pending" || a.status === "confirmed") && time.isBefore(now);
+    // missed: status = "confirmed", chưa started, ĐÃ QUA GIỜ HẸN
+    return a.status === "confirmed" &&
+      !a.started_at &&
+      dayjs(a.appointment_date.replace("Z", "")).isBefore(now);
   }).length;
 
 
@@ -363,7 +418,9 @@ export default function FreelancerDashboard() {
           setShowPopup,
           setNewAppointment,
           soundRef,
-          soundLoopRef
+          soundLoopRef,
+          setUpcomingAppointments,    // Thêm dòng này
+          setNextClientIndex          // Thêm dòng này
         );
 
 
@@ -403,7 +460,9 @@ export default function FreelancerDashboard() {
           setShowPopup,
           setNewAppointment,
           soundRef,
-          soundLoopRef
+          soundLoopRef,
+          setUpcomingAppointments,
+          setNextClientIndex
         );
       }
     } catch (err) {
@@ -570,6 +629,172 @@ export default function FreelancerDashboard() {
           </button>
         </div>
       )}
+      {latePopup && (
+        <div className="fixed bottom-10 right-4 z-50 bg-white text-black rounded-xl px-8 py-5 shadow-xl border-l-8 border-pink-500 animate-popup max-w-sm w-[95vw] sm:w-[440px] space-y-4">
+          <h2 className="font-bold text-xl text-pink-500">⏰ Appointment Is Waiting!</h2>
+          <div className="mb-2">
+            <b>Client:</b> {latePopup.customer_name} <br />
+            <b>Service:</b> {latePopup.services?.map((s) => s.name).join(", ")} <br />
+            <b>Booked Time:</b>{" "}
+            {dayjs(latePopup.appointment_date.replace("Z", "")).format("MMM D, HH:mm")}
+            <br />
+            <b>Late:</b>{" "}
+            <span className="font-bold text-red-500">
+              {Math.max(
+                0,
+                now.diff(dayjs(latePopup.appointment_date.replace("Z", "")), "minute")
+              )}
+            </span>{" "}
+            min
+          </div>
+          <div className="flex flex-col gap-2">
+            {/* Start service */}
+            <button
+              onClick={async () => {
+                const token = await user.getIdToken();
+                await fetch(
+                  `https://crypto-manager-backend.onrender.com/api/appointments/${latePopup.id}`,
+                  {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      status: "processing",
+                      started_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                    }),
+                  }
+                );
+                clearWaitingTimeout();
+                setLatePopup(null);
+                setHideLatePopupUntil(null);
+
+                // ⭐️ GỌI LẠI loadAppointments SAU KHI PATCH
+                await loadAppointments(
+                  token,
+                  setAppointments,
+                  setAppointmentsToday,
+                  setConfirmedNextClient,
+                  setPendingUpcomingAppointment,
+                  setTimeUntilNext,
+                  setShowPopup,
+                  setNewAppointment,
+                  soundRef,
+                  soundLoopRef,
+                  setUpcomingAppointments,
+                  setNextClientIndex
+                );
+              }}
+              className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-600"
+            >
+              👉 Start Service Now
+            </button>
+            {/* Cancel appointment */}
+            <button
+              onClick={async () => {
+                const token = await user.getIdToken();
+                await fetch(
+                  `https://crypto-manager-backend.onrender.com/api/appointments/${latePopup.id}`,
+                  {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ status: "cancelled" }),
+                  }
+                );
+                clearWaitingTimeout();
+                setLatePopup(null);
+                setHideLatePopupUntil(null);
+
+                // ⭐️ GỌI LẠI loadAppointments SAU KHI PATCH
+                await loadAppointments(
+                  token,
+                  setAppointments,
+                  setAppointmentsToday,
+                  setConfirmedNextClient,
+                  setPendingUpcomingAppointment,
+                  setTimeUntilNext,
+                  setShowPopup,
+                  setNewAppointment,
+                  soundRef,
+                  soundLoopRef,
+                  setUpcomingAppointments,
+                  setNextClientIndex
+                );
+              }}
+              className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-600"
+            >
+              ❌ Cancel Appointment
+            </button>
+            {/* Wait more */}
+            <div className="flex flex-row items-center gap-2">
+              <span>⏳ Wait more: </span>
+              <select
+                value={waitMinutes}
+                onChange={(e) => setWaitMinutes(Number(e.target.value))}
+                className="border rounded px-2 py-1"
+              >
+                {[5, 10, 15, 20].map((m) => (
+                  <option value={m} key={m}>
+                    {m} mins
+                  </option>
+                ))}
+              </select>
+              <button
+                className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-3 py-1 rounded"
+                onClick={() => {
+                  clearWaitingTimeout();
+                  setLatePopup(null);
+                  const until = dayjs().add(waitMinutes, "minute");
+                  setHideLatePopupUntil(until);
+                  waitingTimeout.current = setTimeout(() => setLatePopup(latePopup), waitMinutes * 60000);
+                }}
+
+              >
+                Wait
+              </button>
+            </div>
+            {/* Check overlap with next appointment */}
+            {(() => {
+              const allUpcoming = appointments
+                .filter(
+                  (a) =>
+                    a.status === "confirmed" &&
+                    dayjs(a.appointment_date.replace("Z", "")).isAfter(
+                      dayjs(latePopup.appointment_date.replace("Z", ""))
+                    )
+                )
+                .sort(
+                  (a, b) =>
+                    dayjs(a.appointment_date.replace("Z", "")) -
+                    dayjs(b.appointment_date.replace("Z", ""))
+                );
+              if (allUpcoming.length) {
+                const nextAppt = allUpcoming[0];
+                const estStart = now.add(waitMinutes, "minute");
+                const estEnd = estStart.add(latePopup.duration_minutes || 30, "minute");
+                if (
+                  estEnd.isAfter(dayjs(nextAppt.appointment_date.replace("Z", "")))
+                ) {
+                  return (
+                    <div className="text-red-600 font-bold mt-2">
+                      ⚠️ Warning: If you wait {waitMinutes} minutes, the next appointment (
+                      {dayjs(nextAppt.appointment_date.replace("Z", "")).format("HH:mm")}
+                      ) will be affected!
+                    </div>
+                  );
+                }
+              }
+              return null;
+            })()}
+          </div>
+        </div>
+      )}
+
+
       <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-1">
           {/* Welcome Block */}
@@ -758,15 +983,67 @@ export default function FreelancerDashboard() {
             icon={<FiClock />}
             title="Next Client"
             value={
-              confirmedNextClient
-                ? dayjs(confirmedNextClient.appointment_date.replace("Z", "")).format("hh:mm A")
+              upcomingAppointments.length > 0
+                ? dayjs(upcomingAppointments[nextClientIndex].appointment_date.replace("Z", "")).format("hh:mm A")
                 : "No upcoming"
             }
             sub={
-              confirmedNextClient?.customer_name
-                ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` ${timeUntilNext}` : ""}`
+              upcomingAppointments.length > 0
+                ? (
+                  <div>
+                    <div>
+                      <span className="font-semibold">
+                        {upcomingAppointments[nextClientIndex].customer_name}
+                      </span>
+                      {" – "}
+                      {upcomingAppointments[nextClientIndex].services?.map(s => s.name).join(", ")}
+                    </div>
+                    <div className="text-xs mt-1">
+                      {(() => {
+                        const apptTime = dayjs(upcomingAppointments[nextClientIndex].appointment_date.replace("Z", ""));
+                        const diffMinutes = apptTime.diff(now, "minute");
+                        if (diffMinutes > 0) {
+                          const hours = Math.floor(diffMinutes / 60);
+                          const minutes = diffMinutes % 60;
+                          return hours > 0
+                            ? `⏳ In ${hours}h ${minutes}m`
+                            : `⏳ In ${minutes} minute${minutes > 1 ? "s" : ""}`;
+                        } else {
+                          return `🔴 Late ${Math.abs(diffMinutes)} min`;
+                        }
+                      })()}
+                    </div>
+                    <div className="flex gap-2 mt-2 items-center justify-center">
+                      {upcomingAppointments.length > 1 && (
+                        <button
+                          onClick={() => setNextClientIndex(idx => idx > 0 ? idx - 1 : upcomingAppointments.length - 1)}
+                          className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                          aria-label="Previous client"
+                        >
+                          <ChevronLeft className="w-6 h-6" />
+                        </button>
+                      )}
+                      <span className="mx-2 text-xs text-pink-400">
+                        {upcomingAppointments.length > 1
+                          ? `${nextClientIndex + 1} / ${upcomingAppointments.length}`
+                          : null}
+                      </span>
+                      {upcomingAppointments.length > 1 && (
+                        <button
+                          onClick={() => setNextClientIndex(idx => idx < upcomingAppointments.length - 1 ? idx + 1 : 0)}
+                          className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                          aria-label="Next client"
+                        >
+                          <ChevronRight className="w-6 h-6" />
+                        </button>
+                      )}
+                    </div>
+
+                  </div>
+                )
                 : "No upcoming"
             }
+
           />
 
           {/* Appointments */}
@@ -809,13 +1086,14 @@ export default function FreelancerDashboard() {
     </div>
   );
 }
+
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
     <div className={`relative ${className} border-t-4 border-b-4 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-xl font-extrabold text-white">{value}</div>
-      <p className="text-sm text-white/80">{sub}</p>
+      <div className="text-sm text-white/80">{sub}</div>
       {children}
     </div>
   );
@@ -843,6 +1121,8 @@ async function loadAppointments(
   setNewAppointment,
   soundRef,
   soundLoopRef,
+  setUpcomingAppointments,
+  setNextClientIndex
 ) {
   const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
     headers: { Authorization: `Bearer ${token}` },
@@ -920,20 +1200,21 @@ async function loadAppointments(
   }
 
   // 🟢 Lấy lịch đã confirmed gần nhất trong tương lai → dùng cho Next Client
-  const confirmedUpcoming = apptData
+  const confirmedUnstarted = apptData
     .filter((a) =>
-      a.status === "confirmed" &&
-      dayjs(a.appointment_date.replace("Z", "")).isAfter(now)
+      a.status === "confirmed" && !a.started_at
     )
     .sort((a, b) =>
-      dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+      dayjs(a.appointment_date.replace("Z", "")).diff(dayjs(b.appointment_date.replace("Z", "")))
     );
 
-  setConfirmedNextClient(confirmedUpcoming[0] || null);
+  setUpcomingAppointments(confirmedUnstarted);
+  setConfirmedNextClient(confirmedUnstarted[0] || null);
+  setNextClientIndex(0); // reset về đầu mỗi khi reload data
 
   // ⏳ Cập nhật đồng hồ đếm thời gian tới lịch gần nhất (dành cho hiển thị next)
-  if (confirmedUpcoming[0]) {
-    const apptTime = dayjs(confirmedUpcoming[0].appointment_date.replace("Z", ""));
+  if (confirmedUnstarted[0]) {
+    const apptTime = dayjs(confirmedUnstarted[0].appointment_date.replace("Z", ""));
     const diffMinutes = apptTime.diff(now, "minute");
 
     let timeUntil = "";
@@ -943,6 +1224,8 @@ async function loadAppointments(
       timeUntil = hours > 0
         ? `⏳ In ${hours}h ${minutes}m`
         : `⏳ In ${minutes} minute${minutes > 1 ? "s" : ""}`;
+    } else {
+      timeUntil = `🔴 Late ${Math.abs(diffMinutes)} min`;
     }
     setTimeUntilNext(timeUntil);
   } else {
