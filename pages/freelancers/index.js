@@ -51,6 +51,8 @@ export default function FreelancerDashboard() {
   const [hideLatePopupUntil, setHideLatePopupUntil] = useState(null);
   const [serviceTimers, setServiceTimers] = useState({});
   const serviceIntervalRef = useRef({});
+  const [processingApptId, setProcessingApptId] = useState(null); // id đang xử lý (start/complete)
+  const [actionError, setActionError] = useState(""); // text lỗi (nếu có)
 
 
   const soundRef = useRef(null);
@@ -1013,9 +1015,10 @@ export default function FreelancerDashboard() {
                 {/* Group trạng thái, lùi vào trái */}
                 <div className="flex flex-col gap-2 pl-4 text-sm">
                   <span>✅ Completed: {completedToday}</span>
+                  <span>👩‍🔧 Serving: {appointmentsToday.filter(a => a.status === "processing").length}</span>
                   <span>🟡 Pending: {pendingToday}</span>
                   <span>⏳ Upcoming: {upcomingToday}</span>
-                  <span>❌ Missed: {missedToday}</span>
+                  
                 </div>
               </div>
             }
@@ -1079,46 +1082,68 @@ export default function FreelancerDashboard() {
                   {!upcomingAppointments[nextClientIndex].started_at &&
                     upcomingAppointments[nextClientIndex].status === "confirmed" && (
                       <button
-                        className="mt-4 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2"
+                        className={`mt-4 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2
+                     ${processingApptId === upcomingAppointments[nextClientIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+                      `}
+                        disabled={processingApptId === upcomingAppointments[nextClientIndex].id}
                         onClick={async () => {
-                          const token = await user.getIdToken();
-                          await fetch(
-                            `https://crypto-manager-backend.onrender.com/api/appointments/${upcomingAppointments[nextClientIndex].id}`,
-                            {
-                              method: "PATCH",
-                              headers: {
-                                "Content-Type": "application/json",
-                                Authorization: `Bearer ${token}`,
-                              },
-                              body: JSON.stringify({
-                                status: "processing",
-                                started_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-                              }),
-                            }
-                          );
-                          await loadAppointments(
-                            token,
-                            setAppointments,
-                            setAppointmentsToday,
-                            setConfirmedNextClient,
-                            setPendingUpcomingAppointment,
-                            setTimeUntilNext,
-                            setShowPopup,
-                            setNewAppointment,
-                            soundRef,
-                            soundLoopRef,
-                            setUpcomingAppointments,
-                            setNextClientIndex
-                          );
+                          setProcessingApptId(upcomingAppointments[nextClientIndex].id);
+                          setActionError("");
+                          try {
+                            const token = await user.getIdToken();
+                            await fetch(
+                              `https://crypto-manager-backend.onrender.com/api/appointments/${upcomingAppointments[nextClientIndex].id}`,
+                              {
+                                method: "PATCH",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({
+                                  status: "processing",
+                                  started_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                                }),
+                              }
+                            );
+                            await loadAppointments(
+                              token,
+                              setAppointments,
+                              setAppointmentsToday,
+                              setConfirmedNextClient,
+                              setPendingUpcomingAppointment,
+                              setTimeUntilNext,
+                              setShowPopup,
+                              setNewAppointment,
+                              soundRef,
+                              soundLoopRef,
+                              setUpcomingAppointments,
+                              setNextClientIndex
+                            );
+                          } catch (err) {
+                            setActionError("Đã có lỗi, thử lại!");
+                          }
+                          setProcessingApptId(null);
                         }}
                       >
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
-                          <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
-                        </svg>
-                        Start Service
+                        {processingApptId === upcomingAppointments[nextClientIndex].id ? (
+                          <>
+                            <Loader2 className="animate-spin w-5 h-5" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
+                              <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                            </svg>
+                            Start Service
+                          </>
+                        )}
                       </button>
                     )}
+                  {actionError && (
+                    <div className="text-xs text-red-400 mt-1">{actionError}</div>
+                  )}
                   {/* Điều hướng next/prev nếu có nhiều client */}
                   {upcomingAppointments.length > 1 && (
                     <div className="flex gap-2 mt-2 items-center justify-center">
@@ -1175,44 +1200,67 @@ export default function FreelancerDashboard() {
                   </div>
                   {/* Nút Complete ngay dưới info */}
                   <button
-                    className="mt-4 w-full md:w-auto self-start px-12 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2"
+                    className={`mt-4 w-full md:w-auto self-start px-12 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2
+    ${processingApptId === inProgressAppointments[inProgressIndex]?.id ? "opacity-60 cursor-not-allowed" : ""}
+  `}
+                    disabled={processingApptId === inProgressAppointments[inProgressIndex]?.id}
                     onClick={async () => {
                       const appt = inProgressAppointments[inProgressIndex];
-                      const token = await user.getIdToken();
-                      await fetch(
-                        `https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`,
-                        {
-                          method: "PATCH",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${token}`,
-                          },
-                          body: JSON.stringify({
-                            status: "completed",
-                            end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-                          }),
-                        }
-                      );
-                      await loadAppointments(
-                        token,
-                        setAppointments,
-                        setAppointmentsToday,
-                        setConfirmedNextClient,
-                        setPendingUpcomingAppointment,
-                        setTimeUntilNext,
-                        setShowPopup,
-                        setNewAppointment,
-                        soundRef,
-                        soundLoopRef,
-                        setUpcomingAppointments,
-                        setNextClientIndex
-                      );
-                      if (inProgressIndex >= inProgressAppointments.length - 1) setInProgressIndex(0);
+                      setProcessingApptId(appt.id);
+                      setActionError("");
+                      try {
+                        const token = await user.getIdToken();
+                        await fetch(
+                          `https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`,
+                          {
+                            method: "PATCH",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({
+                              status: "completed",
+                              end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                            }),
+                          }
+                        );
+                        await loadAppointments(
+                          token,
+                          setAppointments,
+                          setAppointmentsToday,
+                          setConfirmedNextClient,
+                          setPendingUpcomingAppointment,
+                          setTimeUntilNext,
+                          setShowPopup,
+                          setNewAppointment,
+                          soundRef,
+                          soundLoopRef,
+                          setUpcomingAppointments,
+                          setNextClientIndex
+                        );
+                        if (inProgressIndex >= inProgressAppointments.length - 1) setInProgressIndex(0);
+                      } catch (err) {
+                        setActionError("Đã có lỗi, thử lại!");
+                      }
+                      setProcessingApptId(null);
                     }}
                   >
-                    <FiCheckCircle className="w-5 h-5" />
-                    Complete
+                    {processingApptId === inProgressAppointments[inProgressIndex]?.id ? (
+                      <>
+                        <Loader2 className="animate-spin w-5 h-5" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiCheckCircle className="w-5 h-5" />
+                        Complete
+                      </>
+                    )}
                   </button>
+                  {actionError && (
+                    <div className="text-xs text-red-400 mt-1">{actionError}</div>
+                  )}
+
                   {/* Điều hướng trái/phải nếu có nhiều hơn 1 appointment */}
                   {inProgressAppointments.length > 1 && (
                     <div className="flex gap-2 mt-2 items-center justify-center">

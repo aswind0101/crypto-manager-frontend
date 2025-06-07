@@ -25,6 +25,39 @@
     cursor: pointer;
   }
 }
+@keyframes border-rotate {
+  to {
+    --angle: 1turn;
+  }
+}
+.animated-border {
+  position: relative;
+  z-index: 0;
+}
+.animated-border::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  border-radius: 1rem;
+  padding: 0;
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    #f472b6, #fde68a, #6ee7b7, #f472b6
+  );
+  animation: border-rotate 1.8s linear infinite;
+  --angle: 0deg;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+
 @keyframes spin-slow {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
