@@ -1295,7 +1295,7 @@ export default function FreelancerDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
               <ActionButton label="🧾 Appointments" onClick={() => router.push("/freelancers/appointments")} />
-              <ActionButton label="💬 Chat with Client" onClick={() => router.push("/freelancers/chat")} />
+              <ActionButton label="💬 Chat" onClick={() => router.push("/freelancers/chat")} />
               <ActionButton label="💸 Withdraw" onClick={() => router.push("/freelancers/withdraw")} />
             </div>
           </div>
