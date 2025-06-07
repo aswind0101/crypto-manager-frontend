@@ -42,6 +42,7 @@ export default function FreelancerDashboard() {
 
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   const [nextClientIndex, setNextClientIndex] = useState(0);
+  const [inProgressIndex, setInProgressIndex] = useState(0);
 
   const [showPopup, setShowPopup] = useState(false);
   const [latePopup, setLatePopup] = useState(null); // chứa appointment & logic chờ
@@ -405,6 +406,7 @@ export default function FreelancerDashboard() {
 
   const totalHoursToday = (totalMinutesToday / 60).toFixed(1);
 
+  const inProgressAppointments = appointments.filter(a => a.status === "processing");
 
   const handleConfirmAppointment = async (appointmentId) => {
     try {
@@ -1118,76 +1120,101 @@ export default function FreelancerDashboard() {
           />
 
           {/* Danh sách appointments in progress */}
-          <Card
-            className="col-span-12 md:col-span-6 h-full"
-            icon={<FiUser />}
-            title="Appointments in Progress"
-            value=""
-            sub={
-              <div className="flex flex-col gap-4 w-full">
-                {appointments.filter(a => a.status === "processing").map(appt => (
-                  <div
-                    key={appt.id}
-                    className="flex flex-col h-full justify-between p-4 rounded-xl card-animate-in w-full"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
-                        <FiUser className="w-5 h-5 text-pink-300" />
-                        {appt.customer_name}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate mt-1">
-                        <FiTag className="w-4 h-4 text-yellow-300" />
-                        {appt.services?.map(s => s.name).join(", ")}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
-                          <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
-                        </svg>
-                        <span className="text-sm text-emerald-200 font-semibold">
-                          In Service: {formatSeconds(serviceTimers[appt.id])}
-                        </span>
-                      </div>
+          {inProgressAppointments.length > 0 && (
+            <Card
+              className="col-span-12 md:col-span-6 h-full"
+              icon={<FiUser />}
+              title="Appointments in Progress"
+              value=""
+              sub={
+                <div className="flex flex-col h-full justify-between min-h-[220px]">
+                  {/* HIỂN THỊ appointment in progress theo index */}
+                  <div>
+                    <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                      <FiUser className="w-5 h-5 text-pink-300" />
+                      {inProgressAppointments[inProgressIndex]?.customer_name}
                     </div>
-                    <button
-                      className="mt-11 mb-6 w-full px-4 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center gap-2"
-                      onClick={async () => {
-                        const token = await user.getIdToken();
-                        await fetch(
-                          `https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`,
-                          {
-                            method: "PATCH",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${token}`,
-                            },
-                            body: JSON.stringify({ status: "completed" }),
-                          }
-                        );
-                        await loadAppointments(
-                          token,
-                          setAppointments,
-                          setAppointmentsToday,
-                          setConfirmedNextClient,
-                          setPendingUpcomingAppointment,
-                          setTimeUntilNext,
-                          setShowPopup,
-                          setNewAppointment,
-                          soundRef,
-                          soundLoopRef,
-                          setUpcomingAppointments,
-                          setNextClientIndex
-                        );
-                      }}
-                    >
-                      <FiCheckCircle className="w-5 h-5" />
-                      Complete
-                    </button>
+                    <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate mt-1">
+                      <FiTag className="w-4 h-4 text-yellow-300" />
+                      {inProgressAppointments[inProgressIndex]?.services?.map(s => s.name).join(", ")}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                      </svg>
+                      <span className="text-sm text-emerald-200 font-semibold">
+                        In Service: {formatSeconds(serviceTimers[inProgressAppointments[inProgressIndex]?.id])}
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </div>
-            }
-          />
+                  {/* Nút Complete */}
+                  <button
+                    className="mt-2 mb-6 w-full px-4 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center gap-2"
+                    onClick={async () => {
+                      const appt = inProgressAppointments[inProgressIndex];
+                      const token = await user.getIdToken();
+                      await fetch(
+                        `https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`,
+                        {
+                          method: "PATCH",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({ 
+                            status: "completed" ,
+                            end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                          }),
+                        }
+                      );
+                      await loadAppointments(
+                        token,
+                        setAppointments,
+                        setAppointmentsToday,
+                        setConfirmedNextClient,
+                        setPendingUpcomingAppointment,
+                        setTimeUntilNext,
+                        setShowPopup,
+                        setNewAppointment,
+                        soundRef,
+                        soundLoopRef,
+                        setUpcomingAppointments,
+                        setNextClientIndex
+                      );
+                      // Sau khi complete, nếu index cuối hoặc chỉ còn 1, reset về 0
+                      if (inProgressIndex >= inProgressAppointments.length - 1) setInProgressIndex(0);
+                    }}
+                  >
+                    <FiCheckCircle className="w-5 h-5" />
+                    Complete
+                  </button>
+                  {/* Điều hướng trái/phải nếu có nhiều hơn 1 appointment */}
+                  {inProgressAppointments.length > 1 && (
+                    <div className="flex gap-2 mt-2 items-center justify-center">
+                      <button
+                        onClick={() => setInProgressIndex(idx => idx > 0 ? idx - 1 : inProgressAppointments.length - 1)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Previous in-progress"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <span className="mx-2 text-xs text-pink-400">
+                        {`${inProgressIndex + 1} / ${inProgressAppointments.length}`}
+                      </span>
+                      <button
+                        onClick={() => setInProgressIndex(idx => idx < inProgressAppointments.length - 1 ? idx + 1 : 0)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Next in-progress"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              }
+            />
+          )}
 
           {/* Appointments */}
           <Card
