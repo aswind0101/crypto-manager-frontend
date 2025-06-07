@@ -1082,7 +1082,7 @@ export default function FreelancerDashboard() {
                   {!upcomingAppointments[nextClientIndex].started_at &&
                     upcomingAppointments[nextClientIndex].status === "confirmed" && (
                       <button
-                        className={`mt-4 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2
+                        className={`mt-4 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2
                      ${processingApptId === upcomingAppointments[nextClientIndex].id ? "opacity-60 cursor-not-allowed" : ""}
                       `}
                         disabled={processingApptId === upcomingAppointments[nextClientIndex].id}
@@ -1200,7 +1200,7 @@ export default function FreelancerDashboard() {
                   </div>
                   {/* Nút Complete ngay dưới info */}
                   <button
-                    className={`mt-4 w-full md:w-auto self-start px-12 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2
+                    className={`mt-4 w-full md:w-auto self-start px-12 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-3xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2
     ${processingApptId === inProgressAppointments[inProgressIndex]?.id ? "opacity-60 cursor-not-allowed" : ""}
   `}
                     disabled={processingApptId === inProgressAppointments[inProgressIndex]?.id}
