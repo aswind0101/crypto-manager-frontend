@@ -995,6 +995,41 @@ export default function FreelancerDashboard() {
               </>
             )}
           </div>
+          {/* Appointments */}
+          <Card
+            className="col-span-12 md:col-span-6"
+            icon={<FiCalendar />}
+            title="Appointments"
+            value={
+              <span>
+                {appointmentsToday.filter(a => a.status !== "cancelled").length}
+                <span className="ml-2 font-normal text-[16px]">Today</span>
+              </span>
+            }
+            sub={
+              <div>
+                {/* Dòng Today - cách dưới ra xa */}
+                <div className="mb-3" />
+                {/* Group trạng thái, lùi vào trái */}
+                <div className="flex flex-col gap-2 pl-4 text-sm">
+                  <span>✅ Completed: {completedToday}</span>
+                  <span>🟡 Pending: {pendingToday}</span>
+                  <span>⏳ Upcoming: {upcomingToday}</span>
+                  <span>❌ Missed: {missedToday}</span>
+                </div>
+              </div>
+            }
+          >
+            <button
+              onClick={() => router.push("/freelancers/appointments")}
+              className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
+              title="Manage Appointments"
+            >
+              <FiExternalLink />
+            </button>
+          </Card>
+
+
           {/* Next Client */}
           <Card
             className="col-span-12 md:col-span-6 capitalize h-full"
@@ -1008,47 +1043,43 @@ export default function FreelancerDashboard() {
             sub={
               upcomingAppointments.length > 0 ? (
                 <div className="flex flex-col gap-2 p-4 rounded-xl card-animate-in w-full">
-                  <div className="flex items-center gap-3 w-full">
-                    <div className="flex-1 min-w-0">
-                      {/* Icon user + tên khách */}
-                      <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
-                        <FiUser className="w-5 h-5 text-pink-300" />
-                        {upcomingAppointments[nextClientIndex].customer_name}
-                      </div>
-                      {/* Icon dịch vụ */}
-                      <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate mt-1">
-                        <FiTag className="w-4 h-4 text-yellow-300" />
-                        {upcomingAppointments[nextClientIndex].services?.map(s => s.name).join(", ")}
-                      </div>
-                      {/* Trạng thái (timer/late) */}
-                      <div className="flex items-center gap-2 mt-1">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
-                          <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
-                        </svg>
-                        <span className="text-sm text-emerald-200 font-semibold">
-                          {(() => {
-                            const apptTime = dayjs(upcomingAppointments[nextClientIndex].appointment_date.replace("Z", ""));
-                            const diffMinutes = apptTime.diff(now, "minute");
-                            if (diffMinutes > 0) {
-                              const hours = Math.floor(diffMinutes / 60);
-                              const minutes = diffMinutes % 60;
-                              return hours > 0
-                                ? `⏳ In ${hours}h ${minutes}m`
-                                : `⏳ In ${minutes} minute${minutes > 1 ? "s" : ""}`;
-                            } else {
-                              return `🔴 Late ${Math.abs(diffMinutes)} min`;
-                            }
-                          })()}
-                        </span>
-                      </div>
-                    </div>
+                  {/* Tên khách */}
+                  <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                    <FiUser className="w-5 h-5 text-pink-300" />
+                    {upcomingAppointments[nextClientIndex].customer_name}
                   </div>
-                  {/* Nút Start Service dưới cùng, full width, đồng bộ style */}
+                  {/* Dịch vụ */}
+                  <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
+                    <FiTag className="w-4 h-4 text-yellow-300" />
+                    {upcomingAppointments[nextClientIndex].services?.map(s => s.name).join(", ")}
+                  </div>
+                  {/* Thời gian chờ/lateness */}
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                    </svg>
+                    <span className="text-sm text-emerald-200 font-semibold">
+                      {(() => {
+                        const apptTime = dayjs(upcomingAppointments[nextClientIndex].appointment_date.replace("Z", ""));
+                        const diffMinutes = apptTime.diff(now, "minute");
+                        if (diffMinutes > 0) {
+                          const hours = Math.floor(diffMinutes / 60);
+                          const minutes = diffMinutes % 60;
+                          return hours > 0
+                            ? `In ${hours}h ${minutes}m`
+                            : `In ${minutes} minute${minutes > 1 ? "s" : ""}`;
+                        } else {
+                          return `🔴 Late ${Math.abs(diffMinutes)} min`;
+                        }
+                      })()}
+                    </span>
+                  </div>
+                  {/* Nút Start Service */}
                   {!upcomingAppointments[nextClientIndex].started_at &&
                     upcomingAppointments[nextClientIndex].status === "confirmed" && (
                       <button
-                        className="mt-2 w-full px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center gap-2"
+                        className="mt-4 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2"
                         onClick={async () => {
                           const token = await user.getIdToken();
                           await fetch(
@@ -1089,31 +1120,27 @@ export default function FreelancerDashboard() {
                       </button>
                     )}
                   {/* Điều hướng next/prev nếu có nhiều client */}
-                  <div className="flex gap-2 mt-2 items-center justify-center">
-                    {upcomingAppointments.length > 1 && (
-                      <>
-                        <button
-                          onClick={() => setNextClientIndex(idx => idx > 0 ? idx - 1 : upcomingAppointments.length - 1)}
-                          className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
-                          aria-label="Previous client"
-                        >
-                          <ChevronLeft className="w-6 h-6" />
-                        </button>
-                        <span className="mx-2 text-xs text-pink-400">
-                          {upcomingAppointments.length > 1
-                            ? `${nextClientIndex + 1} / ${upcomingAppointments.length}`
-                            : null}
-                        </span>
-                        <button
-                          onClick={() => setNextClientIndex(idx => idx < upcomingAppointments.length - 1 ? idx + 1 : 0)}
-                          className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
-                          aria-label="Next client"
-                        >
-                          <ChevronRight className="w-6 h-6" />
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  {upcomingAppointments.length > 1 && (
+                    <div className="flex gap-2 mt-2 items-center justify-center">
+                      <button
+                        onClick={() => setNextClientIndex(idx => idx > 0 ? idx - 1 : upcomingAppointments.length - 1)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Previous client"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <span className="mx-2 text-xs text-pink-400">
+                        {`${nextClientIndex + 1} / ${upcomingAppointments.length}`}
+                      </span>
+                      <button
+                        onClick={() => setNextClientIndex(idx => idx < upcomingAppointments.length - 1 ? idx + 1 : 0)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Next client"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : "No upcoming"
             }
@@ -1122,35 +1149,33 @@ export default function FreelancerDashboard() {
           {/* Danh sách appointments in progress */}
           {inProgressAppointments.length > 0 && (
             <Card
-              className="col-span-12 md:col-span-6 h-full"
+              className="col-span-12 md:col-span-12 h-full"
               icon={<FiUser />}
-              title="Appointments in Progress"
+              title="Now Serving"
               value=""
               sub={
-                <div className="flex flex-col h-full justify-between min-h-[220px]">
-                  {/* HIỂN THỊ appointment in progress theo index */}
-                  <div>
-                    <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
-                      <FiUser className="w-5 h-5 text-pink-300" />
-                      {inProgressAppointments[inProgressIndex]?.customer_name}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate mt-1">
-                      <FiTag className="w-4 h-4 text-yellow-300" />
-                      {inProgressAppointments[inProgressIndex]?.services?.map(s => s.name).join(", ")}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
-                      </svg>
-                      <span className="text-sm text-emerald-200 font-semibold">
-                        In Service: {formatSeconds(serviceTimers[inProgressAppointments[inProgressIndex]?.id])}
-                      </span>
-                    </div>
+                <div className="flex flex-col gap-1 p-4 rounded-xl card-animate-in w-full">
+                  {/* Info khách + dịch vụ + timer */}
+                  <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                    <FiUser className="w-5 h-5 text-pink-300" />
+                    {inProgressAppointments[inProgressIndex]?.customer_name}
                   </div>
-                  {/* Nút Complete */}
+                  <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate mt-1">
+                    <FiTag className="w-4 h-4 text-yellow-300" />
+                    {inProgressAppointments[inProgressIndex]?.services?.map(s => s.name).join(", ")}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                    </svg>
+                    <span className="text-sm text-emerald-200 font-semibold">
+                      In Service: {formatSeconds(serviceTimers[inProgressAppointments[inProgressIndex]?.id])}
+                    </span>
+                  </div>
+                  {/* Nút Complete ngay dưới info */}
                   <button
-                    className="mt-2 mb-6 w-full px-4 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center gap-2"
+                    className="mt-4 w-full md:w-auto self-start px-12 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2"
                     onClick={async () => {
                       const appt = inProgressAppointments[inProgressIndex];
                       const token = await user.getIdToken();
@@ -1162,8 +1187,8 @@ export default function FreelancerDashboard() {
                             "Content-Type": "application/json",
                             Authorization: `Bearer ${token}`,
                           },
-                          body: JSON.stringify({ 
-                            status: "completed" ,
+                          body: JSON.stringify({
+                            status: "completed",
                             end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
                           }),
                         }
@@ -1182,7 +1207,6 @@ export default function FreelancerDashboard() {
                         setUpcomingAppointments,
                         setNextClientIndex
                       );
-                      // Sau khi complete, nếu index cuối hoặc chỉ còn 1, reset về 0
                       if (inProgressIndex >= inProgressAppointments.length - 1) setInProgressIndex(0);
                     }}
                   >
@@ -1214,31 +1238,8 @@ export default function FreelancerDashboard() {
                 </div>
               }
             />
-          )}
 
-          {/* Appointments */}
-          <Card
-            className="col-span-12 md:col-span-6"
-            icon={<FiCalendar />}
-            title="Appointments"
-            value={`${appointmentsToday.filter(a => a.status !== "cancelled").length} Today`}
-            sub={
-              <>
-                ✅ Completed: {completedToday} <br />
-                🟡 Pending: {pendingToday} <br />
-                ⏳ Upcoming: {upcomingToday} <br />
-                ❌ Missed: {missedToday}
-              </>
-            }
-          >
-            <button
-              onClick={() => router.push("/freelancers/appointments")}
-              className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
-              title="Manage Appointments"
-            >
-              <FiExternalLink />
-            </button>
-          </Card>
+          )}
 
           {/* Quick Actions */}
           <div className="col-span-12">

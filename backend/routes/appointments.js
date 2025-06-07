@@ -160,7 +160,7 @@ router.get("/me", verifyToken, async (req, res) => {
     a.note,
     a.status,
     a.started_at,  
-    a.ended_at,
+    a.end_at,
     f.name AS stylist_name,
     f.avatar_url AS stylist_avatar,
     f.specialization AS stylist_specialization,
@@ -202,7 +202,7 @@ router.get("/freelancer", verifyToken, async (req, res) => {
     a.duration_minutes,
     a.status,
     a.started_at,
-    a.ended_at,     
+    a.end_at,     
     a.note,
     a.customer_uid,
     c.name AS customer_name,
@@ -236,7 +236,7 @@ router.get("/freelancer", verifyToken, async (req, res) => {
 // ✅ PATCH: Cập nhật trạng thái lịch hẹn
 router.patch("/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
-  const { status, started_at } = req.body;
+  const { status, started_at, end_at } = req.body;
 
   // Bổ sung "processing" vào danh sách hợp lệ
   if (!["pending", "confirmed", "processing", "completed", "cancelled"].includes(status)) {
