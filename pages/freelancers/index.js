@@ -1136,7 +1136,7 @@ export default function FreelancerDashboard() {
                               <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                               <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
                             </svg>
-                            Start Service
+                            Start
                           </>
                         )}
                       </button>
