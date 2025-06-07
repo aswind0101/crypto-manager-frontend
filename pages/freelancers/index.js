@@ -4,22 +4,25 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
 import { useRouter } from "next/router";
 import {
-  FiUser,
   FiDollarSign,
   FiClock,
   FiCalendar,
-  FiMessageSquare,
   FiExternalLink,
-  FiList
+  FiCheckCircle,
+  FiUser,
+  FiScissors,
+  FiTag,
 } from "react-icons/fi";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
 import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
-import { ChevronLeft, ChevronRight, ArrowLeftCircle, ArrowRightCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -45,6 +48,9 @@ export default function FreelancerDashboard() {
   const [waitMinutes, setWaitMinutes] = useState(5); // mặc định 5 phút chờ
   const waitingTimeout = useRef(null);
   const [hideLatePopupUntil, setHideLatePopupUntil] = useState(null);
+  const [serviceTimers, setServiceTimers] = useState({});
+  const serviceIntervalRef = useRef({});
+
 
   const soundRef = useRef(null);
   const soundLoopRef = useRef(null); // ✅ để lưu vòng lặp âm thanh
@@ -303,23 +309,33 @@ export default function FreelancerDashboard() {
 
   }, [user]);
 
-  function isTodayCalifornia(isoDate) {
-    const now = new Date();
-    const appointmentDate = new Date(isoDate);
-    const nowLocal = new Date(
-      now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
-    );
-    const apptLocal = new Date(
-      appointmentDate.toLocaleString("en-US", {
-        timeZone: "America/Los_Angeles",
-      })
-    );
-    return (
-      nowLocal.getFullYear() === apptLocal.getFullYear() &&
-      nowLocal.getMonth() === apptLocal.getMonth() &&
-      nowLocal.getDate() === apptLocal.getDate()
-    );
-  }
+
+  useEffect(() => {
+    // Lấy tất cả appointments đang "processing"
+    const inProgress = appointments.filter(a => a.status === "processing" && a.started_at);
+    // Dừng các interval cũ
+    Object.values(serviceIntervalRef.current).forEach(clearInterval);
+    const timers = {};
+    inProgress.forEach(appt => {
+      const id = appt.id;
+      // Sửa ở đây: parse started_at với custom format để đúng giờ local
+      const startedAt = dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss");
+      timers[id] = dayjs().diff(startedAt, "second");
+      serviceIntervalRef.current[id] = setInterval(() => {
+        setServiceTimers(timers => ({
+          ...timers,
+          [id]: dayjs().diff(dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss"), "second"),
+        }));
+      }, 1000);
+    });
+    setServiceTimers(timers);
+    // Dọn dẹp interval khi appointments đổi
+    return () => {
+      Object.values(serviceIntervalRef.current).forEach(clearInterval);
+      serviceIntervalRef.current = {};
+    };
+  }, [appointments]);
+
 
   //const isComplete = onboarding?.isQualified === true || onboarding?.isqualified === true;
 
@@ -979,7 +995,7 @@ export default function FreelancerDashboard() {
           </div>
           {/* Next Client */}
           <Card
-            className="col-span-12 md:col-span-6 capitalize"
+            className="col-span-12 md:col-span-6 capitalize h-full"
             icon={<FiClock />}
             title="Next Client"
             value={
@@ -988,33 +1004,92 @@ export default function FreelancerDashboard() {
                 : "No upcoming"
             }
             sub={
-              upcomingAppointments.length > 0
-                ? (
-                  <div>
-                    <div>
-                      <span className="font-semibold">
+              upcomingAppointments.length > 0 ? (
+                <div className="flex flex-col gap-2 p-4 rounded-xl card-animate-in w-full">
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="flex-1 min-w-0">
+                      {/* Icon user + tên khách */}
+                      <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                        <FiUser className="w-5 h-5 text-pink-300" />
                         {upcomingAppointments[nextClientIndex].customer_name}
-                      </span>
-                      {" – "}
-                      {upcomingAppointments[nextClientIndex].services?.map(s => s.name).join(", ")}
+                      </div>
+                      {/* Icon dịch vụ */}
+                      <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate mt-1">
+                        <FiTag className="w-4 h-4 text-yellow-300" />
+                        {upcomingAppointments[nextClientIndex].services?.map(s => s.name).join(", ")}
+                      </div>
+                      {/* Trạng thái (timer/late) */}
+                      <div className="flex items-center gap-2 mt-1">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                        </svg>
+                        <span className="text-sm text-emerald-200 font-semibold">
+                          {(() => {
+                            const apptTime = dayjs(upcomingAppointments[nextClientIndex].appointment_date.replace("Z", ""));
+                            const diffMinutes = apptTime.diff(now, "minute");
+                            if (diffMinutes > 0) {
+                              const hours = Math.floor(diffMinutes / 60);
+                              const minutes = diffMinutes % 60;
+                              return hours > 0
+                                ? `⏳ In ${hours}h ${minutes}m`
+                                : `⏳ In ${minutes} minute${minutes > 1 ? "s" : ""}`;
+                            } else {
+                              return `🔴 Late ${Math.abs(diffMinutes)} min`;
+                            }
+                          })()}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-xs mt-1">
-                      {(() => {
-                        const apptTime = dayjs(upcomingAppointments[nextClientIndex].appointment_date.replace("Z", ""));
-                        const diffMinutes = apptTime.diff(now, "minute");
-                        if (diffMinutes > 0) {
-                          const hours = Math.floor(diffMinutes / 60);
-                          const minutes = diffMinutes % 60;
-                          return hours > 0
-                            ? `⏳ In ${hours}h ${minutes}m`
-                            : `⏳ In ${minutes} minute${minutes > 1 ? "s" : ""}`;
-                        } else {
-                          return `🔴 Late ${Math.abs(diffMinutes)} min`;
-                        }
-                      })()}
-                    </div>
-                    <div className="flex gap-2 mt-2 items-center justify-center">
-                      {upcomingAppointments.length > 1 && (
+                  </div>
+                  {/* Nút Start Service dưới cùng, full width, đồng bộ style */}
+                  {!upcomingAppointments[nextClientIndex].started_at &&
+                    upcomingAppointments[nextClientIndex].status === "confirmed" && (
+                      <button
+                        className="mt-2 w-full px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center gap-2"
+                        onClick={async () => {
+                          const token = await user.getIdToken();
+                          await fetch(
+                            `https://crypto-manager-backend.onrender.com/api/appointments/${upcomingAppointments[nextClientIndex].id}`,
+                            {
+                              method: "PATCH",
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token}`,
+                              },
+                              body: JSON.stringify({
+                                status: "processing",
+                                started_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                              }),
+                            }
+                          );
+                          await loadAppointments(
+                            token,
+                            setAppointments,
+                            setAppointmentsToday,
+                            setConfirmedNextClient,
+                            setPendingUpcomingAppointment,
+                            setTimeUntilNext,
+                            setShowPopup,
+                            setNewAppointment,
+                            soundRef,
+                            soundLoopRef,
+                            setUpcomingAppointments,
+                            setNextClientIndex
+                          );
+                        }}
+                      >
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
+                          <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                        </svg>
+                        Start Service
+                      </button>
+                    )}
+                  {/* Điều hướng next/prev nếu có nhiều client */}
+                  <div className="flex gap-2 mt-2 items-center justify-center">
+                    {upcomingAppointments.length > 1 && (
+                      <>
                         <button
                           onClick={() => setNextClientIndex(idx => idx > 0 ? idx - 1 : upcomingAppointments.length - 1)}
                           className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
@@ -1022,13 +1097,11 @@ export default function FreelancerDashboard() {
                         >
                           <ChevronLeft className="w-6 h-6" />
                         </button>
-                      )}
-                      <span className="mx-2 text-xs text-pink-400">
-                        {upcomingAppointments.length > 1
-                          ? `${nextClientIndex + 1} / ${upcomingAppointments.length}`
-                          : null}
-                      </span>
-                      {upcomingAppointments.length > 1 && (
+                        <span className="mx-2 text-xs text-pink-400">
+                          {upcomingAppointments.length > 1
+                            ? `${nextClientIndex + 1} / ${upcomingAppointments.length}`
+                            : null}
+                        </span>
                         <button
                           onClick={() => setNextClientIndex(idx => idx < upcomingAppointments.length - 1 ? idx + 1 : 0)}
                           className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
@@ -1036,14 +1109,84 @@ export default function FreelancerDashboard() {
                         >
                           <ChevronRight className="w-6 h-6" />
                         </button>
-                      )}
-                    </div>
-
+                      </>
+                    )}
                   </div>
-                )
-                : "No upcoming"
+                </div>
+              ) : "No upcoming"
             }
+          />
 
+          {/* Danh sách appointments in progress */}
+          <Card
+            className="col-span-12 md:col-span-6 h-full"
+            icon={<FiUser />}
+            title="Appointments in Progress"
+            value=""
+            sub={
+              <div className="flex flex-col gap-4 w-full">
+                {appointments.filter(a => a.status === "processing").map(appt => (
+                  <div
+                    key={appt.id}
+                    className="flex flex-col h-full justify-between p-4 rounded-xl card-animate-in w-full"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                        <FiUser className="w-5 h-5 text-pink-300" />
+                        {appt.customer_name}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate mt-1">
+                        <FiTag className="w-4 h-4 text-yellow-300" />
+                        {appt.services?.map(s => s.name).join(", ")}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                        </svg>
+                        <span className="text-sm text-emerald-200 font-semibold">
+                          In Service: {formatSeconds(serviceTimers[appt.id])}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      className="mt-11 mb-6 w-full px-4 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-xl font-bold shadow transition text-lg flex items-center justify-center gap-2"
+                      onClick={async () => {
+                        const token = await user.getIdToken();
+                        await fetch(
+                          `https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`,
+                          {
+                            method: "PATCH",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ status: "completed" }),
+                          }
+                        );
+                        await loadAppointments(
+                          token,
+                          setAppointments,
+                          setAppointmentsToday,
+                          setConfirmedNextClient,
+                          setPendingUpcomingAppointment,
+                          setTimeUntilNext,
+                          setShowPopup,
+                          setNewAppointment,
+                          soundRef,
+                          soundLoopRef,
+                          setUpcomingAppointments,
+                          setNextClientIndex
+                        );
+                      }}
+                    >
+                      <FiCheckCircle className="w-5 h-5" />
+                      Complete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            }
           />
 
           {/* Appointments */}
@@ -1233,6 +1376,14 @@ async function loadAppointments(
   }
 }
 
+function formatSeconds(sec) {
+  if (sec == null) return "00:00";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
 
 function clearSoundLoop(soundLoopRef) {
   if (soundLoopRef.current) {
