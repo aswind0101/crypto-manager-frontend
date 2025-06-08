@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
+import FreelancerAddCard from "../../components/FreelancerAddCard";
 
 export default function FreelancerDashboard() {
     const [user, setUser] = useState(null);
@@ -617,36 +618,19 @@ export default function FreelancerDashboard() {
         {
             key: "has_payment",
             title: "Add Payment Method",
-            description: "Add your preferred payment method to complete onboarding.",
+            description: (
+                <>
+                    Add your preferred payment method to complete onboarding.<br />
+                    <span className="text-xs text-gray-400">(We will only charge 5% commission per appointment you serve, nothing else!)</span>
+                    <div className="mt-4">
+                        <FreelancerAddCard onCompleted={refreshOnboardingStatus} />
+                    </div>
+                </>
+            ),
             badge: steps.has_payment ? "Completed" : "Pending",
             badgeColor: steps.has_payment ? "bg-green-500 text-white" : "bg-gray-400 text-white",
-            button: steps.has_payment ? "Added ✅" : "Add Payment Method",
-            renderAction: () => (
-                <button
-                    onClick={async () => {
-                        const token = await auth.currentUser.getIdToken();
-
-                        const res = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/mark-payment-added", {
-                            method: "PATCH",
-                            headers: {
-                                Authorization: `Bearer ${token}`,
-                                "Content-Type": "application/json"
-                            }
-                        });
-
-                        if (res.ok) {
-                            alert("✅ Payment method saved!");
-                            setSteps((prev) => ({ ...prev, has_payment: true }));
-                        } else {
-                            alert("❌ Failed to save payment method");
-                        }
-                    }}
-                    className="w-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 text-white py-2 rounded-3xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition"
-                    disabled={steps.has_payment}
-                >
-                    {steps.has_payment ? "Added ✅" : "Add Payment Method"}
-                </button>
-            )
+            button: null,
+            renderAction: () => null,
         }
         ,
     ];
