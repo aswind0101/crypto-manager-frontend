@@ -1,4 +1,4 @@
-// 📁 components/FreelancerAddCard.js
+// components/FreelancerAddCard.js
 import { useEffect, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -7,8 +7,10 @@ import {
   useElements,
   PaymentElement,
 } from "@stripe/react-stripe-js";
+import { getAuth, onAuthStateChanged } from "firebase/auth"; // Đồng bộ cách gọi
 
-const stripePromise = loadStripe("pk_test_xxx"); // Đổi thành public key của bạn
+// Nên truyền prop stripeKey hoặc import từ file cấu hình env (trong Next.js sẽ dùng NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 function AddCardForm({ onCompleted }) {
   const stripe = useStripe();
@@ -33,8 +35,15 @@ function AddCardForm({ onCompleted }) {
     }
 
     // Lưu payment_method_id lên backend
-    const user = JSON.parse(localStorage.getItem("user"));
-    const token = await window.firebase.auth().currentUser.getIdToken();
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      alert("You must login to save your card!");
+      setLoading(false);
+      return;
+    }
+    const token = await user.getIdToken();
+
     await fetch("https://crypto-manager-backend.onrender.com/api/payment/stripe/save-payment-method", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -62,21 +71,32 @@ function AddCardForm({ onCompleted }) {
 
 export default function FreelancerAddCard({ onCompleted }) {
   const [clientSecret, setClientSecret] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchIntent = async () => {
-      const token = await window.firebase.auth().currentUser.getIdToken();
+    const auth = getAuth();
+    // Đảm bảo đồng bộ cách dùng user giống Navbar
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setLoading(false);
+        setClientSecret(null);
+        return;
+      }
+      // Đã login → lấy token và gọi API Stripe
+      const token = await user.getIdToken();
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/payment/stripe/setup-intent", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       setClientSecret(data.client_secret);
-    };
-    fetchIntent();
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
-  if (!clientSecret) return <div>Loading payment form...</div>;
+  if (loading) return <div>Loading payment form...</div>;
+  if (!clientSecret) return <div className="text-pink-500">You must login to add a payment method.</div>;
 
   return (
     <Elements stripe={stripePromise} options={{ clientSecret }}>
