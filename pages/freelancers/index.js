@@ -702,12 +702,23 @@ export default function FreelancerDashboard() {
       {/* Video hack giữ màn hình sáng iOS, ẩn hoàn toàn khỏi UI */}
       <video
         ref={videoRef}
-        src="/1px-black.mp4" // hoặc bất cứ file video ngắn nào (1-3s), mute/loop
-        style={{ display: "none" }}
+        src="/1px-black.mp4"
         playsInline
         muted
         loop
+        autoPlay
+        style={{
+          position: "fixed",
+          bottom: 0,
+          right: 0,
+          width: "1px",
+          height: "1px",
+          opacity: 0.001,
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
       />
+
       {showPopup && pendingUpcomingAppointment && (
         <div className="fixed bottom-4 right-4 z-50 bg-white text-black rounded-xl px-8 py-2 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
 
