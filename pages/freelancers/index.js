@@ -1278,7 +1278,7 @@ export default function FreelancerDashboard() {
             />
 
           )}
-          <div className="col-span-12 bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-4 border-b-4 border-pink-400 shadow-lg rounded-2xl p-5">
+          <div className="col-span-12 bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 shadow-lg rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-bold text-pink-300">💈 Services</h3>
               <button
@@ -1401,7 +1401,7 @@ export default function FreelancerDashboard() {
 
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-4 border-b-4 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
+    <div className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-xl font-extrabold text-white">{value}</div>
