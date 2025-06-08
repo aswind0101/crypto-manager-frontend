@@ -11,7 +11,10 @@ import { getAuth, onAuthStateChanged } from "firebase/auth"; // Đồng bộ cá
 
 // Nên truyền prop stripeKey hoặc import từ file cấu hình env (trong Next.js sẽ dùng NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+const STRIPE_PUBLISHABLE_KEY =
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_51RXmmn00Is0qEkuZYR7ER6aOoIlaFQ3IekLgG8D1BFM4RSSxKOxOEu5TVLjFKTa3E4xzYVikQIwYy4ynaGbCsqum00RrsXG8Jk";
+
+const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 function AddCardForm({ onCompleted }) {
   const stripe = useStripe();
@@ -75,7 +78,7 @@ export default function FreelancerAddCard({ onCompleted }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log("PUBLIC STRIPE KEY:", process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+    console.log("PUBLIC STRIPE KEY:", STRIPE_PUBLISHABLE_KEY);
     const auth = getAuth();
     // Đảm bảo đồng bộ cách dùng user giống Navbar
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
