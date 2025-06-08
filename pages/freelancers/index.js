@@ -675,7 +675,7 @@ export default function FreelancerDashboard() {
   console.log("onboarding", onboarding);
 
   return (
-    <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
+    <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">/
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       {showPopup && pendingUpcomingAppointment && (
@@ -935,7 +935,7 @@ export default function FreelancerDashboard() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto p-1">
+      <div className="max-w-6xl mx-auto p-2">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-1">
           {/* Welcome Block */}
           <div className="col-span-12 md:col-span-12 flex flex-col md:flex-row md:items-center gap-2 p-1 pb-2">
@@ -1315,7 +1315,7 @@ export default function FreelancerDashboard() {
                       return (
                         <label
                           key={srv.id}
-                          className={`flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize relative`}
+                          className={`flex items-start gap-3 bg-white/5 p-3 rounded-xl shadow hover:bg-white/10 transition cursor-pointer capitalize relative`}
                         >
                           <input
                             type="checkbox"
