@@ -113,6 +113,92 @@ export default function FreelancerDashboard() {
       setSliderX(0); // Reset
     }
   };
+  const now = dayjs();
+  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
+
+  // Tính các appointments theo workflow mới
+  const pendingToday = appointmentsToday.filter(a => {
+    return a.status === "pending";
+  }).length;
+  const upcomingToday = appointmentsToday.filter(a => {
+    // upcoming: status = "confirmed", chưa started, và CHƯA QUA GIỜ HẸN
+    return a.status === "confirmed" &&
+      !a.started_at &&
+      dayjs(a.appointment_date.replace("Z", "")).isAfter(now);
+  }).length;
+  const missedToday = appointmentsToday.filter(a => {
+    // missed: status = "confirmed", chưa started, ĐÃ QUA GIỜ HẸN
+    return a.status === "confirmed" &&
+      !a.started_at &&
+      dayjs(a.appointment_date.replace("Z", "")).isBefore(now);
+  }).length;
+  const completedAppointmentsToday = appointmentsToday.filter(a => a.status === "completed");
+  const totalSecondsToday = completedAppointmentsToday.reduce((sum, a) => {
+    if (a.started_at && a.end_at) {
+      const start = dayjs(a.started_at);
+      const end = dayjs(a.end_at);
+      const seconds = end.diff(start, "second");
+      return sum + Math.max(0, seconds);
+    }
+    return sum;
+  }, 0);
+  const totalHoursToday = (totalSecondsToday / 3600).toFixed(2); // Ví dụ: 4.75 Hours
+  const todayEarnings = completedAppointmentsToday.reduce((sum, a) =>
+    sum + (a.services?.reduce((s, srv) => s + (srv.price || 0), 0) || 0),
+    0
+  );
+  const totalAppointmentsToday = completedAppointmentsToday.length;
+  const inProgressAppointments = appointments.filter(a => a.status === "processing");
+  const nextClient = upcomingAppointments[nextClientIndex];
+  const estimateMinutes =
+    nextClient?.services?.reduce(
+      (sum, srv) => sum + (srv.duration || srv.duration_minutes || 0),
+      0
+    ) || 0;
+
+  // Wake Lock để giữ màn hình luôn sáng (cho cả desktop & mobile)
+  const wakeLockRef = useRef(null);
+
+  useEffect(() => {
+    // Hàm xin quyền giữ màn hình sáng
+    async function requestWakeLock() {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLockRef.current = await navigator.wakeLock.request("screen");
+          console.log("🔋 Wake Lock active!");
+          // Nếu wake lock bị mất (tab ẩn, minimize), có thể xin lại
+          wakeLockRef.current.addEventListener("release", () => {
+            console.log("🔋 Wake Lock was released");
+          });
+        } else {
+          console.warn("Wake Lock API is not supported on this browser.");
+        }
+      } catch (err) {
+        console.error("Failed to acquire wake lock:", err);
+      }
+    }
+
+    // Gọi ngay khi component mount
+    requestWakeLock();
+
+    // Khi tab/trang được bật lại, xin lại quyền nếu đã mất
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Dọn dẹp khi component unmount
+    return () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
 
   // Hàm kiểm tra và show popup late
   useEffect(() => {
@@ -339,8 +425,38 @@ export default function FreelancerDashboard() {
     };
   }, [appointments]);
 
+  useEffect(() => {
+    if (!appointments || appointments.length === 0) return;
+    const processingAppointments = appointments.filter(a =>
+      a.status === "processing" &&
+      a.started_at &&
+      !a.end_at &&
+      Array.isArray(a.services)
+    );
+    processingAppointments.forEach(appt => {
+      const estimateMinutes = appt.services.reduce(
+        (sum, s) => sum + (s.duration || s.duration_minutes || 0),
+        0
+      );
+      if (estimateMinutes < 10) return; // Bảo vệ nếu không có dịch vụ hoặc estimateMinutes quá nhỏ
+      const started = dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss");
+      const now = dayjs();
+      if (started.isAfter(now)) return;
+      const servedMinutes = now.diff(started, "minute");
+      console.log('DEBUG auto-complete:', {
+        id: appt.id,
+        started_at: appt.started_at,
+        now: now.format("YYYY-MM-DD HH:mm:ss"),
+        servedMinutes,
+        estimateMinutes
+      });
+      if (servedMinutes > estimateMinutes + 30) {
+        completeAppointmentById(appt.id);
+      }
+    });
+  }, [appointments]);
 
-  //const isComplete = onboarding?.isQualified === true || onboarding?.isqualified === true;
+
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
@@ -369,46 +485,50 @@ export default function FreelancerDashboard() {
     );
   }
 
-  const now = dayjs();
-  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
 
-  // Tính các appointments theo workflow mới
-  const pendingToday = appointmentsToday.filter(a => {
-    return a.status === "pending";
-  }).length;
+  async function completeAppointmentById(appointmentId, options = {}) {
+    setProcessingApptId(appointmentId);
+    setActionError("");
+    try {
+      const token = await user.getIdToken();
+      await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            status: "completed",
+            end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+          }),
+        }
+      );
+      await loadAppointments(
+        token,
+        setAppointments,
+        setAppointmentsToday,
+        setConfirmedNextClient,
+        setPendingUpcomingAppointment,
+        setTimeUntilNext,
+        setShowPopup,
+        setNewAppointment,
+        soundRef,
+        soundLoopRef,
+        setUpcomingAppointments,
+        setNextClientIndex
+      );
+      if (inProgressIndex >= inProgressAppointments.length - 1) setInProgressIndex(0);
 
-  const upcomingToday = appointmentsToday.filter(a => {
-    // upcoming: status = "confirmed", chưa started, và CHƯA QUA GIỜ HẸN
-    return a.status === "confirmed" &&
-      !a.started_at &&
-      dayjs(a.appointment_date.replace("Z", "")).isAfter(now);
-  }).length;
+      // Nếu truyền onSuccess từ auto-complete hoặc popup thì gọi
+      if (options.onSuccess) options.onSuccess();
 
-  const missedToday = appointmentsToday.filter(a => {
-    // missed: status = "confirmed", chưa started, ĐÃ QUA GIỜ HẸN
-    return a.status === "confirmed" &&
-      !a.started_at &&
-      dayjs(a.appointment_date.replace("Z", "")).isBefore(now);
-  }).length;
-
-
-  const completedAppointmentsToday = appointmentsToday.filter(a => a.status === "completed");
-
-  const todayEarnings = completedAppointmentsToday.reduce((sum, a) =>
-    sum + (a.services?.reduce((s, srv) => s + (srv.price || 0), 0) || 0),
-    0
-  );
-
-  const totalAppointmentsToday = completedAppointmentsToday.length;
-
-  const totalMinutesToday = completedAppointmentsToday.reduce(
-    (sum, a) => sum + (a.duration_minutes || 0),
-    0
-  );
-
-  const totalHoursToday = (totalMinutesToday / 60).toFixed(1);
-
-  const inProgressAppointments = appointments.filter(a => a.status === "processing");
+    } catch (err) {
+      setActionError("Error: Could not complete appointment. Please try again.");
+    }
+    setProcessingApptId(null);
+  }
 
   const handleConfirmAppointment = async (appointmentId) => {
     try {
@@ -489,6 +609,7 @@ export default function FreelancerDashboard() {
       console.error("❌ Error cancelling appointment:", err.message);
     }
   };
+
   const steps = {
     has_avatar: onboarding?.avatar_url,
     has_license: onboarding?.license_url && onboarding?.license_status === "Approved",
@@ -650,22 +771,24 @@ export default function FreelancerDashboard() {
         </div>
       )}
       {latePopup && (
-        <div className="fixed bottom-10 right-4 z-50 bg-white text-black rounded-xl px-8 py-5 shadow-xl border-l-8 border-pink-500 animate-popup max-w-sm w-[95vw] sm:w-[440px] space-y-4">
-          <h2 className="font-bold text-xl text-pink-500">⏰ Appointment Is Waiting!</h2>
-          <div className="mb-2">
+        <div className="fixed bottom-6 right-3 z-50 bg-white text-gray-800 rounded-lg px-3 py-2 shadow-xl border-l-4 border-pink-400 animate-popup w-[95vw] max-w-xs sm:max-w-sm text-sm space-y-2">
+          <h2 className="font-bold text-base text-pink-500 flex items-center gap-2">
+            <FiClock className="text-lg" />
+            Appointment Is Waiting!
+          </h2>
+          <div className="mb-1">
             <b>Client:</b> {latePopup.customer_name} <br />
             <b>Service:</b> {latePopup.services?.map((s) => s.name).join(", ")} <br />
-            <b>Booked Time:</b>{" "}
-            {dayjs(latePopup.appointment_date.replace("Z", "")).format("MMM D, HH:mm")}
+            <b>Booked Time:</b> {dayjs(latePopup.appointment_date.replace("Z", "")).format("MMM D, HH:mm")}
             <br />
-            <b>Late:</b>{" "}
-            <span className="font-bold text-red-500">
+            <b>Late:</b>
+            <span className="font-bold text-red-500 ml-1">
               {Math.max(
                 0,
                 now.diff(dayjs(latePopup.appointment_date.replace("Z", "")), "minute")
-              )}
-            </span>{" "}
-            min
+              )}{" "}
+              min
+            </span>
           </div>
           <div className="flex flex-col gap-2">
             {/* Start service */}
@@ -706,7 +829,7 @@ export default function FreelancerDashboard() {
                   setNextClientIndex
                 );
               }}
-              className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-600"
+              className="bg-emerald-500 text-white px-3 py-1 rounded font-bold hover:bg-emerald-600 text-xs"
             >
               👉 Start Service Now
             </button>
@@ -729,7 +852,6 @@ export default function FreelancerDashboard() {
                 setLatePopup(null);
                 setHideLatePopupUntil(null);
 
-                // ⭐️ GỌI LẠI loadAppointments SAU KHI PATCH
                 await loadAppointments(
                   token,
                   setAppointments,
@@ -745,7 +867,7 @@ export default function FreelancerDashboard() {
                   setNextClientIndex
                 );
               }}
-              className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-600"
+              className="bg-red-400 text-white px-3 py-1 rounded font-bold hover:bg-red-500 text-xs"
             >
               ❌ Cancel Appointment
             </button>
@@ -755,7 +877,7 @@ export default function FreelancerDashboard() {
               <select
                 value={waitMinutes}
                 onChange={(e) => setWaitMinutes(Number(e.target.value))}
-                className="border rounded px-2 py-1"
+                className="border rounded px-2 py-1 text-xs"
               >
                 {[5, 10, 15, 20].map((m) => (
                   <option value={m} key={m}>
@@ -764,7 +886,7 @@ export default function FreelancerDashboard() {
                 ))}
               </select>
               <button
-                className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-3 py-1 rounded"
+                className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-2 py-1 rounded text-xs"
                 onClick={() => {
                   clearWaitingTimeout();
                   setLatePopup(null);
@@ -772,12 +894,11 @@ export default function FreelancerDashboard() {
                   setHideLatePopupUntil(until);
                   waitingTimeout.current = setTimeout(() => setLatePopup(latePopup), waitMinutes * 60000);
                 }}
-
               >
                 Wait
               </button>
             </div>
-            {/* Check overlap with next appointment */}
+            {/* Overlap warning giữ nguyên */}
             {(() => {
               const allUpcoming = appointments
                 .filter(
@@ -800,7 +921,7 @@ export default function FreelancerDashboard() {
                   estEnd.isAfter(dayjs(nextAppt.appointment_date.replace("Z", "")))
                 ) {
                   return (
-                    <div className="text-red-600 font-bold mt-2">
+                    <div className="text-red-600 font-bold mt-1 text-xs">
                       ⚠️ Warning: If you wait {waitMinutes} minutes, the next appointment (
                       {dayjs(nextAppt.appointment_date.replace("Z", "")).format("HH:mm")}
                       ) will be affected!
@@ -813,7 +934,6 @@ export default function FreelancerDashboard() {
           </div>
         </div>
       )}
-
 
       <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-1">
@@ -893,110 +1013,7 @@ export default function FreelancerDashboard() {
 
           </div>
 
-          <div className="col-span-12 border-t-4 border-b-4 border-pink-400 shadow-lg rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold text-pink-300">💈 Services</h3>
-              <button
-                className="text-pink-300 hover:text-pink-200 transition"
-                onClick={() => setShowServiceDetails((prev) => !prev)}
-                title={showServiceDetails ? "Hide details" : "View selected services"}
-              >
-                {showServiceDetails ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <Eye className="w-5 h-5" />
-                    <span className="text-xs text-yellow-300 font-semibold">
-                      {availableServices.length}
-                    </span>
-                  </div>
-                )}
-              </button>
 
-            </div>
-
-            {!showServiceDetails ? (
-              <p className="text-sm text-white/80">
-                You have selected <span className="font-semibold text-emerald-300">{selectedServiceIds.length}</span> service{selectedServiceIds.length !== 1 ? "s" : ""}.
-              </p>
-            ) : (
-              <>
-                {availableServices.length === 0 ? (
-                  <p className="text-sm text-red-300 italic">No services found for your specialization.</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                    {availableServices.map((srv) => {
-                      const checked = selectedServiceIds.includes(srv.id);
-                      return (
-                        <label
-                          key={srv.id}
-                          className={`flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize relative`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={savingStatus === "saving" || updatingServiceId === srv.id}
-                            onChange={async (e) => {
-                              const checked = e.target.checked;
-                              const newIds = checked
-                                ? [...selectedServiceIds, srv.id]
-                                : selectedServiceIds.filter((id) => id !== srv.id);
-
-                              setUpdatingServiceId(srv.id);
-                              setSavingStatus("saving");
-                              setSelectedServiceIds(newIds);
-
-                              try {
-                                const token = await user.getIdToken();
-                                const res = await fetch(
-                                  "https://crypto-manager-backend.onrender.com/api/freelancers/services",
-                                  {
-                                    method: "PATCH",
-                                    headers: {
-                                      Authorization: `Bearer ${token}`,
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({ service_ids: newIds }),
-                                  }
-                                );
-                                if (!res.ok) throw new Error("Failed to update services");
-                                setSavingStatus("saved");
-                                setTimeout(() => setSavingStatus(""), 1200);
-                              } catch (err) {
-                                setSavingStatus("error");
-                                setTimeout(() => setSavingStatus(""), 1500);
-                              }
-                              setUpdatingServiceId(null);
-                            }}
-                            className="accent-pink-500 mt-1"
-                          />
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-pink-300 flex items-center gap-2">
-                              {srv.name}
-                              {updatingServiceId === srv.id && savingStatus === "saving" && (
-                                <Loader2 className="animate-spin w-4 h-4 text-yellow-400 ml-1" />
-                              )}
-                              {checked && savingStatus === "saved" && updatingServiceId === null && (
-                                <CheckCircle className="ml-1 w-4 h-4 text-emerald-400 drop-shadow" />
-                              )}
-                            </span>
-                            <span className="text-xs text-emerald-300">
-                              ${srv.price} – {srv.duration_minutes} min
-                            </span>
-                          </div>
-                        </label>
-                      );
-                    })}
-                    {savingStatus === "error" && (
-                      <div className="text-red-400 text-sm mt-2 animate-bounce-in">
-                        Save failed! Please try again.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
           {/* Appointments */}
           <Card
             className="col-span-12 md:col-span-6"
@@ -1018,7 +1035,7 @@ export default function FreelancerDashboard() {
                   <span>👩‍🔧 Serving: {appointmentsToday.filter(a => a.status === "processing").length}</span>
                   <span>🟡 Pending: {pendingToday}</span>
                   <span>⏳ Upcoming: {upcomingToday}</span>
-                  
+
                 </div>
               </div>
             }
@@ -1056,6 +1073,15 @@ export default function FreelancerDashboard() {
                     <FiTag className="w-4 h-4 text-yellow-300" />
                     {upcomingAppointments[nextClientIndex].services?.map(s => s.name).join(", ")}
                   </div>
+                  {/* Estimate Time */}
+                  {estimateMinutes > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-blue-400">
+                      <FiClock className="w-4 h-4 text-blue-300" />
+                      <span>
+                        Estimated Time: <span className="font-semibold text-emerald-200">{estimateMinutes} min</span>
+                      </span>
+                    </div>
+                  )}
                   {/* Thời gian chờ/lateness */}
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -1206,43 +1232,7 @@ export default function FreelancerDashboard() {
                     disabled={processingApptId === inProgressAppointments[inProgressIndex]?.id}
                     onClick={async () => {
                       const appt = inProgressAppointments[inProgressIndex];
-                      setProcessingApptId(appt.id);
-                      setActionError("");
-                      try {
-                        const token = await user.getIdToken();
-                        await fetch(
-                          `https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`,
-                          {
-                            method: "PATCH",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${token}`,
-                            },
-                            body: JSON.stringify({
-                              status: "completed",
-                              end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-                            }),
-                          }
-                        );
-                        await loadAppointments(
-                          token,
-                          setAppointments,
-                          setAppointmentsToday,
-                          setConfirmedNextClient,
-                          setPendingUpcomingAppointment,
-                          setTimeUntilNext,
-                          setShowPopup,
-                          setNewAppointment,
-                          soundRef,
-                          soundLoopRef,
-                          setUpcomingAppointments,
-                          setNextClientIndex
-                        );
-                        if (inProgressIndex >= inProgressAppointments.length - 1) setInProgressIndex(0);
-                      } catch (err) {
-                        setActionError("Đã có lỗi, thử lại!");
-                      }
-                      setProcessingApptId(null);
+                      await completeAppointmentById(appt.id);
                     }}
                   >
                     {processingApptId === inProgressAppointments[inProgressIndex]?.id ? (
@@ -1288,7 +1278,110 @@ export default function FreelancerDashboard() {
             />
 
           )}
+          <div className="col-span-12 border-t-4 border-b-4 border-pink-400 shadow-lg rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-pink-300">💈 Services</h3>
+              <button
+                className="text-pink-300 hover:text-pink-200 transition"
+                onClick={() => setShowServiceDetails((prev) => !prev)}
+                title={showServiceDetails ? "Hide details" : "View selected services"}
+              >
+                {showServiceDetails ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Eye className="w-5 h-5" />
+                    <span className="text-xs text-yellow-300 font-semibold">
+                      {availableServices.length}
+                    </span>
+                  </div>
+                )}
+              </button>
 
+            </div>
+
+            {!showServiceDetails ? (
+              <p className="text-sm text-white/80">
+                You have selected <span className="font-semibold text-emerald-300">{selectedServiceIds.length}</span> service{selectedServiceIds.length !== 1 ? "s" : ""}.
+              </p>
+            ) : (
+              <>
+                {availableServices.length === 0 ? (
+                  <p className="text-sm text-red-300 italic">No services found for your specialization.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                    {availableServices.map((srv) => {
+                      const checked = selectedServiceIds.includes(srv.id);
+                      return (
+                        <label
+                          key={srv.id}
+                          className={`flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize relative`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={savingStatus === "saving" || updatingServiceId === srv.id}
+                            onChange={async (e) => {
+                              const checked = e.target.checked;
+                              const newIds = checked
+                                ? [...selectedServiceIds, srv.id]
+                                : selectedServiceIds.filter((id) => id !== srv.id);
+
+                              setUpdatingServiceId(srv.id);
+                              setSavingStatus("saving");
+                              setSelectedServiceIds(newIds);
+
+                              try {
+                                const token = await user.getIdToken();
+                                const res = await fetch(
+                                  "https://crypto-manager-backend.onrender.com/api/freelancers/services",
+                                  {
+                                    method: "PATCH",
+                                    headers: {
+                                      Authorization: `Bearer ${token}`,
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ service_ids: newIds }),
+                                  }
+                                );
+                                if (!res.ok) throw new Error("Failed to update services");
+                                setSavingStatus("saved");
+                                setTimeout(() => setSavingStatus(""), 1200);
+                              } catch (err) {
+                                setSavingStatus("error");
+                                setTimeout(() => setSavingStatus(""), 1500);
+                              }
+                              setUpdatingServiceId(null);
+                            }}
+                            className="accent-pink-500 mt-1"
+                          />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-pink-300 flex items-center gap-2">
+                              {srv.name}
+                              {updatingServiceId === srv.id && savingStatus === "saving" && (
+                                <Loader2 className="animate-spin w-4 h-4 text-yellow-400 ml-1" />
+                              )}
+                              {checked && savingStatus === "saved" && updatingServiceId === null && (
+                                <CheckCircle className="ml-1 w-4 h-4 text-emerald-400 drop-shadow" />
+                              )}
+                            </span>
+                            <span className="text-xs text-emerald-300">
+                              ${srv.price} – {srv.duration_minutes} min
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                    {savingStatus === "error" && (
+                      <div className="text-red-400 text-sm mt-2 animate-bounce-in">
+                        Save failed! Please try again.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
           {/* Quick Actions */}
           <div className="col-span-12">
             <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
