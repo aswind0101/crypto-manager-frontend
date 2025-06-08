@@ -935,7 +935,7 @@ export default function FreelancerDashboard() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-6">
+      <div className="max-w-6xl mx-auto p-1">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-1">
           {/* Welcome Block */}
           <div className="col-span-12 md:col-span-12 flex flex-col md:flex-row md:items-center gap-2 p-1 pb-2">
@@ -1278,7 +1278,7 @@ export default function FreelancerDashboard() {
             />
 
           )}
-          <div className="col-span-12 border-t-4 border-b-4 border-pink-400 shadow-lg rounded-2xl p-5">
+          <div className="col-span-12 bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-4 border-b-4 border-pink-400 shadow-lg rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-bold text-pink-300">💈 Services</h3>
               <button
@@ -1401,7 +1401,7 @@ export default function FreelancerDashboard() {
 
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className={`relative ${className} border-t-4 border-b-4 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
+    <div className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-4 border-b-4 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-xl font-extrabold text-white">{value}</div>
