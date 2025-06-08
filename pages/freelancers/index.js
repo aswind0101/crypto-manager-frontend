@@ -675,7 +675,7 @@ export default function FreelancerDashboard() {
   console.log("onboarding", onboarding);
 
   return (
-    <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">/
+    <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       {showPopup && pendingUpcomingAppointment && (
