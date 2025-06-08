@@ -623,7 +623,7 @@ export default function FreelancerDashboard() {
                     Add your preferred payment method to complete onboarding.<br />
                     <span className="text-xs text-gray-400">(We will only charge 5% commission per appointment you serve, nothing else!)</span>
                     <div className="mt-4">
-                        <FreelancerAddCard onCompleted={refreshOnboardingStatus} />
+                        <FreelancerAddCard hasPayment={steps.has_payment} onCompleted={refreshOnboardingStatus} />
                     </div>
                 </>
             ),
@@ -718,7 +718,7 @@ export default function FreelancerDashboard() {
                                         description={step.description}
                                         completed={steps[step.key]}
                                         buttonLabel={step.button}
-                                        renderAction={step.renderAction ? step.renderAction() : null}
+                                        renderAction={step.renderAction}
                                         onClick={() => console.log(`Handle: ${step.key}`)}
                                         badge={step.badge}
                                         badgeColor={step.badgeColor}
@@ -742,7 +742,22 @@ export default function FreelancerDashboard() {
 
 }
 
-function StepCard({ title, description, completed, buttonLabel, onClick, renderAction, badge, badgeColor, disabled }) {
+// components/StepCard.js
+
+function StepCard({
+    title,
+    description,
+    completed,
+    buttonLabel,
+    onClick,
+    renderAction,
+    badge,
+    badgeColor,
+    disabled
+}) {
+    // Nếu renderAction là function thì gọi, lấy kết quả
+    const actionContent = typeof renderAction === "function" ? renderAction() : null;
+
     return (
         <div
             className={`relative pt-8 pb-8 border-t border-b border-white/20 rounded-2xl p-5 flex flex-col justify-between transition ${disabled ? "opacity-50 pointer-events-none" : ""
@@ -760,18 +775,24 @@ function StepCard({ title, description, completed, buttonLabel, onClick, renderA
                 {description}
             </div>
 
-            {renderAction ? (
-                <div>{renderAction}</div>
-            ) : (
-                <button
-                    onClick={onClick}
-                    className="bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition"
-                >
-                    {buttonLabel}
-                </button>
-            )}
+            {/* Chỉ render 1 trong 2: */}
+            {actionContent !== null && actionContent !== undefined
+                ? actionContent
+                : buttonLabel
+                    ? (
+                        <button
+                            onClick={onClick}
+                            className="bg-gradient-to-r from-emerald-500 via-yellow-400 to-pink-400 text-white py-2 rounded-xl text-sm font-semibold shadow-md hover:brightness-105 hover:scale-105 transition"
+                        >
+                            {buttonLabel}
+                        </button>
+                    )
+                    : null
+            }
         </div>
     );
 }
+
+
 
 
