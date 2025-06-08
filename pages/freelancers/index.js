@@ -156,28 +156,7 @@ export default function FreelancerDashboard() {
       0
     ) || 0;
 
-  const videoRef = useRef(null);
-  useEffect(() => {
-    // Chỉ chạy trên iOS Safari
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    if (isIOS) {
-      // Bắt user interaction rồi mới play video (auto-play iOS cần thao tác chạm đầu tiên)
-      const enableNoSleep = () => {
-        if (videoRef.current) {
-          videoRef.current.play();
-        }
-        window.removeEventListener("touchstart", enableNoSleep);
-        window.removeEventListener("click", enableNoSleep);
-      };
-      window.addEventListener("touchstart", enableNoSleep, { once: true });
-      window.addEventListener("click", enableNoSleep, { once: true });
-    }
-    // Clean up
-    return () => {
-      window.removeEventListener("touchstart", enableNoSleep);
-      window.removeEventListener("click", enableNoSleep);
-    };
-  }, []);
+  
   // Wake Lock để giữ màn hình luôn sáng (cho cả desktop & mobile)
   const wakeLockRef = useRef(null);
   useEffect(() => {
@@ -699,26 +678,6 @@ export default function FreelancerDashboard() {
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
-      {/* Video hack giữ màn hình sáng iOS, ẩn hoàn toàn khỏi UI */}
-      <video
-        ref={videoRef}
-        src="/1px-black.mp4"
-        playsInline
-        muted
-        loop
-        autoPlay
-        style={{
-          position: "fixed",
-          bottom: 0,
-          right: 0,
-          width: "1px",
-          height: "1px",
-          opacity: 0.001,
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-
       {showPopup && pendingUpcomingAppointment && (
         <div className="fixed bottom-4 right-4 z-50 bg-white text-black rounded-xl px-8 py-2 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
 
