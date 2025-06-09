@@ -199,7 +199,7 @@ export default function FreelancerRegister() {
             ))}
           </div>
         </div>
-        {/*
+
         <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200 mt-2">
           <input
             type="checkbox"
@@ -212,7 +212,7 @@ export default function FreelancerRegister() {
           />
           Tôi đang làm tại một salon hiện tại
         </label>
-      */}
+
         {workingAtSalon && (
           <div className="space-y-2">
             <Input name="temp_salon_name" label="Tên Salon" value={form.temp_salon_name} onChange={handleChange} />
