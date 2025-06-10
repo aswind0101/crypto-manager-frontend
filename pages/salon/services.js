@@ -219,7 +219,17 @@ export default function SalonServicesPage() {
                             <select
                                 name="specialization"
                                 value={form.specialization}
-                                onChange={(e) => setForm({ ...form, specialization: e.target.value })}
+                                onChange={(e) => {
+                                    const specialization = e.target.value;
+                                    setForm({
+                                        specialization,
+                                        name: "",
+                                        price: "",
+                                        duration_minutes: "",
+                                        promotion: "",
+                                        description: "",
+                                    });
+                                }}
                                 className="rounded-2xl p-2 pl-4 text-yellow-600 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
                             >
                                 {specializations.map((s) => (
