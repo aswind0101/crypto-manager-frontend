@@ -119,7 +119,7 @@ export default function Login() {
             {/* Hiệu ứng glass + particle */}
             <div className="absolute inset-0 z-0 pointer-events-none"></div>
             {/* Card Login */}
-            <div className="relative z-10 bg-white/5 backdrop-blur-2xl border-t-8 border-white/10 rounded-3xl px-6 py-10 max-w-[95vw] sm:max-w-[480px] w-full flex flex-col items-center">
+            <div className="relative z-10  px-6 py-10 max-w-[95vw] sm:max-w-[480px] w-full flex flex-col items-center">
                 <div className="w-20 h-20 bg-gradient-to-br from-emerald-300 via-yellow-200 to-pink-300 rounded-full flex items-center justify-center shadow-xl mb-6">
                     <svg viewBox="0 0 48 48" width="40" height="40" fill="none">
                         <circle cx="24" cy="24" r="22" stroke="#a7f3d0" strokeWidth="3" fill="#fff0" />
@@ -135,7 +135,7 @@ export default function Login() {
                 </p>
                 <button
                     onClick={handleLogin}
-                    className="bg-gradient-to-r from-yellow-400 via-pink-400 to-emerald-400 hover:brightness-120 text-black font-bold text-lg py-2 px-8 rounded-3xl shadow-xl transition-all duration-200 mb-4"
+                    className="bg-gradient-to-r from-yellow-400 via-pink-400 to-emerald-400 hover:brightness-120 text-black font-bold text-lg py-2 px-8 rounded-3xl shadow-3xl transition-all duration-200 mb-4"
                 >
                     <span className="inline-flex items-center gap-2">
                         <svg width="24" height="24" viewBox="0 0 256 262" xmlns="http://www.w3.org/2000/svg"><g fill="none"><path d="M255.9 133.5c0-11.2-1-22-2.8-32.4H130.6v61.4h70.4c-3 16.2-12 29.8-25.4 39v32h41c24.2-22.4 38.3-55.4 38.3-100z" fill="#4285F4" /><path d="M130.6 262c34.6 0 63.6-11.4 84.8-31.1l-41-32c-11.4 7.6-25.8 12-43.8 12-33.6 0-62-22.7-72.1-53.2h-42.3v33.2C37.2 230.4 81.4 262 130.6 262z" fill="#34A853" /><path d="M58.5 157.7C56 151.1 54.5 144 54.5 136.5c0-7.4 1.5-14.6 4-21.2v-33.2h-42.3c-8.5 17-13.3 36-13.3 56.2s4.8 39.2 13.3 56.2l42.3-33.2z" fill="#FBBC05" /><path d="M130.6 51.8c19.2 0 36.4 6.6 49.9 19.7l37.2-37.2C194.2 13 165.2 0 130.6 0 81.4 0 37.2 31.6 16.2 77.8l42.3 33.2c10-30.5 38.4-53.2 72.1-53.2z" fill="#EA4335" /></g></svg>
