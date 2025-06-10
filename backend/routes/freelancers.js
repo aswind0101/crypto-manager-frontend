@@ -583,7 +583,30 @@ router.get("/check", verifyToken, async (req, res) => {
     }
 });
 
-
+router.get("/profile-status", verifyToken, async (req, res) => {
+    const { uid } = req.user;
+    try {
+        // Lấy record freelancer theo firebase_uid
+        const result = await pool.query("SELECT *, (firebase_uid IS NOT NULL AND firebase_uid != '') AS has_profile FROM freelancers WHERE firebase_uid = $1", [uid]);
+        if (result.rows.length === 0) {
+            return res.json({ has_profile: false, is_verified: false, onboarding: null });
+        }
+        const profile = result.rows[0];
+        // Có thể bổ sung thêm trường onboarding đầy đủ
+        return res.json({
+            has_profile: true,
+            is_verified: profile.is_verified,
+            onboarding: {
+                avatar_url: profile.avatar_url,
+                name: profile.name,
+                // ...thêm các trường cần thiết khác
+            }
+        });
+    } catch (err) {
+        console.error("❌ Error profile-status:", err.message);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 // PATCH: Đánh dấu freelancer đã thêm phương thức thanh toán (giả lập)
 router.patch("/mark-payment-added", verifyToken, async (req, res) => {
     const { uid } = req.user;
