@@ -211,7 +211,7 @@ export default function SalonServicesPage() {
                     onSubmit={handleSubmit}
                     className="p-2 mb-4"
                 >
-                   
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* LEFT: specialization + list service */}
                         <div className="bg-white/5 border-t-4 border-pink-500 p-4 rounded-2xl">
@@ -231,26 +231,38 @@ export default function SalonServicesPage() {
                                     <div className="font-semibold text-emerald-200 mb-2 drop-shadow">
                                         Typical services for <span className="capitalize">{form.specialization.replace("_", " ")}</span>
                                     </div>
-                                    <ul className="space-y-1">
-                                        {SERVICES_BY_SPECIALIZATION[form.specialization].map((svc) => {
-                                            const isActive = form.name === svc;
-                                            return (
-                                                <li
-                                                    key={svc}
-                                                    className={`
-                                                            cursor-pointer px-2 py-1 border-t-1 border-white/20 text-gray-400 rounded transition
-                                                            ${isActive
-                                                            ? "bg-emerald-200 text-emerald-900 font-bold ring-2 ring-emerald-400"
-                                                            : "hover:bg-white/10 hover:font-semibold hover:text-emerald-400"
-                                                        }
-                                                        `}
-                                                    onClick={() => setForm({ ...form, name: svc })}
-                                                >
-                                                    {svc}
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
+                                    <div
+                                        className="scroll-services-mobile"
+                                        style={{
+                                            maxHeight: 320,
+                                            overflowY: "auto",
+                                            WebkitOverflowScrolling: "touch",
+                                            overscrollBehavior: "contain",
+                                            touchAction: "pan-y",
+                                            scrollbarWidth: "thin"
+                                        }}
+                                    >
+                                        <ul className="space-y-1 overflow-y-auto pr-2">
+                                            {SERVICES_BY_SPECIALIZATION[form.specialization].map((svc) => {
+                                                const isActive = form.name === svc;
+                                                return (
+                                                    <li
+                                                        key={svc}
+                                                        className={`
+                                                        cursor-pointer px-2 py-1 border-t-1 border-white/20 text-gray-400 rounded transition
+                                                        ${isActive
+                                                                ? "bg-emerald-200 text-emerald-900 font-bold ring-2 ring-emerald-400"
+                                                                : "hover:bg-white/10 hover:font-semibold hover:text-emerald-400"
+                                                            }
+            `}
+                                                        onClick={() => setForm({ ...form, name: svc })}
+                                                    >
+                                                        {svc}
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </div>
 
                                     <div className="text-xs text-yellow-300 mt-2">*  Click any service to fill &quot;Service Name&quot;.</div>
                                 </div>
@@ -310,12 +322,12 @@ export default function SalonServicesPage() {
                             />
 
                             <label className="block text-pink-400 font-semibold mb-1 flex items-center gap-1">
-                                <FaFileAlt /> Description
+                                <FaFileAlt /> Description (optional)
                             </label>
                             <textarea
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                className="rounded-2xl text-yellow-600 p-2 pl-4 w-full bg-white/5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded-2xl mb-4 text-yellow-600 p-2 pl-4 w-full bg-white/5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             />
                         </div>
                     </div>
