@@ -66,6 +66,9 @@ export default function FreelancerDashboard() {
       soundLoopRef.current = null;
     }
   };
+  const fullURL = (url) =>
+    url?.startsWith("http") ? url : `https://crypto-manager-backend.onrender.com${url}`;
+
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
   const [showServiceDetails, setShowServiceDetails] = useState(false);
@@ -285,46 +288,61 @@ export default function FreelancerDashboard() {
       }
       setUser(currentUser);
 
-      // 🟢 Lấy role CHUẨN
+      // 1. Log UID đang dùng
+      console.log("🔥 [DEBUG] currentUser.uid:", currentUser.uid);
+
+      // 2. Lấy role chuẩn
       let role = null;
-      // 1. Thử lấy từ localStorage
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         role = parsedUser.role;
       }
-      // 2. Nếu chưa có, fetch từ backend (làm 1 lần duy nhất)
+
+      // 3. Nếu chưa có role, fetch từ backend
+      let token;
       if (!role) {
         try {
-          const token = await currentUser.getIdToken();
+          token = await currentUser.getIdToken();
           const resRole = await fetch("https://crypto-manager-backend.onrender.com/api/user-role", {
             headers: { Authorization: `Bearer ${token}` },
           });
           const dataRole = await resRole.json();
           role = dataRole.role;
+          console.log("🔥 [DEBUG] /api/user-role:", dataRole);
         } catch (err) {
           console.error("❌ Error fetch user role", err);
         }
       }
 
       setUserRole(role);
-      console.log("FE currentUser.uid:", user?.uid);
-      // 🟢 Check freelancer profile
-      const exists = await checkFreelancerExists(currentUser);
+      // Log lại user role
+      console.log("🔥 [DEBUG] userRole:", role);
+
+      // 4. Check freelancer profile — log response
+      token = token || await currentUser.getIdToken();
+      // Gọi thẳng API check (không dùng checkFreelancerExists nếu muốn thấy data trả về)
+      const resCheck = await fetch("https://crypto-manager-backend.onrender.com/api/freelancers/check", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const checkData = await resCheck.json();
+      console.log("🔥 [DEBUG] /api/freelancers/check:", checkData);
+
+      const exists = checkData.exists;
       setHasFreelancerProfile(exists);
 
-      // ⚠️ Thêm debug ở đây
-      console.log("DEBUG role =", role, "| hasFreelancerProfile =", exists);
+      // 5. Log giá trị kiểm tra freelancer profile
+      console.log("🔥 [DEBUG] hasFreelancerProfile:", exists);
 
-      // 🛑 Nếu là nhân viên salon chưa có freelancer profile, DỪNG!
+      // 6. Nếu là nhân viên salon chưa có freelancer profile, DỪNG!
       if (role === "Salon_NhanVien" && !exists) {
         setLoading(false);
         setOnboarding(null);
+        console.log("🛑 Chưa có profile freelancer → show Register now");
         return;
       }
 
-      // 5. Nếu đã có profile, tiếp tục fetch onboarding, appointments
-      const token = await currentUser.getIdToken();
+      // 7. Nếu đã có profile, tiếp tục fetch onboarding, appointments
       const res = await fetch(
         "https://crypto-manager-backend.onrender.com/api/freelancers/onboarding",
         {
@@ -333,6 +351,16 @@ export default function FreelancerDashboard() {
       );
       const data = await res.json();
       setOnboarding(data);
+
+      // Log response onboarding
+      console.log("🔥 [DEBUG] onboarding:", data);
+
+      if (data && data.is_verified === false) {
+        setLoading(false);
+        setOnboarding(data);
+        console.log("🛑 Đã có profile nhưng chưa verify → show verify warning");
+        return;
+      }
 
       if (data?.salon_id && data?.specialization?.length > 0) {
         try {
@@ -361,8 +389,8 @@ export default function FreelancerDashboard() {
         setNewAppointment,
         soundRef,
         soundLoopRef,
-        setUpcomingAppointments,    // Thêm dòng này
-        setNextClientIndex          // Thêm dòng này
+        setUpcomingAppointments,
+        setNextClientIndex
       );
 
       setLoading(false);
@@ -370,6 +398,7 @@ export default function FreelancerDashboard() {
 
     return () => unsubscribe();
   }, []);
+
 
   useEffect(() => {
     if (!user || !user.uid) return;
@@ -462,17 +491,33 @@ export default function FreelancerDashboard() {
     return (
       <div className="min-h-screen flex flex-col justify-center items-center p-6 bg-[#23242a]">
         <div className="flex flex-1 items-center justify-center w-full">
-          <div className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 mt-6 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center">
+          <div
+            className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 mt-6 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center"
+            role="alert"
+            aria-live="assertive"
+          >
+            {/* Avatar cá nhân hóa nếu có */}
+            {user?.photoURL && (
+              <img
+                src={fullURL(user.photoURL)}
+                alt="User Avatar"
+                className="w-20 h-20 rounded-full border-4 border-yellow-400 mb-3 shadow-lg"
+              />
+            )}
+
+            {console.log("🔥 Photo URL:", user.photoURL)}
+            {/* Icon cảnh báo động */}
+            <span className="text-3xl mb-2 animate-bounce">⚠️</span>
+
             <h2 className="text-2xl font-bold text-yellow-300 mb-3 flex items-center gap-2">
-              <span className="text-3xl">⚠️</span>
               You haven&apos;t registered a freelancer profile
             </h2>
             <p className="mb-6 text-center text-base text-gray-300">
-              To use the dashboard, please complete your freelancer profile.
+              To use the dashboard and receive bookings, please complete your freelancer profile.<br />
             </p>
             <button
               onClick={() => router.push("/freelancers/register")}
-              className="bg-yellow-400 text-black w-full px-6 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition text-lg shadow"
+              className="bg-yellow-400 text-black w-full px-6 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition text-lg shadow focus:outline-none focus:ring-2 focus:ring-yellow-400"
             >
               Register now
             </button>
@@ -481,7 +526,36 @@ export default function FreelancerDashboard() {
       </div>
     );
   }
-
+  // Nếu đã có profile nhưng chưa xác minh email
+  if (onboarding && onboarding.is_verified === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-[#23242a]">
+        <div className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center">
+          <h2 className="text-2xl font-bold text-yellow-300 mb-3 flex items-center gap-2">
+            <span className="text-3xl">✉️</span>
+            Please verify your email
+          </h2>
+          <p className="mb-6 text-center text-base text-gray-300">
+            To activate your freelancer account, please check your email and click the verification link we sent.<br />
+            <span className="block mt-2 text-yellow-200 text-xs">{onboarding?.email}</span>
+          </p>
+          <button
+            onClick={async () => {
+              const res = await fetch(
+                `https://crypto-manager-backend.onrender.com/api/freelancers/resend-verify?email=${encodeURIComponent(onboarding?.email)}`,
+                { method: "GET" }
+              );
+              const data = await res.json();
+              alert(data.message || "Verification email resent!");
+            }}
+            className="bg-yellow-400 text-black w-full px-6 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition text-lg shadow mt-2"
+          >
+            Resend verification email
+          </button>
+        </div>
+      </div>
+    );
+  }
   async function completeAppointmentById(appointmentId, options = {}) {
     setProcessingApptId(appointmentId);
     setActionError("");
