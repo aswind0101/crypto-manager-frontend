@@ -12,6 +12,8 @@ import {
   FiUser,
   FiScissors,
   FiTag,
+  FaUserPlus, 
+  FaSignInAlt
 } from "react-icons/fi";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
