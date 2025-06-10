@@ -238,8 +238,8 @@ export default function SalonServicesPage() {
                             </select>
                             {form.specialization && SERVICES_BY_SPECIALIZATION[form.specialization] && (
                                 <div className="mt-2 p-4 mb-2">
-                                    <div className="font-semibold text-emerald-200 mb-2 drop-shadow">
-                                        Typical services for <span className="capitalize">{form.specialization.replace("_", " ")}</span>
+                                    <div className="font-semibold text-emerald-200 mb-2 text-center drop-shadow">
+                                        Typical Services
                                     </div>
                                     <div
                                         className="scroll-services-mobile"
@@ -259,12 +259,12 @@ export default function SalonServicesPage() {
                                                     <li
                                                         key={svc}
                                                         className={`
-                                                        cursor-pointer px-2 py-1 border-t-1 border-white/20 text-gray-400 rounded transition
+                                                        cursor-pointer text-sm px-2 py-1 border-t-1 border-white/20 text-gray-400 rounded transition
                                                         ${isActive
                                                                 ? "bg-emerald-200 text-emerald-900 font-bold ring-2 ring-emerald-400"
                                                                 : "hover:bg-white/10 hover:font-semibold hover:text-emerald-400"
                                                             }
-            `}
+                                                        `}
                                                         onClick={() => setForm({ ...form, name: svc })}
                                                     >
                                                         {svc}
@@ -274,7 +274,7 @@ export default function SalonServicesPage() {
                                         </ul>
                                     </div>
 
-                                    <div className="text-xs text-yellow-300 mt-2">*  Click any service to fill &quot;Service Name&quot;.</div>
+                                    <div className="text-xs text-yellow-300 mt-4">*  Click any service to fill &quot;Service Name&quot;.</div>
                                 </div>
 
                             )}
