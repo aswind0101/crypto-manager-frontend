@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import Navbar from "../../components/Navbar";
 import { auth } from "../../firebase";
+import { SERVICES_BY_SPECIALIZATION } from "../../constants/servicesBySpecialization";
+
 import { onAuthStateChanged } from "firebase/auth";
 import {
     FaCut,
@@ -198,86 +200,122 @@ export default function SalonServicesPage() {
     }, []);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-800 dark:via-sky-700 dark:to-pink-700 px-4 py-10 text-gray-800 dark:text-gray-100">
+        <div className="min-h-screen  px-4 py-10 font-mono sm:font-['Pacifico', cursive]">
             <Navbar />
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-3xl font-bold text-center text-emerald-700 dark:text-emerald-300 mb-8">
+                <h1 className="text-3xl font-bold text-center text-emerald-300 mb-8">
                     💈 Salon Services
                 </h1>
 
                 <form
                     onSubmit={handleSubmit}
-                    className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl shadow-xl p-6 mb-8"
+                    className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl shadow-xl p-6 mb-8"
                 >
                     <h2 className="text-xl font-bold mb-4 text-pink-100">
                         {editingService ? "✏️ Edit Service" : "➕ Add New Service"}
                     </h2>
 
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* LEFT: specialization + list service */}
                         <div className="border border-white/30 p-3 rounded-xl">
                             <label className="block text-white font-semibold mb-1 flex items-center gap-1"><FaTools /> Specialization</label>
                             <select
                                 name="specialization"
                                 value={form.specialization}
                                 onChange={(e) => setForm({ ...form, specialization: e.target.value })}
-                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
+                                className="rounded p-2 text-yellow-600 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
                             >
                                 {specializations.map((s) => (
                                     <option key={s} value={s}>{s.replace("_", " ")}</option>
                                 ))}
                             </select>
+                            {form.specialization && SERVICES_BY_SPECIALIZATION[form.specialization] && (
+                                <div className="mt-2 bg-white/20 rounded-xl p-4 mb-2">
+                                    <div className="font-semibold text-emerald-200 mb-1 drop-shadow">
+                                        Typical services for <span className="capitalize">{form.specialization.replace("_", " ")}</span>:
+                                    </div>
+                                    <ul className="space-y-1">
+                                        {SERVICES_BY_SPECIALIZATION[form.specialization].map((svc) => {
+                                            const isActive = form.name === svc;
+                                            return (
+                                                <li
+                                                    key={svc}
+                                                    className={`
+                                                            cursor-pointer px-2 py-1 rounded transition
+                                                            ${isActive
+                                                            ? "bg-emerald-200 text-emerald-900 font-bold ring-2 ring-emerald-400"
+                                                            : "hover:bg-white/30 hover:font-semibold hover:text-emerald-900"
+                                                        }
+                                                        `}
+                                                    onClick={() => setForm({ ...form, name: svc })}
+                                                >
+                                                    {svc}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+
+                                    <div className="text-xs text-gray-700 mt-2">Click any service to fill "Service Name".</div>
+                                </div>
+
+                            )}
                         </div>
 
-                        <div className="border border-white/30 p-3 rounded-xl">
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1"><FaCut /> Service Name</label>
+                        {/* RIGHT: Gom tất cả trường lại 1 card */}
+                        <div className="border border-white/30 p-3 rounded-xl flex flex-col gap-4">
+                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                                <FaCut /> Service Name
+                            </label>
                             <input
                                 type="text"
                                 value={form.name}
                                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                                 required
-                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
+                                className="rounded text-yellow-600 p-2 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
+                                placeholder="Please select or enter service name"
                             />
-                        </div>
 
-                        <div className="border border-white/30 p-3 rounded-xl">
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1"><FaDollarSign /> Price ($)</label>
+                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                                <FaDollarSign /> Price ($)
+                            </label>
                             <input
                                 type="number"
                                 step="0.01"
                                 value={form.price}
                                 onChange={(e) => setForm({ ...form, price: e.target.value })}
                                 required
-                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded text-yellow-600 p-2 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             />
-                        </div>
 
-                        <div className="border border-white/30 p-3 rounded-xl">
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1"><FaClock /> Duration (minutes)</label>
+                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                                <FaClock /> Duration (minutes)
+                            </label>
                             <input
                                 type="number"
                                 value={form.duration_minutes}
                                 onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
                                 required
-                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded text-yellow-600 p-2 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             />
-                        </div>
 
-                        <div className="md:col-span-2 border border-white/30 p-3 rounded-xl">
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1"><FaTags /> Promotion (optional)</label>
+                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                                <FaTags /> Promotion (optional)
+                            </label>
                             <input
                                 type="text"
                                 value={form.promotion}
                                 onChange={(e) => setForm({ ...form, promotion: e.target.value })}
-                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded text-yellow-600 p-2  w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             />
-                        </div>
 
-                        <div className="md:col-span-2 border border-white/30 p-3 rounded-xl">
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1"><FaFileAlt /> Description</label>
+                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                                <FaFileAlt /> Description
+                            </label>
                             <textarea
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                className="rounded p-2 text-gray-700 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded text-yellow-600 p-2 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             />
                         </div>
                     </div>
@@ -313,7 +351,7 @@ export default function SalonServicesPage() {
                     <select
                         value={selectedSpecialization}
                         onChange={(e) => handleFilterChange(e.target.value)}
-                        className="rounded p-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
+                        className="rounded p-2 text-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
                     >
                         <option value="all">All</option>
                         {specializations.map((s) => (
@@ -334,7 +372,7 @@ export default function SalonServicesPage() {
                         filteredServices.map((s) => (
                             <div
                                 key={s.id}
-                                className="bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl shadow-xl"
+                                className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl shadow-xl"
                             >
                                 <h3 className="text-lg font-bold text-yellow-300 capitalize">{s.name}</h3>
                                 <p className="text-sm text-white/90 italic mb-1 capitalize">
