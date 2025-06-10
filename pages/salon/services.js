@@ -252,7 +252,7 @@ export default function SalonServicesPage() {
                                         })}
                                     </ul>
 
-                                    <div className="text-xs text-yellow-300 mt-2">* Click any service to fill "Service Name".</div>
+                                    <div className="text-xs text-yellow-300 mt-2">*  Click any service to fill &quot;Service Name&quot;.</div>
                                 </div>
 
                             )}
