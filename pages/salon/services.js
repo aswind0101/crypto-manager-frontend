@@ -200,40 +200,36 @@ export default function SalonServicesPage() {
     }, []);
 
     return (
-        <div className="min-h-screen  px-4 py-10 font-mono sm:font-['Pacifico', cursive]">
+        <div className="min-h-screen px-4 py-10 font-mono sm:font-['Pacifico', cursive]">
             <Navbar />
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-3xl font-bold text-center text-emerald-300 mb-8">
+                <h1 className="text-3xl font-bold text-center text-emerald-300 mb-18">
                     💈 Salon Services
                 </h1>
 
                 <form
                     onSubmit={handleSubmit}
-                    className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl shadow-xl p-6 mb-8"
+                    className="p-2 mb-4"
                 >
-                    <h2 className="text-xl font-bold mb-4 text-pink-100">
-                        {editingService ? "✏️ Edit Service" : "➕ Add New Service"}
-                    </h2>
-
-
+                   
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* LEFT: specialization + list service */}
-                        <div className="border border-white/30 p-3 rounded-xl">
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1"><FaTools /> Specialization</label>
+                        <div className="bg-white/5 border-t-4 border-pink-500 p-4 rounded-2xl">
+                            <label className="block text-pink-400 font-semibold mb-1 flex items-center gap-1"><FaTools /> Specialization</label>
                             <select
                                 name="specialization"
                                 value={form.specialization}
                                 onChange={(e) => setForm({ ...form, specialization: e.target.value })}
-                                className="rounded p-2 text-yellow-600 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
+                                className="rounded-2xl p-2 pl-4 text-yellow-600 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
                             >
                                 {specializations.map((s) => (
                                     <option key={s} value={s}>{s.replace("_", " ")}</option>
                                 ))}
                             </select>
                             {form.specialization && SERVICES_BY_SPECIALIZATION[form.specialization] && (
-                                <div className="mt-2 bg-white/20 rounded-xl p-4 mb-2">
-                                    <div className="font-semibold text-emerald-200 mb-1 drop-shadow">
-                                        Typical services for <span className="capitalize">{form.specialization.replace("_", " ")}</span>:
+                                <div className="mt-2 p-4 mb-2">
+                                    <div className="font-semibold text-emerald-200 mb-2 drop-shadow">
+                                        Typical services for <span className="capitalize">{form.specialization.replace("_", " ")}</span>
                                     </div>
                                     <ul className="space-y-1">
                                         {SERVICES_BY_SPECIALIZATION[form.specialization].map((svc) => {
@@ -242,10 +238,10 @@ export default function SalonServicesPage() {
                                                 <li
                                                     key={svc}
                                                     className={`
-                                                            cursor-pointer px-2 py-1 rounded transition
+                                                            cursor-pointer px-2 py-1 border-t-1 border-white/20 text-gray-400 rounded transition
                                                             ${isActive
                                                             ? "bg-emerald-200 text-emerald-900 font-bold ring-2 ring-emerald-400"
-                                                            : "hover:bg-white/30 hover:font-semibold hover:text-emerald-900"
+                                                            : "hover:bg-white/10 hover:font-semibold hover:text-emerald-400"
                                                         }
                                                         `}
                                                     onClick={() => setForm({ ...form, name: svc })}
@@ -256,15 +252,15 @@ export default function SalonServicesPage() {
                                         })}
                                     </ul>
 
-                                    <div className="text-xs text-gray-700 mt-2">Click any service to fill "Service Name".</div>
+                                    <div className="text-xs text-yellow-300 mt-2">* Click any service to fill "Service Name".</div>
                                 </div>
 
                             )}
                         </div>
 
                         {/* RIGHT: Gom tất cả trường lại 1 card */}
-                        <div className="border border-white/30 p-3 rounded-xl flex flex-col gap-4">
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                        <div className="bg-white/5 border-t-4 border-pink-500 p-4 rounded-2xl flex flex-col gap-4">
+                            <label className="block text-pink-400 font-semibold mb-1 flex items-center gap-1">
                                 <FaCut /> Service Name
                             </label>
                             <input
@@ -272,23 +268,27 @@ export default function SalonServicesPage() {
                                 value={form.name}
                                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                                 required
-                                className="rounded text-yellow-600 p-2 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
-                                placeholder="Please select or enter service name"
+                                className="rounded-2xl text-yellow-600 p-2 pl-4 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400 capitalize"
+                                placeholder="Select or enter service name"
                             />
 
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                            <label className="block text-pink-400 font-semibold mb-1 flex items-center gap-1">
                                 <FaDollarSign /> Price ($)
                             </label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                value={form.price}
-                                onChange={(e) => setForm({ ...form, price: e.target.value })}
-                                required
-                                className="rounded text-yellow-600 p-2 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                            />
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-yellow-600 font-bold pointer-events-none">$</span>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={form.price}
+                                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                                    required
+                                    className="rounded-2xl text-yellow-600 p-2 pl-8 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                    placeholder="Price"
+                                />
+                            </div>
 
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                            <label className="block text-pink-400 font-semibold mb-1 flex items-center gap-1">
                                 <FaClock /> Duration (minutes)
                             </label>
                             <input
@@ -296,26 +296,26 @@ export default function SalonServicesPage() {
                                 value={form.duration_minutes}
                                 onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
                                 required
-                                className="rounded text-yellow-600 p-2 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded-2xl  text-yellow-600 p-2 pl-4 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             />
 
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                            <label className="block text-pink-400 font-semibold mb-1 flex items-center gap-1">
                                 <FaTags /> Promotion (optional)
                             </label>
                             <input
                                 type="text"
                                 value={form.promotion}
                                 onChange={(e) => setForm({ ...form, promotion: e.target.value })}
-                                className="rounded text-yellow-600 p-2  w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded-2xl text-yellow-600 p-2 pl-4 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             />
 
-                            <label className="block text-white font-semibold mb-1 flex items-center gap-1">
+                            <label className="block text-pink-400 font-semibold mb-1 flex items-center gap-1">
                                 <FaFileAlt /> Description
                             </label>
                             <textarea
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                className="rounded text-yellow-600 p-2 w-full bg-white/10 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                className="rounded-2xl text-yellow-600 p-2 pl-4 w-full bg-white/5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             />
                         </div>
                     </div>
@@ -324,7 +324,7 @@ export default function SalonServicesPage() {
                     <div className="mt-4 flex gap-4">
                         <button
                             type="submit"
-                            className="bg-yellow-400 text-black px-6 py-2 rounded hover:bg-yellow-500 font-bold"
+                            className="bg-yellow-400 text-black px-6 py-2 rounded-2xl hover:bg-yellow-500 font-bold"
                         >
                             {editingService ? "✏️ Update Service" : "➕ Add Service"}
                         </button>
@@ -345,7 +345,7 @@ export default function SalonServicesPage() {
 
                 {/* Bộ lọc specialization */}
                 <div className="mb-6">
-                    <label className="font-semibold mr-3 text-white">
+                    <label className="font-semibold mr-3 text-pink-400">
                         🔍 Filter by Specialization:
                     </label>
                     <select

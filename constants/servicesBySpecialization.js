@@ -6,6 +6,7 @@ export const SERVICES_BY_SPECIALIZATION = {
     "Gel Manicure",
     "Gel Pedicure",
     "Acrylic Full Set",
+    "Acrylic Fill",
     "Dip Powder Nails",
     "Nail Art Design",
     "Nail Repair",
