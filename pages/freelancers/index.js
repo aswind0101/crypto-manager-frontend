@@ -462,75 +462,54 @@ export default function FreelancerDashboard() {
   }
   if (userRole === "Salon_NhanVien" && hasFreelancerProfile === false) {
     return (
-      <div className="min-h-screen flex flex-col justify-center items-center p-6 bg-[#23242a]">
-        <div className="flex flex-1 items-center justify-center w-full">
-          <div className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 mt-6 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center">
-            <h2 className="text-2xl font-bold text-yellow-300 mb-3 flex items-center gap-2">
-              <span className="text-3xl">⚠️</span>
-              You haven&apos;t registered a freelancer profile
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#23242a] via-[#2f374a] to-[#0b0f17] px-4">
+        <div className="max-w-4xl w-full flex flex-col md:flex-row gap-8 justify-center items-center">
+          {/* Đăng nhập */}
+          <div className="flex-1 bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 flex flex-col items-center">
+            <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-emerald-400 via-yellow-200 to-pink-400 rounded-full mb-5 shadow-xl">
+              <FaSignInAlt size={36} className="text-emerald-900" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-extrabold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-emerald-400 text-center">
+              Sign In
             </h2>
-            <p className="mb-6 text-center text-base text-gray-300">
-              To use the dashboard, please complete your freelancer profile.
+            <p className="text-gray-200 text-base mb-6 text-center">
+              Already have an account on <span className="font-bold text-yellow-200">OneTool.IT.COM</span>?
+              <br />
+              Please sign in with your verified email account.<br />
+              <span className="text-pink-300 text-sm">* Only accounts with verified email can log in.</span>
+            </p>
+            <button
+              onClick={() =>  router.push("/login")}
+              className="bg-gradient-to-r from-yellow-400 via-pink-400 to-emerald-400 hover:brightness-110 text-black font-bold text-lg px-8 py-2 rounded-full shadow-lg transition-all duration-200 w-full"
+            >
+              Sign In
+            </button>
+          </div>
+
+          {/* Đăng ký */}
+          <div className="flex-1 bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 flex flex-col items-center">
+            <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-pink-400 via-yellow-200 to-emerald-400 rounded-full mb-5 shadow-xl">
+              <FaUserPlus size={36} className="text-pink-700" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-extrabold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 text-center">
+              Register
+            </h2>
+            <p className="text-gray-200 text-base mb-6 text-center">
+              New to <span className="font-bold text-yellow-200">OneTool.IT.COM</span>?<br />
+              Click below to create your free account.<br />
+              <span className="text-emerald-200 text-sm">* You&apos;ll be asked to verify your email before logging in.</span>
             </p>
             <button
               onClick={() => router.push("/freelancers/register")}
-              className="bg-yellow-400 text-black w-full px-6 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition text-lg shadow"
+              className="bg-gradient-to-r from-pink-400 via-yellow-400 to-emerald-400 hover:brightness-110 text-black font-bold text-lg px-8 py-2 rounded-full shadow-lg transition-all duration-200 w-full"
             >
-              Register now
+              Register
             </button>
           </div>
         </div>
       </div>
     );
   }
-
-  if (
-    userRole === "Salon_NhanVien" &&
-    hasFreelancerProfile === true &&
-    onboarding?.is_verified === false
-  ) {
-    return (
-      <div className="min-h-screen flex flex-col justify-center items-center p-6 bg-[#23242a]">
-        <div className="flex flex-1 items-center justify-center w-full">
-          <div className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 mt-6 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center">
-            <h2 className="text-2xl font-bold text-yellow-300 mb-3 flex items-center gap-2">
-              <span className="text-3xl">📧</span>
-              Please verify your email!
-            </h2>
-            <p className="mb-6 text-center text-base text-gray-300">
-              Your freelancer account has not been verified.<br />
-              Please check your email and click the verification link.<br />
-              <span className="text-pink-300">You cannot access the dashboard until your account is verified.</span>
-            </p>
-            <button
-              onClick={async () => {
-                // Gửi lại email xác minh
-                try {
-                  const token = await user.getIdToken();
-                  const res = await fetch(
-                    `https://crypto-manager-backend.onrender.com/api/freelancers/resend-verify?email=${onboarding?.email}`,
-                    { headers: { Authorization: `Bearer ${token}` } }
-                  );
-                  const data = await res.json();
-                  if (res.ok) {
-                    alert("✅ Verification email resent! Please check your email.");
-                  } else {
-                    alert("❌ Failed to resend email: " + (data.error || "Unknown error"));
-                  }
-                } catch (err) {
-                  alert("❌ Network error. Please try again.");
-                }
-              }}
-              className="bg-pink-400 text-white w-full px-6 py-2 rounded-lg font-semibold hover:bg-pink-500 transition text-lg shadow"
-            >
-              Resend verification email
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
 
   async function completeAppointmentById(appointmentId, options = {}) {
     setProcessingApptId(appointmentId);
