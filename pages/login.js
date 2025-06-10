@@ -143,7 +143,7 @@ export default function Login() {
                                 Your account is not verified yet
                             </h3>
                             <p className="text-sm text-gray-300 mb-2">
-                                To use your stylist dashboard, please check your email and click the verification link we've sent.<br />
+                                To use your stylist dashboard, please check your email and click the verification link we&apos;ve sent.<br />
                                 <span className="block mt-2 text-yellow-200 font-mono text-xs">{pendingEmail}</span>
                             </p>
                             <div className="text-xs text-gray-400 mb-1">
