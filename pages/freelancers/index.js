@@ -156,7 +156,7 @@ export default function FreelancerDashboard() {
       0
     ) || 0;
 
-  
+
   // Wake Lock để giữ màn hình luôn sáng (cho cả desktop & mobile)
   const wakeLockRef = useRef(null);
   useEffect(() => {
@@ -308,7 +308,7 @@ export default function FreelancerDashboard() {
       }
 
       setUserRole(role);
-
+      console.log("FE currentUser.uid:", user?.uid);
       // 🟢 Check freelancer profile
       const exists = await checkFreelancerExists(currentUser);
       setHasFreelancerProfile(exists);
@@ -372,32 +372,31 @@ export default function FreelancerDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.uid) return;
     const refresh = async () => {
       const token = await user.getIdToken();
-      if (user && user.role === "Salon_NhanVien") {
-        checkFreelancerExists(user).then(setHasFreelancerProfile);
-      }
+      // Chỉ gọi check nếu chắc chắn là user từ Firebase (có uid)
+      checkFreelancerExists(user).then(setHasFreelancerProfile);
+
       await loadAppointments(
         token,
         setAppointments,
         setAppointmentsToday,
         setConfirmedNextClient,
         setPendingUpcomingAppointment,
-        setTimeUntilNext,            // ✅ Đây!
+        setTimeUntilNext,
         setShowPopup,
         setNewAppointment,
         soundRef,
         soundLoopRef,
-        setUpcomingAppointments,    // Thêm dòng này
-        setNextClientIndex          // Thêm dòng này            // ✅ đối số 9
+        setUpcomingAppointments,
+        setNextClientIndex
       );
     };
     const interval = setInterval(refresh, 60000);
+    refresh();
     return () => clearInterval(interval);
-
   }, [user]);
-
 
   useEffect(() => {
     // Lấy tất cả appointments đang "processing"
@@ -478,6 +477,53 @@ export default function FreelancerDashboard() {
               className="bg-yellow-400 text-black w-full px-6 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition text-lg shadow"
             >
               Register now
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    userRole === "Salon_NhanVien" &&
+    hasFreelancerProfile === true &&
+    onboarding?.is_verified === false
+  ) {
+    return (
+      <div className="min-h-screen flex flex-col justify-center items-center p-6 bg-[#23242a]">
+        <div className="flex flex-1 items-center justify-center w-full">
+          <div className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 mt-6 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center">
+            <h2 className="text-2xl font-bold text-yellow-300 mb-3 flex items-center gap-2">
+              <span className="text-3xl">📧</span>
+              Please verify your email!
+            </h2>
+            <p className="mb-6 text-center text-base text-gray-300">
+              Your freelancer account has not been verified.<br />
+              Please check your email and click the verification link.<br />
+              <span className="text-pink-300">You cannot access the dashboard until your account is verified.</span>
+            </p>
+            <button
+              onClick={async () => {
+                // Gửi lại email xác minh
+                try {
+                  const token = await user.getIdToken();
+                  const res = await fetch(
+                    `https://crypto-manager-backend.onrender.com/api/freelancers/resend-verify?email=${onboarding?.email}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert("✅ Verification email resent! Please check your email.");
+                  } else {
+                    alert("❌ Failed to resend email: " + (data.error || "Unknown error"));
+                  }
+                } catch (err) {
+                  alert("❌ Network error. Please try again.");
+                }
+              }}
+              className="bg-pink-400 text-white w-full px-6 py-2 rounded-lg font-semibold hover:bg-pink-500 transition text-lg shadow"
+            >
+              Resend verification email
             </button>
           </div>
         </div>
