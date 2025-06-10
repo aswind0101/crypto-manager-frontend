@@ -12,8 +12,6 @@ import {
   FiUser,
   FiScissors,
   FiTag,
-  FaUserPlus, 
-  FaSignInAlt
 } from "react-icons/fi";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -457,55 +455,26 @@ export default function FreelancerDashboard() {
     });
   }, [appointments]);
 
-
-
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
   }
   if (userRole === "Salon_NhanVien" && hasFreelancerProfile === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#23242a] via-[#2f374a] to-[#0b0f17] px-4">
-        <div className="max-w-4xl w-full flex flex-col md:flex-row gap-8 justify-center items-center">
-          {/* Đăng nhập */}
-          <div className="flex-1 bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 flex flex-col items-center">
-            <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-emerald-400 via-yellow-200 to-pink-400 rounded-full mb-5 shadow-xl">
-              <FaSignInAlt size={36} className="text-emerald-900" />
-            </div>
-            <h2 className="text-2xl md:text-3xl font-extrabold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-emerald-400 text-center">
-              Sign In
+      <div className="min-h-screen flex flex-col justify-center items-center p-6 bg-[#23242a]">
+        <div className="flex flex-1 items-center justify-center w-full">
+          <div className="bg-[#22232a] border border-yellow-400 rounded-2xl p-8 mt-6 max-w-md w-full text-gray-100 shadow-2xl flex flex-col items-center">
+            <h2 className="text-2xl font-bold text-yellow-300 mb-3 flex items-center gap-2">
+              <span className="text-3xl">⚠️</span>
+              You haven&apos;t registered a freelancer profile
             </h2>
-            <p className="text-gray-200 text-base mb-6 text-center">
-              Already have an account on <span className="font-bold text-yellow-200">OneTool.IT.COM</span>?
-              <br />
-              Please sign in with your verified email account.<br />
-              <span className="text-pink-300 text-sm">* Only accounts with verified email can log in.</span>
-            </p>
-            <button
-              onClick={() =>  router.push("/login")}
-              className="bg-gradient-to-r from-yellow-400 via-pink-400 to-emerald-400 hover:brightness-110 text-black font-bold text-lg px-8 py-2 rounded-full shadow-lg transition-all duration-200 w-full"
-            >
-              Sign In
-            </button>
-          </div>
-
-          {/* Đăng ký */}
-          <div className="flex-1 bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 flex flex-col items-center">
-            <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-pink-400 via-yellow-200 to-emerald-400 rounded-full mb-5 shadow-xl">
-              <FaUserPlus size={36} className="text-pink-700" />
-            </div>
-            <h2 className="text-2xl md:text-3xl font-extrabold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 text-center">
-              Register
-            </h2>
-            <p className="text-gray-200 text-base mb-6 text-center">
-              New to <span className="font-bold text-yellow-200">OneTool.IT.COM</span>?<br />
-              Click below to create your free account.<br />
-              <span className="text-emerald-200 text-sm">* You&apos;ll be asked to verify your email before logging in.</span>
+            <p className="mb-6 text-center text-base text-gray-300">
+              To use the dashboard, please complete your freelancer profile.
             </p>
             <button
               onClick={() => router.push("/freelancers/register")}
-              className="bg-gradient-to-r from-pink-400 via-yellow-400 to-emerald-400 hover:brightness-110 text-black font-bold text-lg px-8 py-2 rounded-full shadow-lg transition-all duration-200 w-full"
+              className="bg-yellow-400 text-black w-full px-6 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition text-lg shadow"
             >
-              Register
+              Register now
             </button>
           </div>
         </div>
