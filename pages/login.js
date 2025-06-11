@@ -175,8 +175,13 @@ export default function Login() {
                     // Toàn bộ UI login gốc của bạn (logo, slogan, nút Google, v.v.)
                     <>
                         <div className="w-20 h-20 bg-gradient-to-br from-emerald-300 via-yellow-200 to-pink-300 rounded-full flex items-center justify-center shadow-xl mb-6">
-                            {/* ...icon login... */}
+                            <svg width="40" height="40" fill="none" viewBox="0 0 48 48">
+                                <circle cx="24" cy="24" r="22" stroke="#a7f3d0" strokeWidth="3" fill="#fff0" />
+                                <path d="M13 33c0-6 8-8 11-8s11 2 11 8" stroke="#fbbf24" strokeWidth="2" />
+                                <circle cx="24" cy="18" r="7" fill="#a7f3d0" stroke="#fbbf24" strokeWidth="2" />
+                            </svg>
                         </div>
+
                         <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-emerald-400 tracking-tight drop-shadow-lg text-center">
                             Welcome to <span className="font-extrabold">OneTool.IT.COM</span>
                         </h1>
@@ -185,14 +190,26 @@ export default function Login() {
                         </p>
                         <button
                             onClick={handleLogin}
-                            className="bg-gradient-to-r from-yellow-400 via-pink-400 to-emerald-400 hover:brightness-120 text-black font-bold text-lg py-2 px-8 rounded-3xl shadow-3xl transition-all duration-200 mb-4"
+                            className="bg-gradient-to-r from-yellow-400 via-pink-400 to-emerald-400 hover:brightness-120 text-black font-bold text-lg py-2 px-8 rounded-3xl shadow-3xl transition-all duration-200 mb-4 flex items-center justify-center gap-2"
                         >
-                            <span className="inline-flex items-center gap-2">
-                                {/* ...icon Google... */}
-                                Sign in with Google
-                            </span>
+                            {/* Google G icon */}
+                            <svg width="24" height="24" viewBox="0 0 256 262" xmlns="http://www.w3.org/2000/svg">
+                                <g fill="none">
+                                    <path d="M255.9 133.5c0-11.2-1-22-2.8-32.4H130.6v61.4h70.4c-3 16.2-12 29.8-25.4 39v32h41c24.2-22.4 38.3-55.4 38.3-100z" fill="#4285F4" />
+                                    <path d="M130.6 262c34.6 0 63.6-11.4 84.8-31.1l-41-32c-11.4 7.6-25.8 12-43.8 12-33.6 0-62-22.7-72.1-53.2h-42.3v33.2C37.2 230.4 81.4 262 130.6 262z" fill="#34A853" />
+                                    <path d="M58.5 157.7C56 151.1 54.5 144 54.5 136.5c0-7.4 1.5-14.6 4-21.2v-33.2h-42.3c-8.5 17-13.3 36-13.3 56.2s4.8 39.2 13.3 56.2l42.3-33.2z" fill="#FBBC05" />
+                                    <path d="M130.6 51.8c19.2 0 36.4 6.6 49.9 19.7l37.2-37.2C194.2 13 165.2 0 130.6 0 81.4 0 37.2 31.6 16.2 77.8l42.3 33.2c10-30.5 38.4-53.2 72.1-53.2z" fill="#EA4335" />
+                                </g>
+                            </svg>
+                            Sign in with Google
                         </button>
+
                         {/* ...thông báo lỗi nếu có... */}
+                        {loginError && (
+                            <div className="mb-2 text-center bg-red-100 border border-red-300 text-red-700 font-semibold px-4 py-2 rounded-xl animate-fade-in">
+                                {loginError}
+                            </div>
+                        )}
                     </>
                 )}
             </div>

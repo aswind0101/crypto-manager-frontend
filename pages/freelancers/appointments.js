@@ -18,7 +18,7 @@ function groupByDay(list) {
 }
 
 const statusColor = {
-  pending: "bg-yellow-100 text-yellow-700 border-yellow-400",
+  pending: "bg-gray-100 text-yellow-700 border-yellow-400",
   confirmed: "bg-emerald-100 text-emerald-700 border-emerald-400",
   cancelled: "bg-red-100 text-red-700 border-red-400",
 };
