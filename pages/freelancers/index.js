@@ -967,17 +967,30 @@ export default function FreelancerDashboard() {
             <div className="text-base font-bold text-emerald-300">{user?.displayName || onboarding?.name || "Freelancer"}</div>
             <div className="flex items-center gap-2 mt-1">
               <div className="flex items-center bg-emerald-400/80 px-2 py-[2px] rounded-sm shadow text-yellow-100 font-bold text-sm">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} viewBox="0 0 20 20" fill={i < Number(onboarding?.rating || 0) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
-                  </svg>
-                ))}
-                <span className="ml-1">{(Number(onboarding?.rating) || 0).toFixed(1)}</span>
+                {[...Array(5)].map((_, i) => {
+                  // Nếu rating > 0 thì show đúng số sao, còn lại luôn là 5 sao vàng
+                  const starCount = onboarding?.rating > 0 ? Math.round(onboarding.rating) : 5;
+                  return (
+                    <svg
+                      key={i}
+                      viewBox="0 0 20 20"
+                      fill={i < starCount ? "#facc15" : "#d1d5db"}
+                      className="w-4 h-4"
+                    >
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
+                    </svg>
+                  );
+                })}
+                {/* Hiển thị số điểm: nếu rating > 0 thì show điểm, ngược lại mặc định là 5.0 */}
+                <span className="ml-1">
+                  {onboarding?.rating > 0 ? Number(onboarding.rating).toFixed(1) : "5.0"}
+                </span>
               </div>
               <span className="text-xs text-yellow-300 font-semibold ml-2">
                 ⭐ {onboarding?.review_count || 0} reviews
               </span>
             </div>
+
             {/* Thông tin + Total earning */}
             <div className="flex-1 flex flex-col items-center justify-center gap-1 mt-4 mb-1">
               {/* Tên + Rating + Review */}

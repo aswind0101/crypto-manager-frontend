@@ -657,8 +657,8 @@ export default function FindStylists() {
                           {/* ⭐ Rating */}
                           <div className="absolute top-4 right-4 flex gap-[1px]">
                             {[...Array(5)].map((_, i) => {
-                              // Nếu rating = 0 hoặc null/undefined thì mặc định là 5 sao vàng
-                              const starCount = (s.review_count > 0 && s.rating > 0) ? Math.round(s.rating) : 5;
+                              // Nếu rating > 0 thì show số sao đúng, còn lại luôn tô 5 sao vàng
+                              const starCount = (s.rating > 0) ? Math.round(s.rating) : 5;
                               return (
                                 <svg
                                   key={i}
@@ -671,6 +671,7 @@ export default function FindStylists() {
                               );
                             })}
                           </div>
+
                           <div className="flex flex-col items-center gap-1 mt-1 mb-1">
                             {/* Avatar */}
                             <div className="relative w-32 h-32 sm:w-32 sm:h-32 rounded-full p-[3px] bg-gradient-to-r from-pink-400 via-yellow-300 to-emerald-400 shadow-xl">
