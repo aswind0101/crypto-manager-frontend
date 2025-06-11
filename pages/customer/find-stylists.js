@@ -656,11 +656,20 @@ export default function FindStylists() {
                         <div className="absolute w-full min-h-[630px] max-h-[630px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                           {/* ⭐ Rating */}
                           <div className="absolute top-4 right-4 flex gap-[1px]">
-                            {[...Array(5)].map((_, i) => (
-                              <svg key={i} viewBox="0 0 20 20" fill={i < Math.round(s.rating) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
-                              </svg>
-                            ))}
+                            {[...Array(5)].map((_, i) => {
+                              // Nếu rating = 0 hoặc null/undefined thì mặc định là 5 sao vàng
+                              const starCount = (s.review_count > 0 && s.rating > 0) ? Math.round(s.rating) : 5;
+                              return (
+                                <svg
+                                  key={i}
+                                  viewBox="0 0 20 20"
+                                  fill={i < starCount ? "#facc15" : "#d1d5db"}
+                                  className="w-4 h-4"
+                                >
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
+                                </svg>
+                              );
+                            })}
                           </div>
                           <div className="flex flex-col items-center gap-1 mt-1 mb-1">
                             {/* Avatar */}

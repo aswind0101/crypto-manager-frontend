@@ -606,17 +606,35 @@ export default function FreelancerDashboard() {
             <div className="text-base font-bold text-emerald-300">{user?.displayName || onboarding?.name || "Freelancer"}</div>
             <div className="flex items-center gap-2 mt-1">
               <div className="flex items-center bg-emerald-400/80 px-2 py-[2px] rounded-sm shadow text-yellow-100 font-bold text-sm">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} viewBox="0 0 20 20" fill={i < Number(onboarding?.rating || 0) ? "#facc15" : "#d1d5db"} className="w-4 h-4">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
-                  </svg>
-                ))}
-                <span className="ml-1">{(Number(onboarding?.rating) || 0).toFixed(1)}</span>
+                {[...Array(5)].map((_, i) => {
+                  // Nếu chưa có review, mặc định 5 sao vàng
+                  const starCount =
+                    Number(onboarding?.review_count) > 0
+                      ? Number(onboarding?.rating || 0)
+                      : 5;
+                  return (
+                    <svg
+                      key={i}
+                      viewBox="0 0 20 20"
+                      fill={i < starCount ? "#facc15" : "#d1d5db"}
+                      className="w-4 h-4"
+                    >
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.184c.969 0 1.371 1.24.588 1.81l-3.39 2.46a1 1 0 00-.364 1.118l1.286 3.974c.3.921-.755 1.688-1.538 1.118l-3.39-2.46a1 1 0 00-1.176 0l-3.39 2.46c-.783.57-1.838-.197-1.539-1.118l1.287-3.974a1 1 0 00-.364-1.118L2.04 9.401c-.783-.57-.38-1.81.588-1.81h4.183a1 1 0 00.951-.69l1.287-3.974z" />
+                    </svg>
+                  );
+                })}
+                {/* Nếu chưa có review thì hiển thị 5.0, còn có review thì hiển thị đúng rating */}
+                <span className="ml-1">
+                  {Number(onboarding?.review_count) > 0
+                    ? (Number(onboarding?.rating) || 0).toFixed(1)
+                    : "5.0"}
+                </span>
               </div>
               <span className="text-xs text-yellow-300 font-semibold ml-2">
                 ⭐ {onboarding?.review_count || 0} reviews
               </span>
             </div>
+
             {/* Thông tin + Total earning */}
             <div className="flex-1 flex flex-col items-center justify-center gap-1 mt-4 mb-1">
               {/* Tên + Rating + Review */}
@@ -759,16 +777,16 @@ export default function FreelancerDashboard() {
             title="Next Client"
             value={
               confirmedNextClient
-                ? dayjs(confirmedNextClient.appointment_date.replace("Z", "")).format("hh:mm A")
+                ? formatNextAppointmentTime(confirmedNextClient.appointment_date)
                 : "No upcoming"
             }
             sub={
               confirmedNextClient?.customer_name
-                ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${timeUntilNext ? ` ${timeUntilNext}` : ""}`
+                ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${confirmedNextClient.appointment_date ? ` (${formatTimeUntilNext(confirmedNextClient.appointment_date)})` : ""}`
                 : "No upcoming"
             }
-          />
 
+          />
           {/* Appointments */}
           <Card
             className="col-span-12 md:col-span-6"
@@ -955,5 +973,53 @@ function clearSoundLoop(soundLoopRef) {
   if (soundLoopRef.current) {
     clearInterval(soundLoopRef.current);
     soundLoopRef.current = null;
+  }
+}
+
+function formatNextAppointmentTime(appointmentDate) {
+  if (!appointmentDate) return "No upcoming";
+
+  const now = dayjs();
+  const date = dayjs(appointmentDate.replace("Z", ""));
+  const diffHours = date.diff(now, "hour");
+  const diffDays = date.diff(now, "day");
+
+  if (diffHours < 24 && now.isSame(date, "day")) {
+    // Hôm nay, show giờ
+    return date.format("hh:mm A");
+  } else if (diffDays === 1) {
+    // Ngày mai
+    return `Tomorrow, ${date.format("hh:mm A")}`;
+  } else if (diffDays > 1 && diffDays < 7) {
+    // Trong tuần này, show thứ
+    return `${date.format("dddd")}, ${date.format("hh:mm A")}`;
+  } else {
+    // Lớn hơn 7 ngày, show ngày tháng
+    return date.format("DD/MM/YYYY, hh:mm A");
+  }
+}
+
+function formatTimeUntilNext(appointmentDate) {
+  if (!appointmentDate) return "";
+
+  const now = dayjs();
+  const target = dayjs(appointmentDate.replace("Z", ""));
+  let diff = target.diff(now, "second");
+
+  if (diff <= 0) return "now";
+
+  const days = Math.floor(diff / (60 * 60 * 24));
+  diff -= days * 60 * 60 * 24;
+  const hours = Math.floor(diff / (60 * 60));
+  diff -= hours * 60 * 60;
+  const minutes = Math.floor(diff / 60);
+
+  if (days > 0) {
+    // Nếu có ngày, chỉ cần show ngày + giờ: "in 2d 4h"
+    return `in ${days}d${hours > 0 ? ` ${hours}h` : ""}`;
+  } else if (hours > 0) {
+    return `in ${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+  } else {
+    return `in ${minutes}m`;
   }
 }
