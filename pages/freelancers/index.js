@@ -16,9 +16,6 @@ import {
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
-import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -26,6 +23,11 @@ dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
+import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
+import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 
 
 export default function FreelancerDashboard() {

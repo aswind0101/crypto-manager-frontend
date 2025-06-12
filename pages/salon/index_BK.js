@@ -504,11 +504,37 @@ export default function SalonDashboard() {
         </div>
         {/* Biểu đồ doanh thu theo ngày */}
         <div className="flex-1 rounded-2xl border-t-2 border-pink-400 p-4 shadow-xl min-h-[220px] flex flex-col">
-          <span className="text-3xl mb-2">🚧</span>
-          <h3 className="text-lg font-bold mb-2 text-pink-300">Revenue by Day</h3>
-          <span className="text-2xl font-bold text-yellow-300 drop-shadow text-center tracking-wide animate-pulse">
-            Coming Soon...
-          </span>
+          <h3 className="text-lg font-bold mb-2 text-yellow-300">Revenue by Day</h3>
+          <ResponsiveContainer width="100%" height={170}>
+            <BarChart data={revenueData} barCategoryGap="20%" barGap={2} margin={{ top: 32, right: 12, left: 12, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="date" stroke="#eee" fontSize={13} />
+              <YAxis stroke="#eee" fontSize={13} tickFormatter={v => v.toLocaleString()} />
+              <Tooltip
+                cursor={{ fill: "#eab30822" }}
+                contentStyle={{ background: "#1e293b", border: "none", borderRadius: 10, color: "#fff" }}
+                formatter={v => [`${v.toLocaleString()}$`, "Revenue"]}
+              />
+              <Bar
+                dataKey="revenue"
+                fill="url(#revenueGradient)"
+                radius={[10, 10, 0, 0]}
+                minPointSize={3}
+              >
+                <LabelList dataKey="revenue" position="top"
+                  formatter={v => `${v > 0 ? v.toLocaleString() + "$" : ""}`}
+                  style={{ fill: "#fde68a", fontWeight: 700, fontSize: 13, textShadow: "0 1px 6px #0009" }}
+                />
+              </Bar>
+              {/* Gradient màu cột */}
+              <defs>
+                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#facc15" />
+                  <stop offset="100%" stopColor="#a7f3d0" />
+                </linearGradient>
+              </defs>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
         {/* Quick Actions (bạn tuỳ chỉnh sau) */}
         <div className="col-span-12 mt-10">

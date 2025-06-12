@@ -227,6 +227,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border: 1px solid rgba(255,255,255,0.3);
 }
 
+@layer utilities {
+  .animate-spin-fast {
+    animation: spin 1s linear infinite;
+  }
+}
 
+@layer utilities {
+  .animate-spin-slow {
+    animation: spin 2s linear infinite;
+  }
+}
 
 
