@@ -204,12 +204,13 @@ export default function Login() {
                             Sign in with Google
                         </button>
 
-                        {/* ...thông báo lỗi nếu có... */}
+                        {/* ...thông báo lỗi nếu có... 
                         {loginError && (
                             <div className="mb-2 text-center bg-red-100 border border-red-300 text-red-700 font-semibold px-4 py-2 rounded-xl animate-fade-in">
                                 {loginError}
                             </div>
                         )}
+                            */}
                     </>
                 )}
             </div>
