@@ -5,7 +5,8 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { CalendarDays } from "lucide-react"; // hoặc dùng react-icons
+import { CalendarDays, Phone } from "lucide-react"; // hoặc dùng react-icons
+import { AsYouType, parsePhoneNumberFromString } from "libphonenumber-js";
 
 // Thêm các icon từ react-icons
 import { FaMale, FaFemale, FaGenderless } from "react-icons/fa";
@@ -44,7 +45,10 @@ export default function FindStylists() {
     appointment_date: "",
     duration_minutes: "",
     note: "",
+    phone: "",
   });
+  const [phoneError, setPhoneError] = useState(""); // trạng thái lỗi số phone
+
   const [filter, setFilter] = useState({
     specialization: "",
     gender: "",
@@ -206,9 +210,16 @@ export default function FindStylists() {
     if (
       form.service_ids.length === 0 ||
       !form.appointment_date ||
-      !selectedTime
+      !selectedTime ||
+      !form.phone
     ) {
-      alert("Please select service, date and time.");
+      alert("Please select service, date, time, and enter your phone number.");
+      return;
+    }
+
+    const phoneNumber = parsePhoneNumberFromString(form.phone, 'US');
+    if (!phoneNumber || !phoneNumber.isValid()) {
+      setPhoneError("❗ Invalid US phone number.");
       return;
     }
 
@@ -247,6 +258,7 @@ export default function FindStylists() {
           appointment_date,
           duration_minutes: parseInt(form.duration_minutes || "60"),
           note: form.note,
+          phone: form.phone,
         }),
       });
 
@@ -274,6 +286,37 @@ export default function FindStylists() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handlePhoneChange = (value) => {
+    let digitsOnly = value.replace(/\D/g, "");
+    let hasCountryCode = digitsOnly.startsWith("1");
+
+    if (hasCountryCode) {
+      if (digitsOnly.length > 11) digitsOnly = digitsOnly.slice(0, 11);
+    } else {
+      if (digitsOnly.length > 10) digitsOnly = digitsOnly.slice(0, 10);
+    }
+
+    if (digitsOnly.length === 0) {
+      setForm((prev) => ({ ...prev, phone: "" }));
+      return;
+    }
+
+    if ((hasCountryCode && digitsOnly.length <= 4) || (!hasCountryCode && digitsOnly.length <= 3)) {
+      setForm((prev) => ({ ...prev, phone: digitsOnly }));
+      return;
+    }
+
+    const formatter = new AsYouType('US');
+    formatter.input(digitsOnly);
+    let formatted = formatter.formattedOutput;
+
+    if (hasCountryCode && !formatted.startsWith('+')) {
+      formatted = `+${formatted}`;
+    }
+
+    setForm((prev) => ({ ...prev, phone: formatted }));
   };
 
   const handleServiceChange = (e, stylist) => {
@@ -643,7 +686,7 @@ export default function FindStylists() {
                   {visibleStylists.map((s) => (
                     <div
                       key={s.id}
-                      className="relative w-full min-h-[630px] sm:min-h-[630px] h-auto perspective-[1500px]"
+                      className="relative w-full min-h-[670px] sm:min-h-[670px] h-auto perspective-[1500px]"
                       style={{
                         overflow: 'visible',
                         touchAction: 'manipulation',
@@ -653,7 +696,7 @@ export default function FindStylists() {
                     >
                       <div className={`transition-transform duration-700 w-full h-full transform-style-preserve-3d ${flippedId === s.id ? "rotate-y-180" : ""}`}>
                         {/* Mặt trước */}
-                        <div className="absolute w-full min-h-[630px] max-h-[630px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
+                        <div className="absolute w-full min-h-[670px] max-h-[670px] bg-white/10 rounded-2xl backface-hidden backdrop-blur-md border-b-8 border-t-8 border-pink-500 p-4 shadow-xl flex flex-col justify-between text-center glass-box">
                           {/* ⭐ Rating */}
                           <div className="absolute top-4 right-4 flex gap-[1px]">
                             {[...Array(5)].map((_, i) => {
@@ -692,7 +735,7 @@ export default function FindStylists() {
                               <div className="absolute top-22 -left-8 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
                                 🌸
                               </div>
-                              <div className="absolute top-43 -right-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
+                              <div className="absolute top-47 -right-12 text-white rounded-full p-[6px] text-3xl rotate-[-10deg]">
                                 🌟
                               </div>
                             </div>
@@ -1091,16 +1134,28 @@ export default function FindStylists() {
                                 placeholder="Anything specific?"
                               />
                             </div>
-
-                            {/* Thông tin đặt */}
-                            {form.appointment_date && selectedTime && (
-                              <div className="mt-3 px-2 py-2 rounded-lg text-pink-200 text-sm font-semibold text-center whitespace-nowrap overflow-x-auto">
-                                📌 You selected:
-                                <span className="ml-1 text-yellow-300 font-bold">{form.appointment_date}</span>
-                                <span className="mx-1">at</span>
-                                <span className="text-yellow-300 font-bold">{selectedTime}</span>
+                            {/* Step 5: Nhập số phone */}
+                            <div className="mt-2 mb-2">
+                              <p className="text-pink-400 font-bold mb-2 underline underline-offset-4 decoration-[1.5px] decoration-pink-400">
+                                Step 5: Enter Phone Number
+                              </p>
+                              <div className="relative">
+                                {/* Icon Phone */}
+                                <Phone className="absolute left-6 top-1/2 transform -translate-y-1/2 text-pink-300 w-4 h-4 pointer-events-none" />
+                                <input
+                                  type="text"
+                                  className={`block w-full max-w-full bg-white/5 rounded-2xl text-yellow-400 px-3 py-1 h-[30px] pl-13 leading-tight focus:outline-none focus:ring-2 focus:ring-pink-300 transition ${phoneError ? "border-red-400" : "border-pink-300"}`}
+                                  value={form.phone}
+                                  onChange={e => {
+                                    handlePhoneChange(e.target.value);
+                                    setPhoneError("");
+                                  }}
+                                  maxLength={17}
+                                  required
+                                />
                               </div>
-                            )}
+                              {phoneError && <div className="text-xs text-red-400 mt-1">{phoneError}</div>}
+                            </div>
 
                           </div>
 
