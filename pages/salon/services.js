@@ -405,7 +405,7 @@ export default function SalonServicesPage() {
                                     className="bg-white/5 backdrop-blur-md border-t-4 border-white/20 p-4 rounded-2xl shadow-xl"
                                 >
                                     <h3 className="text-lg font-bold text-yellow-300 capitalize">{s.name}</h3>
-                                    <p className="text-sm text-white/90 italic mb-1 capitalize">
+                                    <p className="text-sm text-pink-300 italic mb-1 capitalize">
                                         {s.specialization.replace("_", " ")}
                                     </p>
                                     <p className="text-sm">{s.description}</p>

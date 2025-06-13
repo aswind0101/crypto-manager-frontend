@@ -906,7 +906,6 @@ export default function FindStylists() {
                                                 (sum, s) => sum + (s.duration_minutes || 30),
                                                 0
                                               );
-
                                               // ✅ Nếu KHÔNG chọn dịch vụ nào → reset ngày + giờ + slot
                                               if (selected.length === 0) {
                                                 setForm((prev) => ({
@@ -957,14 +956,26 @@ export default function FindStylists() {
                                   })
                                 )}
                               </div>
+                              {form.service_ids.length > 0 && (() => {
+                                const selectedServices = s.services.filter((srv) => form.service_ids.includes(srv.id));
+                                const totalPrice = selectedServices.reduce((sum, srv) => sum + (Number(srv.price) || 0), 0);
+                                const totalTime = form.duration_minutes || 0;
 
+                                return (
+                                  <p className="text-xs font-bold text-yellow-300 mt-2 flex items-center gap-4">
+                                    <span>
+                                      * <span className="text-yellow-300">Estimated:</span>
+                                    </span>
+                                    <span>
+                                      💰 <span className="text-emerald-300">${totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </span>
+                                    <span>
+                                      ⏱ <span className="text-emerald-300">{totalTime} min</span>
+                                    </span>
+                                  </p>
+                                );
+                              })()}
 
-                              {/* Estimated duration */}
-                              {form.duration_minutes > 0 && (
-                                <p className="text-xs text-emerald-300 mt-2">
-                                  ⏱ Estimated total time: {form.duration_minutes} minutes
-                                </p>
-                              )}
                             </div>
                             {/* Step 2: Chọn ngày */}
                             <div>
