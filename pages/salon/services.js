@@ -385,49 +385,58 @@ export default function SalonServicesPage() {
                 </div>
 
                 {/* Danh sách dịch vụ */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {filteredServices.length === 0 ? (
-                        <p className="text-center text-white col-span-2">
-                            No services found.
-                        </p>
-                    ) : (
-                        filteredServices.map((s) => (
-                            <div
-                                key={s.id}
-                                className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl shadow-xl"
-                            >
-                                <h3 className="text-lg font-bold text-yellow-300 capitalize">{s.name}</h3>
-                                <p className="text-sm text-white/90 italic mb-1 capitalize">
-                                    {s.specialization.replace("_", " ")}
-                                </p>
-                                <p className="text-sm">{s.description}</p>
-                                <p className="text-sm mt-1">
-                                    💲 <strong>${s.price}</strong> • ⏱ {s.duration_minutes} min
-                                </p>
-                                {s.promotion && (
-                                    <p className="text-xs text-pink-300 mt-1">
-                                        🎁 {s.promotion}
+                <div
+                    className="scroll-services-mobile custom-scrollbar rounded-2xl"
+                    style={{
+                        maxHeight: 320,
+                        overflowY: "auto",
+                        WebkitOverflowScrolling: "touch",
+                        overscrollBehavior: "contain",
+                        touchAction: "pan-y"
+                    }}
+                >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {filteredServices.length === 0 ? (
+                            <p className="text-center text-white col-span-2">No services found.</p>
+                        ) : (
+                            filteredServices.map((s) => (
+                                <div
+                                    key={s.id}
+                                    className="bg-white/5 backdrop-blur-md border-t-4 border-white/20 p-4 rounded-2xl shadow-xl"
+                                >
+                                    <h3 className="text-lg font-bold text-yellow-300 capitalize">{s.name}</h3>
+                                    <p className="text-sm text-white/90 italic mb-1 capitalize">
+                                        {s.specialization.replace("_", " ")}
                                     </p>
-                                )}
+                                    <p className="text-sm">{s.description}</p>
+                                    <p className="text-sm mt-1">
+                                        💲 <strong>${s.price}</strong> • ⏱ {s.duration_minutes} min
+                                    </p>
+                                    {s.promotion && (
+                                        <p className="text-xs text-pink-300 mt-1">
+                                            🎁 {s.promotion}
+                                        </p>
+                                    )}
 
-                                <div className="flex justify-between items-center mt-3">
-                                    <button
-                                        onClick={() => startEdit(s)}
-                                        className="text-sm text-cyan-300 hover:underline"
-                                    >
-                                        ✏️ Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(s.id)}
-                                        className="text-sm text-red-400 hover:underline"
-                                    >
-                                        🗑️ Delete
-                                    </button>
+                                    <div className="flex justify-between items-center mt-3">
+                                        <button
+                                            onClick={() => startEdit(s)}
+                                            className="text-sm text-cyan-300 hover:underline"
+                                        >
+                                            ✏️ Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(s.id)}
+                                            className="text-sm text-red-400 hover:underline"
+                                        >
+                                            🗑️ Delete
+                                        </button>
+                                    </div>
+
                                 </div>
-
-                            </div>
-                        ))
-                    )}
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
