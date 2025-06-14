@@ -837,7 +837,8 @@ export default function SalonDashboard() {
                         />
                       ))}
                     </div>
-                    <span className="text-xs text-yellow-200 mt-1 animate-pulse">No upcoming appointments</span>
+                    <span className="font-semibold text-pink-200">Searching for next client</span>
+                    <span className="text-xs text-white/40 mt-1 animate-pulse">No upcoming appointments</span>
                   </div>
 
                 )
