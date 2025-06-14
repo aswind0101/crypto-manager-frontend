@@ -3,23 +3,32 @@ import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
 import { useRouter } from "next/router";
+import { SERVICES_BY_SPECIALIZATION } from "../../constants/servicesBySpecialization";
 import {
-  FiUser,
   FiDollarSign,
   FiClock,
   FiCalendar,
-  FiMessageSquare,
   FiExternalLink,
-  FiList
+  FiCheckCircle,
+  FiUser,
+  FiScissors,
+  FiTag,
 } from "react-icons/fi";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
-import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+dayjs.extend(customParseFormat);
+dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
+import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
+import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 
 
 export default function FreelancerDashboard() {
@@ -33,7 +42,45 @@ export default function FreelancerDashboard() {
   const [nextAppointment, setNextAppointment] = useState(null);
   const [timeUntilNext, setTimeUntilNext] = useState("");
   const [newAppointment, setNewAppointment] = useState(null);
+
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
+  const [nextClientIndex, setNextClientIndex] = useState(0);
+  const [inProgressIndex, setInProgressIndex] = useState(0);
+
   const [showPopup, setShowPopup] = useState(false);
+  const [latePopup, setLatePopup] = useState(null); // chứa appointment & logic chờ
+  const [waitMinutes, setWaitMinutes] = useState(5); // mặc định 5 phút chờ
+  const waitingTimeout = useRef(null);
+  const [hideLatePopupUntil, setHideLatePopupUntil] = useState(null);
+  const [serviceTimers, setServiceTimers] = useState({});
+  const serviceIntervalRef = useRef({});
+  const [processingApptId, setProcessingApptId] = useState(null); // id đang xử lý (start/complete)
+  const [actionError, setActionError] = useState(""); // text lỗi (nếu có)
+
+  const [overdueWarning, setOverdueWarning] = useState(null); // chứa appointment quá hạn
+  const [snoozeUntil, setSnoozeUntil] = useState({}); // id: time - để ẩn cảnh báo tạm thời
+
+  const [showInvoicePopup, setShowInvoicePopup] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState(null); // chứa dữ liệu hóa đơn
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState("");
+  const allServiceNames = Array.from(
+    new Set(
+      Object.values(SERVICES_BY_SPECIALIZATION)
+        .flat()
+        .map(name => name.trim())
+        .map(name => name.toLowerCase()) // Loại trùng không phân biệt HOA thường
+    )
+  ).map(name =>
+    // Đưa về chữ hoa đầu từ cho đẹp nếu cần
+    name
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  );
+  const [serviceNameQuery, setServiceNameQuery] = useState("");
+  const [serviceDropdownIdx, setServiceDropdownIdx] = useState(-1); // nếu dùng arrow để chọn
+
   const soundRef = useRef(null);
   const soundLoopRef = useRef(null); // ✅ để lưu vòng lặp âm thanh
   const [isSliding, setIsSliding] = useState(false);
@@ -92,6 +139,157 @@ export default function FreelancerDashboard() {
       setSliderX(0); // Reset
     }
   };
+  const now = dayjs();
+  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
+
+  // Tính các appointments theo workflow mới
+  const pendingToday = appointmentsToday.filter(a => {
+    return a.status === "pending";
+  }).length;
+  const upcomingToday = appointmentsToday.filter(a => {
+    // upcoming: status = "confirmed", chưa started, và CHƯA QUA GIỜ HẸN
+    return a.status === "confirmed" &&
+      !a.started_at &&
+      dayjs(a.appointment_date.replace("Z", "")).isAfter(now);
+  }).length;
+  const missedToday = appointmentsToday.filter(a => {
+    // missed: status = "confirmed", chưa started, ĐÃ QUA GIỜ HẸN
+    return a.status === "confirmed" &&
+      !a.started_at &&
+      dayjs(a.appointment_date.replace("Z", "")).isBefore(now);
+  }).length;
+  const completedAppointmentsToday = appointmentsToday.filter(a => a.status === "completed");
+  const totalSecondsToday = completedAppointmentsToday.reduce((sum, a) => {
+    if (a.started_at && a.end_at) {
+      const start = dayjs(a.started_at);
+      const end = dayjs(a.end_at);
+      const seconds = end.diff(start, "second");
+      return sum + Math.max(0, seconds);
+    }
+    return sum;
+  }, 0);
+  const totalHoursToday = (totalSecondsToday / 3600).toFixed(2); // Ví dụ: 4.75 Hours
+  const todayEarnings = completedAppointmentsToday.reduce((sum, a) =>
+    sum + (a.services?.reduce((s, srv) => s + (srv.price || 0), 0) || 0),
+    0
+  );
+  const totalAppointmentsToday = completedAppointmentsToday.length;
+  const inProgressAppointments = appointments.filter(a => a.status === "processing");
+  const nextClient = upcomingAppointments[nextClientIndex];
+  const estimateMinutes =
+    nextClient?.services?.reduce(
+      (sum, srv) => sum + (srv.duration || srv.duration_minutes || 0),
+      0
+    ) || 0;
+
+  function checkOverdueAppointments() {
+    if (!appointments || appointments.length === 0) return;
+    const now = dayjs();
+    let foundOverdue = null;
+
+    appointments.forEach(appt => {
+      if (
+        appt.status === "processing" &&
+        appt.started_at &&
+        !appt.end_at &&
+        Array.isArray(appt.services)
+      ) {
+        const estimateMinutes = appt.services.reduce(
+          (sum, s) => sum + (s.duration || s.duration_minutes || 0),
+          0
+        );
+        if (estimateMinutes < 10) return;
+        const started = dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss");
+        const servedMinutes = now.diff(started, "minute");
+        const snoozeTime = snoozeUntil[appt.id];
+        if (servedMinutes > estimateMinutes + 30) {
+          if (!snoozeTime || now.isAfter(snoozeTime)) {
+            foundOverdue = appt;
+          }
+        }
+      }
+    });
+
+    setOverdueWarning(foundOverdue);
+  }
+
+  // Wake Lock để giữ màn hình luôn sáng (cho cả desktop & mobile)
+  const wakeLockRef = useRef(null);
+  useEffect(() => {
+    // Hàm xin quyền giữ màn hình sáng
+    async function requestWakeLock() {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLockRef.current = await navigator.wakeLock.request("screen");
+          console.log("🔋 Wake Lock active!");
+          // Nếu wake lock bị mất (tab ẩn, minimize), có thể xin lại
+          wakeLockRef.current.addEventListener("release", () => {
+            console.log("🔋 Wake Lock was released");
+          });
+        } else {
+          console.warn("Wake Lock API is not supported on this browser.");
+        }
+      } catch (err) {
+        console.error("Failed to acquire wake lock:", err);
+      }
+    }
+
+    // Gọi ngay khi component mount
+    requestWakeLock();
+
+    // Khi tab/trang được bật lại, xin lại quyền nếu đã mất
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Dọn dẹp khi component unmount
+    return () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+
+  // Hàm kiểm tra và show popup late
+  useEffect(() => {
+    if (!appointments || appointments.length === 0) return;
+
+    const now = dayjs();
+    // Nếu đang trong thời gian chờ, không show popup
+    if (hideLatePopupUntil && now.isBefore(hideLatePopupUntil)) return;
+
+    const lateAppt = appointments.find(
+      (a) =>
+        a.status === "confirmed" &&
+        now.isSameOrAfter(dayjs(a.appointment_date.replace("Z", ""))) && // CHỈ popup nếu ĐÃ đến hoặc QUA giờ hẹn
+        !a.started_at
+    );
+
+    if (lateAppt && !latePopup) {
+      setLatePopup(lateAppt);
+    }
+    if (!lateAppt && latePopup) {
+      setLatePopup(null);
+    }
+  }, [appointments]);
+
+
+  // Hàm clear timeout khi cần
+  const clearWaitingTimeout = () => {
+    if (waitingTimeout.current) {
+      clearTimeout(waitingTimeout.current);
+      waitingTimeout.current = null;
+    }
+  };
+
+
+
   useEffect(() => {
     if (!user || !Array.isArray(selectedServiceIds)) return;
 
@@ -166,7 +364,7 @@ export default function FreelancerDashboard() {
       }
 
       setUserRole(role);
-
+      console.log("FE currentUser.uid:", user?.uid);
       // 🟢 Check freelancer profile
       const exists = await checkFreelancerExists(currentUser);
       setHasFreelancerProfile(exists);
@@ -218,7 +416,9 @@ export default function FreelancerDashboard() {
         setShowPopup,
         setNewAppointment,
         soundRef,
-        soundLoopRef
+        soundLoopRef,
+        setUpcomingAppointments,    // Thêm dòng này
+        setNextClientIndex          // Thêm dòng này
       );
 
       setLoading(false);
@@ -228,49 +428,73 @@ export default function FreelancerDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.uid) return;
     const refresh = async () => {
       const token = await user.getIdToken();
-      if (user && user.role === "Salon_NhanVien") {
-        checkFreelancerExists(user).then(setHasFreelancerProfile);
-      }
+      // Chỉ gọi check nếu chắc chắn là user từ Firebase (có uid)
+      checkFreelancerExists(user).then(setHasFreelancerProfile);
+
       await loadAppointments(
         token,
         setAppointments,
         setAppointmentsToday,
         setConfirmedNextClient,
         setPendingUpcomingAppointment,
-        setTimeUntilNext,            // ✅ Đây!
+        setTimeUntilNext,
         setShowPopup,
         setNewAppointment,
         soundRef,
-        soundLoopRef            // ✅ đối số 9
+        soundLoopRef,
+        setUpcomingAppointments,
+        setNextClientIndex
       );
     };
     const interval = setInterval(refresh, 60000);
+    refresh();
     return () => clearInterval(interval);
-
   }, [user]);
 
-  function isTodayCalifornia(isoDate) {
-    const now = new Date();
-    const appointmentDate = new Date(isoDate);
-    const nowLocal = new Date(
-      now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
-    );
-    const apptLocal = new Date(
-      appointmentDate.toLocaleString("en-US", {
-        timeZone: "America/Los_Angeles",
-      })
-    );
-    return (
-      nowLocal.getFullYear() === apptLocal.getFullYear() &&
-      nowLocal.getMonth() === apptLocal.getMonth() &&
-      nowLocal.getDate() === apptLocal.getDate()
-    );
-  }
+  useEffect(() => {
+    // Lấy tất cả appointments đang "processing"
+    const inProgress = appointments.filter(a => a.status === "processing" && a.started_at);
+    // Dừng các interval cũ
+    Object.values(serviceIntervalRef.current).forEach(clearInterval);
+    const timers = {};
+    inProgress.forEach(appt => {
+      const id = appt.id;
+      // Sửa ở đây: parse started_at với custom format để đúng giờ local
+      const startedAt = dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss");
+      timers[id] = dayjs().diff(startedAt, "second");
+      serviceIntervalRef.current[id] = setInterval(() => {
+        setServiceTimers(timers => ({
+          ...timers,
+          [id]: dayjs().diff(dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss"), "second"),
+        }));
+      }, 1000);
+    });
+    setServiceTimers(timers);
+    // Dọn dẹp interval khi appointments đổi
+    return () => {
+      Object.values(serviceIntervalRef.current).forEach(clearInterval);
+      serviceIntervalRef.current = {};
+    };
+  }, [appointments]);
 
-  //const isComplete = onboarding?.isQualified === true || onboarding?.isqualified === true;
+  useEffect(() => {
+    // Kiểm tra ngay khi load lần đầu (để không bị trễ 5 phút đầu)
+    checkOverdueAppointments();
+
+    // Tạo interval kiểm tra lại mỗi 5 phút
+    const interval = setInterval(() => {
+      checkOverdueAppointments();
+    }, 5 * 60 * 1000); // 5 phút
+
+    // Dọn dẹp interval khi unmount hoặc appointments thay đổi
+    return () => clearInterval(interval);
+    // eslint-disable-next-line
+  }, [appointments, snoozeUntil]); // phụ thuộc appointments và snooze
+
+
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
@@ -299,41 +523,49 @@ export default function FreelancerDashboard() {
     );
   }
 
-  const now = dayjs();
-  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
+  async function completeAppointmentById(appointmentId, options = {}) {
+    setProcessingApptId(appointmentId);
+    setActionError("");
+    try {
+      const token = await user.getIdToken();
+      await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            status: "completed",
+            end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+          }),
+        }
+      );
+      await loadAppointments(
+        token,
+        setAppointments,
+        setAppointmentsToday,
+        setConfirmedNextClient,
+        setPendingUpcomingAppointment,
+        setTimeUntilNext,
+        setShowPopup,
+        setNewAppointment,
+        soundRef,
+        soundLoopRef,
+        setUpcomingAppointments,
+        setNextClientIndex
+      );
+      if (inProgressIndex >= inProgressAppointments.length - 1) setInProgressIndex(0);
 
-  const pendingToday = appointmentsToday.filter(a => {
-    const time = dayjs(a.appointment_date.replace("Z", ""));
-    return a.status === "pending" && time.isAfter(now);
-  }).length;
+      // Nếu truyền onSuccess từ auto-complete hoặc popup thì gọi
+      if (options.onSuccess) options.onSuccess();
 
-  const upcomingToday = appointmentsToday.filter(a => {
-    const time = dayjs(a.appointment_date.replace("Z", ""));
-    return a.status === "confirmed" && time.isAfter(now);
-  }).length;
-
-  const missedToday = appointmentsToday.filter(a => {
-    const time = dayjs(a.appointment_date.replace("Z", ""));
-    return (a.status === "pending" || a.status === "confirmed") && time.isBefore(now);
-  }).length;
-
-
-  const completedAppointmentsToday = appointmentsToday.filter(a => a.status === "completed");
-
-  const todayEarnings = completedAppointmentsToday.reduce((sum, a) =>
-    sum + (a.services?.reduce((s, srv) => s + (srv.price || 0), 0) || 0),
-    0
-  );
-
-  const totalAppointmentsToday = completedAppointmentsToday.length;
-
-  const totalMinutesToday = completedAppointmentsToday.reduce(
-    (sum, a) => sum + (a.duration_minutes || 0),
-    0
-  );
-
-  const totalHoursToday = (totalMinutesToday / 60).toFixed(1);
-
+    } catch (err) {
+      setActionError("Error: Could not complete appointment. Please try again.");
+    }
+    setProcessingApptId(null);
+  }
 
   const handleConfirmAppointment = async (appointmentId) => {
     try {
@@ -363,7 +595,9 @@ export default function FreelancerDashboard() {
           setShowPopup,
           setNewAppointment,
           soundRef,
-          soundLoopRef
+          soundLoopRef,
+          setUpcomingAppointments,    // Thêm dòng này
+          setNextClientIndex          // Thêm dòng này
         );
 
 
@@ -403,13 +637,16 @@ export default function FreelancerDashboard() {
           setShowPopup,
           setNewAppointment,
           soundRef,
-          soundLoopRef
+          soundLoopRef,
+          setUpcomingAppointments,
+          setNextClientIndex
         );
       }
     } catch (err) {
       console.error("❌ Error cancelling appointment:", err.message);
     }
   };
+
   const steps = {
     has_avatar: onboarding?.avatar_url,
     has_license: onboarding?.license_url && onboarding?.license_status === "Approved",
@@ -478,6 +715,324 @@ export default function FreelancerDashboard() {
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
+      {showInvoicePopup && invoiceForm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <form
+            className="bg-white rounded-2xl p-8 shadow-2xl max-w-xl w-full relative animate-fade-in border-4 border-emerald-400 text-gray-800"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setSavingInvoice(true);
+              setSaveInvoiceError("");
+              try {
+                const token = await user.getIdToken();
+                const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointment-invoices", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify(invoiceForm),
+                });
+                if (!res.ok) {
+                  const data = await res.json();
+                  setSaveInvoiceError(data.error || "Failed to save invoice.");
+                  setSavingInvoice(false);
+                  return;
+                }
+                setShowInvoicePopup(false);
+                setSavingInvoice(false);
+
+                // Reload toàn bộ appointment list, cập nhật lại các state!
+                await loadAppointments(
+                  token,
+                  setAppointments,
+                  setAppointmentsToday,
+                  setConfirmedNextClient,
+                  setPendingUpcomingAppointment,
+                  setTimeUntilNext,
+                  setShowPopup,
+                  setNewAppointment,
+                  soundRef,
+                  soundLoopRef,
+                  setUpcomingAppointments,
+                  setNextClientIndex
+                );
+              } catch (err) {
+                setSaveInvoiceError("Network error. Please try again.");
+                setSavingInvoice(false);
+              }
+            }}
+          >
+            <button
+              type="button"
+              className="absolute top-2 right-3 text-pink-400 text-xl font-bold"
+              onClick={() => setShowInvoicePopup(false)}
+              aria-label="Close"
+              disabled={savingInvoice}
+            >
+              ×
+            </button>
+            <h2 className="text-2xl font-bold text-emerald-600 mb-5">Appointment Invoice</h2>
+
+            {/* Customer info */}
+            <div className="flex flex-col gap-1 mb-3">
+              <div>
+                <label className="block text-gray-700 font-bold">Customer Name</label>
+                <input type="text" className="w-full rounded p-2 border border-gray-300 text-gray-900 bg-gray-100"
+                  value={invoiceForm.customer_name}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer_name: e.target.value }))}
+                  readOnly
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold">Phone</label>
+                <input type="text" className="w-full rounded p-2 border border-gray-300 text-gray-900 bg-gray-100"
+                  value={invoiceForm.customer_phone}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer_phone: e.target.value }))}
+                  readOnly
+                />
+              </div>
+            </div>
+
+            {/* Services */}
+            <div>
+              <label className="block text-gray-700 font-bold mb-1">Services</label>
+              <div className="space-y-2 mb-3">
+                {invoiceForm.services.map((srv, idx) => (
+                  <div key={srv.id || idx} className="flex gap-2 items-center bg-gray-100 rounded px-2 py-1">
+                    <span title="Service name" className="text-pink-400 text-lg">✂️</span>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-32 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                        value={srv.name}
+                        autoComplete="off"
+                        onFocus={() => setServiceDropdownIdx(idx)}
+                        onBlur={() => setTimeout(() => setServiceDropdownIdx(-1), 200)}
+                        onChange={e => {
+                          const value = e.target.value;
+                          const services = [...invoiceForm.services];
+                          services[idx].name = value;
+                          setInvoiceForm(f => ({ ...f, services }));
+                          setServiceNameQuery(value);
+                          setServiceDropdownIdx(idx);
+                        }}
+                        required
+                      />
+                      {/* Custom suggestion dropdown */}
+                      {serviceDropdownIdx === idx && serviceNameQuery.length > 0 && (
+                        <div
+                          className="absolute z-30 left-0 mt-1 w-56 max-h-48 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg"
+                          style={{ minWidth: 120 }}
+                        >
+                          {allServiceNames
+                            .filter(name => name.toLowerCase().includes(serviceNameQuery.toLowerCase()))
+                            .slice(0, 20)
+                            .map(name => (
+                              <div
+                                key={name}
+                                className="px-3 py-1 hover:bg-emerald-100 cursor-pointer text-gray-900"
+                                onMouseDown={() => {
+                                  const services = [...invoiceForm.services];
+                                  services[idx].name = name;
+                                  setInvoiceForm(f => ({ ...f, services }));
+                                  setServiceDropdownIdx(-1);
+                                }}
+                              >
+                                {name}
+                              </div>
+                            ))}
+                          {/* Nếu không có suggestion */}
+                          {allServiceNames.filter(name =>
+                            name.toLowerCase().includes(serviceNameQuery.toLowerCase())
+                          ).length === 0 && (
+                              <div className="px-3 py-1 text-gray-400 italic">No match</div>
+                            )}
+                        </div>
+                      )}
+                    </div>
+
+                    <span title="Price" className="text-yellow-600 text-lg">💵</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      className="w-20 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                      value={srv.price}
+                      onChange={e => {
+                        const services = [...invoiceForm.services];
+                        services[idx].price = Number(e.target.value);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      required
+                    />
+                    <span title="Duration (minutes)" className="text-blue-600 text-lg">⏱️</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-16 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                      value={srv.duration}
+                      onChange={e => {
+                        const services = [...invoiceForm.services];
+                        services[idx].duration = Number(e.target.value);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="text-red-500 text-xl"
+                      onClick={() => {
+                        const services = invoiceForm.services.filter((_, i) => i !== idx);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      disabled={invoiceForm.services.length === 1}
+                      title="Remove service"
+                    >×</button>
+                  </div>
+                ))}
+                {/* Datalist suggest ALL services */}
+                <datalist id="services-suggest">
+                  {allServiceNames.map(name => (
+                    <option value={name} key={name} />
+                  ))}
+                </datalist>
+                {/* Add new service */}
+                <button
+                  type="button"
+                  className="text-emerald-700 hover:text-emerald-900 text-sm font-semibold underline"
+                  onClick={() => setInvoiceForm(f => ({
+                    ...f,
+                    services: [...f.services, { name: "", price: 0, duration: 0 }]
+                  }))}
+                >+ Add Service</button>
+              </div>
+            </div>
+
+            {/* Totals */}
+            <div className="flex gap-6 mb-3">
+              <div>
+                <label className="block text-gray-700 font-bold">Total Amount ($)</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  className="w-32 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                  value={invoiceForm.total_amount}
+                  onChange={e => setInvoiceForm(f => ({ ...f, total_amount: Number(e.target.value) }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold">Total Duration (min)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-20 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                  value={invoiceForm.total_duration}
+                  onChange={e => setInvoiceForm(f => ({ ...f, total_duration: Number(e.target.value) }))}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Time actual */}
+            <div className="flex gap-6 mb-3">
+              <div>
+                <label className="block text-gray-700 font-bold">Actual Start</label>
+                <input type="text" className="w-40 rounded border border-gray-200 p-1 bg-gray-100 text-gray-900"
+                  value={
+                    invoiceForm.actual_start_at
+                      ? dayjs.utc(invoiceForm.actual_start_at).format("YYYY-MM-DD HH:mm:ss")
+                      : ""
+                  }
+                  readOnly />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold">Actual End</label>
+                <input type="text" className="w-40 rounded border border-gray-200 p-1 bg-gray-100 text-gray-900" value={invoiceForm.actual_end_at} readOnly />
+              </div>
+            </div>
+            {/* Notes */}
+            <div className="mb-3">
+              <label className="block text-gray-700 font-bold">Notes</label>
+              <textarea
+                className="w-full rounded border border-gray-300 p-2 text-gray-900 bg-white"
+                rows={2}
+                value={invoiceForm.notes}
+                onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+
+            {/* Error */}
+            {saveInvoiceError && <div className="text-red-500 mb-2">{saveInvoiceError}</div>}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              className={`w-full mt-3 py-3 rounded-xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
+              disabled={savingInvoice}
+            >
+              {savingInvoice ? "Saving..." : "Complete & Save Invoice"}
+            </button>
+          </form>
+        </div>
+      )}
+
+
+      {overdueWarning && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full relative animate-fade-in border-4 border-pink-300">
+            <button
+              className="absolute top-2 right-3 text-pink-400 text-xl font-bold"
+              onClick={() => setOverdueWarning(null)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h2 className="text-xl font-bold text-emerald-600 mb-4 flex items-center gap-2">
+              ⏰ Service Time Overdue
+            </h2>
+            <div className="mb-4 text-gray-700">
+              <b>{overdueWarning.customer_name}</b> has been in service for <b className="text-pink-400">
+                {Math.round(dayjs().diff(dayjs(overdueWarning.started_at, "YYYY-MM-DD HH:mm:ss"), "minute") / 60)}h {dayjs().diff(dayjs(overdueWarning.started_at, "YYYY-MM-DD HH:mm:ss"), "minute") % 60} min
+              </b>, which is over the estimated duration of <span className="font-semibold text-yellow-500">{overdueWarning.services.reduce((sum, s) => sum + (s.duration || s.duration_minutes || 0), 0)} min</span>.<br /><br />
+              <span className="font-semibold text-pink-400">Please complete this appointment, or continue serving if you need more time.</span>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-2 rounded-lg shadow flex items-center justify-center gap-2"
+                onClick={async () => {
+                  await completeAppointmentById(overdueWarning.id);
+                  setOverdueWarning(null);
+                }}
+              >
+                <svg className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24">
+                  <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                </svg>
+                Complete
+              </button>
+              <button
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-black font-bold px-6 py-2 rounded-lg shadow"
+                onClick={() => {
+                  // Snooze this appointment's warning for 30 minutes
+                  setSnoozeUntil(prev => ({
+                    ...prev,
+                    [overdueWarning.id]: dayjs().add(30, "minute")
+                  }));
+                  setOverdueWarning(null);
+                }}
+              >
+                Keep Serving
+              </button>
+            </div>
+            <div className="text-xs text-gray-500 mt-4">
+              This reminder will show again after 30 minutes if the appointment is still not completed.
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPopup && pendingUpcomingAppointment && (
         <div className="fixed bottom-4 right-4 z-50 bg-white text-black rounded-xl px-8 py-2 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
 
@@ -570,7 +1125,172 @@ export default function FreelancerDashboard() {
           </button>
         </div>
       )}
-      <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-6">
+      {latePopup && (
+        <div className="fixed bottom-6 right-3 z-50 bg-white text-gray-800 rounded-lg px-3 py-2 shadow-xl border-l-4 border-pink-400 animate-popup w-[95vw] max-w-xs sm:max-w-sm text-sm space-y-2">
+          <h2 className="font-bold text-base text-pink-500 flex items-center gap-2">
+            <FiClock className="text-lg" />
+            Appointment Is Waiting!
+          </h2>
+          <div className="mb-1">
+            <b>Client:</b> {latePopup.customer_name} <br />
+            <b>Service:</b> {latePopup.services?.map((s) => s.name).join(", ")} <br />
+            <b>Booked Time:</b> {dayjs(latePopup.appointment_date.replace("Z", "")).format("MMM D, HH:mm")}
+            <br />
+            <b>Late:</b>
+            <span className="font-bold text-red-500 ml-1">
+              {Math.max(
+                0,
+                now.diff(dayjs(latePopup.appointment_date.replace("Z", "")), "minute")
+              )}{" "}
+              min
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {/* Start service */}
+            <button
+              onClick={async () => {
+                const token = await user.getIdToken();
+                await fetch(
+                  `https://crypto-manager-backend.onrender.com/api/appointments/${latePopup.id}`,
+                  {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      status: "processing",
+                      started_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                    }),
+                  }
+                );
+                clearWaitingTimeout();
+                setLatePopup(null);
+                setHideLatePopupUntil(null);
+
+                // ⭐️ GỌI LẠI loadAppointments SAU KHI PATCH
+                await loadAppointments(
+                  token,
+                  setAppointments,
+                  setAppointmentsToday,
+                  setConfirmedNextClient,
+                  setPendingUpcomingAppointment,
+                  setTimeUntilNext,
+                  setShowPopup,
+                  setNewAppointment,
+                  soundRef,
+                  soundLoopRef,
+                  setUpcomingAppointments,
+                  setNextClientIndex
+                );
+              }}
+              className="bg-emerald-500 text-white px-3 py-1 rounded font-bold hover:bg-emerald-600 text-xs"
+            >
+              👉 Start Service Now
+            </button>
+            {/* Cancel appointment */}
+            <button
+              onClick={async () => {
+                const token = await user.getIdToken();
+                await fetch(
+                  `https://crypto-manager-backend.onrender.com/api/appointments/${latePopup.id}`,
+                  {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ status: "cancelled" }),
+                  }
+                );
+                clearWaitingTimeout();
+                setLatePopup(null);
+                setHideLatePopupUntil(null);
+
+                await loadAppointments(
+                  token,
+                  setAppointments,
+                  setAppointmentsToday,
+                  setConfirmedNextClient,
+                  setPendingUpcomingAppointment,
+                  setTimeUntilNext,
+                  setShowPopup,
+                  setNewAppointment,
+                  soundRef,
+                  soundLoopRef,
+                  setUpcomingAppointments,
+                  setNextClientIndex
+                );
+              }}
+              className="bg-red-400 text-white px-3 py-1 rounded font-bold hover:bg-red-500 text-xs"
+            >
+              ❌ Cancel Appointment
+            </button>
+            {/* Wait more */}
+            <div className="flex flex-row items-center gap-2">
+              <span>⏳ Wait more: </span>
+              <select
+                value={waitMinutes}
+                onChange={(e) => setWaitMinutes(Number(e.target.value))}
+                className="border rounded px-2 py-1 text-xs"
+              >
+                {[5, 10, 15, 20].map((m) => (
+                  <option value={m} key={m}>
+                    {m} mins
+                  </option>
+                ))}
+              </select>
+              <button
+                className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-2 py-1 rounded text-xs"
+                onClick={() => {
+                  clearWaitingTimeout();
+                  setLatePopup(null);
+                  const until = dayjs().add(waitMinutes, "minute");
+                  setHideLatePopupUntil(until);
+                  waitingTimeout.current = setTimeout(() => setLatePopup(latePopup), waitMinutes * 60000);
+                }}
+              >
+                Wait
+              </button>
+            </div>
+            {/* Overlap warning giữ nguyên */}
+            {(() => {
+              const allUpcoming = appointments
+                .filter(
+                  (a) =>
+                    a.status === "confirmed" &&
+                    dayjs(a.appointment_date.replace("Z", "")).isAfter(
+                      dayjs(latePopup.appointment_date.replace("Z", ""))
+                    )
+                )
+                .sort(
+                  (a, b) =>
+                    dayjs(a.appointment_date.replace("Z", "")) -
+                    dayjs(b.appointment_date.replace("Z", ""))
+                );
+              if (allUpcoming.length) {
+                const nextAppt = allUpcoming[0];
+                const estStart = now.add(waitMinutes, "minute");
+                const estEnd = estStart.add(latePopup.duration_minutes || 30, "minute");
+                if (
+                  estEnd.isAfter(dayjs(nextAppt.appointment_date.replace("Z", "")))
+                ) {
+                  return (
+                    <div className="text-red-600 font-bold mt-1 text-xs">
+                      ⚠️ Warning: If you wait {waitMinutes} minutes, the next appointment (
+                      {dayjs(nextAppt.appointment_date.replace("Z", "")).format("HH:mm")}
+                      ) will be affected!
+                    </div>
+                  );
+                }
+              }
+              return null;
+            })()}
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-6xl mx-auto p-2">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-1">
           {/* Welcome Block */}
           <div className="col-span-12 md:col-span-12 flex flex-col md:flex-row md:items-center gap-2 p-1 pb-2">
@@ -607,11 +1327,8 @@ export default function FreelancerDashboard() {
             <div className="flex items-center gap-2 mt-1">
               <div className="flex items-center bg-emerald-400/80 px-2 py-[2px] rounded-sm shadow text-yellow-100 font-bold text-sm">
                 {[...Array(5)].map((_, i) => {
-                  // Nếu chưa có review, mặc định 5 sao vàng
-                  const starCount =
-                    Number(onboarding?.review_count) > 0
-                      ? Number(onboarding?.rating || 0)
-                      : 5;
+                  // Nếu rating > 0 thì show đúng số sao, còn lại luôn là 5 sao vàng
+                  const starCount = onboarding?.rating > 0 ? Math.round(onboarding.rating) : 5;
                   return (
                     <svg
                       key={i}
@@ -623,11 +1340,9 @@ export default function FreelancerDashboard() {
                     </svg>
                   );
                 })}
-                {/* Nếu chưa có review thì hiển thị 5.0, còn có review thì hiển thị đúng rating */}
+                {/* Hiển thị số điểm: nếu rating > 0 thì show điểm, ngược lại mặc định là 5.0 */}
                 <span className="ml-1">
-                  {Number(onboarding?.review_count) > 0
-                    ? (Number(onboarding?.rating) || 0).toFixed(1)
-                    : "5.0"}
+                  {onboarding?.rating > 0 ? Number(onboarding.rating).toFixed(1) : "5.0"}
                 </span>
               </div>
               <span className="text-xs text-yellow-300 font-semibold ml-2">
@@ -666,7 +1381,288 @@ export default function FreelancerDashboard() {
 
           </div>
 
-          <div className="col-span-12 border-t-4 border-b-4 border-pink-400 shadow-lg rounded-2xl p-5">
+
+          {/* Appointments */}
+          <Card
+            className="col-span-12 md:col-span-6"
+            icon={<FiCalendar />}
+            title="Appointments"
+            value={
+              <span>
+                {appointmentsToday.filter(a => a.status !== "cancelled").length}
+                <span className="ml-2 font-normal text-[16px]">Today</span>
+              </span>
+            }
+            sub={
+              <div>
+                {/* Dòng Today - cách dưới ra xa */}
+                <div className="mb-3" />
+                {/* Group trạng thái, lùi vào trái */}
+                <div className="flex flex-col gap-2 pl-4 text-sm">
+                  <span>✅ Completed: {completedToday}</span>
+                  <span>👩‍🔧 Serving: {appointmentsToday.filter(a => a.status === "processing").length}</span>
+                  <span>🟡 Pending: {pendingToday}</span>
+                  <span>⏳ Upcoming: {upcomingToday}</span>
+
+                </div>
+              </div>
+            }
+          >
+            <button
+              onClick={() => router.push("/freelancers/appointments")}
+              className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
+              title="Manage Appointments"
+            >
+              <FiExternalLink />
+            </button>
+          </Card>
+
+
+          {/* Next Client */}
+          <Card
+            className="col-span-12 md:col-span-6 capitalize h-full"
+            icon={<FiClock />}
+            title="Next Client"
+            value={
+              upcomingAppointments.length > 0
+                ? formatNextAppointmentTime(upcomingAppointments[nextClientIndex].appointment_date)
+                : "No upcoming"
+            }
+            sub={
+              upcomingAppointments.length > 0 ? (
+                <div className="flex flex-col gap-2 p-4 rounded-xl card-animate-in w-full">
+                  {/* Tên khách */}
+                  <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                    <FiUser className="w-5 h-5 text-pink-300" />
+                    {upcomingAppointments[nextClientIndex].customer_name}
+                  </div>
+                  {/* Dịch vụ */}
+                  <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
+                    <FiTag className="w-4 h-4 text-yellow-300" />
+                    {upcomingAppointments[nextClientIndex].services?.map(s => s.name).join(", ")}
+                  </div>
+                  {/* Estimate Time */}
+                  {estimateMinutes > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-blue-400">
+                      <FiClock className="w-4 h-4 text-blue-300" />
+                      <span>
+                        Estimated Time: <span className="font-semibold text-emerald-200">{estimateMinutes} min</span>
+                      </span>
+                    </div>
+                  )}
+                  {/* Thời gian chờ/lateness */}
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                    </svg>
+                    <span className="text-sm text-emerald-200 font-semibold">
+                      {upcomingAppointments.length > 0
+                        ? formatTimeUntilNextWithLate(upcomingAppointments[nextClientIndex].appointment_date)
+                        : ""}
+                    </span>
+
+                  </div>
+                  {/* Nút Start Service */}
+                  {!upcomingAppointments[nextClientIndex].started_at &&
+                    upcomingAppointments[nextClientIndex].status === "confirmed" && (
+                      <button
+                        className={`mt-4 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2
+                     ${processingApptId === upcomingAppointments[nextClientIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+                      `}
+                        disabled={processingApptId === upcomingAppointments[nextClientIndex].id}
+                        onClick={async () => {
+                          setProcessingApptId(upcomingAppointments[nextClientIndex].id);
+                          setActionError("");
+                          try {
+                            const token = await user.getIdToken();
+                            await fetch(
+                              `https://crypto-manager-backend.onrender.com/api/appointments/${upcomingAppointments[nextClientIndex].id}`,
+                              {
+                                method: "PATCH",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({
+                                  status: "processing",
+                                  started_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                                }),
+                              }
+                            );
+                            await loadAppointments(
+                              token,
+                              setAppointments,
+                              setAppointmentsToday,
+                              setConfirmedNextClient,
+                              setPendingUpcomingAppointment,
+                              setTimeUntilNext,
+                              setShowPopup,
+                              setNewAppointment,
+                              soundRef,
+                              soundLoopRef,
+                              setUpcomingAppointments,
+                              setNextClientIndex
+                            );
+                          } catch (err) {
+                            setActionError("Đã có lỗi, thử lại!");
+                          }
+                          setProcessingApptId(null);
+                        }}
+                      >
+                        {processingApptId === upcomingAppointments[nextClientIndex].id ? (
+                          <>
+                            <Loader2 className="animate-spin w-5 h-5" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
+                              <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                            </svg>
+                            Start
+                          </>
+                        )}
+                      </button>
+                    )}
+                  {actionError && (
+                    <div className="text-xs text-red-400 mt-1">{actionError}</div>
+                  )}
+                  {/* Điều hướng next/prev nếu có nhiều client */}
+                  {upcomingAppointments.length > 1 && (
+                    <div className="flex gap-2 mt-2 items-center justify-center">
+                      <button
+                        onClick={() => setNextClientIndex(idx => idx > 0 ? idx - 1 : upcomingAppointments.length - 1)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Previous client"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <span className="mx-2 text-xs text-pink-400">
+                        {`${nextClientIndex + 1} / ${upcomingAppointments.length}`}
+                      </span>
+                      <button
+                        onClick={() => setNextClientIndex(idx => idx < upcomingAppointments.length - 1 ? idx + 1 : 0)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Next client"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : "No upcoming"
+            }
+          />
+
+          {/* Danh sách appointments in progress */}
+          {inProgressAppointments.length > 0 && (
+            <Card
+              className="col-span-12 md:col-span-12 h-full"
+              icon={<FiUser />}
+              title="Now Serving"
+              value=""
+              sub={
+                <div className="flex flex-col gap-1 p-4 rounded-xl card-animate-in w-full">
+                  {/* Info khách + dịch vụ + timer */}
+                  <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                    <FiUser className="w-5 h-5 text-pink-300" />
+                    {inProgressAppointments[inProgressIndex]?.customer_name}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate mt-1">
+                    <FiTag className="w-4 h-4 text-yellow-300" />
+                    {inProgressAppointments[inProgressIndex]?.services?.map(s => s.name).join(", ")}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                    </svg>
+                    <span className="text-sm text-emerald-200 font-semibold">
+                      In Service: {formatSeconds(serviceTimers[inProgressAppointments[inProgressIndex]?.id])}
+                    </span>
+                  </div>
+                  {/* Nút Complete ngay dưới info */}
+                  <button
+                    className={`mt-4 w-full md:w-auto self-start px-12 py-2 bg-gradient-to-r from-pink-500 via-yellow-400 to-emerald-400 hover:from-pink-600 text-white rounded-3xl font-bold shadow transition text-lg flex items-center justify-center md:justify-start gap-2
+    ${processingApptId === inProgressAppointments[inProgressIndex]?.id ? "opacity-60 cursor-not-allowed" : ""}
+  `}
+                    disabled={processingApptId === inProgressAppointments[inProgressIndex]?.id}
+                    onClick={async () => {
+                      // Lấy appointment đang serving
+                      const appt = inProgressAppointments[inProgressIndex];
+                      // Chuẩn bị dữ liệu hóa đơn mặc định
+                      setInvoiceForm({
+                        appointment_id: appt.id,
+                        customer_name: appt.customer_name,
+                        customer_phone: appt.customer_phone,
+                        stylist_id: onboarding?.id,
+                        stylist_name: onboarding?.name || user?.displayName,
+                        salon_id: onboarding?.salon_id,
+                        services: appt.services.map(s => ({
+                          id: s.id,
+                          name: s.name,
+                          price: s.price,
+                          duration: s.duration || s.duration_minutes,
+                          quantity: 1, // mặc định 1
+                        })),
+                        total_amount: appt.services.reduce((sum, s) => sum + (s.price || 0), 0),
+                        total_duration: Math.round(
+                          (dayjs().diff(dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss"), "minute"))
+                        ),
+                        actual_start_at: appt.started_at,
+                        actual_end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                        notes: appt.note || "",
+                      });
+                      setShowInvoicePopup(true);
+                    }}
+
+                  >
+                    {processingApptId === inProgressAppointments[inProgressIndex]?.id ? (
+                      <>
+                        <Loader2 className="animate-spin w-5 h-5" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiCheckCircle className="w-5 h-5" />
+                        Complete
+                      </>
+                    )}
+                  </button>
+                  {actionError && (
+                    <div className="text-xs text-red-400 mt-1">{actionError}</div>
+                  )}
+
+                  {/* Điều hướng trái/phải nếu có nhiều hơn 1 appointment */}
+                  {inProgressAppointments.length > 1 && (
+                    <div className="flex gap-2 mt-2 items-center justify-center">
+                      <button
+                        onClick={() => setInProgressIndex(idx => idx > 0 ? idx - 1 : inProgressAppointments.length - 1)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Previous in-progress"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <span className="mx-2 text-xs text-pink-400">
+                        {`${inProgressIndex + 1} / ${inProgressAppointments.length}`}
+                      </span>
+                      <button
+                        onClick={() => setInProgressIndex(idx => idx < inProgressAppointments.length - 1 ? idx + 1 : 0)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Next in-progress"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              }
+            />
+
+          )}
+          <div className="col-span-12 bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 shadow-lg rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-bold text-pink-300">💈 Services</h3>
               <button
@@ -703,7 +1699,7 @@ export default function FreelancerDashboard() {
                       return (
                         <label
                           key={srv.id}
-                          className={`flex items-start gap-3 bg-white/10 p-3 rounded-xl shadow hover:bg-white/20 transition cursor-pointer capitalize relative`}
+                          className={`flex items-start gap-3 bg-white/5 p-3 rounded-xl shadow hover:bg-white/10 transition cursor-pointer capitalize relative`}
                         >
                           <input
                             type="checkbox"
@@ -770,54 +1766,13 @@ export default function FreelancerDashboard() {
               </>
             )}
           </div>
-          {/* Next Client */}
-          <Card
-            className="col-span-12 md:col-span-6 capitalize"
-            icon={<FiClock />}
-            title="Next Client"
-            value={
-              confirmedNextClient
-                ? formatNextAppointmentTime(confirmedNextClient.appointment_date)
-                : "No upcoming"
-            }
-            sub={
-              confirmedNextClient?.customer_name
-                ? `${confirmedNextClient.customer_name} – ${confirmedNextClient.services?.map(s => s.name).join(", ")}${confirmedNextClient.appointment_date ? ` (${formatTimeUntilNext(confirmedNextClient.appointment_date)})` : ""}`
-                : "No upcoming"
-            }
-
-          />
-          {/* Appointments */}
-          <Card
-            className="col-span-12 md:col-span-6"
-            icon={<FiCalendar />}
-            title="Appointments"
-            value={`${appointmentsToday.filter(a => a.status !== "cancelled").length} Today`}
-            sub={
-              <>
-                ✅ Completed: {completedToday} <br />
-                🟡 Pending: {pendingToday} <br />
-                ⏳ Upcoming: {upcomingToday} <br />
-                ❌ Missed: {missedToday}
-              </>
-            }
-          >
-            <button
-              onClick={() => router.push("/freelancers/appointments")}
-              className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
-              title="Manage Appointments"
-            >
-              <FiExternalLink />
-            </button>
-          </Card>
-
           {/* Quick Actions */}
           <div className="col-span-12">
             <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
               <ActionButton label="🧾 Appointments" onClick={() => router.push("/freelancers/appointments")} />
-              <ActionButton label="💬 Chat with Client" onClick={() => router.push("/freelancers/chat")} />
+              <ActionButton label="💬 Chat" onClick={() => router.push("/freelancers/chat")} />
               <ActionButton label="💸 Withdraw" onClick={() => router.push("/freelancers/withdraw")} />
             </div>
           </div>
@@ -827,13 +1782,14 @@ export default function FreelancerDashboard() {
     </div>
   );
 }
+
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className={`relative ${className} border-t-4 border-b-4 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
+    <div className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-xl font-extrabold text-white">{value}</div>
-      <p className="text-sm text-white/80">{sub}</p>
+      <div className="text-sm text-white/80">{sub}</div>
       {children}
     </div>
   );
@@ -861,6 +1817,8 @@ async function loadAppointments(
   setNewAppointment,
   soundRef,
   soundLoopRef,
+  setUpcomingAppointments,
+  setNextClientIndex
 ) {
   const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
     headers: { Authorization: `Bearer ${token}` },
@@ -938,20 +1896,21 @@ async function loadAppointments(
   }
 
   // 🟢 Lấy lịch đã confirmed gần nhất trong tương lai → dùng cho Next Client
-  const confirmedUpcoming = apptData
+  const confirmedUnstarted = apptData
     .filter((a) =>
-      a.status === "confirmed" &&
-      dayjs(a.appointment_date.replace("Z", "")).isAfter(now)
+      a.status === "confirmed" && !a.started_at
     )
     .sort((a, b) =>
-      dayjs(a.appointment_date).diff(dayjs(b.appointment_date))
+      dayjs(a.appointment_date.replace("Z", "")).diff(dayjs(b.appointment_date.replace("Z", "")))
     );
 
-  setConfirmedNextClient(confirmedUpcoming[0] || null);
+  setUpcomingAppointments(confirmedUnstarted);
+  setConfirmedNextClient(confirmedUnstarted[0] || null);
+  setNextClientIndex(0); // reset về đầu mỗi khi reload data
 
   // ⏳ Cập nhật đồng hồ đếm thời gian tới lịch gần nhất (dành cho hiển thị next)
-  if (confirmedUpcoming[0]) {
-    const apptTime = dayjs(confirmedUpcoming[0].appointment_date.replace("Z", ""));
+  if (confirmedUnstarted[0]) {
+    const apptTime = dayjs(confirmedUnstarted[0].appointment_date.replace("Z", ""));
     const diffMinutes = apptTime.diff(now, "minute");
 
     let timeUntil = "";
@@ -961,6 +1920,8 @@ async function loadAppointments(
       timeUntil = hours > 0
         ? `⏳ In ${hours}h ${minutes}m`
         : `⏳ In ${minutes} minute${minutes > 1 ? "s" : ""}`;
+    } else {
+      timeUntil = `🔴 Late ${Math.abs(diffMinutes)} min`;
     }
     setTimeUntilNext(timeUntil);
   } else {
@@ -968,6 +1929,14 @@ async function loadAppointments(
   }
 }
 
+function formatSeconds(sec) {
+  if (sec == null) return "00:00";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
 
 function clearSoundLoop(soundLoopRef) {
   if (soundLoopRef.current) {
@@ -975,7 +1944,6 @@ function clearSoundLoop(soundLoopRef) {
     soundLoopRef.current = null;
   }
 }
-
 function formatNextAppointmentTime(appointmentDate) {
   if (!appointmentDate) return "No upcoming";
 
@@ -999,27 +1967,29 @@ function formatNextAppointmentTime(appointmentDate) {
   }
 }
 
-function formatTimeUntilNext(appointmentDate) {
+function formatTimeUntilNextWithLate(appointmentDate) {
   if (!appointmentDate) return "";
-
   const now = dayjs();
   const target = dayjs(appointmentDate.replace("Z", ""));
   let diff = target.diff(now, "second");
 
-  if (diff <= 0) return "now";
+  if (diff > 0) {
+    const days = Math.floor(diff / (60 * 60 * 24));
+    diff -= days * 60 * 60 * 24;
+    const hours = Math.floor(diff / (60 * 60));
+    diff -= hours * 60 * 60;
+    const minutes = Math.floor(diff / 60);
 
-  const days = Math.floor(diff / (60 * 60 * 24));
-  diff -= days * 60 * 60 * 24;
-  const hours = Math.floor(diff / (60 * 60));
-  diff -= hours * 60 * 60;
-  const minutes = Math.floor(diff / 60);
-
-  if (days > 0) {
-    // Nếu có ngày, chỉ cần show ngày + giờ: "in 2d 4h"
-    return `in ${days}d${hours > 0 ? ` ${hours}h` : ""}`;
-  } else if (hours > 0) {
-    return `in ${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+    if (days > 0) {
+      return `In ${days}d${hours > 0 ? ` ${hours}h` : ""}`;
+    } else if (hours > 0) {
+      return `In ${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+    } else {
+      return `In ${minutes} minute${minutes !== 1 ? "s" : ""}`;
+    }
   } else {
-    return `in ${minutes}m`;
+    // Quá giờ, đang trễ
+    const lateMinutes = Math.abs(target.diff(now, "minute"));
+    return `🔴 Late ${lateMinutes} min`;
   }
 }

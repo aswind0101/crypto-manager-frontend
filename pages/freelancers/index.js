@@ -494,7 +494,34 @@ export default function FreelancerDashboard() {
     // eslint-disable-next-line
   }, [appointments, snoozeUntil]); // phụ thuộc appointments và snooze
 
-
+  // Đảm bảo có auto update tổng tiền khi services thay đổi:
+  useEffect(() => {
+    if (!invoiceForm) return;
+    const total = invoiceForm.services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    let totalDuration = 0;
+    if (invoiceForm.actual_start_at && invoiceForm.actual_end_at) {
+      const d1 = dayjs(invoiceForm.actual_start_at, "YYYY-MM-DD HH:mm:ss");
+      const d2 = dayjs(invoiceForm.actual_end_at, "YYYY-MM-DD HH:mm:ss");
+      totalDuration = d2.diff(d1, "minute");
+    }
+    const tip = Number(invoiceForm.tip || 0);
+    const amountPaid = Number(invoiceForm.amount_paid || 0);
+    let change = amountPaid - (total + tip);
+    if (change < 0) change = 0;
+    setInvoiceForm(f => ({
+      ...f,
+      total_amount: total,
+      total_duration: totalDuration,
+      change: change,
+    }));
+    // eslint-disable-next-line
+  }, [
+    invoiceForm?.services,
+    invoiceForm?.actual_start_at,
+    invoiceForm?.actual_end_at,
+    invoiceForm?.tip,
+    invoiceForm?.amount_paid,
+  ]);
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
@@ -715,12 +742,26 @@ export default function FreelancerDashboard() {
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
+
       {showInvoicePopup && invoiceForm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <form
-            className="bg-white rounded-2xl p-8 shadow-2xl max-w-xl w-full relative animate-fade-in border-4 border-emerald-400 text-gray-800"
+            className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-4 border-emerald-400 text-gray-800"
             onSubmit={async (e) => {
               e.preventDefault();
+              // Tính tổng cần thanh toán
+              const totalDue = invoiceForm.total_amount + (invoiceForm.tip || 0);
+
+              // Nếu chưa nhập hoặc chưa đủ tiền
+              if (
+                invoiceForm.amount_paid === null ||
+                invoiceForm.amount_paid === undefined ||
+                invoiceForm.amount_paid === "" ||
+                invoiceForm.amount_paid < totalDue
+              ) {
+                setSaveInvoiceError("Customer has not paid enough!");
+                return;
+              }
               setSavingInvoice(true);
               setSaveInvoiceError("");
               try {
@@ -731,7 +772,13 @@ export default function FreelancerDashboard() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                   },
-                  body: JSON.stringify(invoiceForm),
+                  body: JSON.stringify({
+                    ...invoiceForm,
+                    tip: invoiceForm.tip,
+                    amount_paid: invoiceForm.amount_paid,
+                    change: invoiceForm.change,
+                  })
+                  ,
                 });
                 if (!res.ok) {
                   const data = await res.json();
@@ -772,38 +819,67 @@ export default function FreelancerDashboard() {
             >
               ×
             </button>
-            <h2 className="text-2xl font-bold text-emerald-600 mb-5">Appointment Invoice</h2>
+            <h2 className="text-xl font-bold text-emerald-600 mb-4 text-center">Appointment Invoice</h2>
 
             {/* Customer info */}
-            <div className="flex flex-col gap-1 mb-3">
+            <div className="grid grid-cols-2 gap-3 mb-2">
               <div>
-                <label className="block text-gray-700 font-bold">Customer Name</label>
-                <input type="text" className="w-full rounded p-2 border border-gray-300 text-gray-900 bg-gray-100"
+                <label className="block text-gray-700 font-bold text-xs mb-1">Customer Name</label>
+                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-sm"
                   value={invoiceForm.customer_name}
-                  onChange={e => setInvoiceForm(f => ({ ...f, customer_name: e.target.value }))}
-                  required
+                  readOnly
                 />
               </div>
               <div>
-                <label className="block text-gray-700 font-bold">Phone</label>
-                <input type="text" className="w-full rounded p-2 border border-gray-300 text-gray-900 bg-gray-100"
+                <label className="block text-gray-700 font-bold text-xs mb-1">Phone</label>
+                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-sm"
                   value={invoiceForm.customer_phone}
-                  onChange={e => setInvoiceForm(f => ({ ...f, customer_phone: e.target.value }))}
+                  readOnly
                 />
               </div>
             </div>
 
-            {/* Services */}
-            <div>
-              <label className="block text-gray-700 font-bold mb-1">Services</label>
-              <div className="space-y-2 mb-3">
+            {/* Actual Start/End & Duration */}
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <div>
+                <label className="block text-gray-700 font-bold text-xs mb-1">Actual Start</label>
+                <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-800 text-xs select-text">
+                  {dayjs.utc(invoiceForm.actual_start_at).format("YYYY-MM-DD HH:mm:ss")}
+                </div>
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold text-xs mb-1">Actual End</label>
+                <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-800 text-xs select-text">
+                  {invoiceForm.actual_end_at}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end mb-2">
+              <span className="text-xs text-gray-700 mr-1">Total Duration:</span>
+              <span className="font-bold text-sm text-emerald-600">
+                {invoiceForm.total_duration || invoiceForm.total_duration === 0
+                  ? (() => {
+                    const h = Math.floor(invoiceForm.total_duration / 60);
+                    const m = invoiceForm.total_duration % 60;
+                    if (h > 0) return `${h}h ${m}min`;
+                    return `${m}min`;
+                  })()
+                  : "--"}
+              </span>
+            </div>
+
+            {/* Services (nhỏ gọn) */}
+            <div className="mb-2">
+              <label className="block text-gray-700 font-bold text-xs mb-1">Services</label>
+              <div className="space-y-1">
                 {invoiceForm.services.map((srv, idx) => (
-                  <div key={srv.id || idx} className="flex gap-2 items-center bg-gray-100 rounded px-2 py-1">
-                    <span title="Service name" className="text-pink-400 text-lg">✂️</span>
-                    <div className="relative">
+                  <div key={idx} className="flex gap-2 items-center px-1 py-1 text-xs w-full">
+                    <span className="text-pink-400">✂️</span>
+                    {/* Service name: chiếm toàn bộ không gian còn lại */}
+                    <div className="relative flex-1 min-w-0">
                       <input
                         type="text"
-                        className="w-32 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                        className="w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
                         value={srv.name}
                         autoComplete="off"
                         onFocus={() => setServiceDropdownIdx(idx)}
@@ -818,19 +894,18 @@ export default function FreelancerDashboard() {
                         }}
                         required
                       />
-                      {/* Custom suggestion dropdown */}
                       {serviceDropdownIdx === idx && serviceNameQuery.length > 0 && (
                         <div
-                          className="absolute z-30 left-0 mt-1 w-56 max-h-48 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg"
-                          style={{ minWidth: 120 }}
+                          className="absolute z-30 left-0 mt-1 w-44 max-h-32 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-xs"
+                          style={{ minWidth: 90 }}
                         >
                           {allServiceNames
                             .filter(name => name.toLowerCase().includes(serviceNameQuery.toLowerCase()))
-                            .slice(0, 20)
+                            .slice(0, 15)
                             .map(name => (
                               <div
                                 key={name}
-                                className="px-3 py-1 hover:bg-emerald-100 cursor-pointer text-gray-900"
+                                className="px-2 py-1 hover:bg-emerald-100 cursor-pointer text-gray-900"
                                 onMouseDown={() => {
                                   const services = [...invoiceForm.services];
                                   services[idx].name = name;
@@ -841,22 +916,22 @@ export default function FreelancerDashboard() {
                                 {name}
                               </div>
                             ))}
-                          {/* Nếu không có suggestion */}
                           {allServiceNames.filter(name =>
                             name.toLowerCase().includes(serviceNameQuery.toLowerCase())
                           ).length === 0 && (
-                              <div className="px-3 py-1 text-gray-400 italic">No match</div>
+                              <div className="px-2 py-1 text-gray-400 italic">No match</div>
                             )}
                         </div>
                       )}
                     </div>
-
-                    <span title="Price" className="text-yellow-600 text-lg">💵</span>
+                    {/* Price */}
+                    <span className="text-yellow-600" title="Price">💵</span>
                     <input
                       type="number"
                       min={0}
                       step={0.01}
-                      className="w-20 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                      // 👇 width nhỏ gọn (w-14 hoặc w-16 tuỳ ý)
+                      className="w-16 rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs text-right"
                       value={srv.price}
                       onChange={e => {
                         const services = [...invoiceForm.services];
@@ -865,22 +940,9 @@ export default function FreelancerDashboard() {
                       }}
                       required
                     />
-                    <span title="Duration (minutes)" className="text-blue-600 text-lg">⏱️</span>
-                    <input
-                      type="number"
-                      min={0}
-                      className="w-16 rounded border border-gray-300 p-1 text-gray-900 bg-white"
-                      value={srv.duration}
-                      onChange={e => {
-                        const services = [...invoiceForm.services];
-                        services[idx].duration = Number(e.target.value);
-                        setInvoiceForm(f => ({ ...f, services }));
-                      }}
-                      required
-                    />
                     <button
                       type="button"
-                      className="text-red-500 text-xl"
+                      className="text-red-500 text-lg ml-1"
                       onClick={() => {
                         const services = invoiceForm.services.filter((_, i) => i !== idx);
                         setInvoiceForm(f => ({ ...f, services }));
@@ -890,72 +952,88 @@ export default function FreelancerDashboard() {
                     >×</button>
                   </div>
                 ))}
-                {/* Datalist suggest ALL services */}
-                <datalist id="services-suggest">
-                  {allServiceNames.map(name => (
-                    <option value={name} key={name} />
-                  ))}
-                </datalist>
-                {/* Add new service */}
                 <button
                   type="button"
-                  className="text-emerald-700 hover:text-emerald-900 text-sm font-semibold underline"
+                  className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold underline mt-1"
                   onClick={() => setInvoiceForm(f => ({
                     ...f,
-                    services: [...f.services, { name: "", price: 0, duration: 0 }]
+                    services: [...f.services, { name: "", price: 0 }]
                   }))}
                 >+ Add Service</button>
               </div>
             </div>
 
-            {/* Totals */}
-            <div className="flex gap-6 mb-3">
-              <div>
-                <label className="block text-gray-700 font-bold">Total Amount ($)</label>
-                <input
-                  type="number"
-                  step={0.01}
-                  className="w-32 rounded border border-gray-300 p-1 text-gray-900 bg-white"
-                  value={invoiceForm.total_amount}
-                  onChange={e => setInvoiceForm(f => ({ ...f, total_amount: Number(e.target.value) }))}
-                  required
-                />
+            {/* Total Amount, Tip, Amount Paid, Change */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-emerald-700 flex items-center">
+                  <span className="text-lg mr-1">💵</span>Total Amount
+                </span>
+                <span className="font-bold text-base text-emerald-700">
+                  ${invoiceForm.total_amount ? invoiceForm.total_amount.toFixed(2) : "0.00"}
+                </span>
               </div>
-              <div>
-                <label className="block text-gray-700 font-bold">Total Duration (min)</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="w-20 rounded border border-gray-300 p-1 text-gray-900 bg-white"
-                  value={invoiceForm.total_duration}
-                  onChange={e => setInvoiceForm(f => ({ ...f, total_duration: Number(e.target.value) }))}
-                  required
-                />
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-gray-600 flex items-center">
+                  <span className="text-lg mr-1">🎁</span>Tip
+                </span>
+                <div className="relative w-20">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="pl-5 w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                    value={invoiceForm.tip || ""}
+                    onChange={e => setInvoiceForm(f => ({ ...f, tip: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-gray-600 flex items-center">
+                  <span className="text-lg mr-1">💰</span>Amount Paid
+                </span>
+                <div className="relative w-20">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="pl-5 w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                    value={invoiceForm.amount_paid || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setInvoiceForm(f => ({
+                        ...f,
+                        amount_paid: val === "" ? null : Number(val)
+                      }));
+                      setSaveInvoiceError(""); // XÓA lỗi khi người dùng nhập lại
+                    }}
+                  />
+                </div>
+              </div>
+              {typeof invoiceForm.amount_paid === "number" &&
+                invoiceForm.amount_paid < invoiceForm.total_amount + (invoiceForm.tip || 0) &&
+                <div className="text-red-500 text-xs text-right mb-1">
+                  Customer has not paid enough!
+                </div>
+              }
+
+              <div className="flex justify-between items-center mt-1">
+                <span className="font-semibold text-gray-600 flex items-center">
+                  <span className="text-lg mr-1">🧾</span>Change
+                </span>
+                <span className="font-bold text-emerald-700">
+                  ${invoiceForm.change ? invoiceForm.change.toFixed(2) : "0.00"}
+                </span>
               </div>
             </div>
 
-            {/* Time actual */}
-            <div className="flex gap-6 mb-3">
-              <div>
-                <label className="block text-gray-700 font-bold">Actual Start</label>
-                <input type="text" className="w-40 rounded border border-gray-200 p-1 bg-gray-100 text-gray-900"
-                  value={
-                    invoiceForm.actual_start_at
-                      ? dayjs.utc(invoiceForm.actual_start_at).format("YYYY-MM-DD HH:mm:ss")
-                      : ""
-                  }
-                  readOnly />
-              </div>
-              <div>
-                <label className="block text-gray-700 font-bold">Actual End</label>
-                <input type="text" className="w-40 rounded border border-gray-200 p-1 bg-gray-100 text-gray-900" value={invoiceForm.actual_end_at} readOnly />
-              </div>
-            </div>
             {/* Notes */}
-            <div className="mb-3">
-              <label className="block text-gray-700 font-bold">Notes</label>
+            <div className="mb-2">
+              <label className="block text-gray-700 font-bold text-xs mb-1">Notes</label>
               <textarea
-                className="w-full rounded border border-gray-300 p-2 text-gray-900 bg-white"
+                className="w-full rounded border border-gray-300 p-2 text-gray-900 bg-white text-xs"
                 rows={2}
                 value={invoiceForm.notes}
                 onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
@@ -965,10 +1043,9 @@ export default function FreelancerDashboard() {
             {/* Error */}
             {saveInvoiceError && <div className="text-red-500 mb-2">{saveInvoiceError}</div>}
 
-            {/* Submit */}
             <button
               type="submit"
-              className={`w-full mt-3 py-3 rounded-xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
+              className={`w-full mt-2 py-2 rounded-xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
               disabled={savingInvoice}
             >
               {savingInvoice ? "Saving..." : "Complete & Save Invoice"}
@@ -976,7 +1053,6 @@ export default function FreelancerDashboard() {
           </form>
         </div>
       )}
-
 
       {overdueWarning && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
