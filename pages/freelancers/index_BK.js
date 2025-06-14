@@ -1077,7 +1077,33 @@ export default function FreelancerDashboard() {
               <button
                 className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-2 rounded-lg shadow flex items-center justify-center gap-2"
                 onClick={async () => {
-                  await completeAppointmentById(overdueWarning.id);
+                  // Lấy appointment đang serving
+                  const appt = inProgressAppointments[inProgressIndex];
+                  console.log(appt);
+                  // Chuẩn bị dữ liệu hóa đơn mặc định
+                  setInvoiceForm({
+                    appointment_id: appt.id,
+                    customer_name: appt.customer_name,
+                    customer_phone: appt.customer_phone,
+                    stylist_id: appt.stylist_id,
+                    stylist_name: appt.customer_name || user?.displayName,
+                    salon_id: appt.salon_id,
+                    services: appt.services.map(s => ({
+                      id: s.id,
+                      name: s.name,
+                      price: s.price,
+                      duration: s.duration || s.duration_minutes,
+                      quantity: 1, // mặc định 1
+                    })),
+                    total_amount: appt.services.reduce((sum, s) => sum + (s.price || 0), 0),
+                    total_duration: Math.round(
+                      (dayjs().diff(dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss"), "minute"))
+                    ),
+                    actual_start_at: appt.started_at,
+                    actual_end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                    notes: appt.note || "",
+                  });
+                  setShowInvoicePopup(true);
                   setOverdueWarning(null);
                 }}
               >
@@ -1667,14 +1693,15 @@ export default function FreelancerDashboard() {
                     onClick={async () => {
                       // Lấy appointment đang serving
                       const appt = inProgressAppointments[inProgressIndex];
+                      console.log("DEBUG appt", appt); 
                       // Chuẩn bị dữ liệu hóa đơn mặc định
                       setInvoiceForm({
                         appointment_id: appt.id,
                         customer_name: appt.customer_name,
                         customer_phone: appt.customer_phone,
-                        stylist_id: onboarding?.id,
-                        stylist_name: onboarding?.name || user?.displayName,
-                        salon_id: onboarding?.salon_id,
+                        stylist_id: appt.stylist_id,              // <-- ĐÚNG
+                        stylist_name: appt.stylist_name || user?.displayName, // (có thể lấy từ getFreelancerInfo nếu muốn chuẩn hơn)
+                        salon_id: appt.salon_id,
                         services: appt.services.map(s => ({
                           id: s.id,
                           name: s.name,

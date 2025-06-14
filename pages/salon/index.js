@@ -22,7 +22,11 @@ import {
   FiCalendar,
   FiClock,
   FiUser,
+  FiPhone,
+  FiPlayCircle, FiStopCircle,
+  FiDollarSign, FiGift, FiCreditCard, FiRepeat, FiSearch
 } from "react-icons/fi";
+import { MdMiscellaneousServices } from "react-icons/md";
 
 export default function SalonDashboard() {
   const [user, setUser] = useState(null);
@@ -80,6 +84,9 @@ export default function SalonDashboard() {
   // Helper: get freelancer info
   const getFreelancerInfo = (id) => freelancers.find(f => f.id === id) || {};
 
+
+  const serviceIntervalRef = useRef({});
+  const [serviceTimers, setServiceTimers] = useState({});
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
@@ -87,68 +94,21 @@ export default function SalonDashboard() {
         return;
       }
       setUser(firebaseUser);
-
-      try {
-        const token = await firebaseUser.getIdToken();
-
-        // Lấy freelancers (staff salon)
-        const resFreelancers = await fetch(`${baseUrl}/api/freelancers/by-salon`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        let freelancersList = [];
-        try {
-          freelancersList = await resFreelancers.json();
-        } catch { }
-        setFreelancers(Array.isArray(freelancersList) ? freelancersList : []);
-
-        // Lấy lịch hẹn hôm nay
-        const todayStr = dayjs().format("YYYY-MM-DD");
-        const resAppt = await fetch(`${baseUrl}/api/appointments/salon?date=${todayStr}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        let appointments = [];
-        try {
-          appointments = await resAppt.json();
-        } catch { }
-        setAppointmentsToday(Array.isArray(appointments) ? appointments : []);
-
-        // Now serving: status=processing
-        setNowServing(appointments.filter(a => a.status === "processing"));
-
-        // Next Client: status=confirmed, chưa started
-        setNextClients(appointments
-          .filter(a => a.status === "confirmed" && !a.started_at)
-          .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date))
-        );
-
-        // Revenue: 7 ngày gần nhất
-        const from = dayjs().subtract(6, "day").format("YYYY-MM-DD");
-        const to = todayStr;
-        const resRev = await fetch(`${baseUrl}/api/appointments/salon/revenue?from=${from}&to=${to}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        let revenueArr = [];
-        try {
-          revenueArr = await resRev.json();
-        } catch { }
-        setRevenueData(Array.isArray(revenueArr) ? revenueArr.map(item => ({
-          ...item,
-          revenue: Number(item.revenue || 0),
-          date: dayjs(item.date, "YYYY-MM-DD HH:mm:ss").format("MM-DD"),
-        })) : []);
-        await fetchData(firebaseUser);
-        setLoading(false);
-      } catch (err) {
-        setError("Failed to load data. Please try again.");
-        setLoading(false);
-      }
+      setLoading(true);
+      await fetchData(firebaseUser);
+      setLoading(false);
     });
+
     return () => unsubscribe();
-    // eslint-disable-next-line
   }, []);
 
-  const serviceIntervalRef = useRef({});
-  const [serviceTimers, setServiceTimers] = useState({});
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      fetchData(user);
+    }, 60000); // 1 phút cập nhật 1 lần
+    return () => clearInterval(interval);
+  }, [user]);
 
   useEffect(() => {
     const inProgress = nowServing.filter(a => a.status === "processing" && a.started_at);
@@ -182,13 +142,6 @@ export default function SalonDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    const interval = setInterval(() => {
-      fetchData(user);
-    }, 60000); // 60000 ms = 1 phút
-    return () => clearInterval(interval);
-  }, [user]);
 
   useEffect(() => {
     if (!invoiceForm) return;
@@ -298,7 +251,34 @@ export default function SalonDashboard() {
       setError("Failed to load data. Please try again.");
     }
   };
-  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
+  function formatTimeUntilNextWithLate(appointmentDate) {
+    if (!appointmentDate) return "";
+    const now = dayjs();
+    const target = dayjs(appointmentDate.replace("Z", ""));
+    let diff = target.diff(now, "second");
+
+    if (diff > 0) {
+      const days = Math.floor(diff / (60 * 60 * 24));
+      diff -= days * 60 * 60 * 24;
+      const hours = Math.floor(diff / (60 * 60));
+      diff -= hours * 60 * 60;
+      const minutes = Math.floor(diff / 60);
+
+      if (days > 0) {
+        return `In ${days}d${hours > 0 ? ` ${hours}h` : ""}`;
+      } else if (hours > 0) {
+        return `In ${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+      } else {
+        return `In ${minutes} minute${minutes !== 1 ? "s" : ""}`;
+      }
+    } else {
+      // Quá giờ, đang trễ
+      const lateMinutes = Math.abs(target.diff(now, "minute"));
+      return `🔴 Late ${lateMinutes} min`;
+    }
+  }
+  const completedCountToday = appointmentsToday?.filter(a => a.status === "completed").length || 0;
+
   // Tổng tiền doanh thu hôm nay
   const todayRevenue = appointmentsToday.filter(a => a.status === "completed")
     .reduce((sum, a) => sum + (a.services?.reduce((s, srv) => s + (srv.price || 0), 0) || 0), 0);
@@ -312,7 +292,8 @@ export default function SalonDashboard() {
       {showInvoicePopup && invoiceForm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <form
-            className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-4 border-emerald-400 text-gray-800"
+            className="bg-gradient-to-r from-emerald-100 via-yellow-50 to-pink-50 backdrop-blur-xl
+ rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-t-4 border-pink-400 text-gray-800"
             onSubmit={async (e) => {
               e.preventDefault();
               const totalDue = invoiceForm.total_amount + (invoiceForm.tip || 0);
@@ -372,35 +353,61 @@ export default function SalonDashboard() {
             {/* Customer info */}
             <div className="grid grid-cols-2 gap-3 mb-2">
               <div>
-                <label className="block text-gray-700 font-bold text-xs mb-1">Customer Name</label>
-                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-xs"
-                  value={invoiceForm.customer_name} readOnly />
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiUser className="text-pink-600" />
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-2xl p-1 border border-gray-300 text-gray-900 bg-pink-50 text-center text-xs"
+                  value={invoiceForm.customer_name}
+                  readOnly
+                />
               </div>
               <div>
-                <label className="block text-gray-700 font-bold text-xs mb-1">Phone</label>
-                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-xs"
-                  value={invoiceForm.customer_phone} readOnly />
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiPhone className="text-pink-600" />
+                  Phone
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-2xl p-1 border border-gray-300 text-gray-900 bg-pink-50 text-center text-xs"
+                  value={invoiceForm.customer_phone}
+                  readOnly
+                />
               </div>
             </div>
 
             {/* Actual Start/End & Duration */}
             <div className="grid grid-cols-2 gap-3 mb-2">
               <div>
-                <label className="block text-gray-700 font-bold text-xs mb-1">Actual Start</label>
-                <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-800 text-xs select-text">
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiPlayCircle className="text-emerald-500" />
+                  Actual Start
+                </label>
+
+                <div className="bg-pink-50 border border-gray-200 rounded-2xl px-2 py-1 text-gray-800 text-center text-xs select-text">
                   {dayjs.utc(invoiceForm.actual_start_at).format("YYYY-MM-DD HH:mm:ss")}
                 </div>
               </div>
               <div>
-                <label className="block text-gray-700 font-bold text-xs mb-1">Actual End</label>
-                <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-800 text-xs select-text">
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiStopCircle className="text-pink-500" />
+                  Actual End
+                </label>
+
+                <div className="bg-pink-50 border border-gray-200 rounded-2xl px-2 py-1 text-gray-800 text-center text-xs select-text">
                   {invoiceForm.actual_end_at}
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-end mb-2">
-              <span className="text-xs text-gray-700 mr-1">Total Duration:</span>
-              <span className="font-bold text-sm text-emerald-600">
+              <span className="text-xs text-pink-700 mr-1 flex items-center gap-1">
+                <FiClock className="text-pink-700 text-sm" />
+                Service time:
+              </span>
+
+              <span className="font-bold text-xs text-emerald-600">
                 {invoiceForm.total_duration || invoiceForm.total_duration === 0
                   ? (() => {
                     const h = Math.floor(invoiceForm.total_duration / 60);
@@ -414,15 +421,18 @@ export default function SalonDashboard() {
 
             {/* Services (compact) */}
             <div className="mb-2">
-              <label className="block text-gray-700 font-bold text-xs mb-1">Services</label>
+              <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                <MdMiscellaneousServices className="text-pink-600 text-base" />
+                Services
+              </label>
+
               <div className="space-y-1">
                 {invoiceForm.services.map((srv, idx) => (
                   <div key={idx} className="flex gap-2 items-center px-1 py-1 text-xs w-full">
-                    <span className="text-pink-400">✂️</span>
                     <div className="relative flex-1 min-w-0">
                       <input
                         type="text"
-                        className="w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                        className="w-full pl-4 rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-xs"
                         value={srv.name}
                         autoComplete="off"
                         onFocus={() => setServiceDropdownIdx(idx)}
@@ -439,7 +449,7 @@ export default function SalonDashboard() {
                       />
                       {serviceDropdownIdx === idx && serviceNameQuery.length > 0 && (
                         <div
-                          className="absolute z-30 left-0 mt-1 w-44 max-h-32 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-xs"
+                          className="absolute z-30 left-0 mt-1 w-44 max-h-32 overflow-y-auto bg-white border border-gray-300 rounded-xl shadow-lg text-xs"
                           style={{ minWidth: 90 }}
                         >
                           {allServiceNames
@@ -473,7 +483,7 @@ export default function SalonDashboard() {
                       type="number"
                       min={0}
                       step={0.01}
-                      className="w-16 rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs text-right"
+                      className="w-16 rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-xs text-center"
                       value={srv.price}
                       onChange={e => {
                         const services = [...invoiceForm.services];
@@ -506,42 +516,48 @@ export default function SalonDashboard() {
             </div>
 
             {/* Total Amount, Tip, Amount Paid, Change */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-2">
+            <div className="border-t-4 pl-6 border-pink-200 rounded-2xl shadow-2xl px-3 py-2 mb-2">
               <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold text-emerald-700 flex items-center">
-                  <span className="text-sm mr-1">💵</span>Total Amount
+                <span className="font-semibold text-emerald-700 flex items-center gap-2">
+                  <FiDollarSign className="text-emerald-700 text-base" />
+                  Total Amount
                 </span>
+
                 <span className="font-bold text-base text-emerald-700">
                   ${invoiceForm.total_amount ? invoiceForm.total_amount.toFixed(2) : "0.00"}
                 </span>
               </div>
               <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-sm mr-1">🎁</span>Tip
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiGift className="text-yellow-500 text-base" />
+                  Tip
                 </span>
+
                 <div className="relative w-20">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none text-sm">$</span>
                   <input
                     type="number"
                     min={0}
                     step={0.01}
-                    className="pl-5 w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                    className="pl-5 w-full rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-sm"
                     value={invoiceForm.tip || ""}
                     onChange={e => setInvoiceForm(f => ({ ...f, tip: Number(e.target.value) }))}
                   />
                 </div>
               </div>
               <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-sm mr-1">💰</span>Amount Paid
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiCreditCard className="text-pink-400 text-base" />
+                  Amount Paid
                 </span>
+
                 <div className="relative w-20">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none text-sm">$</span>
                   <input
                     type="number"
                     min={0}
                     step={0.01}
-                    className="pl-5 w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                    className="pl-5 w-full rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-sm"
                     value={invoiceForm.amount_paid || ""}
                     onChange={e => {
                       const val = e.target.value;
@@ -561,9 +577,11 @@ export default function SalonDashboard() {
                 </div>
               }
               <div className="flex justify-between items-center mt-1">
-                <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-sm mr-1">🧾</span>Change
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiRepeat className="text-purple-500 text-base" />
+                  Change
                 </span>
+
                 <span className="font-bold text-emerald-700">
                   ${invoiceForm.change ? invoiceForm.change.toFixed(2) : "0.00"}
                 </span>
@@ -572,9 +590,9 @@ export default function SalonDashboard() {
 
             {/* Notes */}
             <div className="mb-2">
-              <label className="block text-gray-700 font-bold text-xs mb-1">Notes</label>
+              <label className="block text-pink-700 font-bold text-sm mb-1">Notes</label>
               <textarea
-                className="w-full rounded border border-gray-300 p-2 text-gray-900 bg-white text-xs"
+                className="w-full rounded-2xl border border-gray-300  p-2 text-gray-900 bg-white text-xs"
                 rows={2}
                 value={invoiceForm.notes}
                 onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
@@ -585,7 +603,7 @@ export default function SalonDashboard() {
 
             <button
               type="submit"
-              className={`w-full mt-2 py-2 rounded-xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
+              className={`w-full mt-2 py-2 rounded-2xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
               disabled={savingInvoice}
             >
               {savingInvoice ? "Saving..." : "Complete & Save Invoice"}
@@ -671,12 +689,12 @@ export default function SalonDashboard() {
 
       <div className="max-w-6xl mx-auto p-2">
 
-        {/* Tổng doanh thu hôm nay + biểu đồ */}
+        {/* Tổng doanh thu hôm nay*/}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1 p-6 flex flex-col items-center">
             <div className="text-5xl font-extrabold text-emerald-500 drop-shadow">${todayRevenue.toLocaleString()}</div>
             <div className="mt-2 text-yellow-600 text-sm">
-              Appointments: {completedToday.length || 0}
+              {completedCountToday} appointment{completedCountToday !== 1 ? "s" : ""}
             </div>
           </div>
         </div>
@@ -725,10 +743,15 @@ export default function SalonDashboard() {
               value={
                 nextClients.length > 0
                   ? dayjs.utc(nextClients[nextClientIndex].appointment_date).format("hh:mm A")
-                  : "No upcoming"
+                  : (
+                    <div className="flex flex-col items-center justify-center text-pink-300 animate-pulse">
+                      <FiSearch className="text-4xl mb-1" />
+                      <span className="text-xs">Searching Client...</span>
+                    </div>
+                  )
               }
               sub={
-                nextClients.length > 0 && (
+                nextClients.length > 0 ? (
                   <div className="flex flex-col gap-2 p-2 rounded-xl w-full">
                     <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
                       <span className="text-pink-300">👤</span>
@@ -746,6 +769,16 @@ export default function SalonDashboard() {
                         </span>
                       </span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                      </svg>
+                      <span className="text-sm text-emerald-200 font-semibold">
+                        {formatTimeUntilNextWithLate(nextClients[nextClientIndex]?.appointment_date)}
+                      </span>
+                    </div>
+
                     {/* Nút Start Service chỉ cho chủ salon, trạng thái confirmed */}
                     {nextClients[nextClientIndex] &&
                       nextClients[nextClientIndex].status === "confirmed" &&
@@ -789,8 +822,27 @@ export default function SalonDashboard() {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-sm text-white/70 p-4">
+                    {/* Animated energy wave bar */}
+                    <div className="flex gap-[4px] items-end h-8 mb-3 overflow-hidden">
+                      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                        <div
+                          key={i}
+                          className="w-[4px] rounded-sm bg-pink-400 animate-rise"
+                          style={{
+                            animationDelay: `${i * 0.1}s`,
+                            animationDuration: `1.2s`
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-yellow-200 mt-1 animate-pulse">No upcoming appointments</span>
+                  </div>
+
                 )
               }
+
             />
           </div>
 
@@ -918,7 +970,7 @@ export default function SalonDashboard() {
                     <div className="flex flex-row gap-4 items-center justify-center w-full">
                       {nowServing.slice(pageStartIndex, pageEndIndex).map((a, idx) => {
                         const emp = getFreelancerInfo(a.stylist_id);
-                        console.log("DEBUG",a);
+                        console.log("DEBUG", a);
                         return (
                           <div key={a.id} className="min-w-[220px] mb-8 border-r-4 border-t-1 border-l-4 border-b-1 border-white/20 rounded-2xl shadow-lg p-4 flex flex-col items-center mx-1">
                             <img src={emp.avatar_url || "/default-avatar.png"} className="w-14 h-14 rounded-full mb-1" alt={emp.name} />

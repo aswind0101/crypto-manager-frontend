@@ -9,6 +9,7 @@ import timezone from "dayjs/plugin/timezone";
 
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import customParseFormat from "dayjs/plugin/customParseFormat";
+import { SERVICES_BY_SPECIALIZATION } from "../../constants/servicesBySpecialization";
 dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
@@ -21,7 +22,11 @@ import {
   FiCalendar,
   FiClock,
   FiUser,
+  FiPhone,
+  FiPlayCircle, FiStopCircle,
+  FiDollarSign, FiGift, FiCreditCard, FiRepeat, FiSearch
 } from "react-icons/fi";
+import { MdMiscellaneousServices } from "react-icons/md";
 
 export default function SalonDashboard() {
   const [user, setUser] = useState(null);
@@ -43,6 +48,26 @@ export default function SalonDashboard() {
   const pageSize = 4;
   const totalPages = Math.ceil(nowServing.length / pageSize);
 
+  const [showInvoicePopup, setShowInvoicePopup] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState(null);
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState("");
+  const [serviceDropdownIdx, setServiceDropdownIdx] = useState(-1);
+  const [serviceNameQuery, setServiceNameQuery] = useState("");
+  const allServiceNames = Array.from(
+    new Set(
+      Object.values(SERVICES_BY_SPECIALIZATION)
+        .flat()
+        .map(name => name.trim())
+        .map(name => name.toLowerCase())
+    )
+  ).map(name =>
+    name
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  )
+
   // Index của khách đầu tiên trên trang hiện tại
   const pageStartIndex = currentNowPage * pageSize;
   const pageEndIndex = pageStartIndex + pageSize;
@@ -59,6 +84,9 @@ export default function SalonDashboard() {
   // Helper: get freelancer info
   const getFreelancerInfo = (id) => freelancers.find(f => f.id === id) || {};
 
+
+  const serviceIntervalRef = useRef({});
+  const [serviceTimers, setServiceTimers] = useState({});
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
@@ -66,68 +94,21 @@ export default function SalonDashboard() {
         return;
       }
       setUser(firebaseUser);
-
-      try {
-        const token = await firebaseUser.getIdToken();
-
-        // Lấy freelancers (staff salon)
-        const resFreelancers = await fetch(`${baseUrl}/api/freelancers/by-salon`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        let freelancersList = [];
-        try {
-          freelancersList = await resFreelancers.json();
-        } catch { }
-        setFreelancers(Array.isArray(freelancersList) ? freelancersList : []);
-
-        // Lấy lịch hẹn hôm nay
-        const todayStr = dayjs().format("YYYY-MM-DD");
-        const resAppt = await fetch(`${baseUrl}/api/appointments/salon?date=${todayStr}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        let appointments = [];
-        try {
-          appointments = await resAppt.json();
-        } catch { }
-        setAppointmentsToday(Array.isArray(appointments) ? appointments : []);
-
-        // Now serving: status=processing
-        setNowServing(appointments.filter(a => a.status === "processing"));
-
-        // Next Client: status=confirmed, chưa started
-        setNextClients(appointments
-          .filter(a => a.status === "confirmed" && !a.started_at)
-          .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date))
-        );
-
-        // Revenue: 7 ngày gần nhất
-        const from = dayjs().subtract(6, "day").format("YYYY-MM-DD");
-        const to = todayStr;
-        const resRev = await fetch(`${baseUrl}/api/appointments/salon/revenue?from=${from}&to=${to}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        let revenueArr = [];
-        try {
-          revenueArr = await resRev.json();
-        } catch { }
-        setRevenueData(Array.isArray(revenueArr) ? revenueArr.map(item => ({
-          ...item,
-          revenue: Number(item.revenue || 0),
-          date: dayjs(item.date, "YYYY-MM-DD HH:mm:ss").format("MM-DD"),
-        })) : []);
-        await fetchData(firebaseUser);
-        setLoading(false);
-      } catch (err) {
-        setError("Failed to load data. Please try again.");
-        setLoading(false);
-      }
+      setLoading(true);
+      await fetchData(firebaseUser);
+      setLoading(false);
     });
+
     return () => unsubscribe();
-    // eslint-disable-next-line
   }, []);
 
-  const serviceIntervalRef = useRef({});
-  const [serviceTimers, setServiceTimers] = useState({});
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      fetchData(user);
+    }, 60000); // 1 phút cập nhật 1 lần
+    return () => clearInterval(interval);
+  }, [user]);
 
   useEffect(() => {
     const inProgress = nowServing.filter(a => a.status === "processing" && a.started_at);
@@ -161,13 +142,34 @@ export default function SalonDashboard() {
     }
   }, []);
 
+
   useEffect(() => {
-    if (!user) return;
-    const interval = setInterval(() => {
-      fetchData(user);
-    }, 60000); // 60000 ms = 1 phút
-    return () => clearInterval(interval);
-  }, [user]);
+    if (!invoiceForm) return;
+    const total = invoiceForm.services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    let totalDuration = 0;
+    if (invoiceForm.actual_start_at && invoiceForm.actual_end_at) {
+      const d1 = dayjs(invoiceForm.actual_start_at, "YYYY-MM-DD HH:mm:ss");
+      const d2 = dayjs(invoiceForm.actual_end_at, "YYYY-MM-DD HH:mm:ss");
+      totalDuration = d2.diff(d1, "minute");
+    }
+    const tip = Number(invoiceForm.tip || 0);
+    const amountPaid = Number(invoiceForm.amount_paid || 0);
+    let change = amountPaid - (total + tip);
+    if (change < 0) change = 0;
+    setInvoiceForm(f => ({
+      ...f,
+      total_amount: total,
+      total_duration: totalDuration,
+      change: change,
+    }));
+    // eslint-disable-next-line
+  }, [
+    invoiceForm?.services,
+    invoiceForm?.actual_start_at,
+    invoiceForm?.actual_end_at,
+    invoiceForm?.tip,
+    invoiceForm?.amount_paid,
+  ]);
 
 
   const handleCompleteAppointment = async (appointmentId) => {
@@ -249,7 +251,34 @@ export default function SalonDashboard() {
       setError("Failed to load data. Please try again.");
     }
   };
-  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
+  function formatTimeUntilNextWithLate(appointmentDate) {
+    if (!appointmentDate) return "";
+    const now = dayjs();
+    const target = dayjs(appointmentDate.replace("Z", ""));
+    let diff = target.diff(now, "second");
+
+    if (diff > 0) {
+      const days = Math.floor(diff / (60 * 60 * 24));
+      diff -= days * 60 * 60 * 24;
+      const hours = Math.floor(diff / (60 * 60));
+      diff -= hours * 60 * 60;
+      const minutes = Math.floor(diff / 60);
+
+      if (days > 0) {
+        return `In ${days}d${hours > 0 ? ` ${hours}h` : ""}`;
+      } else if (hours > 0) {
+        return `In ${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+      } else {
+        return `In ${minutes} minute${minutes !== 1 ? "s" : ""}`;
+      }
+    } else {
+      // Quá giờ, đang trễ
+      const lateMinutes = Math.abs(target.diff(now, "minute"));
+      return `🔴 Late ${lateMinutes} min`;
+    }
+  }
+  const completedCountToday = appointmentsToday?.filter(a => a.status === "completed").length || 0;
+
   // Tổng tiền doanh thu hôm nay
   const todayRevenue = appointmentsToday.filter(a => a.status === "completed")
     .reduce((sum, a) => sum + (a.services?.reduce((s, srv) => s + (srv.price || 0), 0) || 0), 0);
@@ -260,6 +289,329 @@ export default function SalonDashboard() {
   return (
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
+      {showInvoicePopup && invoiceForm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <form
+            className="bg-gradient-to-r from-emerald-100 via-yellow-50 to-pink-50 backdrop-blur-xl
+ rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-t-4 border-pink-400 text-gray-800"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const totalDue = invoiceForm.total_amount + (invoiceForm.tip || 0);
+              if (
+                invoiceForm.amount_paid === null ||
+                invoiceForm.amount_paid === undefined ||
+                invoiceForm.amount_paid === "" ||
+                invoiceForm.amount_paid < totalDue
+              ) {
+                setSaveInvoiceError("Customer has not paid enough!");
+                return;
+              }
+              setSavingInvoice(true);
+              setSaveInvoiceError("");
+              try {
+                const token = await user.getIdToken();
+                const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointment-invoices", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    ...invoiceForm,
+                    tip: invoiceForm.tip,
+                    amount_paid: invoiceForm.amount_paid,
+                    change: invoiceForm.change,
+                  }),
+                });
+                if (!res.ok) {
+                  const data = await res.json();
+                  setSaveInvoiceError(data.error || "Failed to save invoice.");
+                  setSavingInvoice(false);
+                  return;
+                }
+                setShowInvoicePopup(false);
+                setSavingInvoice(false);
+                // Reload lại appointmentsToday và nowServing
+                await fetchData(user);
+              } catch (err) {
+                setSaveInvoiceError("Network error. Please try again.");
+                setSavingInvoice(false);
+              }
+            }}
+          >
+            <button
+              type="button"
+              className="absolute top-2 right-3 text-pink-400 text-xl font-bold"
+              onClick={() => setShowInvoicePopup(false)}
+              aria-label="Close"
+              disabled={savingInvoice}
+            >
+              ×
+            </button>
+            <h2 className="text-xl font-bold text-emerald-600 mb-4 text-center">Appointment Invoice</h2>
+
+            {/* Customer info */}
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <div>
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiUser className="text-pink-600" />
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-2xl p-1 border border-gray-300 text-gray-900 bg-pink-50 text-center text-xs"
+                  value={invoiceForm.customer_name}
+                  readOnly
+                />
+              </div>
+              <div>
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiPhone className="text-pink-600" />
+                  Phone
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-2xl p-1 border border-gray-300 text-gray-900 bg-pink-50 text-center text-xs"
+                  value={invoiceForm.customer_phone}
+                  readOnly
+                />
+              </div>
+            </div>
+
+            {/* Actual Start/End & Duration */}
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <div>
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiPlayCircle className="text-emerald-500" />
+                  Actual Start
+                </label>
+
+                <div className="bg-pink-50 border border-gray-200 rounded-2xl px-2 py-1 text-gray-800 text-center text-xs select-text">
+                  {dayjs.utc(invoiceForm.actual_start_at).format("YYYY-MM-DD HH:mm:ss")}
+                </div>
+              </div>
+              <div>
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiStopCircle className="text-pink-500" />
+                  Actual End
+                </label>
+
+                <div className="bg-pink-50 border border-gray-200 rounded-2xl px-2 py-1 text-gray-800 text-center text-xs select-text">
+                  {invoiceForm.actual_end_at}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end mb-2">
+              <span className="text-xs text-pink-700 mr-1 flex items-center gap-1">
+                <FiClock className="text-pink-700 text-sm" />
+                Service time:
+              </span>
+
+              <span className="font-bold text-xs text-emerald-600">
+                {invoiceForm.total_duration || invoiceForm.total_duration === 0
+                  ? (() => {
+                    const h = Math.floor(invoiceForm.total_duration / 60);
+                    const m = invoiceForm.total_duration % 60;
+                    if (h > 0) return `${h}h ${m}min`;
+                    return `${m}min`;
+                  })()
+                  : "--"}
+              </span>
+            </div>
+
+            {/* Services (compact) */}
+            <div className="mb-2">
+              <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                <MdMiscellaneousServices className="text-pink-600 text-base" />
+                Services
+              </label>
+
+              <div className="space-y-1">
+                {invoiceForm.services.map((srv, idx) => (
+                  <div key={idx} className="flex gap-2 items-center px-1 py-1 text-xs w-full">
+                    <div className="relative flex-1 min-w-0">
+                      <input
+                        type="text"
+                        className="w-full pl-4 rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                        value={srv.name}
+                        autoComplete="off"
+                        onFocus={() => setServiceDropdownIdx(idx)}
+                        onBlur={() => setTimeout(() => setServiceDropdownIdx(-1), 200)}
+                        onChange={e => {
+                          const value = e.target.value;
+                          const services = [...invoiceForm.services];
+                          services[idx].name = value;
+                          setInvoiceForm(f => ({ ...f, services }));
+                          setServiceNameQuery(value);
+                          setServiceDropdownIdx(idx);
+                        }}
+                        required
+                      />
+                      {serviceDropdownIdx === idx && serviceNameQuery.length > 0 && (
+                        <div
+                          className="absolute z-30 left-0 mt-1 w-44 max-h-32 overflow-y-auto bg-white border border-gray-300 rounded-xl shadow-lg text-xs"
+                          style={{ minWidth: 90 }}
+                        >
+                          {allServiceNames
+                            .filter(name => name.toLowerCase().includes(serviceNameQuery.toLowerCase()))
+                            .slice(0, 15)
+                            .map(name => (
+                              <div
+                                key={name}
+                                className="px-2 py-1 hover:bg-emerald-100 cursor-pointer text-gray-900"
+                                onMouseDown={() => {
+                                  const services = [...invoiceForm.services];
+                                  services[idx].name = name;
+                                  setInvoiceForm(f => ({ ...f, services }));
+                                  setServiceDropdownIdx(-1);
+                                }}
+                              >
+                                {name}
+                              </div>
+                            ))}
+                          {allServiceNames.filter(name =>
+                            name.toLowerCase().includes(serviceNameQuery.toLowerCase())
+                          ).length === 0 && (
+                              <div className="px-2 py-1 text-gray-400 italic">No match</div>
+                            )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Price */}
+                    <span className="text-yellow-600" title="Price">💵</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      className="w-16 rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-xs text-center"
+                      value={srv.price}
+                      onChange={e => {
+                        const services = [...invoiceForm.services];
+                        services[idx].price = Number(e.target.value);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="text-red-500 text-lg ml-1"
+                      onClick={() => {
+                        const services = invoiceForm.services.filter((_, i) => i !== idx);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      disabled={invoiceForm.services.length === 1}
+                      title="Remove service"
+                    >×</button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold underline mt-1"
+                  onClick={() => setInvoiceForm(f => ({
+                    ...f,
+                    services: [...f.services, { name: "", price: 0 }]
+                  }))}
+                >+ Add Service</button>
+              </div>
+            </div>
+
+            {/* Total Amount, Tip, Amount Paid, Change */}
+            <div className="border-t-4 pl-6 border-pink-200 rounded-2xl shadow-2xl px-3 py-2 mb-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-emerald-700 flex items-center gap-2">
+                  <FiDollarSign className="text-emerald-700 text-base" />
+                  Total Amount
+                </span>
+
+                <span className="font-bold text-base text-emerald-700">
+                  ${invoiceForm.total_amount ? invoiceForm.total_amount.toFixed(2) : "0.00"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiGift className="text-yellow-500 text-base" />
+                  Tip
+                </span>
+
+                <div className="relative w-20">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none text-sm">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="pl-5 w-full rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-sm"
+                    value={invoiceForm.tip || ""}
+                    onChange={e => setInvoiceForm(f => ({ ...f, tip: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiCreditCard className="text-pink-400 text-base" />
+                  Amount Paid
+                </span>
+
+                <div className="relative w-20">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none text-sm">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="pl-5 w-full rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-sm"
+                    value={invoiceForm.amount_paid || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setInvoiceForm(f => ({
+                        ...f,
+                        amount_paid: val === "" ? null : Number(val)
+                      }));
+                      setSaveInvoiceError("");
+                    }}
+                  />
+                </div>
+              </div>
+              {typeof invoiceForm.amount_paid === "number" &&
+                invoiceForm.amount_paid < invoiceForm.total_amount + (invoiceForm.tip || 0) &&
+                <div className="text-red-500 text-xs text-right mb-1">
+                  Customer has not paid enough!
+                </div>
+              }
+              <div className="flex justify-between items-center mt-1">
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiRepeat className="text-purple-500 text-base" />
+                  Change
+                </span>
+
+                <span className="font-bold text-emerald-700">
+                  ${invoiceForm.change ? invoiceForm.change.toFixed(2) : "0.00"}
+                </span>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="mb-2">
+              <label className="block text-pink-700 font-bold text-sm mb-1">Notes</label>
+              <textarea
+                className="w-full rounded-2xl border border-gray-300  p-2 text-gray-900 bg-white text-xs"
+                rows={2}
+                value={invoiceForm.notes}
+                onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            {/* Error */}
+            {saveInvoiceError && <div className="text-red-500 mb-2">{saveInvoiceError}</div>}
+
+            <button
+              type="submit"
+              className={`w-full mt-2 py-2 rounded-2xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
+              disabled={savingInvoice}
+            >
+              {savingInvoice ? "Saving..." : "Complete & Save Invoice"}
+            </button>
+          </form>
+        </div>
+      )}
+
       {showStartPopup && startTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full relative animate-fade-in">
@@ -337,20 +689,21 @@ export default function SalonDashboard() {
 
       <div className="max-w-6xl mx-auto p-2">
 
-        {/* Tổng doanh thu hôm nay + biểu đồ */}
+        {/* Tổng doanh thu hôm nay*/}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1 p-6 flex flex-col items-center">
             <div className="text-5xl font-extrabold text-emerald-500 drop-shadow">${todayRevenue.toLocaleString()}</div>
             <div className="mt-2 text-yellow-600 text-sm">
-              Appointments: {completedToday.length || 0}
+              {completedCountToday} appointment{completedCountToday !== 1 ? "s" : ""}
             </div>
           </div>
         </div>
 
         {/* Appointments & Next Client: nằm cùng dòng trên desktop */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2 items-stretch">
           {/* Appointments Card */}
           <Card
+            className="h-full flex flex-col"
             icon={<FiCalendar />}
             title="Appointments"
             value={
@@ -372,11 +725,11 @@ export default function SalonDashboard() {
             {nextClients.length > 0 && (
               <div
                 className="
-        absolute top-4 right-4 z-20
-        bg-emerald-400/90 text-emerald-900 font-bold text-sm 
-        px-4 py-1 rounded-full shadow-xl border-2 border-white
-        whitespace-nowrap
-      "
+              absolute top-4 right-4 z-20
+              bg-emerald-400/90 text-emerald-900 font-bold text-sm 
+              px-4 py-1 rounded-full shadow-xl border-2 border-white
+              whitespace-nowrap
+            "
                 style={{ minWidth: 90, textAlign: 'center' }}
               >
                 {getFreelancerInfo(nextClients[nextClientIndex].stylist_id).name || "Staff"}
@@ -384,15 +737,21 @@ export default function SalonDashboard() {
             )}
             {/* Next Client Card */}
             <Card
+              className="h-full flex flex-col"
               icon={<FiClock />}
               title="Next Client"
               value={
                 nextClients.length > 0
                   ? dayjs.utc(nextClients[nextClientIndex].appointment_date).format("hh:mm A")
-                  : "No upcoming"
+                  : (
+                    <div className="flex flex-col items-center justify-center text-pink-300 animate-pulse">
+                      <FiSearch className="text-4xl mb-1" />
+                      <span className="text-xs">Searching Client...</span>
+                    </div>
+                  )
               }
               sub={
-                nextClients.length > 0 && (
+                nextClients.length > 0 ? (
                   <div className="flex flex-col gap-2 p-2 rounded-xl w-full">
                     <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
                       <span className="text-pink-300">👤</span>
@@ -410,6 +769,16 @@ export default function SalonDashboard() {
                         </span>
                       </span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                      </svg>
+                      <span className="text-sm text-emerald-200 font-semibold">
+                        {formatTimeUntilNextWithLate(nextClients[nextClientIndex]?.appointment_date)}
+                      </span>
+                    </div>
+
                     {/* Nút Start Service chỉ cho chủ salon, trạng thái confirmed */}
                     {nextClients[nextClientIndex] &&
                       nextClients[nextClientIndex].status === "confirmed" &&
@@ -453,15 +822,34 @@ export default function SalonDashboard() {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-sm text-white/70 p-4">
+                    {/* Animated energy wave bar */}
+                    <div className="flex gap-[4px] items-end h-8 mb-3 overflow-hidden">
+                      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                        <div
+                          key={i}
+                          className="w-[4px] rounded-sm bg-pink-400 animate-rise"
+                          style={{
+                            animationDelay: `${i * 0.1}s`,
+                            animationDuration: `1.2s`
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-yellow-200 mt-1 animate-pulse">No upcoming appointments</span>
+                  </div>
+
                 )
               }
+
             />
           </div>
 
         </div>
 
         {/* Now Serving Card */}
-        <div className="mt-4 mb-8">
+        <div className="mt-4 mb-4">
           <Card
             icon={<FiUser />}
             title={
@@ -493,10 +881,10 @@ export default function SalonDashboard() {
                         Start: {nowServing[currentNowSlide]?.started_at ? dayjs(nowServing[currentNowSlide]?.started_at, "YYYY-MM-DD HH:mm:ss").format("hh:mm A") : "--"}
                       </div>
                       <div className="text-sm text-pink-200 mb-1">
-                        Client: {nowServing[currentNowSlide]?.customer_name || "--"}
+                        {nowServing[currentNowSlide]?.customer_name || "--"}
                       </div>
                       <div className="text-sm text-emerald-300 mb-1">
-                        Services: {nowServing[currentNowSlide]?.services?.map(s => s.name).join(", ")}
+                        {nowServing[currentNowSlide]?.services?.map(s => s.name).join(", ")}
                       </div>
                       <div className="text-sm text-emerald-400 mb-2 font-mono flex items-center justify-center gap-2">
                         <AlarmClock className="w-6 h-6 text-yellow-400 animate-spin-fast drop-shadow-lg " />
@@ -507,7 +895,38 @@ export default function SalonDashboard() {
                           ${processingApptId === nowServing[currentNowSlide]?.id ? "opacity-60 cursor-not-allowed" : ""}
                         `}
                         disabled={processingApptId === nowServing[currentNowSlide]?.id}
-                        onClick={() => handleCompleteAppointment(nowServing[currentNowSlide]?.id)}
+                        onClick={() => {
+                          const appt = nowServing[currentNowSlide];
+                          console.log(appt);
+                          console.log("stylist_id:", appt.stylist_id, typeof appt.stylist_id);
+                          setInvoiceForm({
+                            appointment_id: appt.id,
+                            customer_name: appt.customer_name,
+                            customer_phone: appt.customer_phone,
+                            stylist_id: appt.stylist_id,
+                            stylist_name: getFreelancerInfo(appt.stylist_id).name || "Staff",
+                            salon_id: appt.salon_id,
+                            services: appt.services.map(s => ({
+                              id: s.id,
+                              name: s.name,
+                              price: s.price,
+                              duration: s.duration || s.duration_minutes,
+                              quantity: 1,
+                            })),
+                            total_amount: appt.services.reduce((sum, s) => sum + (s.price || 0), 0),
+                            total_duration: Math.round(
+                              dayjs().diff(dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss"), "minute")
+                            ),
+                            actual_start_at: appt.started_at,
+                            actual_end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                            notes: appt.note || "",
+                            tip: 0,
+                            amount_paid: null,
+                            change: 0,
+                          });
+                          setShowInvoicePopup(true);
+                        }}
+
                       >
                         {processingApptId === nowServing[currentNowSlide]?.id ? (
                           <>
@@ -551,16 +970,17 @@ export default function SalonDashboard() {
                     <div className="flex flex-row gap-4 items-center justify-center w-full">
                       {nowServing.slice(pageStartIndex, pageEndIndex).map((a, idx) => {
                         const emp = getFreelancerInfo(a.stylist_id);
+                        console.log("DEBUG", a);
                         return (
-                          <div key={a.id} className="min-w-[220px] border-t-1 border-pink-400 rounded-2xl shadow-lg p-4 flex flex-col items-center mx-1">
+                          <div key={a.id} className="min-w-[220px] mb-8 border-r-4 border-t-1 border-l-4 border-b-1 border-white/20 rounded-2xl shadow-lg p-4 flex flex-col items-center mx-1">
                             <img src={emp.avatar_url || "/default-avatar.png"} className="w-14 h-14 rounded-full mb-1" alt={emp.name} />
                             <div className="font-bold text-base text-emerald-100">{emp.name || "Staff"}</div>
                             <div className="text-xs text-yellow-400">
                               Start: {a.started_at ? dayjs(a.started_at, "YYYY-MM-DD HH:mm:ss").format("hh:mm A") : "--"}
                             </div>
-                            <div className="text-xs text-pink-200">Client: {a.customer_name || "Customer"}</div>
+                            <div className="text-xs text-pink-200">{a.customer_name || "Customer"}</div>
                             <div className="text-xs text-emerald-300 mb-1">
-                              Services: {a.services?.map(s => s.name).join(", ")}
+                              {a.services?.map(s => s.name).join(", ")}
                             </div>
                             <div className="text-sm text-emerald-400 mb-2 font-mono flex items-center justify-center gap-2">
                               <AlarmClock className="w-6 h-6 text-yellow-400 animate-spin-fast drop-shadow-lg " />
@@ -579,7 +999,36 @@ export default function SalonDashboard() {
                               ${processingApptId === a.id ? "opacity-60 cursor-not-allowed" : ""}
                             `}
                               disabled={processingApptId === a.id}
-                              onClick={() => handleCompleteAppointment(a.id)}
+                              onClick={() => {
+                                // Lấy appointment đang phục vụ (a)
+                                setInvoiceForm({
+                                  appointment_id: a.id,
+                                  customer_name: a.customer_name,
+                                  customer_phone: a.customer_phone,
+                                  stylist_id: a.stylist_id,
+                                  stylist_name: getFreelancerInfo(a.stylist_id).name || "Staff",
+                                  salon_id: a.salon_id,
+                                  services: a.services.map(s => ({
+                                    id: s.id,
+                                    name: s.name,
+                                    price: s.price,
+                                    duration: s.duration || s.duration_minutes,
+                                    quantity: 1,
+                                  })),
+                                  total_amount: a.services.reduce((sum, s) => sum + (s.price || 0), 0),
+                                  total_duration: Math.round(
+                                    (dayjs().diff(dayjs(a.started_at, "YYYY-MM-DD HH:mm:ss"), "minute"))
+                                  ),
+                                  actual_start_at: a.started_at,
+                                  actual_end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                                  notes: a.note || "",
+                                  tip: 0,
+                                  amount_paid: null,
+                                  change: 0,
+                                });
+                                setShowInvoicePopup(true);
+                              }}
+
                             >
                               {processingApptId === a.id ? (
                                 <>

@@ -11,10 +11,57 @@
     --foreground: #ededed;
   }
 }
+
 @media (max-width: 640px) {
   .glass-salon {
     padding: 1.5rem !important;
   }
+}
+
+@keyframes wave {
+
+  0%,
+  100% {
+    height: 10%;
+  }
+
+  50% {
+    height: 100%;
+  }
+}
+
+@keyframes rise {
+  0% {
+    height: 10%;
+    opacity: 0.5;
+  }
+
+  40% {
+    height: 100%;
+    opacity: 1;
+  }
+
+  80% {
+    height: 10%;
+    opacity: 0.5;
+  }
+
+  100% {
+    height: 10%;
+    opacity: 0.5;
+  }
+}
+
+.animate-rise {
+  animation-name: rise;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.animate-wave {
+  animation-name: wave;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
 }
 
 /* 📅 Đổi màu icon date picker */
@@ -25,15 +72,18 @@
     cursor: pointer;
   }
 }
+
 @keyframes border-rotate {
   to {
     --angle: 1turn;
   }
 }
+
 .animated-border {
   position: relative;
   z-index: 0;
 }
+
 .animated-border::before {
   content: "";
   position: absolute;
@@ -41,10 +91,8 @@
   z-index: -1;
   border-radius: 1rem;
   padding: 0;
-  background: conic-gradient(
-    from var(--angle, 0deg),
-    #f472b6, #fde68a, #6ee7b7, #f472b6
-  );
+  background: conic-gradient(from var(--angle, 0deg),
+      #f472b6, #fde68a, #6ee7b7, #f472b6);
   animation: border-rotate 1.8s linear infinite;
   --angle: 0deg;
   -webkit-mask:
@@ -59,16 +107,27 @@
 
 
 @keyframes spin-slow {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
+
 .animate-spin-slow {
   animation: spin-slow 8s linear infinite;
 }
 
 @keyframes progressSlide {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
 }
 
 @keyframes slideUpFadeIn {
@@ -76,10 +135,12 @@
     transform: translateY(40px) scale(0.95);
     opacity: 0;
   }
+
   60% {
     transform: translateY(-4px) scale(1.02);
     opacity: 1;
   }
+
   100% {
     transform: translateY(0) scale(1);
     opacity: 1;
@@ -101,32 +162,49 @@
     transform: translateY(0) scale(1);
   }
 }
+
 @keyframes shimmer {
-  0% { background-position: -100% 0; }
-  100% { background-position: 100% 0; }
+  0% {
+    background-position: -100% 0;
+  }
+
+  100% {
+    background-position: 100% 0;
+  }
 }
+
 .animate-shimmer {
-  background: linear-gradient(
-    120deg,
-    rgba(255,255,255,0.2) 0%,
-    rgba(255,255,255,0.4) 50%,
-    rgba(255,255,255,0.2) 100%
-  );
+  background: linear-gradient(120deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      rgba(255, 255, 255, 0.2) 100%);
   background-size: 200% 100%;
   animation: shimmer 3s linear infinite;
 }
 
 @keyframes bounce-in {
-  0% { transform: scale(0.8); opacity: 0; }
-  60% { transform: scale(1.1); opacity: 1; }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
+
 .animate-bounce-in {
   animation: bounce-in 0.5s ease-out;
 }
 
 input[type="checkbox"]:checked {
-  accent-color: #059669; /* emerald-600 */
+  accent-color: #059669;
+  /* emerald-600 */
 }
 
 .animate-fade-in {
@@ -175,9 +253,11 @@ input[type="checkbox"]:checked {
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
+
 .transform-style-3d {
   transform-style: preserve-3d;
 }
+
 .transform-style-preserve-3d {
   transform-style: preserve-3d;
 }
@@ -191,6 +271,7 @@ body {
 .spa-shadow {
   box-shadow: 0 6px 28px rgba(255, 192, 203, 0.15), 0 8px 16px rgba(16, 185, 129, 0.1);
 }
+
 .card-animate-in {
   animation: slideUpFadeIn 0.6s ease-out;
 }
@@ -200,18 +281,29 @@ body {
   touch-action: pan-y;
   overscroll-behavior: contain;
 }
+
 @keyframes revealScroll {
-  from { opacity: 0.5; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0.5;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 .reveal-anim {
   animation: revealScroll 0.4s ease-out;
 }
+
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
   opacity: 1;
   cursor: pointer;
 }
+
 .scroll-services-mobile {
   max-height: 120px;
   overflow-y: auto !important;
@@ -221,10 +313,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   scrollbar-width: thin;
   scrollbar-color: #f472b6 #18181b;
 }
+
 .glass-card {
-  background: rgba(255,255,255,0.14);
+  background: rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(18px);
-  border: 1px solid rgba(255,255,255,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 @layer utilities {
@@ -238,5 +331,3 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     animation: spin 2s linear infinite;
   }
 }
-
-
