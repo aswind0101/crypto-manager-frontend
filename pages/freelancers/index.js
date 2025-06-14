@@ -741,8 +741,22 @@ export default function FreelancerDashboard() {
                 }
                 setShowInvoicePopup(false);
                 setSavingInvoice(false);
-                // Optionally: reload data, show success toast, etc.
-                await fetchData(user); // hoặc reload appointment list
+
+                // Reload toàn bộ appointment list, cập nhật lại các state!
+                await loadAppointments(
+                  token,
+                  setAppointments,
+                  setAppointmentsToday,
+                  setConfirmedNextClient,
+                  setPendingUpcomingAppointment,
+                  setTimeUntilNext,
+                  setShowPopup,
+                  setNewAppointment,
+                  soundRef,
+                  soundLoopRef,
+                  setUpcomingAppointments,
+                  setNextClientIndex
+                );
               } catch (err) {
                 setSaveInvoiceError("Network error. Please try again.");
                 setSavingInvoice(false);
@@ -927,7 +941,7 @@ export default function FreelancerDashboard() {
                 <input type="text" className="w-40 rounded border border-gray-200 p-1 bg-gray-100 text-gray-900"
                   value={
                     invoiceForm.actual_start_at
-                      ? dayjs.utc(invoiceForm.actual_start_at).format("HH:mm:ss")
+                      ? dayjs.utc(invoiceForm.actual_start_at).format("YYYY-MM-DD HH:mm:ss")
                       : ""
                   }
                   readOnly />
@@ -1597,7 +1611,7 @@ export default function FreelancerDashboard() {
                           (dayjs().diff(dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss"), "minute"))
                         ),
                         actual_start_at: appt.started_at,
-                        actual_end_at: dayjs().format("HH:mm:ss"),
+                        actual_end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
                         notes: appt.note || "",
                       });
                       setShowInvoicePopup(true);
