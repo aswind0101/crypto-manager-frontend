@@ -682,9 +682,10 @@ export default function SalonDashboard() {
         </div>
 
         {/* Appointments & Next Client: nằm cùng dòng trên desktop */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2 items-stretch">
           {/* Appointments Card */}
           <Card
+            className="h-full flex flex-col"
             icon={<FiCalendar />}
             title="Appointments"
             value={
@@ -706,11 +707,11 @@ export default function SalonDashboard() {
             {nextClients.length > 0 && (
               <div
                 className="
-        absolute top-4 right-4 z-20
-        bg-emerald-400/90 text-emerald-900 font-bold text-sm 
-        px-4 py-1 rounded-full shadow-xl border-2 border-white
-        whitespace-nowrap
-      "
+              absolute top-4 right-4 z-20
+              bg-emerald-400/90 text-emerald-900 font-bold text-sm 
+              px-4 py-1 rounded-full shadow-xl border-2 border-white
+              whitespace-nowrap
+            "
                 style={{ minWidth: 90, textAlign: 'center' }}
               >
                 {getFreelancerInfo(nextClients[nextClientIndex].stylist_id).name || "Staff"}
@@ -718,6 +719,7 @@ export default function SalonDashboard() {
             )}
             {/* Next Client Card */}
             <Card
+              className="h-full flex flex-col"
               icon={<FiClock />}
               title="Next Client"
               value={
@@ -795,7 +797,7 @@ export default function SalonDashboard() {
         </div>
 
         {/* Now Serving Card */}
-        <div className="mt-4 mb-8">
+        <div className="mt-4 mb-4">
           <Card
             icon={<FiUser />}
             title={
@@ -827,10 +829,10 @@ export default function SalonDashboard() {
                         Start: {nowServing[currentNowSlide]?.started_at ? dayjs(nowServing[currentNowSlide]?.started_at, "YYYY-MM-DD HH:mm:ss").format("hh:mm A") : "--"}
                       </div>
                       <div className="text-sm text-pink-200 mb-1">
-                        Client: {nowServing[currentNowSlide]?.customer_name || "--"}
+                        {nowServing[currentNowSlide]?.customer_name || "--"}
                       </div>
                       <div className="text-sm text-emerald-300 mb-1">
-                        Services: {nowServing[currentNowSlide]?.services?.map(s => s.name).join(", ")}
+                        {nowServing[currentNowSlide]?.services?.map(s => s.name).join(", ")}
                       </div>
                       <div className="text-sm text-emerald-400 mb-2 font-mono flex items-center justify-center gap-2">
                         <AlarmClock className="w-6 h-6 text-yellow-400 animate-spin-fast drop-shadow-lg " />
@@ -843,6 +845,8 @@ export default function SalonDashboard() {
                         disabled={processingApptId === nowServing[currentNowSlide]?.id}
                         onClick={() => {
                           const appt = nowServing[currentNowSlide];
+                          console.log(appt);
+                          console.log("stylist_id:", appt.stylist_id, typeof appt.stylist_id);
                           setInvoiceForm({
                             appointment_id: appt.id,
                             customer_name: appt.customer_name,
@@ -914,6 +918,7 @@ export default function SalonDashboard() {
                     <div className="flex flex-row gap-4 items-center justify-center w-full">
                       {nowServing.slice(pageStartIndex, pageEndIndex).map((a, idx) => {
                         const emp = getFreelancerInfo(a.stylist_id);
+                        console.log("DEBUG",a);
                         return (
                           <div key={a.id} className="min-w-[220px] border-t-1 border-pink-400 rounded-2xl shadow-lg p-4 flex flex-col items-center mx-1">
                             <img src={emp.avatar_url || "/default-avatar.png"} className="w-14 h-14 rounded-full mb-1" alt={emp.name} />
@@ -921,9 +926,9 @@ export default function SalonDashboard() {
                             <div className="text-xs text-yellow-400">
                               Start: {a.started_at ? dayjs(a.started_at, "YYYY-MM-DD HH:mm:ss").format("hh:mm A") : "--"}
                             </div>
-                            <div className="text-xs text-pink-200">Client: {a.customer_name || "Customer"}</div>
+                            <div className="text-xs text-pink-200">{a.customer_name || "Customer"}</div>
                             <div className="text-xs text-emerald-300 mb-1">
-                              Services: {a.services?.map(s => s.name).join(", ")}
+                              {a.services?.map(s => s.name).join(", ")}
                             </div>
                             <div className="text-sm text-emerald-400 mb-2 font-mono flex items-center justify-center gap-2">
                               <AlarmClock className="w-6 h-6 text-yellow-400 animate-spin-fast drop-shadow-lg " />
@@ -942,7 +947,36 @@ export default function SalonDashboard() {
                               ${processingApptId === a.id ? "opacity-60 cursor-not-allowed" : ""}
                             `}
                               disabled={processingApptId === a.id}
-                              onClick={() => handleCompleteAppointment(a.id)}
+                              onClick={() => {
+                                // Lấy appointment đang phục vụ (a)
+                                setInvoiceForm({
+                                  appointment_id: a.id,
+                                  customer_name: a.customer_name,
+                                  customer_phone: a.customer_phone,
+                                  stylist_id: a.stylist_id,
+                                  stylist_name: getFreelancerInfo(a.stylist_id).name || "Staff",
+                                  salon_id: a.salon_id,
+                                  services: a.services.map(s => ({
+                                    id: s.id,
+                                    name: s.name,
+                                    price: s.price,
+                                    duration: s.duration || s.duration_minutes,
+                                    quantity: 1,
+                                  })),
+                                  total_amount: a.services.reduce((sum, s) => sum + (s.price || 0), 0),
+                                  total_duration: Math.round(
+                                    (dayjs().diff(dayjs(a.started_at, "YYYY-MM-DD HH:mm:ss"), "minute"))
+                                  ),
+                                  actual_start_at: a.started_at,
+                                  actual_end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                                  notes: a.note || "",
+                                  tip: 0,
+                                  amount_paid: null,
+                                  change: 0,
+                                });
+                                setShowInvoicePopup(true);
+                              }}
+
                             >
                               {processingApptId === a.id ? (
                                 <>
