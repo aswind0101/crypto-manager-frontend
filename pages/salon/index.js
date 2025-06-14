@@ -9,6 +9,7 @@ import timezone from "dayjs/plugin/timezone";
 
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import customParseFormat from "dayjs/plugin/customParseFormat";
+import { SERVICES_BY_SPECIALIZATION } from "../../constants/servicesBySpecialization";
 dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
@@ -42,6 +43,26 @@ export default function SalonDashboard() {
   const [currentNowPage, setCurrentNowPage] = useState(0);
   const pageSize = 4;
   const totalPages = Math.ceil(nowServing.length / pageSize);
+
+  const [showInvoicePopup, setShowInvoicePopup] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState(null);
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState("");
+  const [serviceDropdownIdx, setServiceDropdownIdx] = useState(-1);
+  const [serviceNameQuery, setServiceNameQuery] = useState("");
+  const allServiceNames = Array.from(
+    new Set(
+      Object.values(SERVICES_BY_SPECIALIZATION)
+        .flat()
+        .map(name => name.trim())
+        .map(name => name.toLowerCase())
+    )
+  ).map(name =>
+    name
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  )
 
   // Index của khách đầu tiên trên trang hiện tại
   const pageStartIndex = currentNowPage * pageSize;
@@ -169,6 +190,34 @@ export default function SalonDashboard() {
     return () => clearInterval(interval);
   }, [user]);
 
+  useEffect(() => {
+    if (!invoiceForm) return;
+    const total = invoiceForm.services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    let totalDuration = 0;
+    if (invoiceForm.actual_start_at && invoiceForm.actual_end_at) {
+      const d1 = dayjs(invoiceForm.actual_start_at, "YYYY-MM-DD HH:mm:ss");
+      const d2 = dayjs(invoiceForm.actual_end_at, "YYYY-MM-DD HH:mm:ss");
+      totalDuration = d2.diff(d1, "minute");
+    }
+    const tip = Number(invoiceForm.tip || 0);
+    const amountPaid = Number(invoiceForm.amount_paid || 0);
+    let change = amountPaid - (total + tip);
+    if (change < 0) change = 0;
+    setInvoiceForm(f => ({
+      ...f,
+      total_amount: total,
+      total_duration: totalDuration,
+      change: change,
+    }));
+    // eslint-disable-next-line
+  }, [
+    invoiceForm?.services,
+    invoiceForm?.actual_start_at,
+    invoiceForm?.actual_end_at,
+    invoiceForm?.tip,
+    invoiceForm?.amount_paid,
+  ]);
+
 
   const handleCompleteAppointment = async (appointmentId) => {
     setProcessingApptId(appointmentId);
@@ -260,6 +309,291 @@ export default function SalonDashboard() {
   return (
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
+      {showInvoicePopup && invoiceForm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <form
+            className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-4 border-emerald-400 text-gray-800"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const totalDue = invoiceForm.total_amount + (invoiceForm.tip || 0);
+              if (
+                invoiceForm.amount_paid === null ||
+                invoiceForm.amount_paid === undefined ||
+                invoiceForm.amount_paid === "" ||
+                invoiceForm.amount_paid < totalDue
+              ) {
+                setSaveInvoiceError("Customer has not paid enough!");
+                return;
+              }
+              setSavingInvoice(true);
+              setSaveInvoiceError("");
+              try {
+                const token = await user.getIdToken();
+                const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointment-invoices", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    ...invoiceForm,
+                    tip: invoiceForm.tip,
+                    amount_paid: invoiceForm.amount_paid,
+                    change: invoiceForm.change,
+                  }),
+                });
+                if (!res.ok) {
+                  const data = await res.json();
+                  setSaveInvoiceError(data.error || "Failed to save invoice.");
+                  setSavingInvoice(false);
+                  return;
+                }
+                setShowInvoicePopup(false);
+                setSavingInvoice(false);
+                // Reload lại appointmentsToday và nowServing
+                await fetchData(user);
+              } catch (err) {
+                setSaveInvoiceError("Network error. Please try again.");
+                setSavingInvoice(false);
+              }
+            }}
+          >
+            <button
+              type="button"
+              className="absolute top-2 right-3 text-pink-400 text-xl font-bold"
+              onClick={() => setShowInvoicePopup(false)}
+              aria-label="Close"
+              disabled={savingInvoice}
+            >
+              ×
+            </button>
+            <h2 className="text-xl font-bold text-emerald-600 mb-4 text-center">Appointment Invoice</h2>
+
+            {/* Customer info */}
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <div>
+                <label className="block text-gray-700 font-bold text-xs mb-1">Customer Name</label>
+                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-sm"
+                  value={invoiceForm.customer_name} readOnly />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold text-xs mb-1">Phone</label>
+                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-sm"
+                  value={invoiceForm.customer_phone} readOnly />
+              </div>
+            </div>
+
+            {/* Actual Start/End & Duration */}
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <div>
+                <label className="block text-gray-700 font-bold text-xs mb-1">Actual Start</label>
+                <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-800 text-xs select-text">
+                  {dayjs.utc(invoiceForm.actual_start_at).format("YYYY-MM-DD HH:mm:ss")}
+                </div>
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold text-xs mb-1">Actual End</label>
+                <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-800 text-xs select-text">
+                  {invoiceForm.actual_end_at}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end mb-2">
+              <span className="text-xs text-gray-700 mr-1">Total Duration:</span>
+              <span className="font-bold text-sm text-emerald-600">
+                {invoiceForm.total_duration || invoiceForm.total_duration === 0
+                  ? (() => {
+                    const h = Math.floor(invoiceForm.total_duration / 60);
+                    const m = invoiceForm.total_duration % 60;
+                    if (h > 0) return `${h}h ${m}min`;
+                    return `${m}min`;
+                  })()
+                  : "--"}
+              </span>
+            </div>
+
+            {/* Services (compact) */}
+            <div className="mb-2">
+              <label className="block text-gray-700 font-bold text-xs mb-1">Services</label>
+              <div className="space-y-1">
+                {invoiceForm.services.map((srv, idx) => (
+                  <div key={idx} className="flex gap-2 items-center px-1 py-1 text-xs w-full">
+                    <span className="text-pink-400">✂️</span>
+                    <div className="relative flex-1 min-w-0">
+                      <input
+                        type="text"
+                        className="w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                        value={srv.name}
+                        autoComplete="off"
+                        onFocus={() => setServiceDropdownIdx(idx)}
+                        onBlur={() => setTimeout(() => setServiceDropdownIdx(-1), 200)}
+                        onChange={e => {
+                          const value = e.target.value;
+                          const services = [...invoiceForm.services];
+                          services[idx].name = value;
+                          setInvoiceForm(f => ({ ...f, services }));
+                          setServiceNameQuery(value);
+                          setServiceDropdownIdx(idx);
+                        }}
+                        required
+                      />
+                      {serviceDropdownIdx === idx && serviceNameQuery.length > 0 && (
+                        <div
+                          className="absolute z-30 left-0 mt-1 w-44 max-h-32 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-xs"
+                          style={{ minWidth: 90 }}
+                        >
+                          {allServiceNames
+                            .filter(name => name.toLowerCase().includes(serviceNameQuery.toLowerCase()))
+                            .slice(0, 15)
+                            .map(name => (
+                              <div
+                                key={name}
+                                className="px-2 py-1 hover:bg-emerald-100 cursor-pointer text-gray-900"
+                                onMouseDown={() => {
+                                  const services = [...invoiceForm.services];
+                                  services[idx].name = name;
+                                  setInvoiceForm(f => ({ ...f, services }));
+                                  setServiceDropdownIdx(-1);
+                                }}
+                              >
+                                {name}
+                              </div>
+                            ))}
+                          {allServiceNames.filter(name =>
+                            name.toLowerCase().includes(serviceNameQuery.toLowerCase())
+                          ).length === 0 && (
+                              <div className="px-2 py-1 text-gray-400 italic">No match</div>
+                            )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Price */}
+                    <span className="text-yellow-600" title="Price">💵</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      className="w-16 rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs text-right"
+                      value={srv.price}
+                      onChange={e => {
+                        const services = [...invoiceForm.services];
+                        services[idx].price = Number(e.target.value);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="text-red-500 text-lg ml-1"
+                      onClick={() => {
+                        const services = invoiceForm.services.filter((_, i) => i !== idx);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      disabled={invoiceForm.services.length === 1}
+                      title="Remove service"
+                    >×</button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold underline mt-1"
+                  onClick={() => setInvoiceForm(f => ({
+                    ...f,
+                    services: [...f.services, { name: "", price: 0 }]
+                  }))}
+                >+ Add Service</button>
+              </div>
+            </div>
+
+            {/* Total Amount, Tip, Amount Paid, Change */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-emerald-700 flex items-center">
+                  <span className="text-lg mr-1">💵</span>Total Amount
+                </span>
+                <span className="font-bold text-base text-emerald-700">
+                  ${invoiceForm.total_amount ? invoiceForm.total_amount.toFixed(2) : "0.00"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-gray-600 flex items-center">
+                  <span className="text-lg mr-1">🎁</span>Tip
+                </span>
+                <div className="relative w-20">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="pl-5 w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                    value={invoiceForm.tip || ""}
+                    onChange={e => setInvoiceForm(f => ({ ...f, tip: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-semibold text-gray-600 flex items-center">
+                  <span className="text-lg mr-1">💰</span>Amount Paid
+                </span>
+                <div className="relative w-20">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="pl-5 w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                    value={invoiceForm.amount_paid || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setInvoiceForm(f => ({
+                        ...f,
+                        amount_paid: val === "" ? null : Number(val)
+                      }));
+                      setSaveInvoiceError("");
+                    }}
+                  />
+                </div>
+              </div>
+              {typeof invoiceForm.amount_paid === "number" &&
+                invoiceForm.amount_paid < invoiceForm.total_amount + (invoiceForm.tip || 0) &&
+                <div className="text-red-500 text-xs text-right mb-1">
+                  Customer has not paid enough!
+                </div>
+              }
+              <div className="flex justify-between items-center mt-1">
+                <span className="font-semibold text-gray-600 flex items-center">
+                  <span className="text-lg mr-1">🧾</span>Change
+                </span>
+                <span className="font-bold text-emerald-700">
+                  ${invoiceForm.change ? invoiceForm.change.toFixed(2) : "0.00"}
+                </span>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="mb-2">
+              <label className="block text-gray-700 font-bold text-xs mb-1">Notes</label>
+              <textarea
+                className="w-full rounded border border-gray-300 p-2 text-gray-900 bg-white text-xs"
+                rows={2}
+                value={invoiceForm.notes}
+                onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            {/* Error */}
+            {saveInvoiceError && <div className="text-red-500 mb-2">{saveInvoiceError}</div>}
+
+            <button
+              type="submit"
+              className={`w-full mt-2 py-2 rounded-xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
+              disabled={savingInvoice}
+            >
+              {savingInvoice ? "Saving..." : "Complete & Save Invoice"}
+            </button>
+          </form>
+        </div>
+      )}
+
       {showStartPopup && startTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full relative animate-fade-in">
@@ -507,7 +841,36 @@ export default function SalonDashboard() {
                           ${processingApptId === nowServing[currentNowSlide]?.id ? "opacity-60 cursor-not-allowed" : ""}
                         `}
                         disabled={processingApptId === nowServing[currentNowSlide]?.id}
-                        onClick={() => handleCompleteAppointment(nowServing[currentNowSlide]?.id)}
+                        onClick={() => {
+                          const appt = nowServing[currentNowSlide];
+                          setInvoiceForm({
+                            appointment_id: appt.id,
+                            customer_name: appt.customer_name,
+                            customer_phone: appt.customer_phone,
+                            stylist_id: appt.stylist_id,
+                            stylist_name: getFreelancerInfo(appt.stylist_id).name || "Staff",
+                            salon_id: appt.salon_id,
+                            services: appt.services.map(s => ({
+                              id: s.id,
+                              name: s.name,
+                              price: s.price,
+                              duration: s.duration || s.duration_minutes,
+                              quantity: 1,
+                            })),
+                            total_amount: appt.services.reduce((sum, s) => sum + (s.price || 0), 0),
+                            total_duration: Math.round(
+                              dayjs().diff(dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss"), "minute")
+                            ),
+                            actual_start_at: appt.started_at,
+                            actual_end_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                            notes: appt.note || "",
+                            tip: 0,
+                            amount_paid: null,
+                            change: 0,
+                          });
+                          setShowInvoicePopup(true);
+                        }}
+
                       >
                         {processingApptId === nowServing[currentNowSlide]?.id ? (
                           <>
