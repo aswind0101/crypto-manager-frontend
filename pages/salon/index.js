@@ -920,7 +920,7 @@ export default function SalonDashboard() {
                         const emp = getFreelancerInfo(a.stylist_id);
                         console.log("DEBUG",a);
                         return (
-                          <div key={a.id} className="min-w-[220px] border-t-1 border-pink-400 rounded-2xl shadow-lg p-4 flex flex-col items-center mx-1">
+                          <div key={a.id} className="min-w-[220px] mb-8 border-r-4 border-t-1 border-l-4 border-b-1 border-white/20 rounded-2xl shadow-lg p-4 flex flex-col items-center mx-1">
                             <img src={emp.avatar_url || "/default-avatar.png"} className="w-14 h-14 rounded-full mb-1" alt={emp.name} />
                             <div className="font-bold text-base text-emerald-100">{emp.name || "Staff"}</div>
                             <div className="text-xs text-yellow-400">
