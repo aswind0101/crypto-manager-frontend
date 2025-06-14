@@ -37,7 +37,7 @@ export default function SalonDashboard() {
 
   const [processingApptId, setProcessingApptId] = useState(null);
   const [actionError, setActionError] = useState("");
-
+  const [nextClientIndex, setNextClientIndex] = useState(0);
 
   const [currentNowPage, setCurrentNowPage] = useState(0);
   const pageSize = 4;
@@ -295,7 +295,7 @@ export default function SalonDashboard() {
             title="Next Client"
             value={
               nextClients.length > 0
-                ? dayjs.utc(nextClients[0].appointment_date).format("hh:mm A")
+                ? dayjs.utc(nextClients[nextClientIndex].appointment_date).format("hh:mm A")
                 : "No upcoming"
             }
             sub={
@@ -303,35 +303,51 @@ export default function SalonDashboard() {
                 <div className="flex flex-col gap-2 p-2 rounded-xl w-full">
                   <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
                     <span className="text-pink-300">👤</span>
-                    {nextClients[0].customer_name}
+                    {nextClients[nextClientIndex].customer_name}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
                     <span className="text-yellow-300">💇‍♀️</span>
-                    {nextClients[0].services?.map(s => s.name).join(", ")}
+                    {nextClients[nextClientIndex].services?.map(s => s.name).join(", ")}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-blue-400">
                     <span className="text-blue-300">⏱</span>
                     <span>
                       Estimated Time: <span className="font-semibold text-emerald-200">
-                        {nextClients[0].services?.reduce((sum, s) => sum + (s.duration || s.duration_minutes || 0), 0)} min
+                        {nextClients[nextClientIndex].services?.reduce((sum, s) => sum + (s.duration || s.duration_minutes || 0), 0)} min
                       </span>
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-emerald-400">Staff:</span>
                     <span className="text-pink-200 font-semibold">
-                      {getFreelancerInfo(nextClients[0].stylist_id).name || "Staff"}
+                      {getFreelancerInfo(nextClients[nextClientIndex].stylist_id).name || "Staff"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span className="text-gray-300">At: </span>
-                    {dayjs.utc(nextClients[0].appointment_date).format("MMM D, hh:mm A")}
-                  </div>
+                  {nextClients.length > 1 && (
+                    <div className="flex gap-2 mt-2 items-center justify-center">
+                      <button
+                        onClick={() => setNextClientIndex(idx => idx > 0 ? idx - 1 : nextClients.length - 1)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Previous client"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <span className="mx-2 text-xs text-pink-400">
+                        {`${nextClientIndex + 1} / ${nextClients.length}`}
+                      </span>
+                      <button
+                        onClick={() => setNextClientIndex(idx => idx < nextClients.length - 1 ? idx + 1 : 0)}
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Next client"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             }
           />
-
         </div>
 
         {/* Now Serving Card */}

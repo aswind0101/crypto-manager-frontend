@@ -38,6 +38,9 @@ export default function FindStylists() {
   const [stylistSchedule, setStylistSchedule] = useState({});
   const [showAll, setShowAll] = useState(false);
   const [visibleCount, setVisibleCount] = useState(3);
+  const [showBookingPopup, setShowBookingPopup] = useState(false);
+  const [bookingDetails, setBookingDetails] = useState(null);
+
 
   // Form đặt lịch
   const [form, setForm] = useState({
@@ -269,14 +272,22 @@ export default function FindStylists() {
       }
 
       if (res.ok) {
-        alert("✅ Appointment booked successfully!");
-
-        // ✅ Đợi 1 giây rồi chuyển sang trang customer/me
-        setTimeout(() => {
-          router.push("/customer/me");
-        }, 1000);
-
-        return; // ✅ Không cần reset form nếu đã chuyển trang
+        setBookingDetails({
+          stylist,
+          services: stylist.services.filter(srv => form.service_ids.includes(srv.id)),
+          salonName: stylist.salon_name,
+          salonAddress: stylist.salon_address,
+          appointmentDate: appointment_date,
+          time: selectedTime,
+          duration: form.duration_minutes,
+          totalPrice: stylist.services
+            .filter(srv => form.service_ids.includes(srv.id))
+            .reduce((sum, srv) => sum + (Number(srv.price) || 0), 0),
+          phone: form.phone,
+          note: form.note,
+        });
+        setShowBookingPopup(true);
+        return;
       } else {
         alert("❌ " + (data.error || "Booking failed."));
       }
@@ -541,6 +552,7 @@ export default function FindStylists() {
 
 
   const visibleStylists = filteredStylists.slice(0, visibleCount);
+
   return (
     <div className="min-h-screen text-white font-mono sm:font-['Pacifico', cursive]">
       <Head>
@@ -554,6 +566,113 @@ export default function FindStylists() {
         <h1 className="text-xl sm:text-4xl font-bold text-center mb-8 text-emerald-300 font-mono sm:font-['Pacifico', cursive]">
           ✨ Find Stylists Near You
         </h1>
+        {showBookingPopup && bookingDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-gradient-to-br from-pink-50 via-yellow-50 to-emerald-50 rounded-2xl shadow-2xl p-6 w-[95vw] max-w-md relative animate-fade-in border-[3px] border-pink-200">
+              {/* Close Button */}
+              <button
+                className="absolute top-2 right-3 text-pink-400 text-xl font-bold hover:text-rose-500 transition"
+                onClick={() => {
+                  setShowBookingPopup(false);
+                  router.push("/customer/me");
+                }}
+                aria-label="Close"
+              >
+                ×
+              </button>
+
+              {/* Header */}
+              <div className="flex items-center justify-center mb-1 gap-2">
+                <span className="rounded-full bg-emerald-100 p-2 shadow text-emerald-600 text-2xl">✅</span>
+                <span className="text-xl font-bold text-emerald-600 drop-shadow">Appointment Confirmed!</span>
+              </div>
+
+              {/* Subheading */}
+              <div className="mb-2 text-center">
+                <span className="inline-flex items-center gap-1 text-pink-500 font-semibold">
+                  <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M9 19V6h13"></path></svg>
+                  Please arrive on time & keep your phone available!
+                </span>
+              </div>
+
+              {/* Info Table */}
+              <div className="text-sm text-gray-800 rounded-xl bg-white/70 shadow-inner p-4 mb-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-pink-400"><svg className="w-5 h-5 inline" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" /></svg></span>
+                  <span className="font-semibold mr-1">Stylist:</span>
+                  <span>{bookingDetails.stylist.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400"><svg className="w-5 h-5 inline" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M21 11v2a4 4 0 0 1-4 4h-1.5" /></svg></span>
+                  <span className="font-semibold mr-1">Salon:</span>
+                  <span>{bookingDetails.salonName}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-yellow-400"><svg className="w-5 h-5 inline" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" /><circle cx="12" cy="9" r="2.5" /></svg></span>
+                  <span className="font-semibold mr-1">Address:</span>
+                  <span>{bookingDetails.salonAddress}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-400"><svg className="w-5 h-5 inline" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M22 16.92V19a2 2 0 0 1-2.18 2A19.72 19.72 0 0 1 3 5.18 2 2 0 0 1 5 3h2.09a2 2 0 0 1 2 1.72c.13.81.27 1.58.46 2.32a2 2 0 0 1-.45 2l-.91.91a16 16 0 0 0 6.29 6.29l.91-.91a2 2 0 0 1 2-.45c.74.19 1.51.33 2.32.46A2 2 0 0 1 22 16.92z" /></svg></span>
+                  <span className="font-semibold mr-1">Stylist Phone:</span>
+                  <span className="text-blue-600">{bookingDetails.stylist.phone}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-yellow-600"><CalendarDays className="w-5 h-5 inline" /></span>
+                  <span className="font-semibold mr-1">Date:</span>
+                  <span>{dayjs(bookingDetails.appointmentDate).format("MMM D, YYYY")}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400"><svg className="w-5 h-5 inline" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2" /><path d="M16 3l-4 4-4-4" /></svg></span>
+                  <span className="font-semibold mr-1">Time:</span>
+                  <span>{bookingDetails.time}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-pink-400 mr-1">Services:</span>
+                  <ul className="ml-4 mt-1 text-gray-700 text-[13px]">
+                    {bookingDetails.services.map(srv => (
+                      <li key={srv.id} className="flex items-center gap-2">
+                        <span className="text-pink-400">•</span>
+                        <span className="font-medium">{srv.name}</span>
+                        <span className="text-gray-500">(${srv.price}{srv.duration_minutes && <> • {srv.duration_minutes} min</>})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex items-center gap-3 mt-1 mb-0">
+                  <span className="text-green-600 font-bold flex items-center gap-1">
+                    <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M12 8v4l3 3" /><circle cx="12" cy="12" r="10" /></svg>
+                    {bookingDetails.duration} min
+                  </span>
+                  <span className="text-yellow-600 font-bold flex items-center gap-1">
+                    <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" /></svg>
+                    ${bookingDetails.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="text-[11px] text-gray-500 italic mt-1 mb-0 flex items-center gap-1">
+                  <svg className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 00-1 1v1a1 1 0 102 0V3a1 1 0 00-1-1zM9 7a1 1 0 011 1v4a1 1 0 11-2 0V8a1 1 0 011-1zM10 17a1 1 0 01-1-1v-1a1 1 0 112 0v1a1 1 0 01-1 1z" /></svg>
+                  Estimate only. Final amount & time may change based on your service.
+                </div>
+                {bookingDetails.note && (
+                  <div className="flex items-center gap-2 text-xs text-gray-700 mt-1">
+                    <span className="text-emerald-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" /></svg></span>
+                    <span><span className="font-bold mr-1">Note:</span>{bookingDetails.note}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer/Remind */}
+              <div className="mt-2 text-xs text-center text-emerald-700 font-semibold flex flex-col items-center gap-1">
+                <span className="inline-flex items-center gap-1">
+                  <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" /><path d="M16 3l-4 4-4-4" /></svg>
+                  Please <span className="font-bold text-emerald-600">arrive at least 5 minutes early</span>
+                </span>
+                <span>If you are late, your appointment may be cancelled or rescheduled.</span>
+                <span className="text-pink-400 font-bold pt-1">Thank you for booking with us!</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {geoError && (
           <div className="bg-red-100 border border-red-400 text-red-800 px-4 py-4 rounded-lg shadow-sm text-sm text-center max-w-xl mx-auto mb-6">

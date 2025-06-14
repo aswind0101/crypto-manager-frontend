@@ -37,7 +37,7 @@ export default function SalonDashboard() {
 
   const [processingApptId, setProcessingApptId] = useState(null);
   const [actionError, setActionError] = useState("");
-
+  const [nextClientIndex, setNextClientIndex] = useState(0);
 
   const [currentNowPage, setCurrentNowPage] = useState(0);
   const pageSize = 4;
@@ -46,6 +46,11 @@ export default function SalonDashboard() {
   // Index của khách đầu tiên trên trang hiện tại
   const pageStartIndex = currentNowPage * pageSize;
   const pageEndIndex = pageStartIndex + pageSize;
+
+  const [showStartPopup, setShowStartPopup] = useState(false);
+  const [startTarget, setStartTarget] = useState(null); // lưu appointment muốn start
+  const [processingStart, setProcessingStart] = useState(false);
+  const [actionMsg, setActionMsg] = useState(""); // message khi thao tác
 
   const auth = getAuth();
   const router = useRouter();
@@ -244,7 +249,7 @@ export default function SalonDashboard() {
       setError("Failed to load data. Please try again.");
     }
   };
-
+  const completedToday = appointmentsToday.filter(a => a.status === "completed").length;
   // Tổng tiền doanh thu hôm nay
   const todayRevenue = appointmentsToday.filter(a => a.status === "completed")
     .reduce((sum, a) => sum + (a.services?.reduce((s, srv) => s + (srv.price || 0), 0) || 0), 0);
@@ -255,14 +260,89 @@ export default function SalonDashboard() {
   return (
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
+      {showStartPopup && startTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full relative animate-fade-in">
+            <button
+              className="absolute top-2 right-3 text-pink-400 text-xl font-bold"
+              onClick={() => setShowStartPopup(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h2 className="text-xl font-bold text-emerald-600 mb-4 flex items-center gap-2">
+              Confirm Start Service
+            </h2>
+            <div className="mb-4 text-gray-700">
+              Are you sure you want to start this service for customer: <br />
+              <b>{startTarget.customer_name}</b> <br />
+              Services: <span className="text-pink-400">{startTarget.services?.map(s => s.name).join(", ")}</span> <br />
+              <span className="text-blue-700">
+                Stylist: <b>{getFreelancerInfo(startTarget.stylist_id).name || "Staff"}</b>
+              </span>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-2 rounded-lg shadow"
+                disabled={processingStart}
+                onClick={async () => {
+                  setProcessingStart(true);
+                  setActionMsg("");
+                  try {
+                    const token = await user.getIdToken();
+                    const res = await fetch(
+                      `https://crypto-manager-backend.onrender.com/api/appointments/${startTarget.id}`,
+                      {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                          status: "processing",
+                          started_at: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                        }),
+                      }
+                    );
+                    if (!res.ok) {
+                      setActionMsg("An error occurred. Please try again.");
+                    } else {
+                      setShowStartPopup(false);
+                      setStartTarget(null);
+                      setProcessingStart(false);
+                      setActionMsg("");
+                      // Call fetchData or reload appointment list
+                      await fetchData(user);
+                    }
+                  } catch (err) {
+                    setActionMsg("An error occurred. Please try again.");
+                  }
+                  setProcessingStart(false);
+                }}
+              >
+                {processingStart ? "Processing..." : "Confirm"}
+              </button>
+              <button
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-black font-bold px-6 py-2 rounded-lg"
+                onClick={() => setShowStartPopup(false)}
+                disabled={processingStart}
+              >
+                Cancel
+              </button>
+            </div>
+            {actionMsg && <div className="text-red-500 font-semibold mt-3">{actionMsg}</div>}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto p-2">
 
         {/* Tổng doanh thu hôm nay + biểu đồ */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1 p-6 flex flex-col items-center">
-            <div className="text-5xl font-extrabold text-emerald-500 drop-shadow">{todayRevenue.toLocaleString()}$</div>
+            <div className="text-5xl font-extrabold text-emerald-500 drop-shadow">${todayRevenue.toLocaleString()}</div>
             <div className="mt-2 text-yellow-600 text-sm">
-              Appointments: {appointmentsToday.length}
+              Appointments: {completedToday.length || 0}
             </div>
           </div>
         </div>
@@ -288,49 +368,95 @@ export default function SalonDashboard() {
               </div>
             }
           />
-
-          {/* Next Client Card */}
-          <Card
-            icon={<FiClock />}
-            title="Next Client"
-            value={
-              nextClients.length > 0
-                ? dayjs.utc(nextClients[0].appointment_date).format("hh:mm A")
-                : "No upcoming"
-            }
-            sub={
-              nextClients.length > 0 && (
-                <div className="flex flex-col gap-2 p-2 rounded-xl w-full">
-                  <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
-                    <span className="text-pink-300">👤</span>
-                    {nextClients[0].customer_name}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
-                    <span className="text-yellow-300">💇‍♀️</span>
-                    {nextClients[0].services?.map(s => s.name).join(", ")}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-blue-400">
-                    <span className="text-blue-300">⏱</span>
-                    <span>
-                      Estimated Time: <span className="font-semibold text-emerald-200">
-                        {nextClients[0].services?.reduce((sum, s) => sum + (s.duration || s.duration_minutes || 0), 0)} min
+          <div className="relative w-full">
+            {nextClients.length > 0 && (
+              <div
+                className="
+        absolute top-4 right-4 z-20
+        bg-emerald-400/90 text-emerald-900 font-bold text-sm 
+        px-4 py-1 rounded-full shadow-xl border-2 border-white
+        whitespace-nowrap
+      "
+                style={{ minWidth: 90, textAlign: 'center' }}
+              >
+                {getFreelancerInfo(nextClients[nextClientIndex].stylist_id).name || "Staff"}
+              </div>
+            )}
+            {/* Next Client Card */}
+            <Card
+              icon={<FiClock />}
+              title="Next Client"
+              value={
+                nextClients.length > 0
+                  ? dayjs.utc(nextClients[nextClientIndex].appointment_date).format("hh:mm A")
+                  : "No upcoming"
+              }
+              sub={
+                nextClients.length > 0 && (
+                  <div className="flex flex-col gap-2 p-2 rounded-xl w-full">
+                    <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                      <span className="text-pink-300">👤</span>
+                      {nextClients[nextClientIndex].customer_name}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
+                      <span className="text-yellow-300">💇‍♀️</span>
+                      {nextClients[nextClientIndex].services?.map(s => s.name).join(", ")}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-blue-400">
+                      <span className="text-blue-300">⏱</span>
+                      <span>
+                        Estimated Time: <span className="font-semibold text-emerald-200">
+                          {nextClients[nextClientIndex].services?.reduce((sum, s) => sum + (s.duration || s.duration_minutes || 0), 0)} min
+                        </span>
                       </span>
-                    </span>
+                    </div>
+                    {/* Nút Start Service chỉ cho chủ salon, trạng thái confirmed */}
+                    {nextClients[nextClientIndex] &&
+                      nextClients[nextClientIndex].status === "confirmed" &&
+                      !nextClients[nextClientIndex].started_at && (
+                        <button
+                          className="mt-3 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow transition text-lg flex items-center justify-center gap-2"
+                          onClick={() => {
+                            setStartTarget(nextClients[nextClientIndex]);
+                            setShowStartPopup(true);
+                            setActionMsg("");
+                          }}
+                          disabled={processingStart}
+                        >
+                          <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
+                            <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                          </svg>
+                          Start Service
+                        </button>
+                      )}
+
+                    {nextClients.length > 1 && (
+                      <div className="flex gap-2 mt-2 items-center justify-center">
+                        <button
+                          onClick={() => setNextClientIndex(idx => idx > 0 ? idx - 1 : nextClients.length - 1)}
+                          className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                          aria-label="Previous client"
+                        >
+                          <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <span className="mx-2 text-xs text-pink-400">
+                          {`${nextClientIndex + 1} / ${nextClients.length}`}
+                        </span>
+                        <button
+                          onClick={() => setNextClientIndex(idx => idx < nextClients.length - 1 ? idx + 1 : 0)}
+                          className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                          aria-label="Next client"
+                        >
+                          <ChevronRight className="w-6 h-6" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-400">Staff:</span>
-                    <span className="text-pink-200 font-semibold">
-                      {getFreelancerInfo(nextClients[0].stylist_id).name || "Staff"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span className="text-gray-300">At: </span>
-                    {dayjs.utc(nextClients[0].appointment_date).format("MMM D, hh:mm A")}
-                  </div>
-                </div>
-              )
-            }
-          />
+                )
+              }
+            />
+          </div>
 
         </div>
 
@@ -528,7 +654,7 @@ export default function SalonDashboard() {
 // Card component
 function Card({ icon, title, value, sub, children, className = "" }) {
   return (
-    <div className={`relative ${className} border-t-2 border-b-2 border-pink-400 rounded-2xl shadow-lg p-4 sm:p-5 mb-3 transition-all`}>
+    <div className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 rounded-2xl shadow-lg p-4 sm:p-5 mb-3 transition-all`}>
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-xl font-extrabold text-white">{value}</div>

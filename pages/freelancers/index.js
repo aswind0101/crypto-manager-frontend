@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
 import { useRouter } from "next/router";
+import { SERVICES_BY_SPECIALIZATION } from "../../constants/servicesBySpecialization";
 import {
   FiDollarSign,
   FiClock,
@@ -56,6 +57,29 @@ export default function FreelancerDashboard() {
   const [processingApptId, setProcessingApptId] = useState(null); // id đang xử lý (start/complete)
   const [actionError, setActionError] = useState(""); // text lỗi (nếu có)
 
+  const [overdueWarning, setOverdueWarning] = useState(null); // chứa appointment quá hạn
+  const [snoozeUntil, setSnoozeUntil] = useState({}); // id: time - để ẩn cảnh báo tạm thời
+
+  const [showInvoicePopup, setShowInvoicePopup] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState(null); // chứa dữ liệu hóa đơn
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState("");
+  const allServiceNames = Array.from(
+    new Set(
+      Object.values(SERVICES_BY_SPECIALIZATION)
+        .flat()
+        .map(name => name.trim())
+        .map(name => name.toLowerCase()) // Loại trùng không phân biệt HOA thường
+    )
+  ).map(name =>
+    // Đưa về chữ hoa đầu từ cho đẹp nếu cần
+    name
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  );
+  const [serviceNameQuery, setServiceNameQuery] = useState("");
+  const [serviceDropdownIdx, setServiceDropdownIdx] = useState(-1); // nếu dùng arrow để chọn
 
   const soundRef = useRef(null);
   const soundLoopRef = useRef(null); // ✅ để lưu vòng lặp âm thanh
@@ -158,6 +182,36 @@ export default function FreelancerDashboard() {
       0
     ) || 0;
 
+  function checkOverdueAppointments() {
+    if (!appointments || appointments.length === 0) return;
+    const now = dayjs();
+    let foundOverdue = null;
+
+    appointments.forEach(appt => {
+      if (
+        appt.status === "processing" &&
+        appt.started_at &&
+        !appt.end_at &&
+        Array.isArray(appt.services)
+      ) {
+        const estimateMinutes = appt.services.reduce(
+          (sum, s) => sum + (s.duration || s.duration_minutes || 0),
+          0
+        );
+        if (estimateMinutes < 10) return;
+        const started = dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss");
+        const servedMinutes = now.diff(started, "minute");
+        const snoozeTime = snoozeUntil[appt.id];
+        if (servedMinutes > estimateMinutes + 30) {
+          if (!snoozeTime || now.isAfter(snoozeTime)) {
+            foundOverdue = appt;
+          }
+        }
+      }
+    });
+
+    setOverdueWarning(foundOverdue);
+  }
 
   // Wake Lock để giữ màn hình luôn sáng (cho cả desktop & mobile)
   const wakeLockRef = useRef(null);
@@ -427,35 +481,20 @@ export default function FreelancerDashboard() {
   }, [appointments]);
 
   useEffect(() => {
-    if (!appointments || appointments.length === 0) return;
-    const processingAppointments = appointments.filter(a =>
-      a.status === "processing" &&
-      a.started_at &&
-      !a.end_at &&
-      Array.isArray(a.services)
-    );
-    processingAppointments.forEach(appt => {
-      const estimateMinutes = appt.services.reduce(
-        (sum, s) => sum + (s.duration || s.duration_minutes || 0),
-        0
-      );
-      if (estimateMinutes < 10) return; // Bảo vệ nếu không có dịch vụ hoặc estimateMinutes quá nhỏ
-      const started = dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss");
-      const now = dayjs();
-      if (started.isAfter(now)) return;
-      const servedMinutes = now.diff(started, "minute");
-      console.log('DEBUG auto-complete:', {
-        id: appt.id,
-        started_at: appt.started_at,
-        now: now.format("YYYY-MM-DD HH:mm:ss"),
-        servedMinutes,
-        estimateMinutes
-      });
-      if (servedMinutes > estimateMinutes + 30) {
-        completeAppointmentById(appt.id);
-      }
-    });
-  }, [appointments]);
+    // Kiểm tra ngay khi load lần đầu (để không bị trễ 5 phút đầu)
+    checkOverdueAppointments();
+
+    // Tạo interval kiểm tra lại mỗi 5 phút
+    const interval = setInterval(() => {
+      checkOverdueAppointments();
+    }, 5 * 60 * 1000); // 5 phút
+
+    // Dọn dẹp interval khi unmount hoặc appointments thay đổi
+    return () => clearInterval(interval);
+    // eslint-disable-next-line
+  }, [appointments, snoozeUntil]); // phụ thuộc appointments và snooze
+
+
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
@@ -676,6 +715,309 @@ export default function FreelancerDashboard() {
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
+      {showInvoicePopup && invoiceForm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <form
+            className="bg-white rounded-2xl p-8 shadow-2xl max-w-xl w-full relative animate-fade-in border-4 border-emerald-400 text-gray-800"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setSavingInvoice(true);
+              setSaveInvoiceError("");
+              try {
+                const token = await user.getIdToken();
+                const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointment-invoices", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify(invoiceForm),
+                });
+                if (!res.ok) {
+                  const data = await res.json();
+                  setSaveInvoiceError(data.error || "Failed to save invoice.");
+                  setSavingInvoice(false);
+                  return;
+                }
+                setShowInvoicePopup(false);
+                setSavingInvoice(false);
+                // Optionally: reload data, show success toast, etc.
+                await fetchData(user); // hoặc reload appointment list
+              } catch (err) {
+                setSaveInvoiceError("Network error. Please try again.");
+                setSavingInvoice(false);
+              }
+            }}
+          >
+            <button
+              type="button"
+              className="absolute top-2 right-3 text-pink-400 text-xl font-bold"
+              onClick={() => setShowInvoicePopup(false)}
+              aria-label="Close"
+              disabled={savingInvoice}
+            >
+              ×
+            </button>
+            <h2 className="text-2xl font-bold text-emerald-600 mb-5">Appointment Invoice</h2>
+
+            {/* Customer info */}
+            <div className="flex flex-col gap-1 mb-3">
+              <div>
+                <label className="block text-gray-700 font-bold">Customer Name</label>
+                <input type="text" className="w-full rounded p-2 border border-gray-300 text-gray-900 bg-gray-100"
+                  value={invoiceForm.customer_name}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer_name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold">Phone</label>
+                <input type="text" className="w-full rounded p-2 border border-gray-300 text-gray-900 bg-gray-100"
+                  value={invoiceForm.customer_phone}
+                  onChange={e => setInvoiceForm(f => ({ ...f, customer_phone: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Services */}
+            <div>
+              <label className="block text-gray-700 font-bold mb-1">Services</label>
+              <div className="space-y-2 mb-3">
+                {invoiceForm.services.map((srv, idx) => (
+                  <div key={srv.id || idx} className="flex gap-2 items-center bg-gray-100 rounded px-2 py-1">
+                    <span title="Service name" className="text-pink-400 text-lg">✂️</span>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-32 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                        value={srv.name}
+                        autoComplete="off"
+                        onFocus={() => setServiceDropdownIdx(idx)}
+                        onBlur={() => setTimeout(() => setServiceDropdownIdx(-1), 200)}
+                        onChange={e => {
+                          const value = e.target.value;
+                          const services = [...invoiceForm.services];
+                          services[idx].name = value;
+                          setInvoiceForm(f => ({ ...f, services }));
+                          setServiceNameQuery(value);
+                          setServiceDropdownIdx(idx);
+                        }}
+                        required
+                      />
+                      {/* Custom suggestion dropdown */}
+                      {serviceDropdownIdx === idx && serviceNameQuery.length > 0 && (
+                        <div
+                          className="absolute z-30 left-0 mt-1 w-56 max-h-48 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg"
+                          style={{ minWidth: 120 }}
+                        >
+                          {allServiceNames
+                            .filter(name => name.toLowerCase().includes(serviceNameQuery.toLowerCase()))
+                            .slice(0, 20)
+                            .map(name => (
+                              <div
+                                key={name}
+                                className="px-3 py-1 hover:bg-emerald-100 cursor-pointer text-gray-900"
+                                onMouseDown={() => {
+                                  const services = [...invoiceForm.services];
+                                  services[idx].name = name;
+                                  setInvoiceForm(f => ({ ...f, services }));
+                                  setServiceDropdownIdx(-1);
+                                }}
+                              >
+                                {name}
+                              </div>
+                            ))}
+                          {/* Nếu không có suggestion */}
+                          {allServiceNames.filter(name =>
+                            name.toLowerCase().includes(serviceNameQuery.toLowerCase())
+                          ).length === 0 && (
+                              <div className="px-3 py-1 text-gray-400 italic">No match</div>
+                            )}
+                        </div>
+                      )}
+                    </div>
+
+                    <span title="Price" className="text-yellow-600 text-lg">💵</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      className="w-20 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                      value={srv.price}
+                      onChange={e => {
+                        const services = [...invoiceForm.services];
+                        services[idx].price = Number(e.target.value);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      required
+                    />
+                    <span title="Duration (minutes)" className="text-blue-600 text-lg">⏱️</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-16 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                      value={srv.duration}
+                      onChange={e => {
+                        const services = [...invoiceForm.services];
+                        services[idx].duration = Number(e.target.value);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="text-red-500 text-xl"
+                      onClick={() => {
+                        const services = invoiceForm.services.filter((_, i) => i !== idx);
+                        setInvoiceForm(f => ({ ...f, services }));
+                      }}
+                      disabled={invoiceForm.services.length === 1}
+                      title="Remove service"
+                    >×</button>
+                  </div>
+                ))}
+                {/* Datalist suggest ALL services */}
+                <datalist id="services-suggest">
+                  {allServiceNames.map(name => (
+                    <option value={name} key={name} />
+                  ))}
+                </datalist>
+                {/* Add new service */}
+                <button
+                  type="button"
+                  className="text-emerald-700 hover:text-emerald-900 text-sm font-semibold underline"
+                  onClick={() => setInvoiceForm(f => ({
+                    ...f,
+                    services: [...f.services, { name: "", price: 0, duration: 0 }]
+                  }))}
+                >+ Add Service</button>
+              </div>
+            </div>
+
+            {/* Totals */}
+            <div className="flex gap-6 mb-3">
+              <div>
+                <label className="block text-gray-700 font-bold">Total Amount ($)</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  className="w-32 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                  value={invoiceForm.total_amount}
+                  onChange={e => setInvoiceForm(f => ({ ...f, total_amount: Number(e.target.value) }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold">Total Duration (min)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-20 rounded border border-gray-300 p-1 text-gray-900 bg-white"
+                  value={invoiceForm.total_duration}
+                  onChange={e => setInvoiceForm(f => ({ ...f, total_duration: Number(e.target.value) }))}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Time actual */}
+            <div className="flex gap-6 mb-3">
+              <div>
+                <label className="block text-gray-700 font-bold">Actual Start</label>
+                <input type="text" className="w-40 rounded border border-gray-200 p-1 bg-gray-100 text-gray-900"
+                  value={
+                    invoiceForm.actual_start_at
+                      ? dayjs.utc(invoiceForm.actual_start_at).format("HH:mm:ss")
+                      : ""
+                  }
+                  readOnly />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-bold">Actual End</label>
+                <input type="text" className="w-40 rounded border border-gray-200 p-1 bg-gray-100 text-gray-900" value={invoiceForm.actual_end_at} readOnly />
+              </div>
+            </div>
+            {/* Notes */}
+            <div className="mb-3">
+              <label className="block text-gray-700 font-bold">Notes</label>
+              <textarea
+                className="w-full rounded border border-gray-300 p-2 text-gray-900 bg-white"
+                rows={2}
+                value={invoiceForm.notes}
+                onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+
+            {/* Error */}
+            {saveInvoiceError && <div className="text-red-500 mb-2">{saveInvoiceError}</div>}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              className={`w-full mt-3 py-3 rounded-xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
+              disabled={savingInvoice}
+            >
+              {savingInvoice ? "Saving..." : "Complete & Save Invoice"}
+            </button>
+          </form>
+        </div>
+      )}
+
+
+      {overdueWarning && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full relative animate-fade-in border-4 border-pink-300">
+            <button
+              className="absolute top-2 right-3 text-pink-400 text-xl font-bold"
+              onClick={() => setOverdueWarning(null)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h2 className="text-xl font-bold text-emerald-600 mb-4 flex items-center gap-2">
+              ⏰ Service Time Overdue
+            </h2>
+            <div className="mb-4 text-gray-700">
+              <b>{overdueWarning.customer_name}</b> has been in service for <b className="text-pink-400">
+                {Math.round(dayjs().diff(dayjs(overdueWarning.started_at, "YYYY-MM-DD HH:mm:ss"), "minute") / 60)}h {dayjs().diff(dayjs(overdueWarning.started_at, "YYYY-MM-DD HH:mm:ss"), "minute") % 60} min
+              </b>, which is over the estimated duration of <span className="font-semibold text-yellow-500">{overdueWarning.services.reduce((sum, s) => sum + (s.duration || s.duration_minutes || 0), 0)} min</span>.<br /><br />
+              <span className="font-semibold text-pink-400">Please complete this appointment, or continue serving if you need more time.</span>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-2 rounded-lg shadow flex items-center justify-center gap-2"
+                onClick={async () => {
+                  await completeAppointmentById(overdueWarning.id);
+                  setOverdueWarning(null);
+                }}
+              >
+                <svg className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24">
+                  <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                </svg>
+                Complete
+              </button>
+              <button
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-black font-bold px-6 py-2 rounded-lg shadow"
+                onClick={() => {
+                  // Snooze this appointment's warning for 30 minutes
+                  setSnoozeUntil(prev => ({
+                    ...prev,
+                    [overdueWarning.id]: dayjs().add(30, "minute")
+                  }));
+                  setOverdueWarning(null);
+                }}
+              >
+                Keep Serving
+              </button>
+            </div>
+            <div className="text-xs text-gray-500 mt-4">
+              This reminder will show again after 30 minutes if the appointment is still not completed.
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPopup && pendingUpcomingAppointment && (
         <div className="fixed bottom-4 right-4 z-50 bg-white text-black rounded-xl px-8 py-2 shadow-xl border-l-8 border-emerald-500 animate-popup max-w-sm w-[90%] sm:w-auto space-y-2">
 
@@ -1233,9 +1575,34 @@ export default function FreelancerDashboard() {
   `}
                     disabled={processingApptId === inProgressAppointments[inProgressIndex]?.id}
                     onClick={async () => {
+                      // Lấy appointment đang serving
                       const appt = inProgressAppointments[inProgressIndex];
-                      await completeAppointmentById(appt.id);
+                      // Chuẩn bị dữ liệu hóa đơn mặc định
+                      setInvoiceForm({
+                        appointment_id: appt.id,
+                        customer_name: appt.customer_name,
+                        customer_phone: appt.customer_phone,
+                        stylist_id: onboarding?.id,
+                        stylist_name: onboarding?.name || user?.displayName,
+                        salon_id: onboarding?.salon_id,
+                        services: appt.services.map(s => ({
+                          id: s.id,
+                          name: s.name,
+                          price: s.price,
+                          duration: s.duration || s.duration_minutes,
+                          quantity: 1, // mặc định 1
+                        })),
+                        total_amount: appt.services.reduce((sum, s) => sum + (s.price || 0), 0),
+                        total_duration: Math.round(
+                          (dayjs().diff(dayjs(appt.started_at, "YYYY-MM-DD HH:mm:ss"), "minute"))
+                        ),
+                        actual_start_at: appt.started_at,
+                        actual_end_at: dayjs().format("HH:mm:ss"),
+                        notes: appt.note || "",
+                      });
+                      setShowInvoicePopup(true);
                     }}
+
                   >
                     {processingApptId === inProgressAppointments[inProgressIndex]?.id ? (
                       <>

@@ -99,19 +99,7 @@ function CustomerAppointmentsPage() {
         }
     };
 
-    const formatSpecialization = (code) => {
-        const map = {
-            nail_tech: "Nail Technician",
-            hair_stylist: "Hair Stylist",
-            barber: "Barber",
-            esthetician: "Esthetician",
-            lash_tech: "Lash Technician",
-            massage_therapist: "Massage Therapist",
-            makeup_artist: "Makeup Artist",
-            receptionist: "Receptionist",
-        };
-        return map[code] || code;
-    };
+
 
     function parseLocalTimestamp(str) {
         // str = "2025-05-24 17:30:00" hoặc "2025-05-24T17:30:00"
@@ -226,45 +214,22 @@ function CustomerAppointmentsPage() {
                                 </span>
 
                                 {/* Stylist Info */}
-                                <div className="flex items-center gap-4 mb-3 mt-2">
+                                <div className="flex items-center gap-4 mb-3">
                                     <img
                                         src={appt.stylist_avatar?.startsWith("http") ? appt.stylist_avatar : "/default-avatar.png"}
                                         alt={appt.stylist_name}
                                         className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
                                     />
                                     <div>
-                                        <h2 className="text-lg font-bold text-pink-300 flex items-center gap-2">
-                                            {appt.stylist_name}
-                                            {appt.stylist_phone && (
-                                                <span className="text-blue-300 text-xs flex items-center gap-1 ml-2">
-                                                    <Phone className="w-4 h-4 inline" /> {appt.stylist_phone}
-                                                </span>
-                                            )}
-                                        </h2>
-                                        <p className="text-xs italic text-gray-200 capitalize">
-                                            {
-                                                Array.isArray(appt.stylist_specialization)
-                                                    ? appt.stylist_specialization.map(formatSpecialization).join(", ")
-                                                    : formatSpecialization(appt.stylist_specialization)
-                                            }
-                                        </p>
-
+                                        <h2 className="text-lg font-bold text-pink-300">{appt.stylist_name}</h2>
+                                        <p className="text-xs italic text-gray-200 capitalize">{appt.stylist_specialization}</p>
                                     </div>
                                 </div>
 
                                 {/* Salon Info */}
-                                <div className="mb-2">
-                                    <p className="text-sm text-yellow-300 flex items-center gap-1">
-                                        🏠 {appt.salon_name}
-                                    </p>
-                                    {appt.salon_address && (
-                                        <p className="text-xs text-yellow-200 flex items-center gap-1 ml-5">
-                                            <span className="text-yellow-400">📍</span> {appt.salon_address}
-                                        </p>
-                                    )}
-                                </div>
+                                <p className="text-sm text-yellow-300 mb-2">🏠 {appt.salon_name}</p>
 
-                                {/* Bảng dịch vụ - Giữ nguyên */}
+                                {/* Dịch vụ - bảng gọn */}
                                 <div className="text-xs text-pink-100 mb-2 capitalize space-y-1">
                                     <table className="w-full text-left text-xs text-pink-100">
                                         <thead>
@@ -282,7 +247,7 @@ function CustomerAppointmentsPage() {
                                                     <td className="py-1 text-right">{srv.duration} min</td>
                                                 </tr>
                                             ))}
-                                            {/* Dòng tổng */}
+                                            {/* 🔢 Dòng tổng */}
                                             <tr className="border-t border-pink-400 font-semibold text-yellow-300">
                                                 <td className="py-1">🔢 Total</td>
                                                 <td className="py-1 text-right">
@@ -294,6 +259,7 @@ function CustomerAppointmentsPage() {
                                             </tr>
                                         </tbody>
                                     </table>
+
                                 </div>
 
                                 {/* Ngày giờ */}
@@ -302,6 +268,13 @@ function CustomerAppointmentsPage() {
                                         📅 {appt.appointment_date.replace("T", " ").slice(0, 16)}
                                     </p>
                                 </div>
+
+
+                                {/* Ghi chú (nếu có) */}
+                                {appt.note && (
+                                    <p className="text-sm text-pink-100 mb-2 mt-4">💬 Note: {appt.note}</p>
+                                )}
+
                                 {/* Nút huỷ nếu điều kiện đúng */}
                                 {["pending", "confirmed"].includes(appt.status) &&
                                     dayjs(appt.appointment_date.replace("Z", "")).isAfter(dayjs()) && (
@@ -322,16 +295,16 @@ function CustomerAppointmentsPage() {
                                                 }
                                             }}
                                             className="absolute bottom-2 left-2 
-                                                                            hover:bg-red-500/20 
-                                                                            text-red-400 hover:text-white 
-                                                                            text-[9px] px-4 py-[4px] 
-                                                                            rounded-3xl transition-all duration-200 flex items-center gap-1"
+                                            hover:bg-red-500/20 
+                                            text-red-400 hover:text-white 
+                                            text-[9px] px-4 py-[4px] 
+                                            rounded-3xl transition-all duration-200 flex items-center gap-1"
                                         >
                                             ❌ Click here to cancel
                                         </button>
                                     )}
-                            </div>
 
+                            </div>
                         ))}
                     </div>
                 )}
