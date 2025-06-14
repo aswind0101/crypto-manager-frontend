@@ -373,12 +373,12 @@ export default function SalonDashboard() {
             <div className="grid grid-cols-2 gap-3 mb-2">
               <div>
                 <label className="block text-gray-700 font-bold text-xs mb-1">Customer Name</label>
-                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-sm"
+                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-xs"
                   value={invoiceForm.customer_name} readOnly />
               </div>
               <div>
                 <label className="block text-gray-700 font-bold text-xs mb-1">Phone</label>
-                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-sm"
+                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-xs"
                   value={invoiceForm.customer_phone} readOnly />
               </div>
             </div>
@@ -509,7 +509,7 @@ export default function SalonDashboard() {
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-2">
               <div className="flex justify-between items-center mb-1">
                 <span className="font-semibold text-emerald-700 flex items-center">
-                  <span className="text-lg mr-1">💵</span>Total Amount
+                  <span className="text-sm mr-1">💵</span>Total Amount
                 </span>
                 <span className="font-bold text-base text-emerald-700">
                   ${invoiceForm.total_amount ? invoiceForm.total_amount.toFixed(2) : "0.00"}
@@ -517,7 +517,7 @@ export default function SalonDashboard() {
               </div>
               <div className="flex justify-between items-center mb-1">
                 <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-lg mr-1">🎁</span>Tip
+                  <span className="text-sm mr-1">🎁</span>Tip
                 </span>
                 <div className="relative w-20">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
@@ -533,7 +533,7 @@ export default function SalonDashboard() {
               </div>
               <div className="flex justify-between items-center mb-1">
                 <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-lg mr-1">💰</span>Amount Paid
+                  <span className="text-sm mr-1">💰</span>Amount Paid
                 </span>
                 <div className="relative w-20">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
@@ -562,7 +562,7 @@ export default function SalonDashboard() {
               }
               <div className="flex justify-between items-center mt-1">
                 <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-lg mr-1">🧾</span>Change
+                  <span className="text-sm mr-1">🧾</span>Change
                 </span>
                 <span className="font-bold text-emerald-700">
                   ${invoiceForm.change ? invoiceForm.change.toFixed(2) : "0.00"}
