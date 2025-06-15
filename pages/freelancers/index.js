@@ -29,6 +29,7 @@ dayjs.extend(timezone);
 import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
 import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { MdMiscellaneousServices, MdOutlineCancel } from "react-icons/md";
 
 
 
@@ -187,6 +188,10 @@ export default function FreelancerDashboard() {
       (sum, srv) => sum + (srv.duration || srv.duration_minutes || 0),
       0
     ) || 0;
+
+  const pendingCount = appointmentsToday.filter(a => a.status === "pending").length;
+  const cancelledCount = appointmentsToday.filter(a => a.status === "cancelled").length;
+  const messageCount = 0; // sau này bạn có thể gắn thật nếu có tin nhắn
 
   function checkOverdueAppointments() {
     if (!appointments || appointments.length === 0) return;
@@ -1509,6 +1514,13 @@ export default function FreelancerDashboard() {
                 ? dayjs.utc(pendingAppointments[pendingIndex].appointment_date).format("hh:mm A")
                 : ""
             }
+            extra={
+              <AppointmentNotification
+                pendingCount={pendingCount}
+                cancelledCount={cancelledCount}
+                messageCount={messageCount}
+              />
+            }
             sub={
               pendingAppointments.length > 0 ? (
                 <div className="flex flex-col gap-2 p-4 rounded-xl w-full">
@@ -2010,10 +2022,18 @@ export default function FreelancerDashboard() {
     </div>
   );
 }
-
-function Card({ icon, title, value, sub, children, className = "" }) {
+function Card({ icon, title, value, sub, children, className = "", extra = null }) {
   return (
-    <div className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}>
+    <div
+      className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 rounded-2xl shadow-lg p-5 transition-all`}
+    >
+      {/* Extra slot: ví dụ như chuông thông báo */}
+      {extra && (
+        <div className="absolute top-3 right-3 z-10">
+          {extra}
+        </div>
+      )}
+
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-xl font-extrabold text-white">{value}</div>
