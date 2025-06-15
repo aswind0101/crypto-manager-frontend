@@ -881,26 +881,18 @@ export default function FindStylists() {
                             {Array.isArray(s.services) && s.services.length > 0 && (
                               <div className="mt-2 w-full">
                                 <p className="text-[13px] font-semibold text-emerald-300 mb-1 text-left pl-2">✨ Services:</p>
-
-                                <div className="scroll-services-mobile px-1 py-1 bg-white/5 rounded-md text-[11px] text-pink-100 grid grid-cols-2 gap-2"
-                                  style={{
-                                    maxHeight: 100,
-                                    overflowY: "auto",
-                                    WebkitOverflowScrolling: "touch",
-                                    overscrollBehavior: "contain",
-                                    touchAction: "pan-y",
-                                    scrollbarWidth: "thin"
-                                  }}
+                                <div
+                                  className="max-h-[140px] overflow-y-auto px-1 py-1 bg-white/5 rounded-md text-[11px] text-pink-100 scrollbar-thin scrollbar-thumb-pink-500 scrollbar-track-transparent flex flex-wrap gap-2"
+                                  style={{ WebkitOverflowScrolling: 'touch' }}
                                 >
                                   {s.services.map((srv) => (
                                     <div
                                       key={srv.id}
-                                      className="bg-white/5 rounded-lg px-2 py-[3px] flex flex-col justify-between h-full"
+                                      className="w-[48%] bg-white/5 rounded-lg px-2 py-[3px] capitalize"
                                     >
-                                      <span className="truncate block capitalize">💅 {srv.name}</span>
+                                      💅 {srv.name}
                                     </div>
                                   ))}
-
                                 </div>
                               </div>
                             )}
