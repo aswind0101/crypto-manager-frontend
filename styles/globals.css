@@ -52,6 +52,36 @@
   }
 }
 
+@keyframes scanning {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-scanning {
+  animation: scanning 1.2s linear infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
 .animate-rise {
   animation-name: rise;
   animation-timing-function: ease-in-out;
@@ -71,6 +101,20 @@
     /* biến icon thành màu trắng */
     cursor: pointer;
   }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-rotate {
+  animation: rotate 1.5s linear infinite;
 }
 
 @keyframes border-rotate {
@@ -105,6 +149,31 @@
   mask-composite: exclude;
 }
 
+@keyframes flash {
+
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+
+  40% {
+    opacity: 1;
+  }
+}
+
+.dot-flash {
+  animation: flash 1.4s infinite;
+  font-weight: bold;
+}
+
+.dot-flash.delay-1 {
+  animation-delay: 0.2s;
+}
+
+.dot-flash.delay-2 {
+  animation-delay: 0.4s;
+}
 
 @keyframes spin-slow {
   0% {

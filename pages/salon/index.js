@@ -15,18 +15,17 @@ dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-import { Clock } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from "recharts";
-import { ChevronLeft, ChevronRight, AlarmClock, TimerReset, LoaderCircle, RefreshCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlarmClock, TimerReset, LoaderCircle, RefreshCcw, Loader2 } from "lucide-react";
 import {
   FiCalendar,
   FiClock,
   FiUser,
   FiPhone,
   FiPlayCircle, FiStopCircle,
-  FiDollarSign, FiGift, FiCreditCard, FiRepeat, FiSearch
+  FiDollarSign, FiGift, FiCreditCard, FiRepeat, FiSearch, FiBell
 } from "react-icons/fi";
-import { MdMiscellaneousServices } from "react-icons/md";
+import { MdMiscellaneousServices, MdOutlineCancel } from "react-icons/md";
 
 export default function SalonDashboard() {
   const [user, setUser] = useState(null);
@@ -84,6 +83,8 @@ export default function SalonDashboard() {
   // Helper: get freelancer info
   const getFreelancerInfo = (id) => freelancers.find(f => f.id === id) || {};
 
+  const pendingAppointments = appointmentsToday.filter(a => a.status === "pending");
+  const [pendingIndex, setPendingIndex] = useState(0);
 
   const serviceIntervalRef = useRef({});
   const [serviceTimers, setServiceTimers] = useState({});
@@ -705,20 +706,155 @@ export default function SalonDashboard() {
           <Card
             className="h-full flex flex-col"
             icon={<FiCalendar />}
-            title="Appointments"
+            title="New Appointments"
             value={
-              <span>
-                {appointmentsToday.filter(a => a.status !== "cancelled").length}
-                <span className="ml-2 font-normal text-[16px]">Today</span>
-              </span>
+              pendingAppointments.length > 0
+                ? dayjs.utc(pendingAppointments[pendingIndex].appointment_date).format("hh:mm A")
+                : ""
             }
             sub={
-              <div className="flex flex-col gap-2 pl-2 text-sm">
-                <span>✅ Completed: {appointmentsToday.filter(a => a.status === "completed").length}</span>
-                <span>👩‍🔧 Serving: {appointmentsToday.filter(a => a.status === "processing").length}</span>
-                <span>🟡 Pending: {appointmentsToday.filter(a => a.status === "pending").length}</span>
-                <span>⏳ Upcoming: {appointmentsToday.filter(a => a.status === "confirmed" && !a.started_at).length}</span>
-              </div>
+              pendingAppointments.length > 0 ? (
+                <div className="flex flex-col gap-2 p-4 rounded-xl w-full">
+                  {/* Tên khách hàng */}
+                  <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                    <span className="text-pink-300">👤</span>
+                    {pendingAppointments[pendingIndex].customer_name}
+                  </div>
+
+                  {/* Dịch vụ */}
+                  <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
+                    <span className="text-yellow-300">💇‍♀️</span>
+                    {pendingAppointments[pendingIndex].services?.map(s => s.name).join(", ")}
+                  </div>
+
+                  {/* Estimated Time */}
+                  <div className="flex items-center gap-2 text-xs text-blue-400">
+                    <span className="text-blue-300">⏱</span>
+                    <span>
+                      Estimated Time:{" "}
+                      <span className="font-semibold text-emerald-200">
+                        {pendingAppointments[pendingIndex].services?.reduce(
+                          (sum, s) => sum + (s.duration || s.duration_minutes || 0),
+                          0
+                        )}{" "}
+                        min
+                      </span>
+                    </span>
+                  </div>
+
+                  {/* Nút xác nhận */}
+                  <button
+                    className={`mt-3 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow transition text-lg flex items-center justify-center gap-2
+                ${processingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+              `}
+                    disabled={processingApptId === pendingAppointments[pendingIndex].id}
+                    onClick={async () => {
+                      const appointment = pendingAppointments[pendingIndex];
+                      try {
+                        setProcessingApptId(appointment.id);
+                        const token = await user.getIdToken();
+                        await fetch(
+                          `https://crypto-manager-backend.onrender.com/api/appointments/${appointment.id}`,
+                          {
+                            method: "PATCH",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ status: "confirmed" }),
+                          }
+                        );
+                        await fetchData(user); // hoặc loadAppointments(...)
+                      } catch (err) {
+                        console.error("Confirm failed:", err);
+                        alert("Failed to confirm appointment. Please try again.");
+                      }
+                      setProcessingApptId(null);
+                    }}
+                  >
+                    {processingApptId === pendingAppointments[pendingIndex].id ? (
+                      <>
+                        <Loader2 className="animate-spin w-5 h-5" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
+                          <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                        </svg>
+                        Accept
+                      </>
+                    )}
+                  </button>
+
+                  {/* Điều hướng nhiều lịch hẹn */}
+                  {pendingAppointments.length > 1 && (
+                    <div className="flex gap-2 mt-2 items-center justify-center">
+                      <button
+                        onClick={() =>
+                          setPendingIndex(idx =>
+                            idx > 0 ? idx - 1 : pendingAppointments.length - 1
+                          )
+                        }
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Previous appointment"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <span className="mx-2 text-xs text-pink-400">
+                        {`${pendingIndex + 1} / ${pendingAppointments.length}`}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setPendingIndex(idx =>
+                            idx < pendingAppointments.length - 1 ? idx + 1 : 0
+                          )
+                        }
+                        className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                        aria-label="Next appointment"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-full p-4 rounded-xl flex flex-col items-center justify-center gap-3 text-white/70 text-center">
+                  {/* 🌐 Radar Scan Icon */}
+                  <div className="relative w-20 h-20">
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                      <circle cx="50" cy="50" r="45" stroke="#f472b6" strokeWidth="4" fill="none" className="opacity-50" />
+                      <circle cx="50" cy="50" r="30" stroke="#facc15" strokeWidth="1" fill="none" className="opacity-30" />
+                      <line
+                        x1="50"
+                        y1="50"
+                        x2="95"
+                        y2="50"
+                        stroke="#f472b6"
+                        strokeWidth="1"
+                        className="origin-center animate-rotate"
+                      />
+                    </svg>
+                    {/* Center pulse */}
+                    <div className="absolute top-1/2 left-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-pink-500 rounded-full animate-ping" />
+                  </div>
+                  <div className="text-sm text-pink-200 font-semibold flex items-center justify-center gap-1">
+                    Looking for appointments
+                    <span className="dot-flash">.</span>
+                    <span className="dot-flash delay-1">.</span>
+                    <span className="dot-flash delay-2">.</span>
+                  </div>
+
+                </div>
+              )
+            }
+            extra={
+              <AppointmentNotification
+                pendingCount={appointmentsToday.filter(a => a.status === "pending").length}
+                cancelledCount={appointmentsToday.filter(a => a.status === "cancelled").length}
+                messageCount={0}
+              />
             }
           />
           <div className="relative w-full">
@@ -744,10 +880,7 @@ export default function SalonDashboard() {
                 nextClients.length > 0
                   ? dayjs.utc(nextClients[nextClientIndex].appointment_date).format("hh:mm A")
                   : (
-                    <div className="flex flex-col items-center justify-center text-pink-300 animate-pulse">
-                      <FiSearch className="text-4xl mb-1" />
-                      <span className="text-xs">Searching Client...</span>
-                    </div>
+                    ""
                   )
               }
               sub={
@@ -837,7 +970,7 @@ export default function SalonDashboard() {
                         />
                       ))}
                     </div>
-                    <span className="font-semibold text-pink-200">Searching for next client</span>
+                    <span className="font-semibold text-pink-200">Wating for next client</span>
                     <span className="text-xs text-white/40 mt-1 animate-pulse">No upcoming appointments</span>
                   </div>
 
@@ -1102,9 +1235,18 @@ export default function SalonDashboard() {
 }
 
 // Card component
-function Card({ icon, title, value, sub, children, className = "" }) {
+function Card({ icon, title, value, sub, children, className = "", extra }) {
   return (
-    <div className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 rounded-2xl shadow-lg p-4 sm:p-5 mb-3 transition-all`}>
+    <div
+      className={`relative ${className} bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-t-2 border-b-2 border-pink-400 rounded-2xl shadow-lg p-4 sm:p-5 mb-3 transition-all`}
+    >
+      {/* 🔔 EXTRA content (ví dụ: thông báo) */}
+      {extra && (
+        <div className="absolute top-3 right-4 z-10">
+          {extra}
+        </div>
+      )}
+
       <div className="text-3xl text-yellow-300 mb-1">{icon}</div>
       <h4 className="text-lg font-bold text-pink-300">{title}</h4>
       <div className="text-xl font-extrabold text-white">{value}</div>
@@ -1113,7 +1255,6 @@ function Card({ icon, title, value, sub, children, className = "" }) {
     </div>
   );
 }
-
 
 function ActionButton({ label, onClick }) {
   return (
@@ -1133,4 +1274,71 @@ function formatSeconds(sec) {
   const s = sec % 60;
   if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function AppointmentNotification({ pendingCount = 0, cancelledCount = 0, messageCount = 0 }) {
+  const [showPopup, setShowPopup] = useState(false);
+  const total = pendingCount + cancelledCount + messageCount;
+
+  return (
+    <>
+      {/* 🔔 Nút chuông nổi trong thẻ */}
+      <div className="relative">
+        <button
+          onClick={() => setShowPopup(true)}
+          className="relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition"
+        >
+          <FiBell className="text-white text-base" />
+          {total > 0 && (
+            <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
+              {total}
+            </div>
+          )}
+        </button>
+      </div>
+
+      {/* 🧾 Popup Detail */}
+      {showPopup && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative animate-fadeIn">
+            {/* Close */}
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
+              onClick={() => setShowPopup(false)}
+            >
+              <MdOutlineCancel className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-xl font-bold text-emerald-600 mb-4 text-center">
+              Appointment Notifications
+            </h3>
+
+            <ul className="space-y-3 text-sm">
+              <li className="flex justify-between items-center">
+                <span className="text-gray-700">🟡 Pending Confirmations</span>
+                <span className="font-bold text-emerald-600">{pendingCount}</span>
+              </li>
+              <li className="flex justify-between items-center">
+                <span className="text-gray-700">🔴 Cancelled Appointments</span>
+                <span className="font-bold text-pink-500">{cancelledCount}</span>
+              </li>
+              <li className="flex justify-between items-center">
+                <span className="text-gray-700">💬 Customer Messages</span>
+                <span className="font-bold text-blue-500">{messageCount}</span>
+              </li>
+            </ul>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowPopup(false)}
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 text-white font-semibold shadow hover:brightness-110 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
