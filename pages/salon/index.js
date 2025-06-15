@@ -705,7 +705,7 @@ export default function SalonDashboard() {
           <Card
             className="h-full flex flex-col"
             icon={<FiCalendar />}
-            title="New Appointments"
+            title="Appointments"
             value={
               pendingAppointments.length > 0
                 ? dayjs.utc(pendingAppointments[pendingIndex].appointment_date).format("hh:mm A")
