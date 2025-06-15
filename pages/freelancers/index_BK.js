@@ -11,7 +11,7 @@ import {
   FiExternalLink,
   FiCheckCircle,
   FiUser,
-  FiScissors,
+  FiSearch,
   FiTag,
 } from "react-icons/fi";
 import dayjs from "dayjs";
@@ -1525,10 +1525,16 @@ export default function FreelancerDashboard() {
             icon={<FiClock />}
             title="Next Client"
             value={
-              upcomingAppointments.length > 0
-                ? formatNextAppointmentTime(upcomingAppointments[nextClientIndex].appointment_date)
-                : "No upcoming"
+              upcomingAppointments.length > 0 ? (
+                formatNextAppointmentTime(upcomingAppointments[nextClientIndex].appointment_date)
+              ) : (
+                <div className="flex flex-col items-center justify-center text-pink-300 animate-pulse">
+                  <FiSearch className="text-4xl mb-1" />
+                  <span className="text-xs">Searching Client...</span>
+                </div>
+              )
             }
+
             sub={
               upcomingAppointments.length > 0 ? (
                 <div className="flex flex-col gap-2 p-4 rounded-xl card-animate-in w-full">
@@ -1653,7 +1659,26 @@ export default function FreelancerDashboard() {
                     </div>
                   )}
                 </div>
-              ) : "No upcoming"
+              ) : (
+                <div className="flex flex-col items-center justify-center text-sm text-white/70 p-4">
+                  {/* Animated energy wave */}
+                  <div className="flex gap-[4px] items-end h-8 mb-3 overflow-hidden">
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                      <div
+                        key={i}
+                        className="w-[4px] rounded-sm bg-pink-400 animate-rise"
+                        style={{
+                          animationDelay: `${i * 0.1}s`,
+                          animationDuration: `1.2s`
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <span className="font-semibold text-pink-200">Searching for next client</span>
+                  <span className="text-xs text-white/40 mt-1 animate-pulse">No upcoming appointments</span>
+                </div>
+              )
             }
           />
 
@@ -1693,7 +1718,7 @@ export default function FreelancerDashboard() {
                     onClick={async () => {
                       // Lấy appointment đang serving
                       const appt = inProgressAppointments[inProgressIndex];
-                      console.log("DEBUG appt", appt); 
+                      console.log("DEBUG appt", appt);
                       // Chuẩn bị dữ liệu hóa đơn mặc định
                       setInvoiceForm({
                         appointment_id: appt.id,

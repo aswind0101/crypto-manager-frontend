@@ -47,6 +47,11 @@ export default function FreelancerDashboard() {
   const [nextClientIndex, setNextClientIndex] = useState(0);
   const [inProgressIndex, setInProgressIndex] = useState(0);
 
+  const [pendingAppointments, setPendingAppointments] = useState([]);
+  const [pendingIndex, setPendingIndex] = useState(0);
+  const [cancelingApptId, setCancelingApptId] = useState(null);
+
+
   const [showPopup, setShowPopup] = useState(false);
   const [latePopup, setLatePopup] = useState(null); // chứa appointment & logic chờ
   const [waitMinutes, setWaitMinutes] = useState(5); // mặc định 5 phút chờ
@@ -522,6 +527,11 @@ export default function FreelancerDashboard() {
     invoiceForm?.tip,
     invoiceForm?.amount_paid,
   ]);
+  useEffect(() => {
+    if (!appointmentsToday) return;
+    const pending = appointmentsToday.filter(a => a.status === "pending");
+    setPendingAppointments(pending);
+  }, [appointmentsToday]);
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
@@ -596,6 +606,7 @@ export default function FreelancerDashboard() {
 
   const handleConfirmAppointment = async (appointmentId) => {
     try {
+      setProcessingApptId(appointmentId); // 👉 Set loading
       const token = await user.getIdToken();
       const res = await fetch(
         `https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}`,
@@ -610,8 +621,7 @@ export default function FreelancerDashboard() {
       );
       if (res.ok) {
         clearSoundLoop(soundLoopRef);
-
-        setShowPopup(false);                         // ✅ Tắt popup
+        setShowPopup(false); // ✅ Tắt popup
         await loadAppointments(
           await user.getIdToken(),
           setAppointments,
@@ -623,19 +633,22 @@ export default function FreelancerDashboard() {
           setNewAppointment,
           soundRef,
           soundLoopRef,
-          setUpcomingAppointments,    // Thêm dòng này
-          setNextClientIndex          // Thêm dòng này
+          setUpcomingAppointments,
+          setNextClientIndex
         );
-
-
       }
     } catch (err) {
       console.error("❌ Error confirming appointment:", err.message);
+    } finally {
+      setProcessingApptId(null); // 👉 Reset loading
     }
   };
 
+
   const handleCancelAppointment = async (appointmentId) => {
     try {
+      setCancelingApptId(appointmentId); // 🌀 Loading
+
       const token = await user.getIdToken();
       const res = await fetch(
         `https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}`,
@@ -650,10 +663,9 @@ export default function FreelancerDashboard() {
       );
 
       if (res.ok) {
-        clearSoundLoop(soundLoopRef); // ✅ Tắt âm thanh nếu đang lặp
-        setShowPopup(false);          // ✅ Tắt popup
+        clearSoundLoop(soundLoopRef);
+        setShowPopup(false);
 
-        // ✅ Load lại lịch hẹn để cập nhật ngay UI
         await loadAppointments(
           token,
           setAppointments,
@@ -671,8 +683,11 @@ export default function FreelancerDashboard() {
       }
     } catch (err) {
       console.error("❌ Error cancelling appointment:", err.message);
+    } finally {
+      setCancelingApptId(null); // 🔚 Stop loading
     }
   };
+
 
   const steps = {
     has_avatar: onboarding?.avatar_url,
@@ -1487,37 +1502,125 @@ export default function FreelancerDashboard() {
           <Card
             className="col-span-12 md:col-span-6"
             icon={<FiCalendar />}
-            title="Appointments"
+            title="New Appointments"
             value={
-              <span>
-                {appointmentsToday.filter(a => a.status !== "cancelled").length}
-                <span className="ml-2 font-normal text-[16px]">Today</span>
-              </span>
+              pendingAppointments.length > 0
+                ? dayjs.utc(pendingAppointments[pendingIndex].appointment_date).format("hh:mm A")
+                : ""
             }
             sub={
-              <div>
-                {/* Dòng Today - cách dưới ra xa */}
-                <div className="mb-3" />
-                {/* Group trạng thái, lùi vào trái */}
-                <div className="flex flex-col gap-2 pl-4 text-sm">
-                  <span>✅ Completed: {completedToday}</span>
-                  <span>👩‍🔧 Serving: {appointmentsToday.filter(a => a.status === "processing").length}</span>
-                  <span>🟡 Pending: {pendingToday}</span>
-                  <span>⏳ Upcoming: {upcomingToday}</span>
+              pendingAppointments.length > 0 ? (
+                <div className="flex flex-col gap-2 p-4 rounded-xl w-full">
+                  {/* Tên khách hàng */}
+                  <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                    <span className="text-pink-300">👤</span>
+                    {pendingAppointments[pendingIndex].customer_name}
+                  </div>
+
+                  {/* Dịch vụ */}
+                  <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
+                    <span className="text-yellow-300">💇‍♀️</span>
+                    {pendingAppointments[pendingIndex].services?.map(s => s.name).join(", ")}
+                  </div>
+
+                  {/* Estimated Time */}
+                  <div className="flex items-center gap-2 text-xs text-blue-400">
+                    <span className="text-blue-300">⏱</span>
+                    <span>
+                      Estimated Time:{" "}
+                      <span className="font-semibold text-emerald-200">
+                        {pendingAppointments[pendingIndex].services?.reduce(
+                          (sum, s) => sum + (s.duration || s.duration_minutes || 0),
+                          0
+                        )}{" "}
+                        min
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-2 mt-3 w-full">
+                    {/* Confirm Button */}
+                    <button
+                      className={`flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
+      ${processingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+    `}
+                      disabled={processingApptId === pendingAppointments[pendingIndex].id}
+                      onClick={() => handleConfirmAppointment(pendingAppointments[pendingIndex].id)}
+                    >
+                      {processingApptId === pendingAppointments[pendingIndex].id ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
+                            <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                          </svg>
+                          Confirm
+                        </>
+                      )}
+                    </button>
+
+                    {/* Cancel Button */}
+                    <button
+                      className={`flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
+      ${cancelingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+    `}
+                      disabled={cancelingApptId === pendingAppointments[pendingIndex].id}
+                      onClick={() => handleCancelAppointment(pendingAppointments[pendingIndex].id)}
+                    >
+                      {cancelingApptId === pendingAppointments[pendingIndex].id ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Cancelling...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
+                            <path d="M6 18L18 6M6 6l12 12" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          Cancel
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                 </div>
-              </div>
-            }
-          >
-            <button
-              onClick={() => router.push("/freelancers/appointments")}
-              className="absolute top-2 right-2 text-white hover:text-yellow-400 text-xl"
-              title="Manage Appointments"
-            >
-              <FiExternalLink />
-            </button>
-          </Card>
+              ) : (
+                <div className="w-full p-4 rounded-xl flex flex-col items-center justify-center gap-3 text-white/70 text-center">
+                  {/* 🌐 Radar Scan Icon */}
+                  <div className="relative w-20 h-20">
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                      <circle cx="50" cy="50" r="45" stroke="#f472b6" strokeWidth="2" className="opacity-50" />
+                      <circle cx="50" cy="50" r="30" stroke="#facc15" strokeWidth="1" className="opacity-30" />
+                      <circle cx="50" cy="50" r="15" stroke="#facc15" strokeWidth="1" className="opacity-30" />
+                      <line
+                        x1="50"
+                        y1="50"
+                        x2="95"
+                        y2="50"
+                        stroke="#f472b6"
+                        strokeWidth="1"
+                        className="origin-center animate-rotate"
+                      />
+                    </svg>
+                    {/* Center pulse */}
+                    <div className="absolute top-1/2 left-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-pink-500 rounded-full animate-ping" />
+                  </div>
+                  <div className="text-sm text-pink-200 font-semibold flex items-center justify-center gap-1">
+                    Looking for appointments
+                    <span className="dot-flash">.</span>
+                    <span className="dot-flash delay-1">.</span>
+                    <span className="dot-flash delay-2">.</span>
+                  </div>
 
+                </div>
+
+              )
+            }
+          />
 
           {/* Next Client */}
           <Card
@@ -1528,10 +1631,7 @@ export default function FreelancerDashboard() {
               upcomingAppointments.length > 0 ? (
                 formatNextAppointmentTime(upcomingAppointments[nextClientIndex].appointment_date)
               ) : (
-                <div className="flex flex-col items-center justify-center text-pink-300 animate-pulse">
-                  <FiSearch className="text-4xl mb-1" />
-                  <span className="text-xs">Searching Client...</span>
-                </div>
+                ""
               )
             }
 
@@ -1675,7 +1775,7 @@ export default function FreelancerDashboard() {
                     ))}
                   </div>
 
-                  <span className="font-semibold text-pink-200">Searching for next client</span>
+                  <span className="font-semibold text-pink-200">Waiting for next client</span>
                   <span className="text-xs text-white/40 mt-1 animate-pulse">No upcoming appointments</span>
                 </div>
               )
@@ -2119,4 +2219,71 @@ function formatTimeUntilNextWithLate(appointmentDate) {
     const lateMinutes = Math.abs(target.diff(now, "minute"));
     return `🔴 Late ${lateMinutes} min`;
   }
+}
+
+function AppointmentNotification({ pendingCount = 0, cancelledCount = 0, messageCount = 0 }) {
+  const [showPopup, setShowPopup] = useState(false);
+  const total = pendingCount + cancelledCount + messageCount;
+
+  return (
+    <>
+      {/* 🔔 Nút chuông nổi trong thẻ */}
+      <div className="relative">
+        <button
+          onClick={() => setShowPopup(true)}
+          className="relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition"
+        >
+          <FiBell className="text-white text-base" />
+          {total > 0 && (
+            <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
+              {total}
+            </div>
+          )}
+        </button>
+      </div>
+
+      {/* 🧾 Popup Detail */}
+      {showPopup && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative animate-fadeIn">
+            {/* Close */}
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
+              onClick={() => setShowPopup(false)}
+            >
+              <MdOutlineCancel className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-xl font-bold text-emerald-600 mb-4 text-center">
+              Appointment Notifications
+            </h3>
+
+            <ul className="space-y-3 text-sm">
+              <li className="flex justify-between items-center">
+                <span className="text-gray-700">🟡 Pending Confirmations</span>
+                <span className="font-bold text-emerald-600">{pendingCount}</span>
+              </li>
+              <li className="flex justify-between items-center">
+                <span className="text-gray-700">🔴 Cancelled Appointments</span>
+                <span className="font-bold text-pink-500">{cancelledCount}</span>
+              </li>
+              <li className="flex justify-between items-center">
+                <span className="text-gray-700">💬 Customer Messages</span>
+                <span className="font-bold text-blue-500">{messageCount}</span>
+              </li>
+            </ul>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowPopup(false)}
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 text-white font-semibold shadow hover:brightness-110 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

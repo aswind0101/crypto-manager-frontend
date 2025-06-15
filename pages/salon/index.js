@@ -699,7 +699,6 @@ export default function SalonDashboard() {
             </div>
           </div>
         </div>
-
         {/* Appointments & Next Client: nằm cùng dòng trên desktop */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2 items-stretch">
           {/* Appointments Card */}
@@ -824,8 +823,9 @@ export default function SalonDashboard() {
                   {/* 🌐 Radar Scan Icon */}
                   <div className="relative w-20 h-20">
                     <svg viewBox="0 0 100 100" className="w-full h-full">
-                      <circle cx="50" cy="50" r="45" stroke="#f472b6" strokeWidth="4" fill="none" className="opacity-50" />
-                      <circle cx="50" cy="50" r="30" stroke="#facc15" strokeWidth="1" fill="none" className="opacity-30" />
+                      <circle cx="50" cy="50" r="45" stroke="#f472b6" strokeWidth="2" className="opacity-50" />
+                      <circle cx="50" cy="50" r="30" stroke="#facc15" strokeWidth="1" className="opacity-30" />
+                      <circle cx="50" cy="50" r="15" stroke="#facc15" strokeWidth="1" className="opacity-30" />
                       <line
                         x1="50"
                         y1="50"
