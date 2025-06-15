@@ -13,7 +13,13 @@ import {
   FiUser,
   FiSearch,
   FiTag,
-  FiBell
+  FiBell,
+  FiPhone,
+  FiPlayCircle,
+  FiStopCircle,
+  FiGift,
+  FiCreditCard,
+  FiRepeat
 } from "react-icons/fi";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -767,13 +773,11 @@ export default function FreelancerDashboard() {
       {showInvoicePopup && invoiceForm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <form
-            className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-4 border-emerald-400 text-gray-800"
+            className="bg-gradient-to-r from-emerald-100 via-yellow-50 to-pink-50 backdrop-blur-xl
+                  rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-t-4 border-pink-400 text-gray-800"
             onSubmit={async (e) => {
               e.preventDefault();
-              // Tính tổng cần thanh toán
               const totalDue = invoiceForm.total_amount + (invoiceForm.tip || 0);
-
-              // Nếu chưa nhập hoặc chưa đủ tiền
               if (
                 invoiceForm.amount_paid === null ||
                 invoiceForm.amount_paid === undefined ||
@@ -798,8 +802,7 @@ export default function FreelancerDashboard() {
                     tip: invoiceForm.tip,
                     amount_paid: invoiceForm.amount_paid,
                     change: invoiceForm.change,
-                  })
-                  ,
+                  }),
                 });
                 if (!res.ok) {
                   const data = await res.json();
@@ -807,10 +810,6 @@ export default function FreelancerDashboard() {
                   setSavingInvoice(false);
                   return;
                 }
-                setShowInvoicePopup(false);
-                setSavingInvoice(false);
-
-                // Reload toàn bộ appointment list, cập nhật lại các state!
                 await loadAppointments(
                   token,
                   setAppointments,
@@ -825,6 +824,10 @@ export default function FreelancerDashboard() {
                   setUpcomingAppointments,
                   setNextClientIndex
                 );
+                setShowInvoicePopup(false);
+                setSavingInvoice(false);
+                // Reload lại appointmentsToday và nowServing
+
               } catch (err) {
                 setSaveInvoiceError("Network error. Please try again.");
                 setSavingInvoice(false);
@@ -845,15 +848,25 @@ export default function FreelancerDashboard() {
             {/* Customer info */}
             <div className="grid grid-cols-2 gap-3 mb-2">
               <div>
-                <label className="block text-gray-700 font-bold text-xs mb-1">Customer Name</label>
-                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-sm"
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiUser className="text-pink-600" />
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-2xl p-1 border border-gray-300 text-gray-900 bg-pink-50 text-center text-xs"
                   value={invoiceForm.customer_name}
                   readOnly
                 />
               </div>
               <div>
-                <label className="block text-gray-700 font-bold text-xs mb-1">Phone</label>
-                <input type="text" className="w-full rounded p-1 border border-gray-300 text-gray-900 bg-gray-100 text-sm"
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiPhone className="text-pink-600" />
+                  Phone
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-2xl p-1 border border-gray-300 text-gray-900 bg-pink-50 text-center text-xs"
                   value={invoiceForm.customer_phone}
                   readOnly
                 />
@@ -863,21 +876,33 @@ export default function FreelancerDashboard() {
             {/* Actual Start/End & Duration */}
             <div className="grid grid-cols-2 gap-3 mb-2">
               <div>
-                <label className="block text-gray-700 font-bold text-xs mb-1">Actual Start</label>
-                <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-800 text-xs select-text">
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiPlayCircle className="text-emerald-500" />
+                  Actual Start
+                </label>
+
+                <div className="bg-pink-50 border border-gray-200 rounded-2xl px-2 py-1 text-gray-800 text-center text-xs select-text">
                   {dayjs.utc(invoiceForm.actual_start_at).format("YYYY-MM-DD HH:mm:ss")}
                 </div>
               </div>
               <div>
-                <label className="block text-gray-700 font-bold text-xs mb-1">Actual End</label>
-                <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-800 text-xs select-text">
+                <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                  <FiStopCircle className="text-pink-500" />
+                  Actual End
+                </label>
+
+                <div className="bg-pink-50 border border-gray-200 rounded-2xl px-2 py-1 text-gray-800 text-center text-xs select-text">
                   {invoiceForm.actual_end_at}
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-end mb-2">
-              <span className="text-xs text-gray-700 mr-1">Total Duration:</span>
-              <span className="font-bold text-sm text-emerald-600">
+              <span className="text-xs text-pink-700 mr-1 flex items-center gap-1">
+                <FiClock className="text-pink-700 text-sm" />
+                Service time:
+              </span>
+
+              <span className="font-bold text-xs text-emerald-600">
                 {invoiceForm.total_duration || invoiceForm.total_duration === 0
                   ? (() => {
                     const h = Math.floor(invoiceForm.total_duration / 60);
@@ -889,18 +914,20 @@ export default function FreelancerDashboard() {
               </span>
             </div>
 
-            {/* Services (nhỏ gọn) */}
+            {/* Services (compact) */}
             <div className="mb-2">
-              <label className="block text-gray-700 font-bold text-xs mb-1">Services</label>
+              <label className="block text-pink-700 font-bold text-sm mb-1 flex items-center gap-2">
+                <MdMiscellaneousServices className="text-pink-600 text-base" />
+                Services
+              </label>
+
               <div className="space-y-1">
                 {invoiceForm.services.map((srv, idx) => (
                   <div key={idx} className="flex gap-2 items-center px-1 py-1 text-xs w-full">
-                    <span className="text-pink-400">✂️</span>
-                    {/* Service name: chiếm toàn bộ không gian còn lại */}
                     <div className="relative flex-1 min-w-0">
                       <input
                         type="text"
-                        className="w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                        className="w-full pl-4 rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-xs"
                         value={srv.name}
                         autoComplete="off"
                         onFocus={() => setServiceDropdownIdx(idx)}
@@ -917,7 +944,7 @@ export default function FreelancerDashboard() {
                       />
                       {serviceDropdownIdx === idx && serviceNameQuery.length > 0 && (
                         <div
-                          className="absolute z-30 left-0 mt-1 w-44 max-h-32 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-xs"
+                          className="absolute z-30 left-0 mt-1 w-44 max-h-32 overflow-y-auto bg-white border border-gray-300 rounded-xl shadow-lg text-xs"
                           style={{ minWidth: 90 }}
                         >
                           {allServiceNames
@@ -951,8 +978,7 @@ export default function FreelancerDashboard() {
                       type="number"
                       min={0}
                       step={0.01}
-                      // 👇 width nhỏ gọn (w-14 hoặc w-16 tuỳ ý)
-                      className="w-16 rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs text-right"
+                      className="w-16 rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-xs text-center"
                       value={srv.price}
                       onChange={e => {
                         const services = [...invoiceForm.services];
@@ -985,42 +1011,48 @@ export default function FreelancerDashboard() {
             </div>
 
             {/* Total Amount, Tip, Amount Paid, Change */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-2">
+            <div className="border-t-4 pl-6 border-pink-200 rounded-2xl shadow-2xl px-3 py-2 mb-2">
               <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold text-emerald-700 flex items-center">
-                  <span className="text-lg mr-1">💵</span>Total Amount
+                <span className="font-semibold text-emerald-700 flex items-center gap-2">
+                  <FiDollarSign className="text-emerald-700 text-base" />
+                  Total Amount
                 </span>
+
                 <span className="font-bold text-base text-emerald-700">
                   ${invoiceForm.total_amount ? invoiceForm.total_amount.toFixed(2) : "0.00"}
                 </span>
               </div>
               <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-lg mr-1">🎁</span>Tip
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiGift className="text-yellow-500 text-base" />
+                  Tip
                 </span>
+
                 <div className="relative w-20">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none text-sm">$</span>
                   <input
                     type="number"
                     min={0}
                     step={0.01}
-                    className="pl-5 w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                    className="pl-5 w-full rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-sm"
                     value={invoiceForm.tip || ""}
                     onChange={e => setInvoiceForm(f => ({ ...f, tip: Number(e.target.value) }))}
                   />
                 </div>
               </div>
               <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-lg mr-1">💰</span>Amount Paid
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiCreditCard className="text-pink-400 text-base" />
+                  Amount Paid
                 </span>
+
                 <div className="relative w-20">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none text-xs">$</span>
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none text-sm">$</span>
                   <input
                     type="number"
                     min={0}
                     step={0.01}
-                    className="pl-5 w-full rounded border border-gray-300 p-1 text-gray-900 bg-white text-xs"
+                    className="pl-5 w-full rounded-2xl border border-gray-300 p-1 text-gray-900 bg-white text-sm"
                     value={invoiceForm.amount_paid || ""}
                     onChange={e => {
                       const val = e.target.value;
@@ -1028,7 +1060,7 @@ export default function FreelancerDashboard() {
                         ...f,
                         amount_paid: val === "" ? null : Number(val)
                       }));
-                      setSaveInvoiceError(""); // XÓA lỗi khi người dùng nhập lại
+                      setSaveInvoiceError("");
                     }}
                   />
                 </div>
@@ -1039,11 +1071,12 @@ export default function FreelancerDashboard() {
                   Customer has not paid enough!
                 </div>
               }
-
               <div className="flex justify-between items-center mt-1">
-                <span className="font-semibold text-gray-600 flex items-center">
-                  <span className="text-lg mr-1">🧾</span>Change
+                <span className="font-semibold text-gray-600 flex items-center gap-2">
+                  <FiRepeat className="text-purple-500 text-base" />
+                  Change
                 </span>
+
                 <span className="font-bold text-emerald-700">
                   ${invoiceForm.change ? invoiceForm.change.toFixed(2) : "0.00"}
                 </span>
@@ -1052,24 +1085,31 @@ export default function FreelancerDashboard() {
 
             {/* Notes */}
             <div className="mb-2">
-              <label className="block text-gray-700 font-bold text-xs mb-1">Notes</label>
+              <label className="block text-pink-700 font-bold text-sm mb-1">Notes</label>
               <textarea
-                className="w-full rounded border border-gray-300 p-2 text-gray-900 bg-white text-xs"
+                className="w-full rounded-2xl border border-gray-300  p-2 text-gray-900 bg-white text-xs"
                 rows={2}
                 value={invoiceForm.notes}
                 onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))}
               />
             </div>
-
             {/* Error */}
             {saveInvoiceError && <div className="text-red-500 mb-2">{saveInvoiceError}</div>}
 
             <button
               type="submit"
-              className={`w-full mt-2 py-2 rounded-xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
+              className={`w-full mt-2 py-2 rounded-2xl bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 font-bold text-lg text-white shadow-lg ${savingInvoice ? "opacity-50" : ""}`}
               disabled={savingInvoice}
             >
-              {savingInvoice ? "Saving..." : "Complete & Save Invoice"}
+              {savingInvoice ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Saving...
+                </div>
+              ) : (
+                "Complete & Save Invoice"
+              )}
+
             </button>
           </form>
         </div>

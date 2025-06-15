@@ -294,7 +294,7 @@ export default function SalonDashboard() {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <form
             className="bg-gradient-to-r from-emerald-100 via-yellow-50 to-pink-50 backdrop-blur-xl
- rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-t-4 border-pink-400 text-gray-800"
+            rounded-2xl p-6 shadow-2xl max-w-md w-full relative border-t-4 border-pink-400 text-gray-800"
             onSubmit={async (e) => {
               e.preventDefault();
               const totalDue = invoiceForm.total_amount + (invoiceForm.tip || 0);
@@ -997,7 +997,14 @@ export default function SalonDashboard() {
             value=""
             sub={
               nowServing.length === 0 ? (
-                <div className="text-gray-400">No staff currently serving.</div>
+                <div className="flex flex-col items-center justify-center py-6 text-center animate-fadeIn">
+                  <div className="flex gap-1 h-6 items-end mb-3">
+                    <div className="w-1.5 bg-pink-400 animate-wave1 h-2 rounded"></div>
+                    <div className="w-1.5 bg-yellow-300 animate-wave2 h-4 rounded"></div>
+                    <div className="w-1.5 bg-emerald-400 animate-wave3 h-3 rounded"></div>
+                    <div className="w-1.5 bg-pink-400 animate-wave1 h-5 rounded"></div>
+                  </div>
+                </div>
               ) : (
                 <>
                   {/* MOBILE: 1 card/lần, mũi tên khi > 1 người */}
