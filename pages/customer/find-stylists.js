@@ -881,25 +881,11 @@ export default function FindStylists() {
                             {Array.isArray(s.services) && s.services.length > 0 && (
                               <div className="mt-2 w-full">
                                 <p className="text-[13px] font-semibold text-emerald-300 mb-1 text-left pl-2">✨ Services:</p>
-                                <div
-                                  style={{
-                                    maxHeight: 100,
-                                    overflowY: "auto",
-                                    WebkitOverflowScrolling: "touch",
-                                    overscrollBehavior: "contain",
-                                    touchAction: "pan-y",
-                                    scrollbarWidth: "thin",
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: "0.5rem",
-                                  }}
-                                  className="px-1 py-1 bg-white/5 rounded-md text-[11px] text-pink-100"
-                                >
+                                <div className="scroll-services-mobile px-1 py-1 bg-white/5 rounded-md text-[11px] text-pink-100 flex flex-wrap gap-2">
                                   {s.services.map((srv) => (
                                     <div
                                       key={srv.id}
-                                      style={{ width: "48%" }}
-                                      className="bg-white/5 rounded-lg px-2 py-[3px] capitalize"
+                                      className="w-[48%] bg-white/5 rounded-lg px-2 py-[3px] capitalize"
                                     >
                                       💅 {srv.name}
                                     </div>
@@ -907,7 +893,6 @@ export default function FindStylists() {
                                 </div>
                               </div>
                             )}
-
 
                           </div>
                           <div className="text-sm text-white/80 space-y-1">
