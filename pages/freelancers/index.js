@@ -1973,93 +1973,104 @@ export default function FreelancerDashboard() {
                 {availableServices.length === 0 ? (
                   <p className="text-sm text-red-300 italic">No services found for your specialization.</p>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                    {availableServices.map((srv) => {
-                      const checked = selectedServiceIds.includes(srv.id);
-                      return (
-                        <label
-                          key={srv.id}
-                          className={`flex items-start gap-3 bg-white/5 p-3 rounded-xl shadow hover:bg-white/10 transition cursor-pointer capitalize relative`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={savingStatus === "saving" || updatingServiceId === srv.id}
-                            onChange={async (e) => {
-                              const checked = e.target.checked;
-                              const newIds = checked
-                                ? [...selectedServiceIds, srv.id]
-                                : selectedServiceIds.filter((id) => id !== srv.id);
+                  <div
+                    className="custom-scrollbar max-h-[280px] overflow-y-auto pr-1"
+                    style={{
+                      WebkitOverflowScrolling: "touch",
+                      overscrollBehavior: "contain",
+                      touchAction: "pan-y",
+                    }}
+                  >
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  {availableServices.map((srv) => {
+                    const checked = selectedServiceIds.includes(srv.id);
+                    return (
+                      <label
+                        key={srv.id}
+                        className={`flex items-start gap-3 bg-white/5 p-3 rounded-xl shadow hover:bg-white/10 transition cursor-pointer capitalize relative`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={savingStatus === "saving" || updatingServiceId === srv.id}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            const newIds = checked
+                              ? [...selectedServiceIds, srv.id]
+                              : selectedServiceIds.filter((id) => id !== srv.id);
 
-                              setUpdatingServiceId(srv.id);
-                              setSavingStatus("saving");
-                              setSelectedServiceIds(newIds);
+                            setUpdatingServiceId(srv.id);
+                            setSavingStatus("saving");
+                            setSelectedServiceIds(newIds);
 
-                              try {
-                                const token = await user.getIdToken();
-                                const res = await fetch(
-                                  "https://crypto-manager-backend.onrender.com/api/freelancers/services",
-                                  {
-                                    method: "PATCH",
-                                    headers: {
-                                      Authorization: `Bearer ${token}`,
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({ service_ids: newIds }),
-                                  }
-                                );
-                                if (!res.ok) throw new Error("Failed to update services");
-                                setSavingStatus("saved");
-                                setTimeout(() => setSavingStatus(""), 1200);
-                              } catch (err) {
-                                setSavingStatus("error");
-                                setTimeout(() => setSavingStatus(""), 1500);
-                              }
-                              setUpdatingServiceId(null);
-                            }}
-                            className="accent-pink-500 mt-1"
-                          />
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-pink-300 flex items-center gap-2">
-                              {srv.name}
-                              {updatingServiceId === srv.id && savingStatus === "saving" && (
-                                <Loader2 className="animate-spin w-4 h-4 text-yellow-400 ml-1" />
-                              )}
-                              {checked && savingStatus === "saved" && updatingServiceId === null && (
-                                <CheckCircle className="ml-1 w-4 h-4 text-emerald-400 drop-shadow" />
-                              )}
-                            </span>
-                            <span className="text-xs text-emerald-300">
-                              ${srv.price} – {srv.duration_minutes} min
-                            </span>
-                          </div>
-                        </label>
-                      );
-                    })}
-                    {savingStatus === "error" && (
-                      <div className="text-red-400 text-sm mt-2 animate-bounce-in">
-                        Save failed! Please try again.
-                      </div>
-                    )}
+                            try {
+                              const token = await user.getIdToken();
+                              const res = await fetch(
+                                "https://crypto-manager-backend.onrender.com/api/freelancers/services",
+                                {
+                                  method: "PATCH",
+                                  headers: {
+                                    Authorization: `Bearer ${token}`,
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({ service_ids: newIds }),
+                                }
+                              );
+                              if (!res.ok) throw new Error("Failed to update services");
+                              setSavingStatus("saved");
+                              setTimeout(() => setSavingStatus(""), 1200);
+                            } catch (err) {
+                              setSavingStatus("error");
+                              setTimeout(() => setSavingStatus(""), 1500);
+                            }
+                            setUpdatingServiceId(null);
+                          }}
+                          className="accent-pink-500 mt-1"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-pink-300 flex items-center gap-2">
+                            {srv.name}
+                            {updatingServiceId === srv.id && savingStatus === "saving" && (
+                              <Loader2 className="animate-spin w-4 h-4 text-yellow-400 ml-1" />
+                            )}
+                            {checked && savingStatus === "saved" && updatingServiceId === null && (
+                              <CheckCircle className="ml-1 w-4 h-4 text-emerald-400 drop-shadow" />
+                            )}
+                          </span>
+                          <span className="text-xs text-emerald-300">
+                            ${srv.price} – {srv.duration_minutes} min
+                          </span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {savingStatus === "error" && (
+                  <div className="text-red-400 text-sm mt-2 animate-bounce-in">
+                    Save failed! Please try again.
                   </div>
                 )}
-              </>
+              </div>
+
+                )}
+          </>
             )}
-          </div>
-          {/* Quick Actions */}
-          <div className="col-span-12">
-            <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
-              <ActionButton label="🧾 Appointments" onClick={() => router.push("/freelancers/appointments")} />
-              <ActionButton label="💬 Chat" onClick={() => router.push("/freelancers/chat")} />
-              <ActionButton label="💸 Withdraw" onClick={() => router.push("/freelancers/withdraw")} />
-            </div>
+        </div>
+        {/* Quick Actions */}
+        <div className="col-span-12">
+          <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
+            <ActionButton label="🧾 Appointments" onClick={() => router.push("/freelancers/appointments")} />
+            <ActionButton label="💬 Chat" onClick={() => router.push("/freelancers/chat")} />
+            <ActionButton label="💸 Withdraw" onClick={() => router.push("/freelancers/withdraw")} />
           </div>
         </div>
       </div>
-
     </div>
+
+    </div >
   );
 }
 function Card({ icon, title, value, sub, children, className = "", extra = null }) {

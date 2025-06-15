@@ -886,7 +886,7 @@ export default function FindStylists() {
                                   {s.services.map((srv) => (
                                     <div
                                       key={srv.id}
-                                      className="bg-white/5 rounded-lg px-2 py-[3px] flex flex-col justify-between h-full"
+                                      className="bg-white/5 rounded-sm px-2 py-[3px] flex flex-col justify-between h-full"
                                     >
                                       <span className="truncate block capitalize">💅 {srv.name}</span>
                                     </div>
