@@ -34,7 +34,7 @@ dayjs.extend(timezone);
 
 import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
 import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowUpRight, SquareArrowOutUpRight } from "lucide-react";
 import { MdMiscellaneousServices, MdOutlineCancel } from "react-icons/md";
 
 
@@ -1543,137 +1543,138 @@ export default function FreelancerDashboard() {
 
           </div>
 
+          <div className="relative col-span-12 md:col-span-6">
+            {/* 🔗 Icon chuyển trang góc phải */}
+            <button
+              onClick={() => router.push("/freelancers/appointments")}
+              className="absolute top-2 right-2 z-10 p-1 text-white/60 hover:text-pink-300 transition"
+              title="View all appointments"
+            >
+              <SquareArrowOutUpRight className="w-4 h-4" />
+            </button>
+            {/* Appointments */}
+            <Card
+              icon={<FiCalendar />}
+              title="Appointments"
+              value={
+                pendingAppointments.length > 0
+                  ? dayjs.utc(pendingAppointments[pendingIndex].appointment_date).format("hh:mm A")
+                  : ""
+              }
+              sub={
+                pendingAppointments.length > 0 ? (
+                  <div className="flex flex-col gap-2 p-4 rounded-xl w-full">
+                    {/* Tên khách hàng */}
+                    <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
+                      <span className="text-pink-300">👤</span>
+                      {pendingAppointments[pendingIndex].customer_name}
+                    </div>
 
-          {/* Appointments */}
-          <Card
-            className="col-span-12 md:col-span-6"
-            icon={<FiCalendar />}
-            title="New Appointments"
-            value={
-              pendingAppointments.length > 0
-                ? dayjs.utc(pendingAppointments[pendingIndex].appointment_date).format("hh:mm A")
-                : ""
-            }
-            extra={
-              <AppointmentNotification
-                pendingCount={pendingCount}
-                cancelledCount={cancelledCount}
-                messageCount={messageCount}
-              />
-            }
-            sub={
-              pendingAppointments.length > 0 ? (
-                <div className="flex flex-col gap-2 p-4 rounded-xl w-full">
-                  {/* Tên khách hàng */}
-                  <div className="flex items-center gap-2 font-bold text-yellow-200 capitalize truncate">
-                    <span className="text-pink-300">👤</span>
-                    {pendingAppointments[pendingIndex].customer_name}
-                  </div>
+                    {/* Dịch vụ */}
+                    <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
+                      <span className="text-yellow-300">💇‍♀️</span>
+                      {pendingAppointments[pendingIndex].services?.map(s => s.name).join(", ")}
+                    </div>
 
-                  {/* Dịch vụ */}
-                  <div className="flex items-center gap-2 text-xs text-emerald-300 capitalize truncate">
-                    <span className="text-yellow-300">💇‍♀️</span>
-                    {pendingAppointments[pendingIndex].services?.map(s => s.name).join(", ")}
-                  </div>
-
-                  {/* Estimated Time */}
-                  <div className="flex items-center gap-2 text-xs text-blue-400">
-                    <span className="text-blue-300">⏱</span>
-                    <span>
-                      Estimated Time:{" "}
-                      <span className="font-semibold text-emerald-200">
-                        {pendingAppointments[pendingIndex].services?.reduce(
-                          (sum, s) => sum + (s.duration || s.duration_minutes || 0),
-                          0
-                        )}{" "}
-                        min
+                    {/* Estimated Time */}
+                    <div className="flex items-center gap-2 text-xs text-blue-400">
+                      <span className="text-blue-300">⏱</span>
+                      <span>
+                        Estimated Time:{" "}
+                        <span className="font-semibold text-emerald-200">
+                          {pendingAppointments[pendingIndex].services?.reduce(
+                            (sum, s) => sum + (s.duration || s.duration_minutes || 0),
+                            0
+                          )}{" "}
+                          min
+                        </span>
                       </span>
-                    </span>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-2 mt-3 w-full">
+                      {/* Confirm Button */}
+                      <button
+                        className={`flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
+                  ${processingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+                `}
+                        disabled={processingApptId === pendingAppointments[pendingIndex].id}
+                        onClick={() => handleConfirmAppointment(pendingAppointments[pendingIndex].id)}
+                      >
+                        {processingApptId === pendingAppointments[pendingIndex].id ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
+                              <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
+                            </svg>
+                            Confirm
+                          </>
+                        )}
+                      </button>
+
+                      {/* Cancel Button */}
+                      <button
+                        className={`flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
+                  ${cancelingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+                `}
+                        disabled={cancelingApptId === pendingAppointments[pendingIndex].id}
+                        onClick={() => handleCancelAppointment(pendingAppointments[pendingIndex].id)}
+                      >
+                        {cancelingApptId === pendingAppointments[pendingIndex].id ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Cancelling...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
+                              <path d="M6 18L18 6M6 6l12 12" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            Cancel
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                  </div>
+                ) : (
+                  <div className="w-full p-4 rounded-xl flex flex-col items-center justify-center gap-3 text-white/70 text-center">
+                    {/* 🌐 Radar Scan Icon */}
+                    <div className="relative w-20 h-20">
+                      <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <circle cx="50" cy="50" r="45" stroke="#f472b6" strokeWidth="2" className="opacity-50" />
+                        <circle cx="50" cy="50" r="30" stroke="#facc15" strokeWidth="1" className="opacity-30" />
+                        <circle cx="50" cy="50" r="15" stroke="#facc15" strokeWidth="1" className="opacity-30" />
+                        <line
+                          x1="50"
+                          y1="50"
+                          x2="95"
+                          y2="50"
+                          stroke="#f472b6"
+                          strokeWidth="1"
+                          className="origin-center animate-rotate"
+                        />
+                      </svg>
+                      {/* Center pulse */}
+                      <div className="absolute top-1/2 left-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-pink-500 rounded-full animate-ping" />
+                    </div>
+                    <div className="text-sm text-pink-200 font-semibold flex items-center justify-center gap-1">
+                      Looking for appointments
+                      <span className="dot-flash">.</span>
+                      <span className="dot-flash delay-1">.</span>
+                      <span className="dot-flash delay-2">.</span>
+                    </div>
+
                   </div>
 
-                  <div className="flex flex-col md:flex-row gap-2 mt-3 w-full">
-                    {/* Confirm Button */}
-                    <button
-                      className={`flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
-      ${processingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
-    `}
-                      disabled={processingApptId === pendingAppointments[pendingIndex].id}
-                      onClick={() => handleConfirmAppointment(pendingAppointments[pendingIndex].id)}
-                    >
-                      {processingApptId === pendingAppointments[pendingIndex].id ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
-                            <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
-                          </svg>
-                          Confirm
-                        </>
-                      )}
-                    </button>
-
-                    {/* Cancel Button */}
-                    <button
-                      className={`flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
-      ${cancelingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
-    `}
-                      disabled={cancelingApptId === pendingAppointments[pendingIndex].id}
-                      onClick={() => handleCancelAppointment(pendingAppointments[pendingIndex].id)}
-                    >
-                      {cancelingApptId === pendingAppointments[pendingIndex].id ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Cancelling...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
-                            <path d="M6 18L18 6M6 6l12 12" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                          Cancel
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                </div>
-              ) : (
-                <div className="w-full p-4 rounded-xl flex flex-col items-center justify-center gap-3 text-white/70 text-center">
-                  {/* 🌐 Radar Scan Icon */}
-                  <div className="relative w-20 h-20">
-                    <svg viewBox="0 0 100 100" className="w-full h-full">
-                      <circle cx="50" cy="50" r="45" stroke="#f472b6" strokeWidth="2" className="opacity-50" />
-                      <circle cx="50" cy="50" r="30" stroke="#facc15" strokeWidth="1" className="opacity-30" />
-                      <circle cx="50" cy="50" r="15" stroke="#facc15" strokeWidth="1" className="opacity-30" />
-                      <line
-                        x1="50"
-                        y1="50"
-                        x2="95"
-                        y2="50"
-                        stroke="#f472b6"
-                        strokeWidth="1"
-                        className="origin-center animate-rotate"
-                      />
-                    </svg>
-                    {/* Center pulse */}
-                    <div className="absolute top-1/2 left-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-pink-500 rounded-full animate-ping" />
-                  </div>
-                  <div className="text-sm text-pink-200 font-semibold flex items-center justify-center gap-1">
-                    Looking for appointments
-                    <span className="dot-flash">.</span>
-                    <span className="dot-flash delay-1">.</span>
-                    <span className="dot-flash delay-2">.</span>
-                  </div>
-
-                </div>
-
-              )
-            }
-          />
+                )
+              }
+            />
+          </div>
 
           {/* Next Client */}
           <Card
@@ -1687,7 +1688,13 @@ export default function FreelancerDashboard() {
                 ""
               )
             }
-
+            extra={
+              <AppointmentNotification
+                pendingCount={pendingCount}
+                cancelledCount={cancelledCount}
+                messageCount={messageCount}
+              />
+            }
             sub={
               upcomingAppointments.length > 0 ? (
                 <div className="flex flex-col gap-2 p-4 rounded-xl card-animate-in w-full">
@@ -1981,94 +1988,94 @@ export default function FreelancerDashboard() {
                       touchAction: "pan-y",
                     }}
                   >
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  {availableServices.map((srv) => {
-                    const checked = selectedServiceIds.includes(srv.id);
-                    return (
-                      <label
-                        key={srv.id}
-                        className={`flex items-start gap-3 bg-white/5 p-3 rounded-xl shadow hover:bg-white/10 transition cursor-pointer capitalize relative`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={savingStatus === "saving" || updatingServiceId === srv.id}
-                          onChange={async (e) => {
-                            const checked = e.target.checked;
-                            const newIds = checked
-                              ? [...selectedServiceIds, srv.id]
-                              : selectedServiceIds.filter((id) => id !== srv.id);
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      {availableServices.map((srv) => {
+                        const checked = selectedServiceIds.includes(srv.id);
+                        return (
+                          <label
+                            key={srv.id}
+                            className={`flex items-start gap-3 bg-white/5 p-3 rounded-xl shadow hover:bg-white/10 transition cursor-pointer capitalize relative`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={savingStatus === "saving" || updatingServiceId === srv.id}
+                              onChange={async (e) => {
+                                const checked = e.target.checked;
+                                const newIds = checked
+                                  ? [...selectedServiceIds, srv.id]
+                                  : selectedServiceIds.filter((id) => id !== srv.id);
 
-                            setUpdatingServiceId(srv.id);
-                            setSavingStatus("saving");
-                            setSelectedServiceIds(newIds);
+                                setUpdatingServiceId(srv.id);
+                                setSavingStatus("saving");
+                                setSelectedServiceIds(newIds);
 
-                            try {
-                              const token = await user.getIdToken();
-                              const res = await fetch(
-                                "https://crypto-manager-backend.onrender.com/api/freelancers/services",
-                                {
-                                  method: "PATCH",
-                                  headers: {
-                                    Authorization: `Bearer ${token}`,
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({ service_ids: newIds }),
+                                try {
+                                  const token = await user.getIdToken();
+                                  const res = await fetch(
+                                    "https://crypto-manager-backend.onrender.com/api/freelancers/services",
+                                    {
+                                      method: "PATCH",
+                                      headers: {
+                                        Authorization: `Bearer ${token}`,
+                                        "Content-Type": "application/json",
+                                      },
+                                      body: JSON.stringify({ service_ids: newIds }),
+                                    }
+                                  );
+                                  if (!res.ok) throw new Error("Failed to update services");
+                                  setSavingStatus("saved");
+                                  setTimeout(() => setSavingStatus(""), 1200);
+                                } catch (err) {
+                                  setSavingStatus("error");
+                                  setTimeout(() => setSavingStatus(""), 1500);
                                 }
-                              );
-                              if (!res.ok) throw new Error("Failed to update services");
-                              setSavingStatus("saved");
-                              setTimeout(() => setSavingStatus(""), 1200);
-                            } catch (err) {
-                              setSavingStatus("error");
-                              setTimeout(() => setSavingStatus(""), 1500);
-                            }
-                            setUpdatingServiceId(null);
-                          }}
-                          className="accent-pink-500 mt-1"
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-pink-300 flex items-center gap-2">
-                            {srv.name}
-                            {updatingServiceId === srv.id && savingStatus === "saving" && (
-                              <Loader2 className="animate-spin w-4 h-4 text-yellow-400 ml-1" />
-                            )}
-                            {checked && savingStatus === "saved" && updatingServiceId === null && (
-                              <CheckCircle className="ml-1 w-4 h-4 text-emerald-400 drop-shadow" />
-                            )}
-                          </span>
-                          <span className="text-xs text-emerald-300">
-                            ${srv.price} – {srv.duration_minutes} min
-                          </span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
+                                setUpdatingServiceId(null);
+                              }}
+                              className="accent-pink-500 mt-1"
+                            />
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-pink-300 flex items-center gap-2">
+                                {srv.name}
+                                {updatingServiceId === srv.id && savingStatus === "saving" && (
+                                  <Loader2 className="animate-spin w-4 h-4 text-yellow-400 ml-1" />
+                                )}
+                                {checked && savingStatus === "saved" && updatingServiceId === null && (
+                                  <CheckCircle className="ml-1 w-4 h-4 text-emerald-400 drop-shadow" />
+                                )}
+                              </span>
+                              <span className="text-xs text-emerald-300">
+                                ${srv.price} – {srv.duration_minutes} min
+                              </span>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
 
-                {savingStatus === "error" && (
-                  <div className="text-red-400 text-sm mt-2 animate-bounce-in">
-                    Save failed! Please try again.
+                    {savingStatus === "error" && (
+                      <div className="text-red-400 text-sm mt-2 animate-bounce-in">
+                        Save failed! Please try again.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
                 )}
-          </>
+              </>
             )}
-        </div>
-        {/* Quick Actions */}
-        <div className="col-span-12">
-          <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
-            <ActionButton label="🧾 Appointments" onClick={() => router.push("/freelancers/appointments")} />
-            <ActionButton label="💬 Chat" onClick={() => router.push("/freelancers/chat")} />
-            <ActionButton label="💸 Withdraw" onClick={() => router.push("/freelancers/withdraw")} />
+          </div>
+          {/* Quick Actions */}
+          <div className="col-span-12">
+            <h3 className="text-lg font-bold mb-3">Quick Actions</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <ActionButton label="📅 My Schedule" onClick={() => router.push("/freelancers/schedule")} />
+              <ActionButton label="🧾 Appointments" onClick={() => router.push("/freelancers/appointments")} />
+              <ActionButton label="💬 Chat" onClick={() => router.push("/freelancers/chat")} />
+              <ActionButton label="💸 Withdraw" onClick={() => router.push("/freelancers/withdraw")} />
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
     </div >
   );
