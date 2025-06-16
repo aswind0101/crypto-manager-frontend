@@ -1547,10 +1547,10 @@ export default function FreelancerDashboard() {
             {/* 🔗 Icon chuyển trang góc phải */}
             <button
               onClick={() => router.push("/freelancers/appointments")}
-              className="absolute top-2 right-2 z-10 p-1 text-white/60 hover:text-pink-300 transition"
+              className="absolute top-2 right-2 z-10 p-1 text-white/60 hover:text-pink-600 transition"
               title="View all appointments"
             >
-              <SquareArrowOutUpRight className="w-4 h-4" />
+              <SquareArrowOutUpRight className="w-4 h-4 text-pink-300 hover:text-pink-400" />
             </button>
             {/* Appointments */}
             <Card
