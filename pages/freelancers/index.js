@@ -1596,8 +1596,8 @@ export default function FreelancerDashboard() {
                       {/* Confirm Button */}
                       <button
                         className={`flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
-                  ${processingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
-                `}
+                          ${processingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+                        `}
                         disabled={processingApptId === pendingAppointments[pendingIndex].id}
                         onClick={() => handleConfirmAppointment(pendingAppointments[pendingIndex].id)}
                       >
@@ -1620,8 +1620,8 @@ export default function FreelancerDashboard() {
                       {/* Cancel Button */}
                       <button
                         className={`flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
-                  ${cancelingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
-                `}
+                        ${cancelingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
+                        `}
                         disabled={cancelingApptId === pendingAppointments[pendingIndex].id}
                         onClick={() => handleCancelAppointment(pendingAppointments[pendingIndex].id)}
                       >
@@ -1640,6 +1640,32 @@ export default function FreelancerDashboard() {
                         )}
                       </button>
                     </div>
+                    {/* Điều hướng giữa nhiều appointment */}
+                    {pendingAppointments.length > 1 && (
+                      <div className="flex gap-2 mt-4 items-center justify-center">
+                        <button
+                          onClick={() =>
+                            setPendingIndex((idx) => (idx > 0 ? idx - 1 : pendingAppointments.length - 1))
+                          }
+                          className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                          aria-label="Previous appointment"
+                        >
+                          <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <span className="mx-2 text-xs text-pink-400">
+                          {`${pendingIndex + 1} / ${pendingAppointments.length}`}
+                        </span>
+                        <button
+                          onClick={() =>
+                            setPendingIndex((idx) => (idx < pendingAppointments.length - 1 ? idx + 1 : 0))
+                          }
+                          className="p-1 rounded-full bg-pink-200/30 hover:bg-pink-400/80 text-pink-600 font-bold text-lg transition flex items-center"
+                          aria-label="Next appointment"
+                        >
+                          <ChevronRight className="w-6 h-6" />
+                        </button>
+                      </div>
+                    )}
 
                   </div>
                 ) : (
