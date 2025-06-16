@@ -1619,7 +1619,7 @@ export default function FreelancerDashboard() {
 
                       {/* Cancel Button */}
                       <button
-                        className={`flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
+                        className={`flex-1 px-4 py-2 bg-red-400 hover:bg-red-500 text-white rounded-3xl font-bold shadow text-lg flex items-center justify-center gap-2
                         ${cancelingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
                         `}
                         disabled={cancelingApptId === pendingAppointments[pendingIndex].id}
