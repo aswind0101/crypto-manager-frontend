@@ -1543,7 +1543,7 @@ export default function FreelancerDashboard() {
 
           </div>
 
-          <div className="relative col-span-12 md:col-span-6">
+          <div className="relative col-span-12 md:col-span-6 h-full">
             {/* 🔗 Icon chuyển trang góc phải */}
             <button
               onClick={() => router.push("/freelancers/appointments")}
@@ -1554,6 +1554,7 @@ export default function FreelancerDashboard() {
             </button>
             {/* Appointments */}
             <Card
+              className="relative col-span-12 md:col-span-6 h-full"
               icon={<FiCalendar />}
               title="Appointments"
               value={
