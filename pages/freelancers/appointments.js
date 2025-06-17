@@ -1,5 +1,6 @@
 // 📁 pages/freelancers/appointments.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import Navbar from "../../components/Navbar";
 import dayjs from "dayjs";
@@ -42,6 +43,9 @@ function FreelancerAppointmentsPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const router = useRouter();
+  const highlightedId = router.query.id;
+  const { id: queryId } = router.query;
 
   const auth = getAuth();
 
@@ -70,18 +74,40 @@ function FreelancerAppointmentsPage() {
 
   useEffect(() => {
     const now = dayjs();
+
     const filteredList = appointments.filter((a) => {
       const apptTime = dayjs(a.appointment_date.replace("Z", ""));
+
       const matchesSearch =
         a.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         apptTime.format("YYYY-MM-DD HH:mm").includes(searchTerm);
+
+      // 🟡 Nếu có query id → override filter, chỉ show đúng lịch đó
+      if (queryId && (a.id === queryId || a.id === Number(queryId))) {
+        return true;
+      }
+
+      // ✅ Bình thường: lọc theo filter
       const isFuture = apptTime.isSameOrAfter(now);
       const matchesFilter =
-        filter === "all" || (filter === "upcoming" && isFuture && (a.status === "pending" || a.status === "confirmed"));
+        filter === "all" ||
+        (filter === "upcoming" &&
+          isFuture &&
+          (a.status === "pending" || a.status === "confirmed"));
+
       return matchesSearch && matchesFilter;
     });
+
     setFiltered(filteredList);
-  }, [appointments, searchTerm, filter]);
+  }, [appointments, searchTerm, filter, queryId]);
+
+  const scrollRefs = useRef({});
+
+  useEffect(() => {
+    if (highlightedId && scrollRefs.current[highlightedId]) {
+      scrollRefs.current[highlightedId].scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightedId]);
 
   const handleConfirm = async (id) => {
     const token = await user.getIdToken();
@@ -147,6 +173,7 @@ function FreelancerAppointmentsPage() {
     return d.format("ddd, MMM D, YYYY");
   }
 
+
   return (
     <div className="min-h-screen text-white px-2 sm:px-4 py-4 font-mono">
       <Navbar />
@@ -195,7 +222,9 @@ function FreelancerAppointmentsPage() {
                 {appts.map((a) => (
                   <div
                     key={a.id}
-                    className={`relative bg-white/10 backdrop-blur-xl border-t-4 ${statusColor[a.status] || "border-gray-300"} rounded-3xl p-5 shadow-xl flex flex-col gap-3 group hover:scale-[1.025] transition-transform`}
+                    ref={(el) => (scrollRefs.current[a.id] = el)}
+                    className={`relative bg-white/10 backdrop-blur-xl border-t-4 ${statusColor[a.status] || "border-gray-300"} rounded-3xl p-5 shadow-xl flex flex-col gap-3 group hover:scale-[1.025] transition-transform ${highlightedId === a.id ? "ring-2 ring-yellow-400 bg-yellow-100/20" : ""
+                      }`}
                   >
                     <div className="flex items-center gap-3 mb-2">
                       {/* Avatar hoặc icon */}

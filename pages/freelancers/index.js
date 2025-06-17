@@ -36,12 +36,36 @@ import { checkFreelancerExists } from "../../components/utils/checkFreelancer";
 import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import { ChevronLeft, ChevronRight, ArrowUpRight, SquareArrowOutUpRight } from "lucide-react";
 import { MdMiscellaneousServices, MdOutlineCancel } from "react-icons/md";
+import { toast } from "react-hot-toast";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 
 export default function FreelancerDashboard() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [openMessageModal, setOpenMessageModal] = useState(false);
+  const [showCenterPopup, setShowCenterPopup] = useState(false);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+
   const [onboarding, setOnboarding] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -69,6 +93,8 @@ export default function FreelancerDashboard() {
   const serviceIntervalRef = useRef({});
   const [processingApptId, setProcessingApptId] = useState(null); // id đang xử lý (start/complete)
   const [actionError, setActionError] = useState(""); // text lỗi (nếu có)
+
+
 
   const [overdueWarning, setOverdueWarning] = useState(null); // chứa appointment quá hạn
   const [snoozeUntil, setSnoozeUntil] = useState({}); // id: time - để ẩn cảnh báo tạm thời
@@ -349,6 +375,43 @@ export default function FreelancerDashboard() {
       return () => clearTimeout(timeout); // Cleanup nếu user kéo tiếp
     }
   }, [sliderValue]);
+  const refreshUnreadCount = async () => {
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/messages/unread-count", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    setUnreadCount(data.count);
+  };
+
+  const loadNotifications = async () => {
+    try {
+      const [cancelRes, msgRes] = await Promise.all([
+        fetch("https://crypto-manager-backend.onrender.com/api/appointments/freelancer", {
+          headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }
+        }).then(res => res.json()),
+        fetch("https://crypto-manager-backend.onrender.com/api/appointments/messages", {
+          headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }
+        }).then(res => res.json())
+      ]);
+
+      const messages = (msgRes || []).map(m => ({
+        type: 'message',
+        id: m.id,
+        appointment_id: m.appointment_id,
+        message: m.message,
+        customer_name: m.sender_name,
+        customer_phone: m.sender_phone,
+        start_at: m.appointment_date,
+        is_read: m.is_read
+      }));
+
+      setNotifications(messages);
+      await refreshUnreadCount();
+    } catch (err) {
+      console.error("❌ Error loading notifications:", err.message);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -437,7 +500,10 @@ export default function FreelancerDashboard() {
         setUpcomingAppointments,    // Thêm dòng này
         setNextClientIndex          // Thêm dòng này
       );
-
+      setIsSending(true);
+      await loadNotifications(token);
+      refreshUnreadCount();
+      setIsSending(false);
       setLoading(false);
     });
 
@@ -448,9 +514,11 @@ export default function FreelancerDashboard() {
     if (!user || !user.uid) return;
     const refresh = async () => {
       const token = await user.getIdToken();
-      // Chỉ gọi check nếu chắc chắn là user từ Firebase (có uid)
+
+      // ✅ Gọi check profile
       checkFreelancerExists(user).then(setHasFreelancerProfile);
 
+      // ✅ Gọi loadAppointments
       await loadAppointments(
         token,
         setAppointments,
@@ -465,11 +533,18 @@ export default function FreelancerDashboard() {
         setUpcomingAppointments,
         setNextClientIndex
       );
+
+      // ✅ Gọi thêm loadNotifications mỗi 1 phút
+      await loadNotifications(token);
+      refreshUnreadCount();
     };
-    const interval = setInterval(refresh, 60000);
-    refresh();
-    return () => clearInterval(interval);
+
+    const interval = setInterval(refresh, 60000); // ⏳ mỗi 60 giây
+    refresh(); // gọi lần đầu
+
+    return () => clearInterval(interval); // 🧹 dọn khi unmount
   }, [user]);
+
 
   useEffect(() => {
     // Lấy tất cả appointments đang "processing"
@@ -572,6 +647,7 @@ export default function FreelancerDashboard() {
     );
   }
 
+
   async function completeAppointmentById(appointmentId, options = {}) {
     setProcessingApptId(appointmentId);
     setActionError("");
@@ -615,6 +691,55 @@ export default function FreelancerDashboard() {
     }
     setProcessingApptId(null);
   }
+
+
+  const handleReply = async () => {
+    if (!selectedMessage?.appointment_id || !replyMessage.trim()) return;
+
+    try {
+      setIsSending(true);
+
+      const created_at = dayjs().tz("America/Los_Angeles").format("YYYY-MM-DD HH:mm:ss");
+
+      const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await auth.currentUser.getIdToken()}`
+        },
+        body: JSON.stringify({
+          appointment_id: selectedMessage.appointment_id,
+          message: replyMessage.trim(),
+          created_at,
+        })
+      });
+
+      if (res.ok) {
+        toast.success("Đã gửi tin nhắn!");
+
+        // ✅ Gọi lại API để lấy toàn bộ messages
+        const token = await auth.currentUser.getIdToken();
+        const newMessages = await fetch(
+          `https://crypto-manager-backend.onrender.com/api/appointments/${selectedMessage.appointment_id}/messages`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        ).then(r => r.json());
+
+        setMessages(newMessages); // ✅ Cập nhật toàn bộ đoạn hội thoại
+        setReplyMessage("");      // ✅ Xóa input
+        // KHÔNG đóng modal nữa để user có thể nhắn tiếp
+      } else {
+        toast.error("Gửi tin nhắn thất bại");
+      }
+    } catch (err) {
+      console.error("❌ Send reply failed:", err.message);
+      toast.error("Gửi tin nhắn thất bại");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
 
   const handleConfirmAppointment = async (appointmentId) => {
     try {
@@ -765,10 +890,45 @@ export default function FreelancerDashboard() {
   console.log("hasFreelancerProfile", hasFreelancerProfile);
   console.log("onboarding", onboarding);
 
+  const loadMessages = async (appointmentId) => {
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}/messages`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    const data = await res.json();
+    return data || [];
+  };
+
+
+
   return (
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
+      <Dialog open={openMessageModal} onOpenChange={setOpenMessageModal}>
+        <DialogContent>
+          <DialogHeader>📨 Trả lời khách hàng</DialogHeader>
+          {selectedMessage && (
+            <div className="space-y-2 text-sm">
+              <div>👤 <b>{selectedMessage.customer_name}</b></div>
+              <div>📱 {selectedMessage.customer_phone}</div>
+              <div>🕒 {dayjs.utc(selectedMessage.start_at).format("HH:mm, DD/MM")}</div>
+
+              <div>💬 “{selectedMessage.message}”</div>
+              <Textarea
+                placeholder="Nhập tin nhắn trả lời..."
+                value={replyMessage}
+                onChange={e => setReplyMessage(e.target.value)}
+              />
+              <Button onClick={handleReply} disabled={isSending || !replyMessage.trim()}>
+                {isSending ? "Đang gửi..." : "Gửi"}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {showInvoicePopup && invoiceForm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -1716,12 +1876,90 @@ export default function FreelancerDashboard() {
               )
             }
             extra={
-              <AppointmentNotification
-                pendingCount={pendingCount}
-                cancelledCount={cancelledCount}
-                messageCount={messageCount}
-              />
+              <div className="relative flex items-center justify-center w-full">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition"
+                    >
+                      <FiBell className="text-white text-base" />
+                      {unreadCount > 0 && (
+                        <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
+                          {unreadCount}
+                        </div>
+                      )}
+                    </button>
+                  </PopoverTrigger>
+
+                  <PopoverContent
+                    side="bottom"
+                    align="center"
+                    sideOffset={8}
+                    className="w-[320px] bg-gradient-to-br from-[#1a1a1a] to-[#111] text-pink-300 border border-pink-500 shadow-xl rounded-2xl p-4 font-mono"
+                  >
+                    <div className="font-bold text-pink-400 text-base flex items-center gap-2 mb-3">
+                      🛎️ Notifications
+                    </div>
+
+                    {notifications.length === 0 ? (
+                      <div className="text-center text-gray-500 italic text-xs">
+                        📭 No new notifications
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 text-xs custom-scrollbar">
+                        {notifications
+                          .filter(n => n.type === "message")
+                          .map((n, i) => {
+                            const isUnread = !n.is_read;
+
+                            const timeText = dayjs.utc(n.start_at).format("HH:mm");
+                            const dateText = dayjs.utc(n.start_at).format("MMM D");
+
+                            const title = `💬 ${n.customer_name} sent a message`;
+                            const subtitle = `📅 ${timeText}, ${dateText}`;
+                            const contentPreview = n.message?.length
+                              ? `“${n.message.length > 60 ? n.message.slice(0, 60) + '…' : n.message}”`
+                              : "(No message)";
+
+                            return (
+                              <div
+                                key={i}
+                                onClick={async () => {
+                                  if (isUnread) {
+                                    const token = await auth.currentUser.getIdToken();
+                                    await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/messages/${n.id}/read`, {
+                                      method: "PATCH",
+                                      headers: { Authorization: `Bearer ${token}` }
+                                    });
+                                    await refreshUnreadCount();
+                                  }
+                                  setSelectedMessage(n);
+                                  setOpenMessageModal(true);
+                                }}
+                                className={`group flex flex-col p-3 rounded-lg cursor-pointer transition-all ${isUnread
+                                  ? "bg-white/20 hover:bg-pink-600/30"
+                                  : "bg-white/5 hover:bg-white/10"
+                                  }`}
+                              >
+                                <div className={`text-white ${isUnread ? "font-bold" : "font-medium"}`}>
+                                  {title}
+                                </div>
+                                <div className="text-gray-400 text-xs mt-0.5">{subtitle}</div>
+                                <div className="text-pink-300 text-xs mt-1 italic line-clamp-2">
+                                  {contentPreview}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
             }
+
+
             sub={
               upcomingAppointments.length > 0 ? (
                 <div className="flex flex-col gap-2 p-4 rounded-xl card-animate-in w-full">
@@ -2327,69 +2565,3 @@ function formatTimeUntilNextWithLate(appointmentDate) {
   }
 }
 
-function AppointmentNotification({ pendingCount = 0, cancelledCount = 0, messageCount = 0 }) {
-  const [showPopup, setShowPopup] = useState(false);
-  const total = pendingCount + cancelledCount + messageCount;
-
-  return (
-    <>
-      {/* 🔔 Nút chuông nổi trong thẻ */}
-      <div className="relative">
-        <button
-          onClick={() => setShowPopup(true)}
-          className="relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition"
-        >
-          <FiBell className="text-white text-base" />
-          {total > 0 && (
-            <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
-              {total}
-            </div>
-          )}
-        </button>
-      </div>
-
-      {/* 🧾 Popup Detail */}
-      {showPopup && (
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative animate-fadeIn">
-            {/* Close */}
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
-              onClick={() => setShowPopup(false)}
-            >
-              <MdOutlineCancel className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-xl font-bold text-emerald-600 mb-4 text-center">
-              Appointment Notifications
-            </h3>
-
-            <ul className="space-y-3 text-sm">
-              <li className="flex justify-between items-center">
-                <span className="text-gray-700">🟡 Pending Confirmations</span>
-                <span className="font-bold text-emerald-600">{pendingCount}</span>
-              </li>
-              <li className="flex justify-between items-center">
-                <span className="text-gray-700">🔴 Cancelled Appointments</span>
-                <span className="font-bold text-pink-500">{cancelledCount}</span>
-              </li>
-              <li className="flex justify-between items-center">
-                <span className="text-gray-700">💬 Customer Messages</span>
-                <span className="font-bold text-blue-500">{messageCount}</span>
-              </li>
-            </ul>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowPopup(false)}
-                className="px-4 py-2 rounded-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-pink-400 text-white font-semibold shadow hover:brightness-110 transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}

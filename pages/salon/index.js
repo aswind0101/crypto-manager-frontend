@@ -743,7 +743,7 @@ export default function SalonDashboard() {
 
                   {/* Nút xác nhận */}
                   <button
-                    className={`mt-3 w-full md:w-[280px] self-center px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow transition text-lg flex items-center justify-center gap-2
+                    className={`mt-3 w-full md:w-auto self-start px-8 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-bold shadow transition text-lg flex items-center justify-center gap-2
                 ${processingApptId === pendingAppointments[pendingIndex].id ? "opacity-60 cursor-not-allowed" : ""}
               `}
                     disabled={processingApptId === pendingAppointments[pendingIndex].id}

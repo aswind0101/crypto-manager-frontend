@@ -158,31 +158,42 @@ router.get("/me", verifyToken, async (req, res) => {
   const { uid } = req.user;
   try {
     const result = await pool.query(`
-  SELECT 
-    a.id,
-    a.appointment_date,
-    a.duration_minutes,
-    a.note,
-    a.status,
-    a.started_at,  
-    a.end_at,
-    f.name AS stylist_name,
-    f.avatar_url AS stylist_avatar,
-    f.specialization AS stylist_specialization,
-    f.phone AS stylist_phone,
-    s.name AS salon_name,
-    s.address AS salon_address,
-    ARRAY(
-      SELECT json_build_object('id', ss.id, 'name', ss.name, 'price', ss.price, 'duration', ss.duration_minutes)
-      FROM salon_services ss
-      WHERE ss.id = ANY(a.service_ids)
-    ) AS services
-  FROM appointments a
-  JOIN freelancers f ON a.stylist_id = f.id
-  JOIN salons s ON a.salon_id = s.id
-  WHERE a.customer_uid = $1
-  ORDER BY a.appointment_date DESC
-`, [uid]);
+      SELECT 
+        a.id,
+        a.appointment_date,
+        a.duration_minutes,
+        a.note,
+        a.status,
+        a.started_at,  
+        a.end_at,
+        f.name AS stylist_name,
+        f.avatar_url AS stylist_avatar,
+        f.specialization AS stylist_specialization,
+        f.phone AS stylist_phone,
+        s.name AS salon_name,
+        s.address AS salon_address,
+        ARRAY(
+          SELECT json_build_object('id', ss.id, 'name', ss.name, 'price', ss.price, 'duration', ss.duration_minutes)
+          FROM salon_services ss
+          WHERE ss.id = ANY(a.service_ids)
+        ) AS services,
+        ARRAY(
+          SELECT json_build_object(
+            'id', m.id,
+            'message', m.message,
+            'sender_role', m.sender_role,
+            'created_at', m.created_at
+          )
+          FROM appointment_messages m
+          WHERE m.appointment_id = a.id
+          ORDER BY m.created_at ASC
+        ) AS messages
+      FROM appointments a
+      JOIN freelancers f ON a.stylist_id = f.id
+      JOIN salons s ON a.salon_id = s.id
+      WHERE a.customer_uid = $1
+      ORDER BY a.appointment_date DESC
+    `, [uid]);
 
     res.json(result.rows);
   } catch (err) {
@@ -190,6 +201,7 @@ router.get("/me", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 // ✅ GET: Stylist lấy lịch hẹn của mình
 router.get("/freelancer", verifyToken, async (req, res) => {
@@ -540,5 +552,170 @@ router.delete("/:id", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+router.post("/messages", verifyToken, async (req, res) => {
+  const { appointment_id, message, created_at } = req.body;
+  const { uid } = req.user;
+
+  if (!appointment_id || !message) {
+    return res.status(400).json({ error: "Missing appointment_id or message" });
+  }
+
+  try {
+    // Ưu tiên freelancer
+    const freelancerRes = await pool.query(
+      `SELECT name, phone FROM freelancers WHERE firebase_uid = $1`,
+      [uid]
+    );
+
+    if (freelancerRes.rows.length > 0) {
+      const { name, phone } = freelancerRes.rows[0];
+      await pool.query(
+        `INSERT INTO appointment_messages (
+          appointment_id, sender_role, sender_name, sender_phone, message, created_at
+        ) VALUES ($1, 'freelancer', $2, $3, $4, TO_TIMESTAMP($5, 'YYYY-MM-DD HH24:MI:SS'))`,
+        [appointment_id, name, phone, message, created_at]
+      );
+      return res.json({ success: true });
+    }
+
+    // Nếu không phải freelancer → thử kiểm tra customer
+    const customerRes = await pool.query(
+      `SELECT name, phone FROM customers WHERE firebase_uid = $1`,
+      [uid]
+    );
+
+    if (customerRes.rows.length > 0) {
+      const { name, phone } = customerRes.rows[0];
+      await pool.query(
+        `INSERT INTO appointment_messages (
+          appointment_id, sender_role, sender_name, sender_phone, message, created_at
+        ) VALUES ($1, 'customer', $2, $3, $4, TO_TIMESTAMP($5, 'YYYY-MM-DD HH24:MI:SS'))`,
+        [appointment_id, name, phone, message, created_at]
+      );
+      return res.json({ success: true });
+    }
+
+    return res.status(403).json({ error: "Unauthorized user" });
+  } catch (err) {
+    console.error("❌ Error sending message:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+router.get("/messages", verifyToken, async (req, res) => {
+  const { uid } = req.user;
+
+  try {
+    // 1. Lấy freelancer ID
+    const stylistRes = await pool.query(
+      `SELECT id FROM freelancers WHERE firebase_uid = $1`,
+      [uid]
+    );
+    if (stylistRes.rows.length === 0) return res.json([]);
+
+    const stylistId = stylistRes.rows[0].id;
+
+    // 2. Lấy các cuộc hẹn 'confirmed'
+    const appointmentsRes = await pool.query(
+      `SELECT id, customer_uid, appointment_date 
+       FROM appointments 
+       WHERE stylist_id = $1 AND status = 'confirmed'`,
+      [stylistId]
+    );
+
+    const appointments = appointmentsRes.rows;
+    if (appointments.length === 0) return res.json([]);
+
+    const appointmentIds = appointments.map(a => a.id);
+
+    // 3. Lấy tất cả message của customer trong các appointment đó
+    const messagesRes = await pool.query(
+      `SELECT * FROM appointment_messages 
+       WHERE appointment_id = ANY($1) 
+       AND sender_role = 'customer'
+       ORDER BY created_at DESC`,
+      [appointmentIds]
+    );
+
+    // 4. Gắn thêm thông tin lịch hẹn
+    const enriched = messagesRes.rows.map(m => {
+      const appt = appointments.find(a => a.id === m.appointment_id);
+      return {
+        ...m,
+        appointment_date: appt?.appointment_date,
+        customer_uid: appt?.customer_uid,
+      };
+    });
+
+    res.json(enriched);
+  } catch (err) {
+    console.error("❌ Error fetching messages:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.patch("/messages/:id/read", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query(
+      `UPDATE appointment_messages SET is_read = TRUE WHERE id = $1`,
+      [id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ Error marking message as read:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.get("/:id/messages", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT * FROM appointment_messages 
+       WHERE appointment_id = $1 
+       AND sender_role = 'customer'
+       ORDER BY created_at ASC`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("❌ Error fetching messages:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.get("/messages/unread-count", verifyToken, async (req, res) => {
+  const { uid } = req.user;
+  try {
+    const freelancerRes = await pool.query(
+      `SELECT id FROM freelancers WHERE firebase_uid = $1`, [uid]
+    );
+    const freelancerId = freelancerRes.rows[0]?.id;
+    if (!freelancerId) return res.json({ count: 0 });
+
+    const appointmentIdsRes = await pool.query(
+      `SELECT id FROM appointments WHERE stylist_id = $1 AND status = 'confirmed'`,
+      [freelancerId]
+    );
+    const ids = appointmentIdsRes.rows.map(r => r.id);
+    if (ids.length === 0) return res.json({ count: 0 });
+
+    const unreadRes = await pool.query(
+      `SELECT COUNT(*) FROM appointment_messages
+       WHERE appointment_id = ANY($1)
+       AND sender_role = 'customer'
+       AND is_read = FALSE`,
+      [ids]
+    );
+
+    res.json({ count: parseInt(unreadRes.rows[0].count, 10) });
+  } catch (err) {
+    console.error("❌ Error counting unread messages:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 
 export default router;

@@ -5,6 +5,18 @@ import Navbar from "../../components/Navbar";
 import withAuthProtection from "../../hoc/withAuthProtection";
 import { Phone } from "lucide-react";
 import dayjs from "dayjs"; // Đảm bảo đã import
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+// ⚠️ Bạn phải gọi các plugin trước khi sử dụng tz()
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { toast } from "react-hot-toast";
+
 
 const auth = getAuth(); // ✅ Đặt ngoài component
 
@@ -23,6 +35,10 @@ function CustomerAppointmentsPage() {
 
     const soundConfirmRef = useRef(null);
     const soundCancelRef = useRef(null);
+
+    const [openMessageModal, setOpenMessageModal] = useState(false);
+    const [selectedAppt, setSelectedAppt] = useState(null);
+    const [messageText, setMessageText] = useState("");
 
 
     useEffect(() => {
@@ -113,6 +129,66 @@ function CustomerAppointmentsPage() {
         return map[code] || code;
     };
 
+    const handleSendMessage = async () => {
+        if (!selectedAppt || !messageText.trim()) return;
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+
+            const created_at = dayjs()
+                .tz("America/Los_Angeles")
+                .format("YYYY-MM-DD HH:mm:ss"); // đúng định dạng cho TO_TIMESTAMP
+
+            const res = await fetch(
+                "https://crypto-manager-backend.onrender.com/api/appointments/messages",
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        appointment_id: selectedAppt.id,
+                        message: messageText.trim(),
+                        created_at,
+                    }),
+                }
+            );
+
+            const data = await res.json();
+            if (res.ok) {
+                toast.success("Message sent!");
+
+                setAppointments((prev) =>
+                    prev.map((a) => {
+                        if (a.id !== selectedAppt.id) return a;
+                        return {
+                            ...a,
+                            messages: [
+                                ...(a.messages || []),
+                                {
+                                    id: Date.now(),
+                                    message: messageText.trim(),
+                                    sender_role: "customer",
+                                    created_at, // lưu lại để hiển thị luôn
+                                },
+                            ],
+                        };
+                    })
+                );
+
+                setMessageText("");
+                setOpenMessageModal(false);
+            } else {
+                toast.error(data.error || "Failed to send message");
+            }
+        } catch (err) {
+            console.error("Send failed:", err.message);
+            toast.error("Something went wrong.");
+        }
+    };
+
+
     function parseLocalTimestamp(str) {
         // str = "2025-05-24 17:30:00" hoặc "2025-05-24T17:30:00"
         const clean = str.replace("T", " ");
@@ -136,6 +212,45 @@ function CustomerAppointmentsPage() {
             <Navbar />
             <audio ref={soundConfirmRef} src="/confirmed.wav" preload="auto" />
             <audio ref={soundCancelRef} src="/cancelled.wav" preload="auto" />
+            <Dialog open={openMessageModal} onOpenChange={setOpenMessageModal}>
+                <DialogContent>
+                    <DialogHeader>📨 Chat with Stylist</DialogHeader>
+                    {selectedAppt && (
+                        <div className="space-y-3 text-sm max-h-[400px] overflow-y-auto">
+                            <div className="space-y-1">
+                                {selectedAppt.messages?.map((msg, i) => (
+                                    <div
+                                        key={i}
+                                        className={`rounded-xl px-3 py-2 max-w-[80%] shadow ${msg.sender_role === "customer"
+                                            ? "bg-blue-500 text-white ml-auto text-right"
+                                            : "bg-gray-200 text-gray-800"
+                                            }`}
+                                    >
+                                        {msg.message}
+                                        <div className="text-[10px] text-gray-300 mt-1">
+                                            {dayjs(msg.created_at).tz("America/Los_Angeles").format("MMM D, HH:mm")}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <Textarea
+                                placeholder="Enter your message..."
+                                value={messageText}
+                                onChange={(e) => setMessageText(e.target.value)}
+                            />
+                            <Button
+                                onClick={handleSendMessage}
+                                disabled={!messageText.trim()}
+                                className="bg-pink-500 text-white hover:bg-pink-600 w-full"
+                            >
+                                Send
+                            </Button>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
             {showConfirmPopup && confirmedAppt && (
                 <div
                     className={`fixed bottom-6 right-6 z-50 px-5 py-4 max-w-sm w-[90%] sm:w-auto rounded-xl shadow-xl border-l-8 animate-popup space-y-2
@@ -330,6 +445,21 @@ function CustomerAppointmentsPage() {
                                             ❌ Click here to cancel
                                         </button>
                                     )}
+                                {/* 💬 Gửi tin nhắn nếu còn hiệu lực */}
+                                {appt.status !== "cancelled" && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedAppt(appt);
+                                            setOpenMessageModal(true);
+                                        }}
+                                        className="absolute bottom-2 right-2 hover:bg-blue-500/20 
+               text-blue-400 hover:text-white text-[9px] px-4 py-[4px] 
+               rounded-3xl transition-all duration-200 flex items-center gap-1"
+                                    >
+                                        💬 Send Message
+                                    </button>
+                                )}
+
                             </div>
 
                         ))}
