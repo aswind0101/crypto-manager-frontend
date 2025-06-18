@@ -64,6 +64,8 @@ export default function FreelancerDashboard() {
   const [showCenterPopup, setShowCenterPopup] = useState(false);
   const [replyMessage, setReplyMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const messageIntervalRef = useRef(null);
 
 
   const [onboarding, setOnboarding] = useState(null);
@@ -297,6 +299,27 @@ export default function FreelancerDashboard() {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
+
+  useEffect(() => {
+    if (!openMessageModal || !selectedMessage?.appointment_id) return;
+
+    const fetchMessages = async () => {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(
+        `https://crypto-manager-backend.onrender.com/api/appointments/${selectedMessage.appointment_id}/messages/all`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await res.json();
+      setMessages(data);
+    };
+
+    fetchMessages(); // Gọi lần đầu tiên ngay khi mở
+
+    const interval = setInterval(fetchMessages, 5000); // Gọi lại mỗi 5 giây
+
+    return () => clearInterval(interval); // Dọn dẹp khi dialog đóng
+  }, [openMessageModal, selectedMessage?.appointment_id]);
+
 
 
   // Hàm kiểm tra và show popup late
@@ -701,11 +724,13 @@ export default function FreelancerDashboard() {
 
       const created_at = dayjs().tz("America/Los_Angeles").format("YYYY-MM-DD HH:mm:ss");
 
+      const token = await auth.currentUser.getIdToken();
+
       const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${await auth.currentUser.getIdToken()}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           appointment_id: selectedMessage.appointment_id,
@@ -717,18 +742,33 @@ export default function FreelancerDashboard() {
       if (res.ok) {
         toast.success("Đã gửi tin nhắn!");
 
-        // ✅ Gọi lại API để lấy toàn bộ messages
-        const token = await auth.currentUser.getIdToken();
+        // ✅ Lấy lại toàn bộ tin nhắn của cuộc hẹn này
         const newMessages = await fetch(
-          `https://crypto-manager-backend.onrender.com/api/appointments/${selectedMessage.appointment_id}/messages`,
+          `https://crypto-manager-backend.onrender.com/api/appointments/${selectedMessage.appointment_id}/messages/all`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
         ).then(r => r.json());
 
         setMessages(newMessages); // ✅ Cập nhật toàn bộ đoạn hội thoại
-        setReplyMessage("");      // ✅ Xóa input
-        // KHÔNG đóng modal nữa để user có thể nhắn tiếp
+
+
+        // ✅ Cập nhật vào state `notifications` (nếu bạn muốn hội thoại cập nhật)
+        setNotifications((prev) =>
+          prev.map(n =>
+            n.appointment_id === selectedMessage.appointment_id
+              ? { ...n, messages: newMessages }
+              : n
+          )
+        );
+
+        // ✅ Cập nhật lại selectedMessage để render lại hội thoại
+        setSelectedMessage(prev => ({
+          ...prev,
+          messages: newMessages
+        }));
+
+        setReplyMessage(""); // clear input
       } else {
         toast.error("Gửi tin nhắn thất bại");
       }
@@ -739,7 +779,6 @@ export default function FreelancerDashboard() {
       setIsSending(false);
     }
   };
-
 
   const handleConfirmAppointment = async (appointmentId) => {
     try {
@@ -898,35 +937,70 @@ export default function FreelancerDashboard() {
       }
     });
     const data = await res.json();
-    return data || [];
+    setMessages(data || []);
   };
-
-
 
   return (
     <div className="min-h-screen text-white px-4 py-6 font-mono sm:font-['Pacifico', cursive]">
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       <Dialog open={openMessageModal} onOpenChange={setOpenMessageModal}>
-        <DialogContent>
-          <DialogHeader>📨 Trả lời khách hàng</DialogHeader>
-          {selectedMessage && (
-            <div className="space-y-2 text-sm">
-              <div>👤 <b>{selectedMessage.customer_name}</b></div>
-              <div>📱 {selectedMessage.customer_phone}</div>
-              <div>🕒 {dayjs.utc(selectedMessage.start_at).format("HH:mm, DD/MM")}</div>
+        <DialogContent className="font-mono sm:font-['Pacifico', cursive] text-sm max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-emerald-400">
+              📨 Chat with {selectedMessage?.customer_name || "Customer"}
+            </DialogTitle>
+          </DialogHeader>
 
-              <div>💬 “{selectedMessage.message}”</div>
-              <Textarea
-                placeholder="Nhập tin nhắn trả lời..."
-                value={replyMessage}
-                onChange={e => setReplyMessage(e.target.value)}
-              />
-              <Button onClick={handleReply} disabled={isSending || !replyMessage.trim()}>
-                {isSending ? "Đang gửi..." : "Gửi"}
-              </Button>
+          {/* Thời gian cuộc hẹn */}
+          <p className="text-xs font-bold text-yellow-300 mb-2 flex items-center gap-1">
+            <svg className="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" strokeWidth="2"
+              viewBox="0 0 24 24">
+              <path d="M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
+            </svg>
+            Appointment:
+            <span className="text-white ml-1">
+              {selectedMessage?.start_at
+                ? dayjs.utc(selectedMessage.start_at).format("MMM D, hh:mm A")
+                : ""}
+            </span>
+          </p>
+
+          {/* Danh sách tin nhắn */}
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar" style={{ scrollbarWidth: "none" }}>
+            <div className="space-y-1">
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`rounded-2xl border-t border-l border-pink-500 px-3 py-2 max-w-[80%] shadow
+              ${msg.sender_role === "freelancer" ? "text-white/80 ml-auto text-right" : "text-pink-300"}
+            `}
+                >
+                  <b className="block text-xs mb-1 text-yellow-300">
+                    {msg.sender_role === "freelancer" ? "You" : "Customer"}
+                  </b>
+                  {msg.message}
+                  <div className="text-[10px] text-gray-400 mt-1">
+                    {dayjs(msg.created_at).tz("America/Los_Angeles").format("MMM D, HH:mm")}
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* Nhập và gửi tin nhắn */}
+          <Textarea
+            placeholder="Enter your message..."
+            value={replyMessage}
+            onChange={e => setReplyMessage(e.target.value)}
+          />
+          <Button
+            onClick={handleReply}
+            disabled={isSending || !replyMessage.trim()}
+            className="bg-pink-500 text-white hover:bg-pink-600 w-full mt-2"
+          >
+            {isSending ? "Sending..." : "Send"}
+          </Button>
         </DialogContent>
       </Dialog>
 
@@ -1772,7 +1846,7 @@ export default function FreelancerDashboard() {
                               <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                               <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2" />
                             </svg>
-                            Confirm
+                            Accept
                           </>
                         )}
                       </button>
@@ -1795,7 +1869,7 @@ export default function FreelancerDashboard() {
                             <svg className="w-6 h-6 mr-1" fill="none" viewBox="0 0 24 24">
                               <path d="M6 18L18 6M6 6l12 12" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
-                            Cancel
+                            Declince
                           </>
                         )}
                       </button>
@@ -1877,88 +1951,56 @@ export default function FreelancerDashboard() {
             }
             extra={
               <div className="relative flex items-center justify-center w-full">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      className="relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition"
-                    >
-                      <FiBell className="text-white text-base" />
-                      {unreadCount > 0 && (
-                        <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
-                          {unreadCount}
-                        </div>
-                      )}
-                    </button>
-                  </PopoverTrigger>
+                <button
+                  onClick={async () => {
+                    if (!nextClient) return;
 
-                  <PopoverContent
-                    side="bottom"
-                    align="center"
-                    sideOffset={8}
-                    className="w-[320px] bg-gradient-to-br from-[#1a1a1a] to-[#111] text-pink-300 border border-pink-500 shadow-xl rounded-2xl p-4 font-mono"
-                  >
-                    <div className="font-bold text-pink-400 text-base flex items-center gap-2 mb-3">
-                      🛎️ Notifications
-                    </div>
+                    const token = await auth.currentUser.getIdToken();
 
-                    {notifications.length === 0 ? (
-                      <div className="text-center text-gray-500 italic text-xs">
-                        📭 No new notifications
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 text-xs custom-scrollbar">
-                        {notifications
-                          .filter(n => n.type === "message")
-                          .map((n, i) => {
-                            const isUnread = !n.is_read;
+                    // 🔍 Tìm notification ứng với lịch hẹn đang xem
+                    const target = notifications.find(n => n.appointment_id === nextClient.id);
 
-                            const timeText = dayjs.utc(n.start_at).format("HH:mm");
-                            const dateText = dayjs.utc(n.start_at).format("MMM D");
+                    if (!target) {
+                      toast.error("No message found for this appointment");
+                      return;
+                    }
 
-                            const title = `💬 ${n.customer_name} sent a message`;
-                            const subtitle = `📅 ${timeText}, ${dateText}`;
-                            const contentPreview = n.message?.length
-                              ? `“${n.message.length > 60 ? n.message.slice(0, 60) + '…' : n.message}”`
-                              : "(No message)";
+                    // 🔁 Load lại tất cả tin nhắn
+                    const fullMessages = await fetch(
+                      `https://crypto-manager-backend.onrender.com/api/appointments/${target.appointment_id}/messages/all`,
+                      {
+                        headers: { Authorization: `Bearer ${token}` },
+                      }
+                    ).then(res => res.json());
 
-                            return (
-                              <div
-                                key={i}
-                                onClick={async () => {
-                                  if (isUnread) {
-                                    const token = await auth.currentUser.getIdToken();
-                                    await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/messages/${n.id}/read`, {
-                                      method: "PATCH",
-                                      headers: { Authorization: `Bearer ${token}` }
-                                    });
-                                    await refreshUnreadCount();
-                                  }
-                                  setSelectedMessage(n);
-                                  setOpenMessageModal(true);
-                                }}
-                                className={`group flex flex-col p-3 rounded-lg cursor-pointer transition-all ${isUnread
-                                  ? "bg-white/20 hover:bg-pink-600/30"
-                                  : "bg-white/5 hover:bg-white/10"
-                                  }`}
-                              >
-                                <div className={`text-white ${isUnread ? "font-bold" : "font-medium"}`}>
-                                  {title}
-                                </div>
-                                <div className="text-gray-400 text-xs mt-0.5">{subtitle}</div>
-                                <div className="text-pink-300 text-xs mt-1 italic line-clamp-2">
-                                  {contentPreview}
-                                </div>
-                              </div>
-                            );
-                          })}
+                    // ✅ Đánh dấu đã đọc nếu chưa
+                    if (!target.is_read) {
+                      await fetch(
+                        `https://crypto-manager-backend.onrender.com/api/appointments/messages/${target.id}/read`,
+                        {
+                          method: "PATCH",
+                          headers: { Authorization: `Bearer ${token}` },
+                        }
+                      );
+                      await refreshUnreadCount();
+                    }
 
-                      </div>
-                    )}
-                  </PopoverContent>
-                </Popover>
+                    // 🟢 Set đúng dữ liệu
+                    setSelectedMessage(target);
+                    setMessages(fullMessages);
+                    setOpenMessageModal(true);
+                  }}
+
+
+                  className={`relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition
+        ${notifications.some(n => !n.is_read) ? "ring-2 ring-yellow-400 animate-pulse" : ""}
+      `}
+                  title="Open chat"
+                >
+                  <FiBell className="text-white text-base" />
+                </button>
               </div>
             }
-
 
             sub={
               upcomingAppointments.length > 0 ? (

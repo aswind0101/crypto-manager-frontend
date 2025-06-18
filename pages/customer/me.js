@@ -7,12 +7,14 @@ import { Phone } from "lucide-react";
 import dayjs from "dayjs"; // Đảm bảo đã import
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import { CalendarDays } from "lucide-react";
+
 
 // ⚠️ Bạn phải gọi các plugin trước khi sử dụng tz()
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
@@ -39,6 +41,26 @@ function CustomerAppointmentsPage() {
     const [openMessageModal, setOpenMessageModal] = useState(false);
     const [selectedAppt, setSelectedAppt] = useState(null);
     const [messageText, setMessageText] = useState("");
+
+    useEffect(() => {
+        if (!openMessageModal || !selectedAppt || !user) return;
+
+        const interval = setInterval(async () => {
+            const token = await user.getIdToken();
+            const res = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/me", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            setAppointments(data || []);
+
+            const updatedAppt = data.find(a => a.id === selectedAppt.id);
+            if (updatedAppt) {
+                setSelectedAppt(updatedAppt);
+            }
+        }, 5000); // mỗi 5 giây
+
+        return () => clearInterval(interval);
+    }, [openMessageModal, selectedAppt, user]);
 
 
     useEffect(() => {
@@ -128,16 +150,22 @@ function CustomerAppointmentsPage() {
         };
         return map[code] || code;
     };
+    const markMessagesAsRead = async (appointmentId) => {
+        const token = await auth.currentUser.getIdToken();
+        await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}/read-all`, {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+    };
 
     const handleSendMessage = async () => {
         if (!selectedAppt || !messageText.trim()) return;
 
         try {
             const token = await auth.currentUser.getIdToken();
-
-            const created_at = dayjs()
-                .tz("America/Los_Angeles")
-                .format("YYYY-MM-DD HH:mm:ss"); // đúng định dạng cho TO_TIMESTAMP
+            const created_at = dayjs().tz("America/Los_Angeles").format("YYYY-MM-DD HH:mm:ss");
 
             const res = await fetch(
                 "https://crypto-manager-backend.onrender.com/api/appointments/messages",
@@ -155,31 +183,24 @@ function CustomerAppointmentsPage() {
                 }
             );
 
-            const data = await res.json();
             if (res.ok) {
                 toast.success("Message sent!");
-
-                setAppointments((prev) =>
-                    prev.map((a) => {
-                        if (a.id !== selectedAppt.id) return a;
-                        return {
-                            ...a,
-                            messages: [
-                                ...(a.messages || []),
-                                {
-                                    id: Date.now(),
-                                    message: messageText.trim(),
-                                    sender_role: "customer",
-                                    created_at, // lưu lại để hiển thị luôn
-                                },
-                            ],
-                        };
-                    })
-                );
-
                 setMessageText("");
-                setOpenMessageModal(false);
+
+                // 👉 Gọi lại appointments/me để cập nhật toàn bộ
+                const resAll = await fetch("https://crypto-manager-backend.onrender.com/api/appointments/me", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const updated = await resAll.json();
+                setAppointments(updated || []);
+
+                // 👉 Gán lại cuộc hẹn đang chọn với bản mới
+                const updatedAppt = updated.find(a => a.id === selectedAppt.id);
+                if (updatedAppt) {
+                    setSelectedAppt(updatedAppt);
+                }
             } else {
+                const data = await res.json();
                 toast.error(data.error || "Failed to send message");
             }
         } catch (err) {
@@ -187,6 +208,8 @@ function CustomerAppointmentsPage() {
             toast.error("Something went wrong.");
         }
     };
+
+
 
 
     function parseLocalTimestamp(str) {
@@ -213,28 +236,52 @@ function CustomerAppointmentsPage() {
             <audio ref={soundConfirmRef} src="/confirmed.wav" preload="auto" />
             <audio ref={soundCancelRef} src="/cancelled.wav" preload="auto" />
             <Dialog open={openMessageModal} onOpenChange={setOpenMessageModal}>
-                <DialogContent>
-                    <DialogHeader>📨 Chat with Stylist</DialogHeader>
+                <DialogContent className="font-mono sm:font-['Pacifico', cursive] text-sm">
+                    <DialogHeader className="space-y-1">
+                        <DialogTitle className="text-lg font-bold text-emerald-400">
+                            📨 Chat with {selectedAppt?.stylist_name || "Stylist"}
+                        </DialogTitle>
+                        <p className="text-xs font-semibold text-pink-300 px-3 py-1 inline-flex items-center gap-2 mt-1">
+                            <CalendarDays className="w-4 h-4 text-yellow-300" />
+                            <span>
+                                Appointment Date:&nbsp;
+                                <span className="text-yellow-300 font-bold">
+                                    {dayjs(selectedAppt?.appointment_date.replace("Z", "")).format("MMM D, hh:mm A")}
+                                </span>
+                            </span>
+                        </p>
+
+
+                    </DialogHeader>
                     {selectedAppt && (
-                        <div className="space-y-3 text-sm max-h-[400px] overflow-y-auto">
+                        <div className="space-y-3 text-sm max-h-[400px] overflow-y-auto scrollbar-hide">
                             <div className="space-y-1">
-                                {selectedAppt.messages?.map((msg, i) => (
-                                    <div
-                                        key={i}
-                                        className={`rounded-xl px-3 py-2 max-w-[80%] shadow ${msg.sender_role === "customer"
-                                            ? "bg-blue-500 text-white ml-auto text-right"
-                                            : "bg-gray-200 text-gray-800"
-                                            }`}
-                                    >
-                                        {msg.message}
-                                        <div className="text-[10px] text-gray-300 mt-1">
-                                            {dayjs(msg.created_at).tz("America/Los_Angeles").format("MMM D, HH:mm")}
+                                {selectedAppt.messages?.map((msg, i) => {
+                                    const isYou = msg.sender_role === "customer"; // 👈 khách là "you"
+                                    const senderLabel = isYou ? "You" : "Stylist";
+
+                                    return (
+                                        <div
+                                            key={i}
+                                            className={`rounded-2xl border-t border-l border-pink-500 px-3 py-2 max-w-[80%]
+                                        ${isYou
+                                                    ? "text-white/80 ml-auto text-right"
+                                                    : "text-pink-300"
+                                                }`}
+                                        >
+                                            <div className={"text-[11px] font-bold mb-1 text-yellow-300"}>{senderLabel}</div>
+                                            {msg.message}
+                                            <div className="text-[10px] text-gray-500 mt-1">
+                                                {dayjs(msg.created_at).tz("America/Los_Angeles").format("MMM D, HH:mm")}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
+
                             </div>
 
                             <Textarea
+                                className="font-mono sm:font-['Pacifico', cursive] text-sm"
                                 placeholder="Enter your message..."
                                 value={messageText}
                                 onChange={(e) => setMessageText(e.target.value)}
@@ -323,146 +370,163 @@ function CustomerAppointmentsPage() {
                     </p>
                 ) : (
                     <div className="grid sm:grid-cols-2 gap-6">
-                        {filteredAppointments.map((appt) => (
-                            <div key={appt.id} className="relative bg-white/10 backdrop-blur-md border-t-2 border-pink-500 rounded-2xl p-5 pt-4 pb-12 shadow-lg">
-                                <span
-                                    className={`absolute top-2 right-2 px-3 py-1 text-xs rounded-full font-semibold shadow ${appt.status === "pending"
-                                        ? "bg-yellow-400 text-black"
-                                        : appt.status === "confirmed"
-                                            ? "bg-green-500 text-white"
-                                            : appt.status === "completed"
-                                                ? "bg-blue-500 text-white"
-                                                : appt.status === "cancelled"
-                                                    ? "bg-red-500 text-white"
-                                                    : "bg-gray-400 text-white"
-                                        }`}
-                                >
-                                    📌 {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
-                                </span>
+                        {filteredAppointments.map((appt) => {
+                            const hasUnread = appt.messages?.some(
+                                m => m.sender_role === "freelancer" && m.is_read === false
+                            );
 
-                                {/* Stylist Info */}
-                                <div className="flex items-center gap-4 mb-3 mt-2">
-                                    <img
-                                        src={appt.stylist_avatar?.startsWith("http") ? appt.stylist_avatar : "/default-avatar.png"}
-                                        alt={appt.stylist_name}
-                                        className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
-                                    />
-                                    <div>
-                                        <h2 className="text-lg font-bold text-pink-300 flex items-center gap-2">
-                                            {appt.stylist_name}
-                                            {appt.stylist_phone && (
-                                                <span className="text-blue-300 text-xs flex items-center gap-1 ml-2">
-                                                    <Phone className="w-4 h-4 inline" /> {appt.stylist_phone}
-                                                </span>
-                                            )}
-                                        </h2>
-                                        <p className="text-xs italic text-gray-200 capitalize">
-                                            {
-                                                Array.isArray(appt.stylist_specialization)
+                            return (
+                                <div key={appt.id} className="relative bg-white/10 backdrop-blur-md border-t-2 border-pink-500 rounded-2xl p-5 pt-4 pb-12 shadow-lg">
+                                    <span
+                                        className={`absolute top-2 right-2 px-3 py-1 text-xs rounded-full font-semibold shadow ${appt.status === "pending"
+                                            ? "bg-yellow-400 text-black"
+                                            : appt.status === "confirmed"
+                                                ? "bg-green-500 text-white"
+                                                : appt.status === "completed"
+                                                    ? "bg-blue-500 text-white"
+                                                    : appt.status === "cancelled"
+                                                        ? "bg-red-500 text-white"
+                                                        : "bg-gray-400 text-white"
+                                            }`}
+                                    >
+                                        📌 {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
+                                    </span>
+
+                                    {/* Stylist Info */}
+                                    <div className="flex items-center gap-4 mb-3 mt-2">
+                                        <img
+                                            src={appt.stylist_avatar?.startsWith("http") ? appt.stylist_avatar : "/default-avatar.png"}
+                                            alt={appt.stylist_name}
+                                            className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
+                                        />
+                                        <div>
+                                            <h2 className="text-lg font-bold text-pink-300 flex items-center gap-2">
+                                                {appt.stylist_name}
+                                                {appt.stylist_phone && (
+                                                    <span className="text-blue-300 text-xs flex items-center gap-1 ml-2">
+                                                        <Phone className="w-4 h-4 inline" /> {appt.stylist_phone}
+                                                    </span>
+                                                )}
+                                            </h2>
+                                            <p className="text-xs italic text-gray-200 capitalize">
+                                                {Array.isArray(appt.stylist_specialization)
                                                     ? appt.stylist_specialization.map(formatSpecialization).join(", ")
-                                                    : formatSpecialization(appt.stylist_specialization)
-                                            }
-                                        </p>
-
+                                                    : formatSpecialization(appt.stylist_specialization)}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Salon Info */}
-                                <div className="mb-2">
-                                    <p className="text-sm text-yellow-300 flex items-center gap-1">
-                                        🏠 {appt.salon_name}
-                                    </p>
-                                    {appt.salon_address && (
-                                        <p className="text-xs text-yellow-200 flex items-center gap-1 ml-5">
-                                            <span className="text-yellow-400">📍</span> {appt.salon_address}
+                                    {/* Salon Info */}
+                                    <div className="mb-2">
+                                        <p className="text-sm text-yellow-300 flex items-center gap-1">
+                                            🏠 {appt.salon_name}
                                         </p>
-                                    )}
-                                </div>
+                                        {appt.salon_address && (
+                                            <p className="text-xs text-yellow-200 flex items-center gap-1 ml-5">
+                                                <span className="text-yellow-400">📍</span> {appt.salon_address}
+                                            </p>
+                                        )}
+                                    </div>
 
-                                {/* Bảng dịch vụ - Giữ nguyên */}
-                                <div className="text-xs text-pink-100 mb-2 capitalize space-y-1">
-                                    <table className="w-full text-left text-xs text-pink-100">
-                                        <thead>
-                                            <tr className="text-pink-300 border-b border-pink-400">
-                                                <th className="py-1">Service</th>
-                                                <th className="py-1 text-right">Price</th>
-                                                <th className="py-1 text-right">Duration</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {appt.services?.map((srv) => (
-                                                <tr key={srv.id}>
-                                                    <td className="py-1">💅 {srv.name}</td>
-                                                    <td className="py-1 text-right">${srv.price}</td>
-                                                    <td className="py-1 text-right">{srv.duration} min</td>
+                                    {/* Bảng dịch vụ */}
+                                    <div className="text-xs text-pink-100 mb-2 capitalize space-y-1">
+                                        <table className="w-full text-left text-xs text-pink-100">
+                                            <thead>
+                                                <tr className="text-pink-300 border-b border-pink-400">
+                                                    <th className="py-1">Service</th>
+                                                    <th className="py-1 text-right">Price</th>
+                                                    <th className="py-1 text-right">Duration</th>
                                                 </tr>
-                                            ))}
-                                            {/* Dòng tổng */}
-                                            <tr className="border-t border-pink-400 font-semibold text-yellow-300">
-                                                <td className="py-1">🔢 Total</td>
-                                                <td className="py-1 text-right">
-                                                    ${appt.services?.reduce((sum, s) => sum + (s.price || 0), 0)}
-                                                </td>
-                                                <td className="py-1 text-right">
-                                                    {appt.services?.reduce((sum, s) => sum + (s.duration || 0), 0)} min
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody>
+                                                {appt.services?.map((srv) => (
+                                                    <tr key={srv.id}>
+                                                        <td className="py-1">💅 {srv.name}</td>
+                                                        <td className="py-1 text-right">${srv.price}</td>
+                                                        <td className="py-1 text-right">{srv.duration} min</td>
+                                                    </tr>
+                                                ))}
+                                                <tr className="border-t border-pink-400 font-semibold text-yellow-300">
+                                                    <td className="py-1">🔢 Total</td>
+                                                    <td className="py-1 text-right">
+                                                        ${appt.services?.reduce((sum, s) => sum + (s.price || 0), 0)}
+                                                    </td>
+                                                    <td className="py-1 text-right">
+                                                        {appt.services?.reduce((sum, s) => sum + (s.duration || 0), 0)} min
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
 
-                                {/* Ngày giờ */}
-                                <div className="mt-2 text-center">
-                                    <p className="inline-block bg-gradient-to-r from-yellow-400 via-pink-400 to-emerald-400 text-black text-sm px-3 py-1 rounded-sm shadow font-semibold tracking-wide">
-                                        📅 {appt.appointment_date.replace("T", " ").slice(0, 16)}
-                                    </p>
-                                </div>
-                                {/* Nút huỷ nếu điều kiện đúng */}
-                                {["pending", "confirmed"].includes(appt.status) &&
-                                    dayjs(appt.appointment_date.replace("Z", "")).isAfter(dayjs()) && (
+                                    {/* Ngày giờ */}
+                                    <div className="mt-2 text-center">
+                                        <p className="inline-block bg-gradient-to-r from-yellow-400 via-pink-400 to-emerald-400 text-black text-sm px-3 py-1 rounded-sm shadow font-semibold tracking-wide">
+                                            📅 {appt.appointment_date.replace("T", " ").slice(0, 16)}
+                                        </p>
+                                    </div>
+
+                                    {/* Cancel button */}
+                                    {["pending", "confirmed"].includes(appt.status) &&
+                                        dayjs(appt.appointment_date.replace("Z", "")).isAfter(dayjs()) && (
+                                            <button
+                                                onClick={async () => {
+                                                    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+                                                    const token = await user.getIdToken();
+                                                    const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`, {
+                                                        method: "DELETE",
+                                                        headers: { Authorization: `Bearer ${token}` },
+                                                    });
+                                                    const data = await res.json();
+                                                    if (res.ok) {
+                                                        alert("✅ Appointment cancelled.");
+                                                        setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
+                                                    } else {
+                                                        alert("❌ " + (data.error || "Failed to cancel."));
+                                                    }
+                                                }}
+                                                className="absolute bottom-2 left-2 hover:bg-red-500/20 text-red-400 hover:text-white text-[9px] px-4 py-[4px] rounded-3xl transition-all duration-200 flex items-center gap-1"
+                                            >
+                                                ❌ Click here to cancel
+                                            </button>
+                                        )}
+
+                                    {/* Nút tin nhắn */}
+                                    {appt.status === "confirmed" && (
                                         <button
                                             onClick={async () => {
-                                                if (!confirm("Are you sure you want to cancel this appointment?")) return;
-                                                const token = await user.getIdToken();
-                                                const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`, {
-                                                    method: "DELETE",
-                                                    headers: { Authorization: `Bearer ${token}` },
-                                                });
-                                                const data = await res.json();
-                                                if (res.ok) {
-                                                    alert("✅ Appointment cancelled.");
-                                                    setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
-                                                } else {
-                                                    alert("❌ " + (data.error || "Failed to cancel."));
-                                                }
+                                                setSelectedAppt(appt);
+                                                setOpenMessageModal(true);
+                                                await markMessagesAsRead(appt.id); // 👈 Đảm bảo phải `await`
+
+                                                // ✅ Update lại trạng thái messages đã đọc
+                                                setAppointments(prev =>
+                                                    prev.map(a => {
+                                                        if (a.id !== appt.id) return a;
+                                                        return {
+                                                            ...a,
+                                                            messages: a.messages.map(m =>
+                                                                m.sender_role === 'freelancer' ? { ...m, is_read: true } : m
+                                                            )
+                                                        };
+                                                    })
+                                                );
                                             }}
-                                            className="absolute bottom-2 left-2 
-                                                                            hover:bg-red-500/20 
-                                                                            text-red-400 hover:text-white 
-                                                                            text-[9px] px-4 py-[4px] 
-                                                                            rounded-3xl transition-all duration-200 flex items-center gap-1"
+
+                                            className={`absolute bottom-2 right-2 flex items-center gap-1 px-3 py-[5px] rounded-full text-xs transition-all
+            ${hasUnread
+                                                    ? "bg-yellow-300 text-black animate-pulse shadow"
+                                                    : "hover:bg-blue-500/20 text-blue-400 hover:text-white"
+                                                }`}
+                                            title={hasUnread ? "New message from stylist" : "View chat"}
                                         >
-                                            ❌ Click here to cancel
+                                            {hasUnread ? "🔔 New Msg" : "📩 Chat"}
                                         </button>
                                     )}
-                                {/* 💬 Gửi tin nhắn nếu còn hiệu lực */}
-                                {appt.status !== "cancelled" && (
-                                    <button
-                                        onClick={() => {
-                                            setSelectedAppt(appt);
-                                            setOpenMessageModal(true);
-                                        }}
-                                        className="absolute bottom-2 right-2 hover:bg-blue-500/20 
-               text-blue-400 hover:text-white text-[9px] px-4 py-[4px] 
-               rounded-3xl transition-all duration-200 flex items-center gap-1"
-                                    >
-                                        💬 Send Message
-                                    </button>
-                                )}
+                                </div>
+                            );
+                        })}
 
-                            </div>
-
-                        ))}
                     </div>
                 )}
             </div>

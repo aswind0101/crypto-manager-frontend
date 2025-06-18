@@ -182,7 +182,8 @@ router.get("/me", verifyToken, async (req, res) => {
             'id', m.id,
             'message', m.message,
             'sender_role', m.sender_role,
-            'created_at', m.created_at
+            'created_at', m.created_at,
+            'is_read', m.is_read
           )
           FROM appointment_messages m
           WHERE m.appointment_id = a.id
@@ -717,5 +718,40 @@ router.get("/messages/unread-count", verifyToken, async (req, res) => {
   }
 });
 
+// ✅ Đánh dấu tất cả tin nhắn stylist (chưa đọc) của 1 appointment là đã đọc
+router.patch("/:id/read-all", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `UPDATE appointment_messages
+       SET is_read = TRUE
+       WHERE appointment_id = $1 AND sender_role = 'freelancer' AND is_read = FALSE
+       RETURNING id`,
+      [id]
+    );
+    console.log("🔄 Messages marked as read:", result.rows);
+    res.json({ success: true, updated: result.rows.length });
+  } catch (err) {
+    console.error("❌ Error marking messages as read:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// 📌 API mới: Lấy toàn bộ tin nhắn (cả customer và stylist) theo appointment_id
+router.get("/:id/messages/all", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT * FROM appointment_messages 
+       WHERE appointment_id = $1 
+       ORDER BY created_at ASC`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("❌ Error fetching all messages:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
 export default router;
