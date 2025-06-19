@@ -43,6 +43,7 @@ function CustomerAppointmentsPage() {
     const [messageText, setMessageText] = useState("");
     const messagesEndRef = useRef(null);
     const initialMessageCountRef = useRef(0);
+    const [isSending, setIsSending] = useState(false);
 
 
     useEffect(() => {
@@ -189,7 +190,7 @@ function CustomerAppointmentsPage() {
 
     const handleSendMessage = async () => {
         if (!selectedAppt || !messageText.trim()) return;
-
+        setIsSending(true); // ⏳ bật trạng thái gửi
         try {
             const token = await auth.currentUser.getIdToken();
             const created_at = dayjs().tz("America/Los_Angeles").format("YYYY-MM-DD HH:mm:ss");
@@ -233,6 +234,8 @@ function CustomerAppointmentsPage() {
         } catch (err) {
             console.error("Send failed:", err.message);
             toast.error("Something went wrong.");
+        } finally {
+            setIsSending(false); // ✅ luôn reset trạng thái
         }
     };
     const scrollToBottom = () => {
@@ -267,7 +270,8 @@ function CustomerAppointmentsPage() {
             <audio ref={soundConfirmRef} src="/confirmed.wav" preload="auto" />
             <audio ref={soundCancelRef} src="/cancelled.wav" preload="auto" />
             <Dialog open={openMessageModal} onOpenChange={setOpenMessageModal}>
-                <DialogContent className="font-mono sm:font-['Pacifico', cursive] text-sm">
+                <DialogContent className="rounded-3xl border-t-4 border-b-4 border-pink-500 shadow-xl 
+          bg-[#1f2937]/90 backdrop-blur font-mono sm:font-['Pacifico', cursive] text-sm">
                     <DialogHeader className="space-y-1">
                         <DialogTitle className="text-lg font-bold text-emerald-400">
                             📨 Chat with {selectedAppt?.stylist_name || "Stylist"}
@@ -286,23 +290,23 @@ function CustomerAppointmentsPage() {
                     </DialogHeader>
                     {selectedAppt && (
                         <div className="space-y-3 text-sm max-h-[400px] overflow-y-auto scrollbar-hide">
-                            <div className="space-y-1">
+                            <div className="space-y-4">
                                 {selectedAppt.messages?.map((msg, i) => {
                                     const isYou = msg.sender_role === "customer"; // 👈 khách là "you"
-                                    const senderLabel = isYou ? "You" : "Stylist";
+                                    const senderLabel = isYou ? "You" : selectedAppt?.stylist_name || "Stylist";
 
                                     return (
                                         <div
                                             key={i}
-                                            className={`rounded-2xl border-t border-l border-pink-500 px-3 py-2 max-w-[80%]
+                                            className={`rounded-xl px-4 py-2 max-w-[80%] text-sm shadow-md backdrop-blur-sm
                                         ${isYou
-                                                    ? "text-white/80 ml-auto text-right"
-                                                    : "text-pink-300"
+                                                    ? "bg-gradient-to-br from-emerald-600/50 to-emerald-800/40 text-white ml-auto text-right"
+                                                    : "bg-gradient-to-br from-pink-600/50 to-pink-800/40 text-pink-200"
                                                 }`}
                                         >
-                                            <div className={"text-[11px] font-bold mb-1 text-yellow-300"}>{senderLabel}</div>
+                                            <div className={"text-xs font-bold mb-1 text-yellow-300"}>{senderLabel}</div>
                                             {msg.message}
-                                            <div className="text-[10px] text-gray-500 mt-1">
+                                            <div className="text-[10px] text-gray-400 mt-1">
                                                 {dayjs(msg.created_at).tz("America/Los_Angeles").format("MMM D, HH:mm")}
                                             </div>
                                         </div>
@@ -320,11 +324,12 @@ function CustomerAppointmentsPage() {
                             />
                             <Button
                                 onClick={handleSendMessage}
-                                disabled={!messageText.trim()}
-                                className="bg-pink-500 text-white hover:bg-pink-600 w-full"
+                                disabled={!messageText.trim() || isSending}
+                                className={"w-full bg-pink-500 text-white hover:bg-pink-600"}
                             >
-                                Send
+                                {isSending ? "Sending..." : "Send"}
                             </Button>
+
                         </div>
                     )}
                 </DialogContent>
@@ -547,6 +552,7 @@ function CustomerAppointmentsPage() {
                                                     })
                                                 );
                                             }}
+
 
                                             className={`absolute bottom-2 right-2 flex items-center gap-1 px-3 py-[5px] rounded-full text-sm transition-all
                                             ${hasUnread

@@ -1006,7 +1006,8 @@ export default function FreelancerDashboard() {
       <Navbar />
       <audio ref={soundRef} src="/notification.wav" preload="auto" />
       <Dialog open={openMessageModal} onOpenChange={setOpenMessageModal}>
-        <DialogContent className="font-mono sm:font-['Pacifico', cursive] text-sm max-w-md">
+        <DialogContent className="rounded-3xl border-t-4 border-b-4 border-pink-500 shadow-xl 
+          bg-[#1f2937]/90 backdrop-blur font-mono sm:font-['Pacifico', cursive] text-sm max-w-md">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-emerald-400">
               📨 Chat with {selectedMessage?.customer_name || "Customer"}
@@ -1029,16 +1030,18 @@ export default function FreelancerDashboard() {
 
           {/* Danh sách tin nhắn */}
           <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar" style={{ scrollbarWidth: "none" }}>
-            <div className="space-y-1">
+            <div className="space-y-4">
               {messages.map((msg, i) => (
                 <div
                   key={i}
-                  className={`rounded-2xl border-t border-l border-pink-500 px-3 py-2 max-w-[80%] shadow
-                    ${msg.sender_role === "freelancer" ? "text-white/80 ml-auto text-right" : "text-pink-300"}
-                  `}
+                  className={`rounded-xl px-4 py-2 max-w-[80%] text-sm shadow-md backdrop-blur-sm
+    ${msg.sender_role === "freelancer"
+                      ? "bg-gradient-to-br from-emerald-600/50 to-emerald-800/40 text-white ml-auto text-right"
+                      : "bg-gradient-to-br from-pink-600/50 to-pink-800/40 text-pink-200"}
+  `}
                 >
                   <b className="block text-xs mb-1 text-yellow-300">
-                    {msg.sender_role === "freelancer" ? "You" : "Customer"}
+                    {msg.sender_role === "freelancer" ? "You" : selectedMessage?.customer_name || "Customer"}
                   </b>
                   {msg.message}
                   <div className="text-[10px] text-gray-400 mt-1">
@@ -1052,6 +1055,7 @@ export default function FreelancerDashboard() {
 
           {/* Nhập và gửi tin nhắn */}
           <Textarea
+            className="font-mono sm:font-['Pacifico', cursive] text-sm"
             placeholder="Enter your message..."
             value={replyMessage}
             onChange={e => setReplyMessage(e.target.value)}
