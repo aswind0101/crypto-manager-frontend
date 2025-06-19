@@ -67,6 +67,7 @@ export default function FreelancerDashboard() {
   const [messages, setMessages] = useState([]);
   const messageIntervalRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const initialMessageCountRef = useRef(0);
 
   const [onboarding, setOnboarding] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -658,10 +659,50 @@ export default function FreelancerDashboard() {
   }, [appointmentsToday]);
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
+    if (!openMessageModal) return;
+
+    const current = messages?.length || 0;
+    const initial = initialMessageCountRef.current;
+
+    if (current > initial) {
+      scrollToBottom();
+      initialMessageCountRef.current = current; // cập nhật lại
     }
-  }, [messages]);
+  }, [messages, openMessageModal]);
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 50);
+  };
+  useEffect(() => {
+    if (!openMessageModal && selectedMessage) {
+      const markAndUpdate = async () => {
+        const token = await auth.currentUser.getIdToken();
+
+        // ✅ Mark as read cho toàn bộ tin nhắn từ khách
+        await fetch(
+          `https://crypto-manager-backend.onrender.com/api/appointments/${selectedMessage.appointment_id}/read-all`,
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ sender_role: "customer" })
+          }
+        );
+
+        // ✅ Cập nhật icon 🔔
+        await refreshUnreadCount();
+        await loadNotifications(token); // 👈 nếu bạn dùng để hiển thị popup hoặc danh sách
+      };
+
+      markAndUpdate();
+    }
+  }, [openMessageModal]);
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
@@ -987,14 +1028,14 @@ export default function FreelancerDashboard() {
           </p>
 
           {/* Danh sách tin nhắn */}
-          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar" ref={messagesEndRef} style={{ scrollbarWidth: "none" }}>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar" style={{ scrollbarWidth: "none" }}>
             <div className="space-y-1">
               {messages.map((msg, i) => (
                 <div
                   key={i}
                   className={`rounded-2xl border-t border-l border-pink-500 px-3 py-2 max-w-[80%] shadow
-              ${msg.sender_role === "freelancer" ? "text-white/80 ml-auto text-right" : "text-pink-300"}
-            `}
+                    ${msg.sender_role === "freelancer" ? "text-white/80 ml-auto text-right" : "text-pink-300"}
+                  `}
                 >
                   <b className="block text-xs mb-1 text-yellow-300">
                     {msg.sender_role === "freelancer" ? "You" : "Customer"}
@@ -1005,6 +1046,7 @@ export default function FreelancerDashboard() {
                   </div>
                 </div>
               ))}
+              <div ref={messagesEndRef} />
             </div>
           </div>
 
@@ -2010,7 +2052,9 @@ export default function FreelancerDashboard() {
                     setSelectedMessage(target);
                     setMessages(fullMessages);
                     setUnreadCount(0);
+                    initialMessageCountRef.current = fullMessages.length || 0;
                     setOpenMessageModal(true);
+                    setTimeout(scrollToBottom, 100); // ✅ chỉ cuộn khi mở lần đầu
                   }}
                   className="relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition"
                   title="Open chat"

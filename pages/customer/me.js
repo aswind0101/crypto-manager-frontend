@@ -42,6 +42,8 @@ function CustomerAppointmentsPage() {
     const [selectedAppt, setSelectedAppt] = useState(null);
     const [messageText, setMessageText] = useState("");
     const messagesEndRef = useRef(null);
+    const initialMessageCountRef = useRef(0);
+
 
     useEffect(() => {
         if (!openMessageModal || !selectedAppt || !user) return;
@@ -89,10 +91,25 @@ function CustomerAppointmentsPage() {
     }, [user]);
 
     useEffect(() => {
-        if (openMessageModal && selectedAppt?.messages?.length > 0) {
+        if (!openMessageModal) return;
+
+        const current = selectedAppt?.messages?.length || 0;
+        const initial = initialMessageCountRef.current;
+
+        if (current > initial) {
             scrollToBottom();
+            initialMessageCountRef.current = current; // cập nhật lại
         }
-    }, [selectedAppt?.messages]);
+    }, [selectedAppt?.messages, openMessageModal]);
+    useEffect(() => {
+        if (!openMessageModal && selectedAppt) {
+            const markAndRefresh = async () => {
+                await markMessagesAsRead(selectedAppt.id); // ✅ đánh dấu đọc hết
+                await fetchAppointments(); // ✅ load lại danh sách
+            };
+            markAndRefresh();
+        }
+    }, [openMessageModal]);
 
     const fetchAppointments = async () => {
         if (!user) return;
@@ -511,6 +528,8 @@ function CustomerAppointmentsPage() {
                                         <button
                                             onClick={async () => {
                                                 setSelectedAppt(appt);
+                                                initialMessageCountRef.current = appt.messages?.length || 0;
+                                                setTimeout(scrollToBottom, 100); // ✅ cuộn 1 lần lúc mở
                                                 setOpenMessageModal(true);
                                                 setTimeout(scrollToBottom, 100);
                                                 await markMessagesAsRead(appt.id); // 👈 Đảm bảo phải `await`
