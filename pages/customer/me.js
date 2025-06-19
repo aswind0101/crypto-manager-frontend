@@ -8,6 +8,7 @@ import dayjs from "dayjs"; // Đảm bảo đã import
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { CalendarDays } from "lucide-react";
+import EmojiPicker from "emoji-picker-react";
 
 
 // ⚠️ Bạn phải gọi các plugin trước khi sử dụng tz()
@@ -44,6 +45,7 @@ function CustomerAppointmentsPage() {
     const messagesEndRef = useRef(null);
     const initialMessageCountRef = useRef(0);
     const [isSending, setIsSending] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
 
     useEffect(() => {
