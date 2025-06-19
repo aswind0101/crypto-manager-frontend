@@ -41,6 +41,7 @@ function CustomerAppointmentsPage() {
     const [openMessageModal, setOpenMessageModal] = useState(false);
     const [selectedAppt, setSelectedAppt] = useState(null);
     const [messageText, setMessageText] = useState("");
+    const messagesEndRef = useRef(null);
 
     useEffect(() => {
         if (!openMessageModal || !selectedAppt || !user) return;
@@ -86,6 +87,12 @@ function CustomerAppointmentsPage() {
 
         return () => clearInterval(interval); // dọn sạch khi unmount
     }, [user]);
+
+    useEffect(() => {
+        if (openMessageModal && selectedAppt?.messages?.length > 0) {
+            scrollToBottom();
+        }
+    }, [selectedAppt?.messages]);
 
     const fetchAppointments = async () => {
         if (!user) return;
@@ -155,10 +162,13 @@ function CustomerAppointmentsPage() {
         await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appointmentId}/read-all`, {
             method: "PATCH",
             headers: {
-                Authorization: `Bearer ${token}`
-            }
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ sender_role: "freelancer" })
         });
     };
+
 
     const handleSendMessage = async () => {
         if (!selectedAppt || !messageText.trim()) return;
@@ -208,9 +218,13 @@ function CustomerAppointmentsPage() {
             toast.error("Something went wrong.");
         }
     };
-
-
-
+    const scrollToBottom = () => {
+        setTimeout(() => {
+            if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+            }
+        }, 50); // Delay nhẹ để đảm bảo ref đã render
+    };
 
     function parseLocalTimestamp(str) {
         // str = "2025-05-24 17:30:00" hoặc "2025-05-24T17:30:00"
@@ -277,7 +291,8 @@ function CustomerAppointmentsPage() {
                                         </div>
                                     );
                                 })}
-
+                                {/* ✅ Auto scroll target */}
+                                <div ref={messagesEndRef} />
                             </div>
 
                             <Textarea
@@ -497,6 +512,7 @@ function CustomerAppointmentsPage() {
                                             onClick={async () => {
                                                 setSelectedAppt(appt);
                                                 setOpenMessageModal(true);
+                                                setTimeout(scrollToBottom, 100);
                                                 await markMessagesAsRead(appt.id); // 👈 Đảm bảo phải `await`
 
                                                 // ✅ Update lại trạng thái messages đã đọc
@@ -513,8 +529,8 @@ function CustomerAppointmentsPage() {
                                                 );
                                             }}
 
-                                            className={`absolute bottom-2 right-2 flex items-center gap-1 px-3 py-[5px] rounded-full text-xs transition-all
-            ${hasUnread
+                                            className={`absolute bottom-2 right-2 flex items-center gap-1 px-3 py-[5px] rounded-full text-sm transition-all
+                                            ${hasUnread
                                                     ? "bg-yellow-300 text-black animate-pulse shadow"
                                                     : "hover:bg-blue-500/20 text-blue-400 hover:text-white"
                                                 }`}

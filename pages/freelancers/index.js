@@ -66,7 +66,7 @@ export default function FreelancerDashboard() {
   const [isSending, setIsSending] = useState(false);
   const [messages, setMessages] = useState([]);
   const messageIntervalRef = useRef(null);
-
+  const messagesEndRef = useRef(null);
 
   const [onboarding, setOnboarding] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -264,8 +264,9 @@ export default function FreelancerDashboard() {
     // Hàm xin quyền giữ màn hình sáng
     async function requestWakeLock() {
       try {
-        if ("wakeLock" in navigator) {
+        if ("wakeLock" in navigator && document.visibilityState === "visible") {
           wakeLockRef.current = await navigator.wakeLock.request("screen");
+
           console.log("🔋 Wake Lock active!");
           // Nếu wake lock bị mất (tab ẩn, minimize), có thể xin lại
           wakeLockRef.current.addEventListener("release", () => {
@@ -320,7 +321,20 @@ export default function FreelancerDashboard() {
     return () => clearInterval(interval); // Dọn dẹp khi dialog đóng
   }, [openMessageModal, selectedMessage?.appointment_id]);
 
+  useEffect(() => {
+    if (!openMessageModal) {
+      const reload = async () => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return; // 👈 tránh crash nếu chưa đăng nhập
 
+        const token = await currentUser.getIdToken();
+        await loadNotifications(token);
+        await refreshUnreadCount();
+      };
+      reload();
+    }
+
+  }, [openMessageModal]);
 
   // Hàm kiểm tra và show popup late
   useEffect(() => {
@@ -562,7 +576,7 @@ export default function FreelancerDashboard() {
       refreshUnreadCount();
     };
 
-    const interval = setInterval(refresh, 60000); // ⏳ mỗi 60 giây
+    const interval = setInterval(refresh, 30000); // ⏳ mỗi 60 giây
     refresh(); // gọi lần đầu
 
     return () => clearInterval(interval); // 🧹 dọn khi unmount
@@ -642,6 +656,12 @@ export default function FreelancerDashboard() {
     const pending = appointmentsToday.filter(a => a.status === "pending");
     setPendingAppointments(pending);
   }, [appointmentsToday]);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   if (loading) {
     return <div className="text-center py-20 text-gray-600">⏳ Loading dashboard...</div>;
@@ -967,7 +987,7 @@ export default function FreelancerDashboard() {
           </p>
 
           {/* Danh sách tin nhắn */}
-          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar" style={{ scrollbarWidth: "none" }}>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar" ref={messagesEndRef} style={{ scrollbarWidth: "none" }}>
             <div className="space-y-1">
               {messages.map((msg, i) => (
                 <div
@@ -981,7 +1001,7 @@ export default function FreelancerDashboard() {
                   </b>
                   {msg.message}
                   <div className="text-[10px] text-gray-400 mt-1">
-                    {dayjs(msg.created_at).tz("America/Los_Angeles").format("MMM D, HH:mm")}
+                    {dayjs.utc(msg.created_at).format("MMM D, HH:mm")}
                   </div>
                 </div>
               ))}
@@ -1957,7 +1977,7 @@ export default function FreelancerDashboard() {
 
                     const token = await auth.currentUser.getIdToken();
 
-                    // 🔍 Tìm notification ứng với lịch hẹn đang xem
+                    // 🔍 Lấy notification ứng với client đang xem
                     const target = notifications.find(n => n.appointment_id === nextClient.id);
 
                     if (!target) {
@@ -1965,43 +1985,53 @@ export default function FreelancerDashboard() {
                       return;
                     }
 
-                    // 🔁 Load lại tất cả tin nhắn
+                    // ✅ Đánh dấu đã đọc
+                    await fetch(
+                      `https://crypto-manager-backend.onrender.com/api/appointments/${target.appointment_id}/read-all`,
+                      {
+                        method: "PATCH",
+                        headers: {
+                          Authorization: `Bearer ${token}`,
+                          "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ sender_role: "customer" })
+                      }
+                    );
+                    await refreshUnreadCount();
+
+                    // ✅ Load lại tin nhắn
                     const fullMessages = await fetch(
                       `https://crypto-manager-backend.onrender.com/api/appointments/${target.appointment_id}/messages/all`,
                       {
-                        headers: { Authorization: `Bearer ${token}` },
+                        headers: { Authorization: `Bearer ${token}` }
                       }
                     ).then(res => res.json());
 
-                    // ✅ Đánh dấu đã đọc nếu chưa
-                    if (!target.is_read) {
-                      await fetch(
-                        `https://crypto-manager-backend.onrender.com/api/appointments/messages/${target.id}/read`,
-                        {
-                          method: "PATCH",
-                          headers: { Authorization: `Bearer ${token}` },
-                        }
-                      );
-                      await refreshUnreadCount();
-                    }
-
-                    // 🟢 Set đúng dữ liệu
                     setSelectedMessage(target);
                     setMessages(fullMessages);
+                    setUnreadCount(0);
                     setOpenMessageModal(true);
                   }}
-
-
-                  className={`relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition
-        ${notifications.some(n => !n.is_read) ? "ring-2 ring-yellow-400 animate-pulse" : ""}
-      `}
+                  className="relative w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center shadow hover:scale-105 transition"
                   title="Open chat"
                 >
                   <FiBell className="text-white text-base" />
+
+                  {/* 🎯 Hiển thị đúng số lượng tin chưa đọc của client đang chọn */}
+                  {(() => {
+                    const count = notifications.filter(
+                      n => n.appointment_id === nextClient?.id && !n.is_read
+                    ).length;
+
+                    return count > 0 ? (
+                      <span className="absolute -top-1 -right-1 bg-yellow-400 text-black text-[10px] font-bold px-1.5 py-[1px] rounded-full shadow">
+                        {count}
+                      </span>
+                    ) : null;
+                  })()}
                 </button>
               </div>
             }
-
             sub={
               upcomingAppointments.length > 0 ? (
                 <div className="flex flex-col gap-2 p-4 rounded-xl card-animate-in w-full">
