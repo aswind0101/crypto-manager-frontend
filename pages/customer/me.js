@@ -573,9 +573,12 @@ function CustomerAppointmentsPage() {
                                         </p>
                                     </div>
 
-                                    {/* Cancel button */}
+                                    {/* Cancel button 
+                                    - Nếu muốn hiển thị cuộc hẹn ở quá khứ, thêm 
+                                     dayjs(appt.appointment_date.replace("Z", "")).isAfter(dayjs()) &&
+                                    */}
                                     {["pending", "confirmed"].includes(appt.status) &&
-                                        dayjs(appt.appointment_date.replace("Z", "")).isAfter(dayjs()) && (
+                                        (
                                             <button
                                                 onClick={() => {
                                                     setCancelTargetId(appt.id);          // lưu ID cuộc hẹn muốn huỷ
