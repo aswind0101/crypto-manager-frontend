@@ -285,57 +285,79 @@ function FreelancerAppointmentsPage() {
                   <div
                     key={a.id}
                     ref={(el) => (scrollRefs.current[a.id] = el)}
-                    className={`relative bg-white/10 backdrop-blur-xl border-t-4 ${statusColor[a.status] || "border-gray-300"} rounded-3xl p-5 shadow-xl flex flex-col gap-3 group hover:scale-[1.025] transition-transform ${highlightedId === a.id ? "ring-2 ring-yellow-400 bg-yellow-100/20" : ""
-                      }`}
+                    className={`relative bg-gradient-to-br from-[#2f374a] via-[#1C1F26] to-[#0b0f17] border-l-4 ${statusColor[a.status] || "border-gray-300"} rounded-2xl shadow-xl p-5 space-y-4 hover:scale-[1.01] transition-all duration-200
+    ${highlightedId === a.id ? "ring-2 ring-yellow-400 bg-yellow-100/20" : ""}`}
                   >
-                    <div className="flex items-center gap-3 mb-2">
-                      {/* Avatar hoặc icon */}
+                    {/* Status badge */}
+                    <div className="absolute top-3 right-3">
+                      <StatusBadge status={a.status} />
+                    </div>
+
+                    {/* Customer Info */}
+                    <div className="flex gap-3 items-center mt-4">
                       <div className="w-14 h-14 bg-pink-500 rounded-full flex items-center justify-center shadow-inner">
                         <FiUser className="text-white text-3xl" />
                       </div>
                       <div>
                         <p className="font-bold text-lg text-pink-300">{a.customer_name}</p>
-                        <StatusBadge status={a.status} />
+                        <p className="text-xs text-emerald-200">📞 {a.customer_phone || "Not provided"}</p>
                       </div>
                     </div>
-                    <p className="text-sm text-yellow-500 flex items-center gap-2 font-semibold">
-                      <FiClock /> {dayjs(a.appointment_date.replace("Z", "")).format("hh:mm A")}
+
+                    {/* Time + Duration */}
+                    <div className="text-sm text-yellow-500 flex items-center gap-2 font-semibold">
+                      <FiClock /> {dayjs(a.appointment_date.replace("Z", "")).format("MMM D, hh:mm A")}
                       <span className="text-emerald-400 font-bold ml-4"><FiCheckCircle /> {a.duration_minutes} min</span>
-                    </p>
-                    <div className="text-sm text-emerald-200 capitalize mb-2">
-                      Services:{" "}
-                      <span className="font-semibold">{a.services.map((s) => s.name).join(", ")}</span>
                     </div>
+
+                    {/* Services */}
+                    <div className="text-sm text-white/90 space-y-1">
+                      <div className="font-semibold text-pink-300">💅 Services</div>
+                      <ul className="pl-4 list-disc text-sm text-emerald-100">
+                        {a.services.map((s) => (
+                          <li key={s.id}>
+                            <span className="text-white">{s.name}</span> — ${s.price} / {s.duration} min
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Cancelled Reason */}
                     {a.status === "cancelled" && a.cancel_reason && (
                       <div className="text-sm text-red-300 bg-red-500/10 p-3 rounded-xl border border-red-400 mt-1">
                         📌 <span className="font-semibold text-red-400">Cancelled Reason:</span> <em>{a.cancel_reason}</em>
                       </div>
                     )}
-                    <div className="flex flex-col gap-3 mt-2">
-                      {(a.status === "pending" || a.status === "confirmed") &&
-                        dayjs(a.appointment_date.replace("Z", "")).isSameOrAfter(dayjs()) && (
-                          <div className="flex gap-2 justify-end">
-                            {a.status === "pending" && (
-                              <button
-                                onClick={() => handleConfirm(a.id)}
-                                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-600 hover:to-green-400 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all duration-150"
-                              >
-                                <FiCheckCircle className="text-xl" /> Confirm
-                              </button>
-                            )}
-                            <button
-                              onClick={() => {
-                                setCancelTargetId(a.id);
-                                setShowCancelPopup(true);
-                              }}
-                              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-pink-400 to-red-400 hover:from-red-500 hover:to-pink-400 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all duration-150"
-                            >
-                              <FiXCircle className="text-xl" /> Cancel
-                            </button>
-                          </div>
+
+                    {/* Actions 
+                      - Nếu sau này muốn thêm điều kiệm không cho hủy cuộc hẹn đã trong quá khứ thì thêm 
+                       dayjs(a.appointment_date.replace("Z", "")).isSameOrAfter(dayjs()). Cụ thể:
+                      (a.status === "pending" || a.status === "confirmed") && dayjs(a.appointment_date.replace("Z", "")).isSameOrAfter(dayjs())
+                    */}
+
+                    {(a.status === "pending" || a.status === "confirmed") && (
+                      <div className="flex gap-2 justify-end pt-2">
+                        {a.status === "pending" && (
+                          <button
+                            onClick={() => handleConfirm(a.id)}
+                            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-600 hover:to-green-400 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all duration-150"
+                          >
+                            <FiCheckCircle className="text-xl" /> Confirm
+                          </button>
                         )}
-                    </div>
+                        <button
+                          onClick={() => {
+                            setCancelTargetId(a.id);
+                            setShowCancelPopup(true);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-pink-400 to-red-400 hover:from-red-500 hover:to-pink-400 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all duration-150"
+                        >
+                          <FiXCircle className="text-xl" /> Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
+
                 ))}
               </div>
             </div>
