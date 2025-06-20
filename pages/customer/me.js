@@ -47,6 +47,11 @@ function CustomerAppointmentsPage() {
     const [isSending, setIsSending] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
+    const [showCancelPopup, setShowCancelPopup] = useState(false);
+    const [cancelTargetId, setCancelTargetId] = useState(null);
+    const [selectedReason, setSelectedReason] = useState("");
+
+
 
     useEffect(() => {
         if (!openMessageModal || !selectedAppt || !user) return;
@@ -247,7 +252,13 @@ function CustomerAppointmentsPage() {
             }
         }, 50); // Delay nhẹ để đảm bảo ref đã render
     };
-
+    const cancellationReasons = [
+        "I can't make it",
+        "Found another stylist",
+        "Booked by mistake",
+        "Time conflict",
+        "Other"
+    ];
     function parseLocalTimestamp(str) {
         // str = "2025-05-24 17:30:00" hoặc "2025-05-24T17:30:00"
         const clean = str.replace("T", " ");
@@ -271,6 +282,58 @@ function CustomerAppointmentsPage() {
             <Navbar />
             <audio ref={soundConfirmRef} src="/confirmed.wav" preload="auto" />
             <audio ref={soundCancelRef} src="/cancelled.wav" preload="auto" />
+            {showCancelPopup && (
+                <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center">
+                    <div className="bg-white text-black rounded-xl p-6 max-w-sm w-full shadow-xl space-y-4">
+                        <h2 className="text-lg font-bold text-pink-500">Cancel Appointment</h2>
+                        <p className="text-sm text-gray-600">Please select a reason:</p>
+                        <select
+                            value={selectedReason}
+                            onChange={(e) => setSelectedReason(e.target.value)}
+                            className="w-full border rounded px-3 py-2 text-sm"
+                        >
+                            <option value="">-- Choose a reason --</option>
+                            {cancellationReasons.map((r) => (
+                                <option key={r} value={r}>{r}</option>
+                            ))}
+                        </select>
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setShowCancelPopup(false)}
+                                className="text-sm text-gray-500 hover:underline"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                disabled={!selectedReason}
+                                className="bg-red-500 text-white px-4 py-1 rounded shadow disabled:opacity-40"
+                                onClick={async () => {
+                                    const token = await user.getIdToken();
+                                    const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${cancelTargetId}`, {
+                                        method: "DELETE",
+                                        headers: {
+                                            Authorization: `Bearer ${token}`,
+                                            "Content-Type": "application/json"
+                                        },
+                                        body: JSON.stringify({ cancel_reason: selectedReason })
+                                    });
+
+                                    if (res.ok) {
+                                        toast.success("Appointment cancelled!");
+                                        setAppointments(prev => prev.filter(a => a.id !== cancelTargetId));
+                                        setShowCancelPopup(false);
+                                        setSelectedReason("");
+                                    } else {
+                                        toast.error("Failed to cancel appointment");
+                                    }
+                                }}
+                            >
+                                Confirm Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <Dialog open={openMessageModal} onOpenChange={setOpenMessageModal}>
                 <DialogContent className="rounded-3xl border-t-4 border-b-4 border-pink-500 shadow-xl 
           bg-[#1f2937]/90 backdrop-blur font-mono sm:font-['Pacifico', cursive] text-sm">
@@ -324,6 +387,7 @@ function CustomerAppointmentsPage() {
                                 value={messageText}
                                 onChange={(e) => setMessageText(e.target.value)}
                             />
+
                             <Button
                                 onClick={handleSendMessage}
                                 disabled={!messageText.trim() || isSending}
@@ -430,7 +494,11 @@ function CustomerAppointmentsPage() {
                                     >
                                         📌 {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
                                     </span>
-
+                                    {appt.status === "cancelled" && appt.cancel_reason && (
+                                        <p className="mt-1 text-xs text-red-400 italic">
+                                            ❌ Reason: {appt.cancel_reason}
+                                        </p>
+                                    )}
                                     {/* Stylist Info */}
                                     <div className="flex items-center gap-4 mb-3 mt-2">
                                         <img
@@ -509,20 +577,9 @@ function CustomerAppointmentsPage() {
                                     {["pending", "confirmed"].includes(appt.status) &&
                                         dayjs(appt.appointment_date.replace("Z", "")).isAfter(dayjs()) && (
                                             <button
-                                                onClick={async () => {
-                                                    if (!confirm("Are you sure you want to cancel this appointment?")) return;
-                                                    const token = await user.getIdToken();
-                                                    const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${appt.id}`, {
-                                                        method: "DELETE",
-                                                        headers: { Authorization: `Bearer ${token}` },
-                                                    });
-                                                    const data = await res.json();
-                                                    if (res.ok) {
-                                                        alert("✅ Appointment cancelled.");
-                                                        setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
-                                                    } else {
-                                                        alert("❌ " + (data.error || "Failed to cancel."));
-                                                    }
+                                                onClick={() => {
+                                                    setCancelTargetId(appt.id);          // lưu ID cuộc hẹn muốn huỷ
+                                                    setShowCancelPopup(true);            // mở popup lý do
                                                 }}
                                                 className="absolute bottom-2 left-2 hover:bg-red-500/20 text-red-400 hover:text-white text-[9px] px-4 py-[4px] rounded-3xl transition-all duration-200 flex items-center gap-1"
                                             >

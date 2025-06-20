@@ -164,6 +164,7 @@ router.get("/me", verifyToken, async (req, res) => {
         a.duration_minutes,
         a.note,
         a.status,
+        a.cancel_reason,
         a.started_at,  
         a.end_at,
         f.name AS stylist_name,
@@ -224,6 +225,7 @@ router.get("/freelancer", verifyToken, async (req, res) => {
     a.started_at,
     a.end_at,     
     a.note,
+    a.cancel_reason,
     a.customer_uid,
     a.stylist_id,
     a.phone AS customer_phone,
@@ -352,7 +354,7 @@ router.get("/salon/revenue", verifyToken, async (req, res) => {
 // ✅ PATCH: Cập nhật trạng thái lịch hẹn
 router.patch("/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
-  const { status, started_at, end_at } = req.body;
+  const { status, started_at, end_at, cancel_reason } = req.body;
 
   // Bổ sung "processing" vào danh sách hợp lệ
   if (!["pending", "confirmed", "processing", "completed", "cancelled"].includes(status)) {
@@ -459,7 +461,11 @@ router.patch("/:id", verifyToken, async (req, res) => {
       values.push(end_at);
       idx++;
     }
-
+    if (status === "cancelled" && cancel_reason) {
+      updateFields.push('cancel_reason'); // ✅ CHO PHÉP UPDATE lý do hủy
+      values.push(cancel_reason);
+      idx++;
+    }
     let setClause = updateFields.map((f, i) => `${f} = $${i + 1}`).join(', ');
     values.push(id);
 
@@ -526,6 +532,7 @@ router.patch("/:id", verifyToken, async (req, res) => {
 router.delete("/:id", verifyToken, async (req, res) => {
   const { uid } = req.user;
   const { id } = req.params;
+  const { cancel_reason } = req.body;
 
   try {
     const check = await pool.query(`
@@ -540,12 +547,17 @@ router.delete("/:id", verifyToken, async (req, res) => {
 
     const { status } = check.rows[0];
 
-    if (status !== "pending") {
-      return res.status(400).json({ error: "Only pending appointments can be cancelled." });
+    // ❌ Chỉ không cho huỷ nếu đã completed hoặc đã huỷ rồi
+    if (["completed", "cancelled"].includes(status)) {
+      return res.status(400).json({ error: "Cannot cancel this appointment." });
     }
 
-    // ✅ KHÔNG kiểm tra thời gian nữa — frontend lo phần này rồi
-    await pool.query("DELETE FROM appointments WHERE id = $1", [id]);
+    // ✅ Update thay vì xoá
+    await pool.query(`
+      UPDATE appointments
+      SET status = 'cancelled', cancel_reason = $1
+      WHERE id = $2
+    `, [cancel_reason || null, id]);
 
     res.json({ message: "✅ Appointment cancelled." });
   } catch (err) {
@@ -553,6 +565,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 router.post("/messages", verifyToken, async (req, res) => {
   const { appointment_id, message, created_at } = req.body;
   const { uid } = req.user;

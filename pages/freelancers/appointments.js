@@ -43,6 +43,10 @@ function FreelancerAppointmentsPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showCancelPopup, setShowCancelPopup] = useState(false);
+  const [cancelTargetId, setCancelTargetId] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+
   const router = useRouter();
   const highlightedId = router.query.id;
   const { id: queryId } = router.query;
@@ -177,6 +181,64 @@ function FreelancerAppointmentsPage() {
   return (
     <div className="min-h-screen text-white px-2 sm:px-4 py-4 font-mono">
       <Navbar />
+      {showCancelPopup && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-[90%] text-black shadow-xl">
+            <h2 className="text-lg font-bold text-red-600 mb-3">Cancel Appointment</h2>
+            <p className="mb-2">Please select a reason for cancellation:</p>
+            <select
+              className="w-full border px-3 py-2 rounded-lg mb-4"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            >
+              <option value="">-- Select reason --</option>
+              <option value="Customer no-show">Customer no-show</option>
+              <option value="Unexpected delay">Unexpected delay</option>
+              <option value="Double booking">Double booking</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowCancelPopup(false)}
+                className="px-4 py-2 bg-gray-300 rounded-lg"
+              >
+                Close
+              </button>
+              <button
+                disabled={!cancelReason}
+                onClick={async () => {
+                  const token = await user.getIdToken();
+                  const res = await fetch(`https://crypto-manager-backend.onrender.com/api/appointments/${cancelTargetId}`, {
+                    method: "PATCH",
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ status: "cancelled", cancel_reason: cancelReason })
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert("❌ Appointment cancelled");
+                    setAppointments(prev => prev.map(a =>
+                      a.id === cancelTargetId ? { ...a, status: "cancelled", cancel_reason: cancelReason } : a
+                    ));
+                    setShowCancelPopup(false);
+                    setCancelReason("");
+                    setCancelTargetId(null);
+                  } else {
+                    alert("❌ " + (data.error || "Failed to cancel"));
+                  }
+                }}
+                className={`px-4 py-2 rounded-lg font-bold text-white ${cancelReason ? "bg-red-500 hover:bg-red-600" : "bg-gray-400 cursor-not-allowed"}`}
+              >
+                Confirm Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-4 text-center text-pink-400">📅 Manage Appointments</h1>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
@@ -244,6 +306,11 @@ function FreelancerAppointmentsPage() {
                       Services:{" "}
                       <span className="font-semibold">{a.services.map((s) => s.name).join(", ")}</span>
                     </div>
+                    {a.status === "cancelled" && a.cancel_reason && (
+                      <div className="text-sm text-red-300 bg-red-500/10 p-3 rounded-xl border border-red-400 mt-1">
+                        📌 <span className="font-semibold text-red-400">Cancelled Reason:</span> <em>{a.cancel_reason}</em>
+                      </div>
+                    )}
                     <div className="flex flex-col gap-3 mt-2">
                       {(a.status === "pending" || a.status === "confirmed") &&
                         dayjs(a.appointment_date.replace("Z", "")).isSameOrAfter(dayjs()) && (
@@ -257,7 +324,10 @@ function FreelancerAppointmentsPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => handleCancel(a.id)}
+                              onClick={() => {
+                                setCancelTargetId(a.id);
+                                setShowCancelPopup(true);
+                              }}
                               className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-pink-400 to-red-400 hover:from-red-500 hover:to-pink-400 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all duration-150"
                             >
                               <FiXCircle className="text-xl" /> Cancel
