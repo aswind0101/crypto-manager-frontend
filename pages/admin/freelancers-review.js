@@ -82,10 +82,10 @@ export default function FreelancersReviewPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-300 via-sky-300 to-pink-300 dark:from-emerald-800 dark:via-sky-700 dark:to-pink-700 px-4 py-10 text-gray-800 dark:text-gray-100">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-800 via-sky-700 to-pink-700 px-4 py-10 text-gray-100">
             <Navbar />
-            <div className="max-w-6xl mx-auto bg-white/30 dark:bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8">
-                <h1 className="text-3xl font-bold text-center text-emerald-700 dark:text-emerald-300 mb-6">
+            <div className="max-w-6xl mx-auto bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl p-8">
+                <h1 className="text-3xl font-bold text-center text-emerald-300 mb-6">
                     🧾 Freelancers Document Review
                 </h1>
 
@@ -98,7 +98,7 @@ export default function FreelancersReviewPage() {
                         {data.map((freelancer) => (
                             <div
                                 key={freelancer.id}
-                                className="w-full bg-white/30 dark:bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-5 shadow-md flex flex-col gap-4"
+                                className="w-full bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-5 shadow-md flex flex-col gap-4"
                             >
                                 {/* Avatar + Info */}
                                 <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
@@ -109,7 +109,7 @@ export default function FreelancersReviewPage() {
                                     />
                                     <div className="flex flex-col overflow-hidden">
                                         <p className="font-bold text-base truncate">{freelancer.name}</p>
-                                        <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                                        <p className="text-xs font-mono text-gray-300 break-all">
                                             {freelancer.email}
                                         </p>
                                     </div>

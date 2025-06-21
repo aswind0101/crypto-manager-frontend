@@ -397,16 +397,26 @@ router.delete("/:id", verifyToken, attachUserRole, async (req, res) => {
         }
         const { firebase_uid, email } = check.rows[0];
 
-        // 2️⃣ Xóa employee
+        // 2️⃣ Xoá employee
         await pool.query(`DELETE FROM employees WHERE id = $1`, [id]);
 
-        // 3️⃣ Kiểm tra role trong bảng users
+        // 3️⃣ Cập nhật các trường salon ở freelancers về NULL
+        await pool.query(`
+            UPDATE freelancers
+            SET salon_id = NULL,
+                temp_salon_name = NULL,
+                temp_salon_address = NULL,
+                temp_salon_phone = NULL
+            WHERE firebase_uid = $1
+        `, [firebase_uid]);
+
+        // 4️⃣ Kiểm tra role trong bảng users
         const checkUser = await pool.query(`SELECT id, role FROM users WHERE firebase_uid = $1`, [firebase_uid]);
         if (checkUser.rows.length > 0) {
             const userId = checkUser.rows[0].id;
             const role = checkUser.rows[0].role;
             if (role === "Salon_NhanVien") {
-                // Nếu là nhân viên → XÓA user
+                // Nếu là nhân viên → xoá user
                 await pool.query(`DELETE FROM users WHERE firebase_uid = $1`, [firebase_uid]);
             } else if (role === "Salon_All") {
                 // Nếu là all → cập nhật về Salon_Freelancers
@@ -414,13 +424,12 @@ router.delete("/:id", verifyToken, attachUserRole, async (req, res) => {
             }
         }
 
-        res.json({ message: "Employee (and user if applicable) deleted/updated successfully" });
+        res.json({ message: "✅ Employee and related freelancer updated successfully" });
     } catch (err) {
         console.error("❌ Error deleting employee:", err.message);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
-
 
 // ✅ Lấy danh sách freelancer cần duyệt (Salon Chủ)
 router.get("/freelancers-pending", verifyToken, attachUserRole, async (req, res) => {

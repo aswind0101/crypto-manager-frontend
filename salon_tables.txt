@@ -303,3 +303,76 @@ TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public.users
     OWNER to crypto_manager_user;
+==================================================================
+
+-- Table: public.appointment_invoices
+
+-- DROP TABLE IF EXISTS public.appointment_invoices;
+
+CREATE TABLE IF NOT EXISTS public.appointment_invoices
+(
+    id integer NOT NULL DEFAULT nextval('appointment_invoices_id_seq'::regclass),
+    appointment_id integer,
+    customer_name character varying(100) COLLATE pg_catalog."default",
+    customer_phone character varying(20) COLLATE pg_catalog."default",
+    stylist_id integer,
+    stylist_name character varying(100) COLLATE pg_catalog."default",
+    salon_id integer,
+    services jsonb,
+    total_amount numeric(12,2),
+    total_duration integer,
+    actual_start_at timestamp without time zone,
+    actual_end_at timestamp without time zone,
+    notes text COLLATE pg_catalog."default",
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    tip numeric(12,2) DEFAULT 0,
+    amount_paid numeric(12,2) DEFAULT 0,
+    change numeric(12,2) DEFAULT 0,
+    CONSTRAINT appointment_invoices_pkey PRIMARY KEY (id),
+    CONSTRAINT appointment_invoices_appointment_id_fkey FOREIGN KEY (appointment_id)
+        REFERENCES public.appointments (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT appointment_invoices_salon_id_fkey FOREIGN KEY (salon_id)
+        REFERENCES public.salons (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT appointment_invoices_stylist_id_fkey FOREIGN KEY (stylist_id)
+        REFERENCES public.freelancers (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.appointment_invoices
+    OWNER to crypto_manager_user;
+
+    ==============================================================
+    -- Table: public.appointment_messages
+
+-- DROP TABLE IF EXISTS public.appointment_messages;
+
+CREATE TABLE IF NOT EXISTS public.appointment_messages
+(
+    id integer NOT NULL DEFAULT nextval('appointment_messages_id_seq'::regclass),
+    appointment_id integer NOT NULL,
+    sender_role character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    sender_name text COLLATE pg_catalog."default",
+    sender_phone text COLLATE pg_catalog."default",
+    message text COLLATE pg_catalog."default" NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    is_read boolean DEFAULT false,
+    CONSTRAINT appointment_messages_pkey PRIMARY KEY (id),
+    CONSTRAINT appointment_messages_appointment_id_fkey FOREIGN KEY (appointment_id)
+        REFERENCES public.appointments (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    CONSTRAINT appointment_messages_sender_role_check CHECK (sender_role::text = ANY (ARRAY['customer'::character varying, 'freelancer'::character varying]::text[]))
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.appointment_messages
+    OWNER to crypto_manager_user;
