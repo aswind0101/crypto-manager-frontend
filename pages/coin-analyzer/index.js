@@ -72,6 +72,7 @@ export default function CoinAnalyzerPage() {
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState("");
   const [refreshInfo, setRefreshInfo] = useState(null);
+  const [progress, setProgress] = useState(0);
 
   // ====== Autocomplete state ======
   const [search, setSearch] = useState("");
@@ -80,6 +81,23 @@ export default function CoinAnalyzerPage() {
   const [platforms, setPlatforms] = useState([]); // [{id,label,contract}]
   const [activeIdx, setActiveIdx] = useState(-1);
   const listRef = useRef(null);
+
+  useEffect(() => {
+    let timer;
+    if (loading) {
+      setProgress(0);
+      timer = setInterval(() => {
+        setProgress((p) => {
+          if (p < 90) return p + 5;
+          return p;
+        });
+      }, 300);
+    } else {
+      setProgress(100);
+      setTimeout(() => setProgress(0), 500);
+    }
+    return () => clearInterval(timer);
+  }, [loading]);
 
   const onChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
 
@@ -282,7 +300,15 @@ export default function CoinAnalyzerPage() {
             </ul>
           )}
         </div>
-
+        {progress > 0 && progress < 100 && (
+          <div className="w-full bg-gray-700 rounded-full h-2.5 mb-4">
+            <div
+              className="bg-blue-500 h-2.5 rounded-full transition-all duration-200"
+              style={{ width: `${progress}%` }}
+            ></div>
+            <div className="text-xs text-right text-gray-300 mt-1">{progress}%</div>
+          </div>
+        )}
         {/* Form */}
         <form className="mt-6 grid gap-4 bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
