@@ -300,15 +300,7 @@ export default function CoinAnalyzerPage() {
             </ul>
           )}
         </div>
-        {progress > 0 && progress < 100 && (
-          <div className="w-full bg-gray-700 rounded-full h-2.5 mb-4 mt-4">
-            <div
-              className="bg-blue-500 h-2.5 rounded-full transition-all duration-200"
-              style={{ width: `${progress}%` }}
-            ></div>
-            <div className="text-xs text-right text-gray-300 mt-1">{progress}%</div>
-          </div>
-        )}
+
         {/* Form */}
         <form className="mt-6 grid gap-4 bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -395,7 +387,15 @@ export default function CoinAnalyzerPage() {
             >
               {loading ? "Processing..." : "Analyze Existing"}
             </button>
-
+            {progress > 0 && progress < 100 && (
+              <div className="w-full bg-gray-700 rounded-full h-2.5 mb-4 mt-4">
+                <div
+                  className="bg-blue-500 h-2.5 rounded-full transition-all duration-200"
+                  style={{ width: `${progress}%` }}
+                ></div>
+                <div className="text-xs text-right text-gray-300 mt-1">{progress}%</div>
+              </div>
+            )}
             {error && <span className="text-red-400 text-sm">{error}</span>}
           </div>
         </form>
