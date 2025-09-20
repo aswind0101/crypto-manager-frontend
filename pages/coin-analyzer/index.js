@@ -1,17 +1,6 @@
 // frontend/pages/coin-analyzer/index.js
 import { useState } from "react";
 
-/**
- * ENV bắt buộc:
- * NEXT_PUBLIC_BACKEND_URL = https://<your-backend-domain>
- * Ví dụ: https://crypto-manager-backend.onrender.com
- *
- * Backend endpoints được dùng:
- * - POST /api/crypto-assets/register   → upsert coin vào crypto_assets
- * - POST /api/coins/:symbol/run-analysis → chạy analyzer 1 lần cho coin
- * - GET  /api/coins/:symbol/analyze      → lấy kết quả phân tích mới nhất
- */
-
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export default function CoinAnalyzerPage() {
@@ -24,34 +13,57 @@ export default function CoinAnalyzerPage() {
     coingecko_id: "",
     binance_symbol: "",
   });
-
   const [loading, setLoading] = useState(false);
   const [registerResp, setRegisterResp] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState("");
+  const [refreshInfo, setRefreshInfo] = useState(null);
 
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setForm((s) => ({ ...s, [name]: value }));
-  };
+  const onChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
 
-  async function handleAnalyze(e) {
+  async function refreshDataAndAnalyze(symbol, doAll = true) {
+    // 2) kick worker
+    const kickUrl = doAll
+      ? `${BACKEND}/api/workers/refresh-all/${encodeURIComponent(symbol)}`
+      : `${BACKEND}/api/workers/refresh-price/${encodeURIComponent(symbol)}`;
+    const k = await fetch(kickUrl, { method: "POST" });
+    if (!k.ok) throw new Error("Refresh worker failed");
+    const kJson = await k.json();
+    setRefreshInfo(kJson);
+
+    // 3) run analysis
+    const runRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/run-analysis`, { method: "POST" });
+    if (!runRes.ok) {
+      const j = await runRes.json().catch(()=>({}));
+      throw new Error(j.error || "Phân tích thất bại (run-analysis)");
+    }
+
+    // 4) get latest snapshot
+    const getRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/analyze`);
+    if (!getRes.ok) {
+      const j = await getRes.json().catch(()=>({}));
+      throw new Error(j.error || "Không lấy được kết quả phân tích");
+    }
+    const a = await getRes.json();
+    setAnalysis(a);
+  }
+
+  async function handleRegisterThenAnalyze(e) {
     e.preventDefault();
-    setError("");
-    setAnalysis(null);
-    setRegisterResp(null);
+    setError(""); setAnalysis(null); setRegisterResp(null); setRefreshInfo(null);
     if (!form.symbol || !form.name) {
       setError("Vui lòng nhập tối thiểu Symbol và Name.");
       return;
     }
     setLoading(true);
+    const symbol = form.symbol.trim().toUpperCase();
     try {
-      // 1) Đăng ký/Upsert coin vào crypto_assets
+      // 1) register / upsert
       const regRes = await fetch(`${BACKEND}/api/crypto-assets/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          symbol: form.symbol.trim().toUpperCase(),
+          symbol,
           name: form.name.trim(),
           chain: form.chain?.trim() || null,
           contract_address: form.contract_address?.trim() || null,
@@ -67,24 +79,23 @@ export default function CoinAnalyzerPage() {
       const regData = await regRes.json();
       setRegisterResp(regData);
 
-      // 2) Chạy phân tích cho symbol
-      const runRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(form.symbol.trim().toUpperCase())}/run-analysis`, {
-        method: "POST",
-      });
-      if (!runRes.ok) {
-        const j = await runRes.json().catch(()=>({}));
-        throw new Error(j.error || "Phân tích thất bại (run-analysis)");
-      }
-      // (Có thể bỏ qua payload runRes; mình sẽ fetch snapshot mới nhất để hiển thị)
+      // 2→3→4) refresh & analyze
+      await refreshDataAndAnalyze(symbol, true);
+    } catch (err) {
+      setError(err.message || "Đã xảy ra lỗi.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      // 3) Lấy kết quả mới nhất
-      const getRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(form.symbol.trim().toUpperCase())}/analyze`);
-      if (!getRes.ok) {
-        const j = await getRes.json().catch(()=>({}));
-        throw new Error(j.error || "Không lấy được kết quả phân tích");
-      }
-      const a = await getRes.json();
-      setAnalysis(a);
+  async function handleAnalyzeExisting(e) {
+    e.preventDefault();
+    setError(""); setAnalysis(null); setRefreshInfo(null);
+    const symbol = form.symbol?.trim()?.toUpperCase();
+    if (!symbol) { setError("Nhập SYMBOL để phân tích coin đã đăng ký."); return; }
+    setLoading(true);
+    try {
+      await refreshDataAndAnalyze(symbol, true);
     } catch (err) {
       setError(err.message || "Đã xảy ra lỗi.");
     } finally {
@@ -97,43 +108,57 @@ export default function CoinAnalyzerPage() {
       <div className="max-w-4xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight">Coin Analyzer</h1>
         <p className="text-sm text-gray-300 mt-2">
-          Đăng ký coin vào hệ thống → chạy phân tích → xem khuyến nghị mua/bán, buy zone, SL/TP.
+          Đăng ký coin vào hệ thống → nạp dữ liệu (worker) → chạy phân tích → xem khuyến nghị.
         </p>
 
         {/* Form */}
-        <form onSubmit={handleAnalyze} className="mt-8 grid gap-4 bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+        <form className="mt-8 grid gap-4 bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Symbol *" name="symbol" value={form.symbol} onChange={onChange} placeholder="VD: NEAR, BTC, ETH" required />
-            <Field label="Name *" name="name" value={form.name} onChange={onChange} placeholder="VD: NEAR Protocol" required />
-            <Field label="Chain" name="chain" value={form.chain} onChange={onChange} placeholder="VD: NEAR, Ethereum, BSC" />
-            <Field label="Contract Address" name="contract_address" value={form.contract_address} onChange={onChange} placeholder="ERC20/BEP20... (để rỗng nếu L1)" />
-            <Field label="Decimals" name="decimals" value={form.decimals} onChange={onChange} placeholder="VD: 18, 24" type="number" />
-            <Field label="CoinGecko ID" name="coingecko_id" value={form.coingecko_id} onChange={onChange} placeholder="VD: near" />
-            <Field label="Binance Symbol" name="binance_symbol" value={form.binance_symbol} onChange={onChange} placeholder="VD: NEARUSDT" />
+            <Field label="Symbol *" name="symbol" value={form.symbol} onChange={onChange} placeholder="NEAR, BTC, ETH" required />
+            <Field label="Name *" name="name" value={form.name} onChange={onChange} placeholder="NEAR Protocol" required />
+            <Field label="Chain" name="chain" value={form.chain} onChange={onChange} placeholder="NEAR, Ethereum, BSC…" />
+            <Field label="Contract Address" name="contract_address" value={form.contract_address} onChange={onChange} placeholder="ERC20/BEP20… (để trống nếu L1)" />
+            <Field label="Decimals" name="decimals" value={form.decimals} onChange={onChange} placeholder="18, 24" type="number" />
+            <Field label="CoinGecko ID" name="coingecko_id" value={form.coingecko_id} onChange={onChange} placeholder="near" />
+            <Field label="Binance Symbol" name="binance_symbol" value={form.binance_symbol} onChange={onChange} placeholder="NEARUSDT" />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              type="submit"
+              onClick={handleRegisterThenAnalyze}
               disabled={loading}
               className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition"
             >
-              {loading ? "Analyzing..." : "Register & Analyze"}
+              {loading ? "Processing..." : "Register & Analyze"}
             </button>
+
+            <button
+              onClick={handleAnalyzeExisting}
+              disabled={loading}
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition"
+            >
+              {loading ? "Processing..." : "Analyze Existing"}
+            </button>
+
             {error && <span className="text-red-400 text-sm">{error}</span>}
           </div>
         </form>
 
-        {/* Kết quả đăng ký */}
         {registerResp && (
-          <div className="mt-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-400/30">
-            <div className="text-emerald-300 text-sm">
-              ✅ Đã đăng ký/ cập nhật coin: <strong>{registerResp.symbol}</strong> – {registerResp.name}
-            </div>
+          <div className="mt-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-400/30 text-sm">
+            ✅ Đã đăng ký/cập nhật coin: <b>{registerResp.symbol}</b> — {registerResp.name}
           </div>
         )}
 
-        {/* Kết quả phân tích */}
+        {refreshInfo && (
+          <div className="mt-4 p-4 rounded-xl bg-indigo-500/10 border border-indigo-400/30 text-sm">
+            <div className="font-medium mb-1">Worker refresh:</div>
+            <pre className="whitespace-pre-wrap text-indigo-200 text-xs">
+{JSON.stringify(refreshInfo, null, 2)}
+            </pre>
+          </div>
+        )}
+
         {analysis && (
           <div className="mt-8 grid gap-6">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
@@ -148,16 +173,6 @@ export default function CoinAnalyzerPage() {
                 <KV k="Take Profit 1" v={analysis.take_profit?.[0]} />
                 <KV k="Take Profit 2" v={analysis.take_profit?.[1]} />
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <h3 className="font-medium mb-2">Ghi chú</h3>
-              <ul className="list-disc list-inside text-gray-300 text-sm space-y-1">
-                <li>Giá/biểu đồ được lấy từ worker giá (Binance US ưu tiên, fallback CoinGecko). Cron 5’/lần theo server. :contentReference[oaicite:3]{index=3} :contentReference[oaicite:4]{index=4}</li>
-                <li>On-chain netflow/large transfers được cập nhật định kỳ từ Covalent. :contentReference[oaicite:5]{index=5}</li>
-                <li>News activity từ NewsAPI/CryptoPanic (15’/lần). :contentReference[oaicite:6]{index=6}</li>
-                <li>Analyzer tổng hợp RSI/EMA/MACD + on-chain + news để tính điểm & khuyến nghị. :contentReference[oaicite:7]{index=7}</li>
-              </ul>
             </div>
           </div>
         )}
