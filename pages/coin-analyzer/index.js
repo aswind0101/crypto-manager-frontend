@@ -49,14 +49,11 @@ async function cgCoinDetail(id) {
 // =================== Binance helpers ===================
 async function findBinancePair(baseSymbol) {
   if (!baseSymbol) return null;
-  const candidates = [`${baseSymbol}USDT`, `${baseSymbol}BUSD`, `${baseSymbol}USDC`];
-  for (const s of candidates) {
-    try {
-      const r = await fetch(`https://api.binance.com/api/v3/exchangeInfo?symbol=${s}`);
-      if (r.ok) return s; // tồn tại
-    } catch {}
-  }
-  return null;
+  const url = `${BACKEND}/api/market/detect-binance/${encodeURIComponent(baseSymbol)}?quotes=USDT,USDC,BUSD`;
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => ({}));
+  return j?.ok ? j.symbol : null;
 }
 
 export default function CoinAnalyzerPage() {
@@ -175,13 +172,13 @@ export default function CoinAnalyzerPage() {
 
     const runRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/run-analysis`, { method: "POST" });
     if (!runRes.ok) {
-      const j = await runRes.json().catch(()=>({}));
+      const j = await runRes.json().catch(() => ({}));
       throw new Error(j.error || "Phân tích thất bại (run-analysis)");
     }
 
     const getRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/analyze`);
     if (!getRes.ok) {
-      const j = await getRes.json().catch(()=>({}));
+      const j = await getRes.json().catch(() => ({}));
       throw new Error(j.error || "Không lấy được kết quả phân tích");
     }
     const a = await getRes.json();
@@ -212,7 +209,7 @@ export default function CoinAnalyzerPage() {
         }),
       });
       if (!regRes.ok) {
-        const j = await regRes.json().catch(()=>({}));
+        const j = await regRes.json().catch(() => ({}));
         throw new Error(j.error || "Đăng ký coin thất bại");
       }
       const regData = await regRes.json();
@@ -274,9 +271,8 @@ export default function CoinAnalyzerPage() {
                     setSearch("");
                     setActiveIdx(-1);
                   }}
-                  className={`px-3 py-2 cursor-pointer hover:bg-white/10 flex items-center justify-between ${
-                    i === activeIdx ? "bg-white/10" : ""
-                  }`}
+                  className={`px-3 py-2 cursor-pointer hover:bg-white/10 flex items-center justify-between ${i === activeIdx ? "bg-white/10" : ""
+                    }`}
                 >
                   <span className="font-semibold">{c.name}</span>
                   <span className="text-gray-400">({(c.symbol || "").toUpperCase()})</span>
@@ -289,7 +285,7 @@ export default function CoinAnalyzerPage() {
         {/* Form */}
         <form className="mt-6 grid gap-4 bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Symbol *" name="symbol" value={form.symbol} onChange={(e)=>setForm(s=>({...s, symbol:e.target.value.toUpperCase()}))} placeholder="NEAR, BTC, ETH" required />
+            <Field label="Symbol *" name="symbol" value={form.symbol} onChange={(e) => setForm(s => ({ ...s, symbol: e.target.value.toUpperCase() }))} placeholder="NEAR, BTC, ETH" required />
             <Field label="Name *" name="name" value={form.name} onChange={onChange} placeholder="NEAR Protocol" required />
 
             <div>
@@ -320,7 +316,7 @@ export default function CoinAnalyzerPage() {
             </div>
 
             <Field label="Contract Address" name="contract_address" value={form.contract_address} onChange={onChange} placeholder="ERC20/BEP20… (để trống nếu L1)" />
-            <Field label="Decimals" name="decimals" value={form.decimals} onChange={(e)=>setForm(s=>({...s, decimals: e.target.value.replace(/[^0-9]/g,'')}))} placeholder="18, 24" type="text" />
+            <Field label="Decimals" name="decimals" value={form.decimals} onChange={(e) => setForm(s => ({ ...s, decimals: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="18, 24" type="text" />
             <Field label="CoinGecko ID" name="coingecko_id" value={form.coingecko_id} onChange={onChange} placeholder="near" />
 
             <div className="md:col-span-2">
@@ -330,7 +326,7 @@ export default function CoinAnalyzerPage() {
                   className="bg-white/10 border border-white/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/50 w-full"
                   name="binance_symbol"
                   value={form.binance_symbol}
-                  onChange={(e)=>setForm(s=>({...s, binance_symbol: e.target.value.toUpperCase()}))}
+                  onChange={(e) => setForm(s => ({ ...s, binance_symbol: e.target.value.toUpperCase() }))}
                   placeholder="NEARUSDT…"
                 />
                 <button
@@ -338,12 +334,17 @@ export default function CoinAnalyzerPage() {
                   className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500"
                   onClick={async () => {
                     const s = await findBinancePair(form.symbol?.toUpperCase());
-                    setForm((f) => ({ ...f, binance_symbol: s || f.binance_symbol }));
+                    if (s) {
+                      setForm((f) => ({ ...f, binance_symbol: s }));
+                    } else {
+                      alert("Không tìm thấy cặp trên Binance (.com/.us) cho " + (form.symbol || ""));
+                    }
                   }}
                   title="Tự dò trên Binance"
                 >
                   Auto Detect
                 </button>
+
               </div>
               <p className="text-xs text-gray-400 mt-1">Gợi ý: hệ thống sẽ thử {form.symbol?.toUpperCase()}USDT/BUSD/USDC.</p>
             </div>
@@ -380,7 +381,7 @@ export default function CoinAnalyzerPage() {
           <div className="mt-4 p-4 rounded-xl bg-indigo-500/10 border border-indigo-400/30 text-sm">
             <div className="font-medium mb-1">Worker refresh:</div>
             <pre className="whitespace-pre-wrap text-indigo-200 text-xs">
-{JSON.stringify(refreshInfo, null, 2)}
+              {JSON.stringify(refreshInfo, null, 2)}
             </pre>
           </div>
         )}
@@ -407,7 +408,7 @@ export default function CoinAnalyzerPage() {
   );
 }
 
-function Field({ label, name, value, onChange, placeholder, type="text", required }) {
+function Field({ label, name, value, onChange, placeholder, type = "text", required }) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs uppercase tracking-wide text-gray-300">{label}{required ? " *" : ""}</span>
