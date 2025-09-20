@@ -75,6 +75,7 @@ export default function CoinAnalyzerPage() {
   const [progress, setProgress] = useState(0);
 
   const [insights, setInsights] = useState(null);
+  const [insightWindow, setInsightWindow] = useState("7d"); // mặc định 7d để dễ thấy số
 
 
   // ====== Autocomplete state ======
@@ -208,16 +209,10 @@ export default function CoinAnalyzerPage() {
 
     // insights
     try {
-      const insRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/insights`);
-      if (insRes.ok) {
-        const ins = await insRes.json();
-        setInsights(ins);
-      } else {
-        setInsights(null);
-      }
-    } catch {
-      setInsights(null);
-    }
+      const insRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/insights?window=${encodeURIComponent(insightWindow)}`);
+      if (insRes.ok) setInsights(await insRes.json());
+      else setInsights(null);
+    } catch { setInsights(null); }
   }
 
   async function handleRegisterThenAnalyze(e) {
@@ -454,6 +449,33 @@ export default function CoinAnalyzerPage() {
             </div>
           )
         }
+        {analysis && (
+          <div className="mt-4 flex items-center gap-3">
+            <span className="text-sm text-gray-300">Insights window:</span>
+            <select
+              value={insightWindow}
+              onChange={async (e) => {
+                const w = e.target.value; setInsightWindow(w);
+                // refetch insights cho window mới
+                try {
+                  const insRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(analysis.symbol)}/insights?window=${encodeURIComponent(w)}`);
+                  if (insRes.ok) setInsights(await insRes.json()); else setInsights(null);
+                } catch { setInsights(null); }
+              }}
+              className="bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-sm"
+            >
+              <option value="24h">24h</option>
+              <option value="48h">48h</option>
+              <option value="7d">7 ngày</option>
+              <option value="30d">30 ngày</option>
+              <option value="all">Tất cả</option>
+            </select>
+            {insights?.window_used && (
+              <span className="text-xs text-gray-400">Đang xem: {insights.window_used}</span>
+            )}
+          </div>
+        )}
+
         {insights && (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* On-chain snapshot */}
@@ -474,7 +496,7 @@ export default function CoinAnalyzerPage() {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h3 className="font-semibold mb-3">News (48h)</h3>
               <div className="space-y-2 text-sm">
-                <KV k="Số bài" v={insights.news?.count_48h ?? 0} />
+                <KV k="Số bài" v={insights.news?.count ?? 0} />
                 <KV k="Sentiment (−1..1)" v={(insights.news?.avg_sentiment ?? 0).toFixed(2)} />
               </div>
               <p className="text-xs text-gray-400 mt-3">
