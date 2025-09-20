@@ -1,7 +1,63 @@
 // frontend/pages/coin-analyzer/index.js
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+/** Label đẹp cho platform id của CoinGecko */
+const PLATFORM_LABEL = {
+  "ethereum": "Ethereum",
+  "binance-smart-chain": "BSC",
+  "polygon-pos": "Polygon",
+  "arbitrum-one": "Arbitrum",
+  "optimistic-ethereum": "Optimism",
+  "base": "Base",
+  "avalanche": "Avalanche",
+  "solana": "Solana",
+  "tron": "TRON",
+  "near-protocol": "NEAR",
+  "bitcoin": "Bitcoin",
+};
+
+/** Decimals mặc định cho 1 số L1; token EVM mặc định 18 */
+const L1_DECIMALS = { BTC: 8, ETH: 18, NEAR: 24, SOL: 9, ATOM: 6, BNB: 18, TRX: 6, MATIC: 18 };
+
+function debounce(fn, ms = 300) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
+
+// =================== CoinGecko helpers ===================
+async function cgSearch(query) {
+  if (!query?.trim()) return [];
+  const url = `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query.trim())}`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data?.coins || []).slice(0, 12);
+}
+
+async function cgCoinDetail(id) {
+  const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}?tickers=false&market_data=false&community_data=false&developer_data=false&sparkline=false`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  return await res.json();
+}
+
+// =================== Binance helpers ===================
+async function findBinancePair(baseSymbol) {
+  if (!baseSymbol) return null;
+  const candidates = [`${baseSymbol}USDT`, `${baseSymbol}BUSD`, `${baseSymbol}USDC`];
+  for (const s of candidates) {
+    try {
+      const r = await fetch(`https://api.binance.com/api/v3/exchangeInfo?symbol=${s}`);
+      if (r.ok) return s; // tồn tại
+    } catch {}
+  }
+  return null;
+}
 
 export default function CoinAnalyzerPage() {
   const [form, setForm] = useState({
@@ -19,10 +75,96 @@ export default function CoinAnalyzerPage() {
   const [error, setError] = useState("");
   const [refreshInfo, setRefreshInfo] = useState(null);
 
+  // ====== Autocomplete state ======
+  const [search, setSearch] = useState("");
+  const [suggests, setSuggests] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [platforms, setPlatforms] = useState([]); // [{id,label,contract}]
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const listRef = useRef(null);
+
   const onChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
 
+  // Debounced search to CoinGecko
+  const runSearch = useMemo(
+    () =>
+      debounce(async (q) => {
+        setSearching(true);
+        try {
+          const items = await cgSearch(q);
+          setSuggests(items);
+        } finally {
+          setSearching(false);
+        }
+      }, 300),
+    []
+  );
+
+  useEffect(() => {
+    if (search.trim().length >= 2) runSearch(search);
+    else setSuggests([]);
+  }, [search, runSearch]);
+
+  // Khi chọn 1 coin trong list gợi ý
+  const pickCoin = async (c) => {
+    const symbol = (c?.symbol || "").toUpperCase();
+    setForm((f) => ({
+      ...f,
+      symbol,
+      name: c?.name || f.name,
+      coingecko_id: c?.id || f.coingecko_id,
+    }));
+
+    // Lấy chi tiết -> điền platforms/contracts
+    const detail = await cgCoinDetail(c.id);
+    const plats = [];
+    const mapping = detail?.platforms || {};
+    Object.entries(mapping).forEach(([pid, contract]) => {
+      if (!contract) return;
+      plats.push({ id: pid, label: PLATFORM_LABEL[pid] || pid, contract });
+    });
+    setPlatforms(plats);
+
+    // Suy luận L1 / decimals
+    const isL1 = plats.length === 0; // CG: L1 thường không có platforms hoặc contract rỗng
+    const decimals = isL1 ? (L1_DECIMALS[symbol] || "") : 18;
+    const defaultChain = isL1 ? symbol : (plats[0]?.label || "");
+
+    setForm((f) => ({
+      ...f,
+      chain: defaultChain,
+      contract_address: isL1 ? "" : plats[0]?.contract || "",
+      decimals,
+    }));
+
+    // Dò Binance symbol
+    const binance = await findBinancePair(symbol);
+    setForm((f) => ({ ...f, binance_symbol: binance || f.binance_symbol }));
+  };
+
+  const handleSuggestKeyDown = (e) => {
+    if (!suggests.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIdx((i) => (i + 1) % suggests.length);
+      listRef.current?.children?.[(activeIdx + 1) % suggests.length]?.scrollIntoView({ block: "nearest" });
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx((i) => (i - 1 + suggests.length) % suggests.length);
+      listRef.current?.children?.[(activeIdx - 1 + suggests.length) % suggests.length]?.scrollIntoView({ block: "nearest" });
+    }
+    if (e.key === "Enter" && activeIdx >= 0) {
+      e.preventDefault();
+      pickCoin(suggests[activeIdx]);
+      setSuggests([]);
+      setSearch("");
+      setActiveIdx(-1);
+    }
+  };
+
+  // ===============================================
   async function refreshDataAndAnalyze(symbol, doAll = true) {
-    // 2) kick worker
     const kickUrl = doAll
       ? `${BACKEND}/api/workers/refresh-all/${encodeURIComponent(symbol)}`
       : `${BACKEND}/api/workers/refresh-price/${encodeURIComponent(symbol)}`;
@@ -31,14 +173,12 @@ export default function CoinAnalyzerPage() {
     const kJson = await k.json();
     setRefreshInfo(kJson);
 
-    // 3) run analysis
     const runRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/run-analysis`, { method: "POST" });
     if (!runRes.ok) {
       const j = await runRes.json().catch(()=>({}));
       throw new Error(j.error || "Phân tích thất bại (run-analysis)");
     }
 
-    // 4) get latest snapshot
     const getRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/analyze`);
     if (!getRes.ok) {
       const j = await getRes.json().catch(()=>({}));
@@ -58,7 +198,6 @@ export default function CoinAnalyzerPage() {
     setLoading(true);
     const symbol = form.symbol.trim().toUpperCase();
     try {
-      // 1) register / upsert
       const regRes = await fetch(`${BACKEND}/api/crypto-assets/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -79,7 +218,6 @@ export default function CoinAnalyzerPage() {
       const regData = await regRes.json();
       setRegisterResp(regData);
 
-      // 2→3→4) refresh & analyze
       await refreshDataAndAnalyze(symbol, true);
     } catch (err) {
       setError(err.message || "Đã xảy ra lỗi.");
@@ -111,16 +249,104 @@ export default function CoinAnalyzerPage() {
           Đăng ký coin vào hệ thống → nạp dữ liệu (worker) → chạy phân tích → xem khuyến nghị.
         </p>
 
+        {/* Search & Suggest */}
+        <div className="mt-6">
+          <label className="block text-sm text-gray-300 mb-1">🔎 Tìm coin theo tên hoặc symbol</label>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSuggestKeyDown}
+            placeholder="vd: near, eth, sol, pepe…"
+            className="w-full rounded-xl bg-white/10 border border-white/20 px-3 py-2 text-white outline-none"
+          />
+          {searching && <div className="text-xs text-gray-400 mt-1">Đang tìm…</div>}
+          {suggests.length > 0 && (
+            <ul
+              ref={listRef}
+              className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-white/20 bg-[#171a22] text-sm text-white shadow-lg"
+            >
+              {suggests.map((c, i) => (
+                <li
+                  key={c.id}
+                  onClick={() => {
+                    pickCoin(c);
+                    setSuggests([]);
+                    setSearch("");
+                    setActiveIdx(-1);
+                  }}
+                  className={`px-3 py-2 cursor-pointer hover:bg-white/10 flex items-center justify-between ${
+                    i === activeIdx ? "bg-white/10" : ""
+                  }`}
+                >
+                  <span className="font-semibold">{c.name}</span>
+                  <span className="text-gray-400">({(c.symbol || "").toUpperCase()})</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {/* Form */}
-        <form className="mt-8 grid gap-4 bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+        <form className="mt-6 grid gap-4 bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Symbol *" name="symbol" value={form.symbol} onChange={onChange} placeholder="NEAR, BTC, ETH" required />
+            <Field label="Symbol *" name="symbol" value={form.symbol} onChange={(e)=>setForm(s=>({...s, symbol:e.target.value.toUpperCase()}))} placeholder="NEAR, BTC, ETH" required />
             <Field label="Name *" name="name" value={form.name} onChange={onChange} placeholder="NEAR Protocol" required />
-            <Field label="Chain" name="chain" value={form.chain} onChange={onChange} placeholder="NEAR, Ethereum, BSC…" />
+
+            <div>
+              <label className="text-xs uppercase tracking-wide text-gray-300 block mb-1">Chain</label>
+              {platforms.length > 0 ? (
+                <select
+                  value={form.chain}
+                  onChange={(e) => {
+                    const label = e.target.value;
+                    const p = platforms.find((x) => x.label === label) || {};
+                    setForm((f) => ({ ...f, chain: label, contract_address: p.contract || f.contract_address }));
+                  }}
+                  className="bg-white/10 border border-white/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/50 w-full"
+                >
+                  {platforms.map((p) => (
+                    <option key={p.id} value={p.label}>{p.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="bg-white/10 border border-white/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/50 w-full"
+                  name="chain"
+                  value={form.chain}
+                  onChange={onChange}
+                  placeholder="NEAR, Ethereum, BSC…"
+                />
+              )}
+            </div>
+
             <Field label="Contract Address" name="contract_address" value={form.contract_address} onChange={onChange} placeholder="ERC20/BEP20… (để trống nếu L1)" />
-            <Field label="Decimals" name="decimals" value={form.decimals} onChange={onChange} placeholder="18, 24" type="number" />
+            <Field label="Decimals" name="decimals" value={form.decimals} onChange={(e)=>setForm(s=>({...s, decimals: e.target.value.replace(/[^0-9]/g,'')}))} placeholder="18, 24" type="text" />
             <Field label="CoinGecko ID" name="coingecko_id" value={form.coingecko_id} onChange={onChange} placeholder="near" />
-            <Field label="Binance Symbol" name="binance_symbol" value={form.binance_symbol} onChange={onChange} placeholder="NEARUSDT" />
+
+            <div className="md:col-span-2">
+              <label className="text-xs uppercase tracking-wide text-gray-300 block mb-1">Binance Symbol</label>
+              <div className="flex gap-2">
+                <input
+                  className="bg-white/10 border border-white/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/50 w-full"
+                  name="binance_symbol"
+                  value={form.binance_symbol}
+                  onChange={(e)=>setForm(s=>({...s, binance_symbol: e.target.value.toUpperCase()}))}
+                  placeholder="NEARUSDT…"
+                />
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500"
+                  onClick={async () => {
+                    const s = await findBinancePair(form.symbol?.toUpperCase());
+                    setForm((f) => ({ ...f, binance_symbol: s || f.binance_symbol }));
+                  }}
+                  title="Tự dò trên Binance"
+                >
+                  Auto Detect
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Gợi ý: hệ thống sẽ thử {form.symbol?.toUpperCase()}USDT/BUSD/USDC.</p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -186,7 +412,7 @@ function Field({ label, name, value, onChange, placeholder, type="text", require
     <label className="flex flex-col gap-1">
       <span className="text-xs uppercase tracking-wide text-gray-300">{label}{required ? " *" : ""}</span>
       <input
-        className="bg-white/10 border border-white/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/50"
+        className="bg-white/10 border border-white/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/50 w-full"
         name={name}
         value={value}
         onChange={onChange}
