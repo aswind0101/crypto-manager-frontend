@@ -74,6 +74,9 @@ export default function CoinAnalyzerPage() {
   const [refreshInfo, setRefreshInfo] = useState(null);
   const [progress, setProgress] = useState(0);
 
+  const [insights, setInsights] = useState(null);
+
+
   // ====== Autocomplete state ======
   const [search, setSearch] = useState("");
   const [suggests, setSuggests] = useState([]);
@@ -202,6 +205,19 @@ export default function CoinAnalyzerPage() {
     }
     const a = await getRes.json();
     setAnalysis(a);
+
+    // insights
+    try {
+      const insRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/insights`);
+      if (insRes.ok) {
+        const ins = await insRes.json();
+        setInsights(ins);
+      } else {
+        setInsights(null);
+      }
+    } catch {
+      setInsights(null);
+    }
   }
 
   async function handleRegisterThenAnalyze(e) {
@@ -438,6 +454,35 @@ export default function CoinAnalyzerPage() {
             </div>
           )
         }
+        {insights && (
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* On-chain snapshot */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h3 className="font-semibold mb-3">On-chain (24h)</h3>
+              <div className="space-y-2 text-sm">
+                <KV k="Inflow → sàn (USD)" v={Number(insights.onchain?.inflow_usd || 0).toLocaleString()} />
+                <KV k="Outflow ← sàn (USD)" v={Number(insights.onchain?.outflow_usd || 0).toLocaleString()} />
+                <KV k="Netflow (out-in)" v={Number(insights.onchain?.netflow_usd || 0).toLocaleString()} />
+                <KV k="Large transfers" v={insights.onchain?.large_count ?? 0} />
+              </div>
+              <p className="text-xs text-gray-400 mt-3">
+                Lưu ý: NEAR/ADA/BTC (L1) chưa lấy on-chain theo cách cũ ⇒ giá trị có thể là 0 (không lỗi).
+              </p>
+            </div>
+
+            {/* News snapshot */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h3 className="font-semibold mb-3">News (48h)</h3>
+              <div className="space-y-2 text-sm">
+                <KV k="Số bài" v={insights.news?.count_48h ?? 0} />
+                <KV k="Sentiment (−1..1)" v={(insights.news?.avg_sentiment ?? 0).toFixed(2)} />
+              </div>
+              <p className="text-xs text-gray-400 mt-3">
+                Tin lấy từ NewsAPI/CryptoPanic; sentiment sơ cấp (có thể nâng cấp VADER sau).
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
