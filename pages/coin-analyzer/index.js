@@ -48,12 +48,13 @@ async function cgCoinDetail(id) {
 
 // =================== Binance helpers ===================
 async function findBinancePair(baseSymbol) {
-  if (!baseSymbol) return null;
-  const url = `${BACKEND}/api/market/detect-binance/${encodeURIComponent(baseSymbol)}?quotes=USDT,USDC,BUSD`;
+  if (!baseSymbol) return { symbol: null, guessed: null };
+  const url = `${BACKEND}/api/market/detect-binance/${encodeURIComponent(baseSymbol)}?quotes=USDT,USDC,BUSD,TUSD`;
   const r = await fetch(url);
-  if (!r.ok) return null;
+  if (!r.ok) return { symbol: null, guessed: `${baseSymbol}USDT` };
   const j = await r.json().catch(() => ({}));
-  return j?.ok ? j.symbol : null;
+  if (j?.ok && j?.symbol) return { symbol: j.symbol, guessed: null };
+  return { symbol: null, guessed: j?.guessed || `${baseSymbol}USDT` };
 }
 
 export default function CoinAnalyzerPage() {
@@ -333,9 +334,12 @@ export default function CoinAnalyzerPage() {
                   type="button"
                   className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500"
                   onClick={async () => {
-                    const s = await findBinancePair(form.symbol?.toUpperCase());
-                    if (s) {
-                      setForm((f) => ({ ...f, binance_symbol: s }));
+                    const { symbol, guessed } = await findBinancePair(form.symbol?.toUpperCase());
+                    if (symbol) {
+                      setForm((f) => ({ ...f, binance_symbol: symbol }));
+                    } else if (guessed) {
+                      setForm((f) => ({ ...f, binance_symbol: guessed }));
+                      alert(`Không truy vấn được từ Binance lúc này. Tạm điền gợi ý: ${guessed}`);
                     } else {
                       alert("Không tìm thấy cặp trên Binance (.com/.us) cho " + (form.symbol || ""));
                     }
@@ -344,7 +348,6 @@ export default function CoinAnalyzerPage() {
                 >
                   Auto Detect
                 </button>
-
               </div>
               <p className="text-xs text-gray-400 mt-1">Gợi ý: hệ thống sẽ thử {form.symbol?.toUpperCase()}USDT/BUSD/USDC.</p>
             </div>
@@ -371,38 +374,44 @@ export default function CoinAnalyzerPage() {
           </div>
         </form>
 
-        {registerResp && (
-          <div className="mt-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-400/30 text-sm">
-            ✅ Đã đăng ký/cập nhật coin: <b>{registerResp.symbol}</b> — {registerResp.name}
-          </div>
-        )}
+        {
+          registerResp && (
+            <div className="mt-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-400/30 text-sm">
+              ✅ Đã đăng ký/cập nhật coin: <b>{registerResp.symbol}</b> — {registerResp.name}
+            </div>
+          )
+        }
 
-        {refreshInfo && (
-          <div className="mt-4 p-4 rounded-xl bg-indigo-500/10 border border-indigo-400/30 text-sm">
-            <div className="font-medium mb-1">Worker refresh:</div>
-            <pre className="whitespace-pre-wrap text-indigo-200 text-xs">
-              {JSON.stringify(refreshInfo, null, 2)}
-            </pre>
-          </div>
-        )}
+        {
+          refreshInfo && (
+            <div className="mt-4 p-4 rounded-xl bg-indigo-500/10 border border-indigo-400/30 text-sm">
+              <div className="font-medium mb-1">Worker refresh:</div>
+              <pre className="whitespace-pre-wrap text-indigo-200 text-xs">
+                {JSON.stringify(refreshInfo, null, 2)}
+              </pre>
+            </div>
+          )
+        }
 
-        {analysis && (
-          <div className="mt-8 grid gap-6">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-xl font-semibold mb-4">Analysis Summary – {analysis.symbol}</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <KV k="Overall Score" v={analysis.overall_score?.toFixed?.(4) ?? analysis.overall_score} />
-                <KV k="Action" v={analysis.action} />
-                <KV k="Confidence" v={analysis.confidence} />
-                <KV k="Run At" v={new Date(analysis.run_at).toLocaleString()} />
-                <KV k="Buy Zone" v={`${analysis.buy_zone?.[0]} – ${analysis.buy_zone?.[1]}`} />
-                <KV k="Stop Loss" v={analysis.stop_loss} />
-                <KV k="Take Profit 1" v={analysis.take_profit?.[0]} />
-                <KV k="Take Profit 2" v={analysis.take_profit?.[1]} />
+        {
+          analysis && (
+            <div className="mt-8 grid gap-6">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                <h2 className="text-xl font-semibold mb-4">Analysis Summary – {analysis.symbol}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <KV k="Overall Score" v={analysis.overall_score?.toFixed?.(4) ?? analysis.overall_score} />
+                  <KV k="Action" v={analysis.action} />
+                  <KV k="Confidence" v={analysis.confidence} />
+                  <KV k="Run At" v={new Date(analysis.run_at).toLocaleString()} />
+                  <KV k="Buy Zone" v={`${analysis.buy_zone?.[0]} – ${analysis.buy_zone?.[1]}`} />
+                  <KV k="Stop Loss" v={analysis.stop_loss} />
+                  <KV k="Take Profit 1" v={analysis.take_profit?.[0]} />
+                  <KV k="Take Profit 2" v={analysis.take_profit?.[1]} />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        }
       </div>
     </div>
   );
