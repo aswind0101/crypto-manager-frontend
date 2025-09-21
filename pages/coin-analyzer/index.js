@@ -127,6 +127,13 @@ export default function CoinAnalyzerPage() {
 
   // Khi chọn 1 coin trong list gợi ý
   const pickCoin = async (c) => {
+    // Reset kết quả khi chọn coin mới
+    setAnalysis(null);
+    setRegisterResp(null);
+    setRefreshInfo(null);
+    setInsights(null);
+    setError("");
+    setProgress(0);
     const symbol = (c?.symbol || "").toUpperCase();
     setForm((f) => ({
       ...f,
