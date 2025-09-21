@@ -73,6 +73,11 @@ export default function CoinAnalyzerPage() {
   const [error, setError] = useState("");
   const [refreshInfo, setRefreshInfo] = useState(null);
   const [progress, setProgress] = useState(0);
+
+  const [insights, setInsights] = useState(null);
+  const [insightWindow, setInsightWindow] = useState("7d"); // 24h | 48h | 7d | 30d | all
+
+
   // ====== Autocomplete state ======
   const [search, setSearch] = useState("");
   const [suggests, setSuggests] = useState([]);
@@ -153,8 +158,9 @@ export default function CoinAnalyzerPage() {
     }));
 
     // Dò Binance symbol
-    const binance = await findBinancePair(symbol);
-    setForm((f) => ({ ...f, binance_symbol: binance || f.binance_symbol }));
+    const { symbol: bz, guessed } = await findBinancePair(symbol);
+    setForm((f) => ({ ...f, binance_symbol: bz || guessed || f.binance_symbol }));
+
   };
 
   const handleSuggestKeyDown = (e) => {
@@ -201,7 +207,14 @@ export default function CoinAnalyzerPage() {
     }
     const a = await getRes.json();
     setAnalysis(a);
-
+    try {
+      const insRes = await fetch(
+        `${BACKEND}/api/coins/${encodeURIComponent(symbol)}/insights?window=${encodeURIComponent(insightWindow)}`
+      );
+      setInsights(insRes.ok ? await insRes.json() : null);
+    } catch {
+      setInsights(null);
+    }
     // insights
   }
 
@@ -439,6 +452,65 @@ export default function CoinAnalyzerPage() {
             </div>
           )
         }
+        {analysis && (
+          <div className="mt-4 flex items-center gap-3">
+            <span className="text-sm text-gray-300">Insights window:</span>
+            <select
+              value={insightWindow}
+              onChange={async (e) => {
+                const w = e.target.value;
+                setInsightWindow(w);
+                try {
+                  const insRes = await fetch(
+                    `${BACKEND}/api/coins/${encodeURIComponent(analysis.symbol)}/insights?window=${encodeURIComponent(w)}`
+                  );
+                  setInsights(insRes.ok ? await insRes.json() : null);
+                } catch { setInsights(null); }
+              }}
+              className="bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-sm"
+            >
+              <option value="24h">24h</option>
+              <option value="48h">48h</option>
+              <option value="7d">7 ngày</option>
+              <option value="30d">30 ngày</option>
+              <option value="all">Tất cả</option>
+            </select>
+            {insights?.window_used && (
+              <span className="text-xs text-gray-400">Đang xem: {insights.window_used}</span>
+            )}
+          </div>
+        )}
+
+        {insights && (
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* On-chain snapshot */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h3 className="font-semibold mb-3">On-chain ({insights.window_used})</h3>
+              <div className="space-y-2 text-sm">
+                <KV k="Inflow → sàn (USD)" v={Number(insights.onchain?.inflow_usd || 0).toLocaleString()} />
+                <KV k="Outflow ← sàn (USD)" v={Number(insights.onchain?.outflow_usd || 0).toLocaleString()} />
+                <KV k="Netflow (out - in)" v={Number(insights.onchain?.netflow_usd || 0).toLocaleString()} />
+                <KV k="Large transfers" v={insights.onchain?.large_count ?? 0} />
+              </div>
+              <p className="text-xs text-gray-400 mt-3">
+                L1 như BTC/NEAR/ADA không quét on-chain theo worker EVM hiện tại ⇒ giá trị có thể là 0.
+              </p>
+            </div>
+
+            {/* News snapshot */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h3 className="font-semibold mb-3">News ({insights.window_used})</h3>
+              <div className="space-y-2 text-sm">
+                <KV k="Số bài" v={insights.news?.count ?? 0} />
+                <KV k="Sentiment (−1..1)" v={(insights.news?.avg_sentiment ?? 0).toFixed(2)} />
+              </div>
+              <p className="text-xs text-gray-400 mt-3">
+                Tin từ NewsAPI/CryptoPanic; sentiment sơ cấp (có thể nâng cấp VADER sau).
+              </p>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
