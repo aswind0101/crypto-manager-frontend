@@ -450,10 +450,22 @@ export default function CoinAnalyzerPage() {
                   <KV k="Action" v={analysis.action} />
                   <KV k="Confidence" v={analysis.confidence} />
                   <KV k="Run At" v={new Date(analysis.run_at).toLocaleString()} />
-                  <KV k="Buy Zone" v={`${analysis.buy_zone?.[0]} – ${analysis.buy_zone?.[1]}`} />
-                  <KV k="Stop Loss" v={analysis.stop_loss} />
-                  <KV k="Take Profit 1" v={analysis.take_profit?.[0]} />
-                  <KV k="Take Profit 2" v={analysis.take_profit?.[1]} />
+                  {(() => {
+                    const isSell = analysis.action === "SELL" || analysis.action === "STRONG_SELL";
+                    const zone = isSell ? analysis.reentry_zone : analysis.buy_zone;
+                    const ok = Array.isArray(zone)
+                      && Number.isFinite(Number(zone[0]))
+                      && Number.isFinite(Number(zone[1]));
+                    if (ok) {
+                      return <KV k={isSell ? "Re-entry Zone" : "Buy Zone"} v={`${zone[0]} – ${zone[1]}`} />;
+                    }
+                    return null;
+                  })()}
+
+                  <RenderIfNumber label="Stop Loss" value={analysis.stop_loss} />
+                  <RenderIfNumber label="Take Profit 1" value={analysis.take_profit?.[0]} />
+                  <RenderIfNumber label="Take Profit 2" value={analysis.take_profit?.[1]} />
+
                 </div>
               </div>
             </div>
@@ -548,3 +560,9 @@ function KV({ k, v }) {
     </div>
   );
 }
+function RenderIfNumber({ label, value }) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return <KV k={label} v={n} />;
+}
+
