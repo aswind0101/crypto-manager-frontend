@@ -73,11 +73,6 @@ export default function CoinAnalyzerPage() {
   const [error, setError] = useState("");
   const [refreshInfo, setRefreshInfo] = useState(null);
   const [progress, setProgress] = useState(0);
-
-  const [insights, setInsights] = useState(null);
-  const [insightWindow, setInsightWindow] = useState("7d"); // mặc định 7d để dễ thấy số
-
-
   // ====== Autocomplete state ======
   const [search, setSearch] = useState("");
   const [suggests, setSuggests] = useState([]);
@@ -208,11 +203,6 @@ export default function CoinAnalyzerPage() {
     setAnalysis(a);
 
     // insights
-    try {
-      const insRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/insights?window=${encodeURIComponent(insightWindow)}`);
-      if (insRes.ok) setInsights(await insRes.json());
-      else setInsights(null);
-    } catch { setInsights(null); }
   }
 
   async function handleRegisterThenAnalyze(e) {
