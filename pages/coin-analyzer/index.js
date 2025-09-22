@@ -29,6 +29,17 @@ function debounce(fn, ms = 300) {
   };
 }
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function fetchJSON(url, opts) {
+  const r = await fetch(url, opts);
+  let j = null;
+  try { j = await r.json(); } catch { }
+  if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+  return j ?? {};
+}
+
+
 // =================== CoinGecko helpers ===================
 async function cgSearch(query) {
   if (!query?.trim()) return [];
@@ -73,6 +84,8 @@ export default function CoinAnalyzerPage() {
   const [error, setError] = useState("");
   const [refreshInfo, setRefreshInfo] = useState(null);
   const [progress, setProgress] = useState(0);
+
+  const [onchainStatus, setOnchainStatus] = useState('idle'); // idle | running
 
   const [insights, setInsights] = useState(null);
   const [insightWindow, setInsightWindow] = useState("7d"); // 24h | 48h | 7d | 30d | all
@@ -191,39 +204,54 @@ export default function CoinAnalyzerPage() {
     }
   };
 
-  // ===============================================
-  async function refreshDataAndAnalyze(symbol, doAll = true) {
-    const kickUrl = doAll
-      ? `${BACKEND}/api/workers/refresh-all/${encodeURIComponent(symbol)}`
-      : `${BACKEND}/api/workers/refresh-price/${encodeURIComponent(symbol)}`;
-    const k = await fetch(kickUrl, { method: "POST" });
-    if (!k.ok) throw new Error("Refresh worker failed");
-    const kJson = await k.json();
-    setRefreshInfo(kJson);
-
-    const runRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/run-analysis`, { method: "POST" });
-    if (!runRes.ok) {
-      const j = await runRes.json().catch(() => ({}));
-      throw new Error(j.error || "Phân tích thất bại (run-analysis)");
-    }
-
-    const getRes = await fetch(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/analyze`);
-    if (!getRes.ok) {
-      const j = await getRes.json().catch(() => ({}));
-      throw new Error(j.error || "Không lấy được kết quả phân tích");
-    }
-    const a = await getRes.json();
-    setAnalysis(a);
+  async function reloadInsights(symbol, windowUsed) {
     try {
       const insRes = await fetch(
-        `${BACKEND}/api/coins/${encodeURIComponent(symbol)}/insights?window=${encodeURIComponent(insightWindow)}`
+        `${BACKEND}/api/coins/${encodeURIComponent(symbol)}/insights?window=${encodeURIComponent(windowUsed)}`
       );
       setInsights(insRes.ok ? await insRes.json() : null);
     } catch {
       setInsights(null);
     }
-    // insights
   }
+
+
+  // ===============================================
+  async function refreshDataAndAnalyze(symbol, doAll = true) {
+    // 1) Kick workers
+    const kickUrl = doAll
+      ? `${BACKEND}/api/workers/refresh-all/${encodeURIComponent(symbol)}`
+      : `${BACKEND}/api/workers/refresh-price/${encodeURIComponent(symbol)}`;
+
+    const kJson = await fetchJSON(kickUrl, { method: "POST" });
+    setRefreshInfo(kJson);
+
+    // 2) Nếu on-chain báo đang chạy (-1 hoặc 'running') → poll debug vài vòng
+    if (kJson?.onchainRows === -1 || kJson?.onchainRows === "running") {
+      setOnchainStatus("running");
+      for (let i = 0; i < 15; i++) {        // tối đa ~45s
+        await sleep(3000);
+        try {
+          const dbg = await fetchJSON(`${BACKEND}/api/workers/debug/onchain/${encodeURIComponent(symbol)}`);
+          const inserted = Number(dbg?.inserted_now ?? 0);
+          const c24h = Number(dbg?.count_24h ?? 0);
+          if (inserted > 0 || c24h > 0) break; // đã có dữ liệu → dừng poll
+        } catch {
+          // bỏ qua lỗi lẻ
+        }
+      }
+      setOnchainStatus("idle");
+    }
+
+    // 3) Chạy phân tích (sau khi đã chờ on-chain một nhịp)
+    await fetchJSON(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/run-analysis`, { method: "POST" });
+
+    // 4) Lấy kết quả phân tích + insights mới nhất
+    const a = await fetchJSON(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/analyze`);
+    setAnalysis(a);
+    await reloadInsights(symbol, insightWindow);
+  }
+
 
   async function handleRegisterThenAnalyze(e) {
     e.preventDefault();
@@ -439,6 +467,12 @@ export default function CoinAnalyzerPage() {
             </div>
           )
         }
+        
+        {onchainStatus === 'running' && (
+          <div className="mt-2 text-xs text-yellow-400">
+            On-chain đang chạy… Mình sẽ tự cập nhật khi có dữ liệu.
+          </div>
+        )}
 
         {
           analysis && (
