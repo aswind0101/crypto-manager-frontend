@@ -35,7 +35,7 @@ export default function Login() {
 
             localStorage.setItem("user", JSON.stringify(userData));
 
-            // ✅ Gọi API trước khi chuyển trang
+            // ✅ Gọi API trước khi chuyển trang mới
             try {
                 const res = await fetch("https://crypto-manager-backend.onrender.com/api/user-alerts/init", {
                     method: "POST",
