@@ -98,22 +98,21 @@ export default function CoinAnalyzerPage() {
   const [platforms, setPlatforms] = useState([]); // [{id,label,contract}]
   const [activeIdx, setActiveIdx] = useState(-1);
   const listRef = useRef(null);
+  const activeIdxRef = useRef(activeIdx);
 
   useEffect(() => {
-    let timer;
-    if (loading) {
-      setProgress(0);
-      timer = setInterval(() => {
-        setProgress((p) => {
-          if (p < 90) return p + 5;
-          return p;
-        });
-      }, 300);
-    } else {
-      setProgress(100);
-      setTimeout(() => setProgress(0), 500);
+    activeIdxRef.current = activeIdx;
+  }, [activeIdx]);
+
+  useEffect(() => {
+    // Progress is now driven by actual backend steps in refreshDataAndAnalyze.
+    // When loading finishes and progress reached 100, reset the progress bar after a short delay.
+    if (!loading && progress === 100) {
+      const t = setTimeout(() => setProgress(0), 500);
+      return () => clearTimeout(t);
     }
-    return () => clearInterval(timer);
+    // No interval/timer when loading; refreshDataAndAnalyze will update progress explicitly.
+    return undefined;
   }, [loading]);
 
   const onChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
@@ -187,30 +186,43 @@ export default function CoinAnalyzerPage() {
     if (!suggests.length) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIdx((i) => (i + 1) % suggests.length);
-      listRef.current?.children?.[(activeIdx + 1) % suggests.length]?.scrollIntoView({ block: "nearest" });
+      setActiveIdx((i) => {
+        const next = (i + 1) % suggests.length;
+        // scroll into view using the computed next index
+        setTimeout(() => listRef.current?.children?.[next]?.scrollIntoView({ block: "nearest" }), 0);
+        return next;
+      });
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIdx((i) => (i - 1 + suggests.length) % suggests.length);
-      listRef.current?.children?.[(activeIdx - 1 + suggests.length) % suggests.length]?.scrollIntoView({ block: "nearest" });
+      setActiveIdx((i) => {
+        const prev = (i - 1 + suggests.length) % suggests.length;
+        setTimeout(() => listRef.current?.children?.[prev]?.scrollIntoView({ block: "nearest" }), 0);
+        return prev;
+      });
     }
-    if (e.key === "Enter" && activeIdx >= 0) {
-      e.preventDefault();
-      pickCoin(suggests[activeIdx]);
-      setSuggests([]);
-      setSearch("");
-      setActiveIdx(-1);
+    if (e.key === "Enter") {
+      const idx = activeIdxRef.current;
+      if (idx >= 0) {
+        e.preventDefault();
+        pickCoin(suggests[idx]);
+        setSuggests([]);
+        setSearch("");
+        setActiveIdx(-1);
+      }
     }
   };
 
   async function reloadInsights(symbol, windowUsed) {
     try {
+      setProgress((p) => Math.max(p, 80));
       const insRes = await fetch(
         `${BACKEND}/api/coins/${encodeURIComponent(symbol)}/insights?window=${encodeURIComponent(windowUsed)}`
       );
-      setInsights(insRes.ok ? await insRes.json() : null);
-    } catch {
+      const json = insRes.ok ? await insRes.json() : null;
+      setInsights(json);
+      setProgress((p) => Math.max(p, 90));
+    } catch (err) {
       setInsights(null);
     }
   }
@@ -218,38 +230,66 @@ export default function CoinAnalyzerPage() {
 
   // ===============================================
   async function refreshDataAndAnalyze(symbol, doAll = true) {
-    // 1) Kick workers
-    const kickUrl = doAll
-      ? `${BACKEND}/api/workers/refresh-all/${encodeURIComponent(symbol)}`
-      : `${BACKEND}/api/workers/refresh-price/${encodeURIComponent(symbol)}`;
+    try {
+      setProgress(0);
+      setOnchainStatus('idle');
 
-    const kJson = await fetchJSON(kickUrl, { method: "POST" });
-    setRefreshInfo(kJson);
+      // 1) Kick workers
+      const kickUrl = doAll
+        ? `${BACKEND}/api/workers/refresh-all/${encodeURIComponent(symbol)}`
+        : `${BACKEND}/api/workers/refresh-price/${encodeURIComponent(symbol)}`;
 
-    // 2) Nếu on-chain báo đang chạy (-1 hoặc 'running') → poll debug vài vòng
-    if (kJson?.onchainRows === -1 || kJson?.onchainRows === "running") {
-      setOnchainStatus("running");
-      for (let i = 0; i < 15; i++) {        // tối đa ~45s
-        await sleep(3000);
-        try {
-          const dbg = await fetchJSON(`${BACKEND}/api/workers/debug/onchain/${encodeURIComponent(symbol)}`);
-          const inserted = Number(dbg?.inserted_now ?? 0);
-          const c24h = Number(dbg?.count_24h ?? 0);
-          if (inserted > 0 || c24h > 0) break; // đã có dữ liệu → dừng poll
-        } catch {
-          // bỏ qua lỗi lẻ
+      setProgress(10);
+      const kJson = await fetchJSON(kickUrl, { method: "POST" });
+      setRefreshInfo(kJson);
+      setProgress(25);
+
+      // 2) If on-chain expected to run, poll with progress updates
+      if (kJson?.onchainRows === -1 || kJson?.onchainRows === "running") {
+        setOnchainStatus("running");
+        // We'll give the on-chain polling up to ~15 iterations (~45s) and report incremental progress
+        const maxIter = 15;
+        for (let i = 0; i < maxIter; i++) {
+          await sleep(3000);
+          try {
+            const dbg = await fetchJSON(`${BACKEND}/api/workers/debug/onchain/${encodeURIComponent(symbol)}`);
+            const inserted = Number(dbg?.inserted_now ?? 0);
+            const c24h = Number(dbg?.count_24h ?? 0);
+            // progress moves from 25 -> 45 during polling
+            const progressDuring = 25 + Math.round(((i + 1) / maxIter) * 20);
+            setProgress(progressDuring);
+            if (inserted > 0 || c24h > 0) break; // data appeared -> stop polling
+          } catch (err) {
+            // Ignored, but advance small progress
+            const progressDuring = 25 + Math.round(((i + 1) / maxIter) * 20);
+            setProgress(progressDuring);
+          }
         }
+        setOnchainStatus("idle");
+        setProgress(45);
       }
-      setOnchainStatus("idle");
+
+      // 3) Run analysis
+      setProgress(55);
+      await fetchJSON(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/run-analysis`, { method: "POST" });
+      setProgress(70);
+
+      // 4) Fetch analysis result
+      const a = await fetchJSON(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/analyze`);
+      setAnalysis(a);
+      setProgress(85);
+
+      // 5) Reload insights
+      await reloadInsights(symbol, insightWindow);
+      setProgress(100);
+
+    } catch (err) {
+      // On any error, surface it and reset progress/loading
+      setError(err.message || 'Đã xảy ra lỗi khi tải dữ liệu');
+      setProgress(0);
+      setOnchainStatus('idle');
+      throw err;
     }
-
-    // 3) Chạy phân tích (sau khi đã chờ on-chain một nhịp)
-    await fetchJSON(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/run-analysis`, { method: "POST" });
-
-    // 4) Lấy kết quả phân tích + insights mới nhất
-    const a = await fetchJSON(`${BACKEND}/api/coins/${encodeURIComponent(symbol)}/analyze`);
-    setAnalysis(a);
-    await reloadInsights(symbol, insightWindow);
   }
 
 
@@ -328,10 +368,15 @@ export default function CoinAnalyzerPage() {
           {suggests.length > 0 && (
             <ul
               ref={listRef}
+              role="listbox"
+              aria-label="Coin suggestions"
               className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-white/20 bg-[#171a22] text-sm text-white shadow-lg"
             >
               {suggests.map((c, i) => (
                 <li
+                  role="option"
+                  aria-selected={i === activeIdx}
+                  tabIndex={-1}
                   key={c.id}
                   onClick={() => {
                     pickCoin(c);
