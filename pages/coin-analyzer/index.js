@@ -39,6 +39,15 @@ async function fetchJSON(url, opts) {
   return j ?? {};
 }
 
+function getProgressLabel(progress, onchainStatus) {
+  if (onchainStatus === 'running') return 'Polling on-chain...';
+  if (progress < 20) return 'Preparing...';
+  if (progress < 50) return 'Refreshing data...';
+  if (progress < 70) return 'Running analysis...';
+  if (progress < 90) return 'Fetching results...';
+  return 'Finalizing...';
+}
+
 
 // =================== CoinGecko helpers ===================
 async function cgSearch(query) {
@@ -482,12 +491,23 @@ export default function CoinAnalyzerPage() {
               {loading ? "Processing..." : "Analyze Existing"}
             </button>
             {progress > 0 && progress < 100 && (
-              <div className="w-full bg-gray-700 rounded-full h-2.5 mb-4 mt-4">
-                <div
-                  className="bg-blue-500 h-2.5 rounded-full transition-all duration-200"
-                  style={{ width: `${progress}%` }}
-                ></div>
-                <div className="text-xs text-right text-gray-300 mt-1">{progress}%</div>
+              <div className="w-full mb-4 mt-4">
+                <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden relative progress-track">
+                  <div
+                    className="bg-blue-500 h-2.5 rounded-full progress-fill"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="text-xs text-gray-300">{getProgressLabel(progress, onchainStatus)}</div>
+                  <div className="text-xs text-gray-300">{progress}%</div>
+                </div>
+                <style jsx>{`
+                  .progress-track { position: relative; }
+                  .progress-fill { transition: width 600ms cubic-bezier(.2,.9,.2,1); position: relative; }
+                  .progress-fill::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.02) 100%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; opacity: 0.9; }
+                  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+                `}</style>
               </div>
             )}
             {error && <span className="text-red-400 text-sm">{error}</span>}
