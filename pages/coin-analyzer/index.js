@@ -601,7 +601,7 @@ export default function CoinAnalyzerPage() {
 
         {insights && (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* On-chain snapshot */}
+            {/* On-chain snapshot. */}
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h3 className="font-semibold mb-3">On-chain ({insights.window_used})</h3>
               <div className="space-y-2 text-sm">
