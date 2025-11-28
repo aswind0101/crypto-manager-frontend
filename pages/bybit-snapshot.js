@@ -4,9 +4,128 @@ import { useRouter } from "next/router";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app } from "../firebase";
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  "https://crypto-manager-backend.onrender.com";
+const BYBIT_BASE = "https://api.bybit.com";
+
+// ===== Helpers gọi Bybit trực tiếp từ browser =====
+
+async function getFromBybit(path, params = {}) {
+  const url = new URL(path, BYBIT_BASE);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.append(key, String(value));
+    }
+  });
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    // Không cần header đặc biệt vì là public endpoint
+  });
+
+  if (!res.ok) {
+    // HTTP 403, 5xx...
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `Bybit HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
+    );
+  }
+
+  const data = await res.json();
+
+  if (data.retCode !== 0) {
+    throw new Error(`Bybit retCode ${data.retCode}: ${data.retMsg}`);
+  }
+
+  return data.result || {};
+}
+
+async function getKlines(symbol, intervals = ["1", "5", "15", "60", "240", "D"], limit = 200) {
+  const klines = {};
+  for (const interval of intervals) {
+    const result = await getFromBybit("/v5/market/kline", {
+      category: "linear",
+      symbol,
+      interval,
+      limit,
+    });
+    klines[interval] = result.list || [];
+  }
+  return klines;
+}
+
+async function getOpenInterest(symbol, intervalTime = "5min", limit = 200) {
+  const result = await getFromBybit("/v5/market/open-interest", {
+    category: "linear",
+    symbol,
+    intervalTime,
+    limit,
+  });
+  return result.list || [];
+}
+
+async function getLongShortRatio(symbol, period = "1h", limit = 100) {
+  const result = await getFromBybit("/v5/market/account-ratio", {
+    category: "linear",
+    symbol,
+    period,
+    limit,
+  });
+  return result.list || [];
+}
+
+async function getFundingHistory(symbol, limit = 50) {
+  const result = await getFromBybit("/v5/market/funding/history", {
+    category: "linear",
+    symbol,
+    limit,
+  });
+  return result.list || [];
+}
+
+async function getOrderbook(symbol, limit = 25) {
+  const result = await getFromBybit("/v5/market/orderbook", {
+    category: "linear",
+    symbol,
+    limit,
+  });
+  return {
+    bids: result.b || [],
+    asks: result.a || [],
+  };
+}
+
+async function getRecentTrades(symbol, limit = 500) {
+  const result = await getFromBybit("/v5/market/recent-trade", {
+    category: "linear",
+    symbol,
+    limit,
+  });
+  return result.list || [];
+}
+
+async function getTicker(symbol) {
+  const result = await getFromBybit("/v5/market/tickers", {
+    category: "linear",
+    symbol,
+  });
+  const list = result.list || [];
+  return list[0] || {};
+}
+
+async function collectSymbolData(symbol) {
+  return {
+    symbol,
+    klines: await getKlines(symbol),
+    open_interest: await getOpenInterest(symbol),
+    long_short_ratio: await getLongShortRatio(symbol),
+    funding_history: await getFundingHistory(symbol),
+    orderbook: await getOrderbook(symbol),
+    recent_trades: await getRecentTrades(symbol),
+    ticker: await getTicker(symbol),
+  };
+}
+
+// ===== React page =====
 
 export default function BybitSnapshotPage() {
   const router = useRouter();
@@ -18,14 +137,13 @@ export default function BybitSnapshotPage() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // Bảo vệ route: nếu chưa login => về /login
+  // Bảo vệ route: chưa login => về /login
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.push("/login");
       }
     });
-
     return () => unsubscribe();
   }, [auth, router]);
 
@@ -36,32 +154,41 @@ export default function BybitSnapshotPage() {
       return;
     }
 
+    const symbols = trimmed
+      .split(",")
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+
+    if (!symbols.length) {
+      setError("Danh sách symbol không hợp lệ");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setSnapshot(null);
     setCopied(false);
 
     try {
-      const query = encodeURIComponent(trimmed);
-      const url = `${BACKEND_URL}/api/bybit/snapshot?symbols=${query}`;
+      const generatedAt = Date.now();
+      const symbolsData = [];
 
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (!res.ok) {
-        // Backend trả status != 2xx
-        setError(
-          data?.error ||
-            `Request failed with status ${res.status} ${res.statusText}`
-        );
-        setSnapshot(null);
-      } else if (data.error) {
-        // Backend trả JSON { error: ... }
-        setError(data.error);
-        setSnapshot(null);
-      } else {
-        setSnapshot(data);
+      for (const sym of symbols) {
+        // Có thể dùng Promise.all nhưng để tránh ddos API thì mình làm tuần tự
+        // eslint-disable-next-line no-console
+        console.log("Fetching data for", sym);
+        const data = await collectSymbolData(sym);
+        symbolsData.push(data);
       }
+
+      const payload = {
+        exchange: "bybit",
+        category: "linear",
+        generated_at: generatedAt,
+        symbols: symbolsData,
+      };
+
+      setSnapshot(payload);
     } catch (err) {
       console.error("Fetch snapshot error:", err);
       setError(err.message || "Fetch snapshot error");
@@ -86,12 +213,12 @@ export default function BybitSnapshotPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
         <h1 className="text-2xl md:text-3xl font-semibold mb-2">
-          Bybit Snapshot Tool
+          Bybit Snapshot Tool (Client-side)
         </h1>
         <p className="text-sm md:text-base text-slate-400 mb-6">
-          Lấy dữ liệu kline / OI / funding / orderbook / recent trades cho
-          nhiều symbol (BTCUSDT, ETHUSDT, SOLUSDT...). Sau đó bạn chỉ cần copy
-          JSON và dán qua ChatGPT để mình phân tích swing 1–2 ngày.
+          Trang này gọi trực tiếp Bybit từ trình duyệt của bạn (qua VPN nếu có),
+          không đi qua server Render. Lấy dữ liệu kline / OI / funding / orderbook / trades
+          cho nhiều symbol rồi cho phép copy JSON để dán qua ChatGPT phân tích.
         </p>
 
         {/* Form nhập symbol */}
@@ -109,9 +236,9 @@ export default function BybitSnapshotPage() {
 
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
             <div className="text-xs md:text-sm text-slate-400">
-              Backend:{" "}
+              API base:{" "}
               <span className="font-mono text-[11px] md:text-xs break-all">
-                {BACKEND_URL}/api/bybit/snapshot
+                {BYBIT_BASE}
               </span>
             </div>
             <button
@@ -124,7 +251,7 @@ export default function BybitSnapshotPage() {
           </div>
 
           {error && (
-            <div className="mt-3 text-xs md:text-sm text-red-400 bg-red-950/40 border border-red-500/40 rounded-xl px-3 py-2">
+            <div className="mt-3 text-xs md:text-sm text-red-400 bg-red-950/40 border border-red-500/40 rounded-xl px-3 py-2 whitespace-pre-wrap">
               <span className="font-semibold">Lỗi:</span> {error}
             </div>
           )}
