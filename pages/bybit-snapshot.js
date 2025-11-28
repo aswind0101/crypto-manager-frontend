@@ -19,11 +19,9 @@ async function getFromBybit(path, params = {}) {
 
   const res = await fetch(url.toString(), {
     method: "GET",
-    // Không cần header đặc biệt vì là public endpoint
   });
 
   if (!res.ok) {
-    // HTTP 403, 5xx...
     const text = await res.text().catch(() => "");
     throw new Error(
       `Bybit HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
@@ -174,7 +172,6 @@ export default function BybitSnapshotPage() {
       const symbolsData = [];
 
       for (const sym of symbols) {
-        // Có thể dùng Promise.all nhưng để tránh ddos API thì mình làm tuần tự
         // eslint-disable-next-line no-console
         console.log("Fetching data for", sym);
         const data = await collectSymbolData(sym);
@@ -209,6 +206,34 @@ export default function BybitSnapshotPage() {
     }
   };
 
+  const handleDownload = () => {
+    if (!snapshot) return;
+
+    try {
+      const jsonString = JSON.stringify(snapshot, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+
+      // Tạo tên file: bybit_snapshot_<timestamp>_<symbols>.json
+      const ts = snapshot.generated_at || Date.now();
+      let symbolsName = "ALL";
+      if (Array.isArray(snapshot.symbols) && snapshot.symbols.length > 0) {
+        symbolsName = snapshot.symbols.map((s) => s.symbol).join("_");
+      }
+      const filename = `bybit_snapshot_${ts}_${symbolsName}.json`;
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
@@ -218,7 +243,7 @@ export default function BybitSnapshotPage() {
         <p className="text-sm md:text-base text-slate-400 mb-6">
           Trang này gọi trực tiếp Bybit từ trình duyệt của bạn (qua VPN nếu có),
           không đi qua server Render. Lấy dữ liệu kline / OI / funding / orderbook / trades
-          cho nhiều symbol rồi cho phép copy JSON để dán qua ChatGPT phân tích.
+          cho nhiều symbol rồi cho phép copy JSON hoặc tải về file để gửi cho ChatGPT phân tích.
         </p>
 
         {/* Form nhập symbol */}
@@ -259,17 +284,26 @@ export default function BybitSnapshotPage() {
 
         {/* Kết quả */}
         <div className="bg-slate-900/70 border border-slate-700/60 rounded-2xl p-4 md:p-5 shadow-xl shadow-black/30">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
             <h2 className="text-sm md:text-base font-semibold">
               Kết quả JSON
             </h2>
-            <button
-              onClick={handleCopy}
-              disabled={!snapshot}
-              className="text-xs md:text-sm px-3 py-1 rounded-lg border border-slate-600 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {copied ? "✅ Đã copy" : "Copy JSON"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopy}
+                disabled={!snapshot}
+                className="text-xs md:text-sm px-3 py-1 rounded-lg border border-slate-600 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {copied ? "✅ Đã copy" : "Copy JSON"}
+              </button>
+              <button
+                onClick={handleDownload}
+                disabled={!snapshot}
+                className="text-xs md:text-sm px-3 py-1 rounded-lg border border-emerald-500/60 bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                ⬇️ Download JSON
+              </button>
+            </div>
           </div>
 
           {!snapshot && !error && !loading && (
