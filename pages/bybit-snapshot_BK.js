@@ -37,11 +37,7 @@ async function getFromBybit(path, params = {}) {
   return data.result || {};
 }
 
-async function getKlines(
-  symbol,
-  intervals = ["1", "5", "15", "60", "240", "D"],
-  limit = 200
-) {
+async function getKlines(symbol, intervals = ["1", "5", "15", "60", "240", "D"], limit = 200) {
   const klines = {};
   for (const interval of intervals) {
     const result = await getFromBybit("/v5/market/kline", {
@@ -182,29 +178,11 @@ export default function BybitSnapshotPage() {
         symbolsData.push(data);
       }
 
-      // Stub on-chain & global derivatives cho v2 (Phase 1)
-      const onchain = {
-        exchange_netflow_daily: [],
-        whale_exchange_flows: [],
-      };
-
-      const global_derivatives = {
-        total_oi: [],
-        funding_mean: [],
-        estimated_leverage_ratio: [],
-      };
-
       const payload = {
-        version: 2,
+        exchange: "bybit",
+        category: "linear",
         generated_at: generatedAt,
-        per_exchange: {
-          bybit: {
-            category: "linear",
-            symbols: symbolsData,
-          },
-        },
-        onchain,
-        global_derivatives,
+        symbols: symbolsData,
       };
 
       setSnapshot(payload);
@@ -238,15 +216,9 @@ export default function BybitSnapshotPage() {
       // Tạo tên file: bybit_snapshot_<timestamp>_<symbols>.json
       const ts = snapshot.generated_at || Date.now();
       let symbolsName = "ALL";
-      const bybitData = snapshot.per_exchange?.bybit;
-      if (
-        bybitData &&
-        Array.isArray(bybitData.symbols) &&
-        bybitData.symbols.length > 0
-      ) {
-        symbolsName = bybitData.symbols.map((s) => s.symbol).join("_");
+      if (Array.isArray(snapshot.symbols) && snapshot.symbols.length > 0) {
+        symbolsName = snapshot.symbols.map((s) => s.symbol).join("_");
       }
-
       const filename = `bybit_snapshot_${ts}_${symbolsName}.json`;
 
       const url = URL.createObjectURL(blob);
@@ -266,12 +238,12 @@ export default function BybitSnapshotPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
         <h1 className="text-2xl md:text-3xl font-semibold mb-2">
-          Bybit Snapshot Tool (Client-side, v2 schema)
+          Bybit Snapshot Tool (Client-side)
         </h1>
         <p className="text-sm md:text-base text-slate-400 mb-6">
           Trang này gọi trực tiếp Bybit từ trình duyệt của bạn (qua VPN nếu có),
           không đi qua server Render. Lấy dữ liệu kline / OI / funding / orderbook / trades
-          cho nhiều symbol rồi cho phép copy JSON hoặc tải về file (schema v2) để gửi cho ChatGPT phân tích.
+          cho nhiều symbol rồi cho phép copy JSON hoặc tải về file để gửi cho ChatGPT phân tích.
         </p>
 
         {/* Form nhập symbol */}
@@ -314,7 +286,7 @@ export default function BybitSnapshotPage() {
         <div className="bg-slate-900/70 border border-slate-700/60 rounded-2xl p-4 md:p-5 shadow-xl shadow-black/30">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
             <h2 className="text-sm md:text-base font-semibold">
-              Kết quả JSON (schema v2)
+              Kết quả JSON
             </h2>
             <div className="flex gap-2">
               <button
