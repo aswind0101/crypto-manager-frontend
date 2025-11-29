@@ -5,8 +5,10 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app } from "../firebase";
 
 const BYBIT_BASE = "https://api.bybit.com";
+const BINANCE_BASE = "https://fapi.binance.com";
+const OKX_BASE = "https://www.okx.com";
 
-// ===== Helpers gọi Bybit trực tiếp từ browser =====
+// ====================== BYBIT HELPERS ======================
 
 async function getFromBybit(path, params = {}) {
   const url = new URL(path, BYBIT_BASE);
@@ -127,13 +129,172 @@ async function collectSymbolData(symbol) {
   };
 }
 
-// ===== React page =====
+// ====================== BINANCE HELPERS ======================
+
+async function getFromBinance(path, params = {}) {
+  const url = new URL(path, BINANCE_BASE);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.append(key, String(value));
+    }
+  });
+
+  const res = await fetch(url.toString(), { method: "GET" });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `Binance HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
+    );
+  }
+
+  // Một số endpoint Binance trả về array trực tiếp
+  return res.json();
+}
+
+// Funding history (perp) – fapi/v1/fundingRate
+async function getBinanceFundingHistory(symbol, limit = 50) {
+  try {
+    const data = await getFromBinance("/fapi/v1/fundingRate", {
+      symbol,
+      limit,
+    });
+
+    // data là array [{ fundingTime, fundingRate, ... }]
+    return (data || []).map((row) => ({
+      t: row.fundingTime,
+      fundingRate: Number(row.fundingRate),
+      symbol: row.symbol,
+    }));
+  } catch (err) {
+    console.error("getBinanceFundingHistory error:", err.message || err);
+    return [];
+  }
+}
+
+// Open interest history – futures/data/openInterestHist
+async function getBinanceOpenInterestHist(
+  symbol,
+  period = "5m",
+  limit = 50
+) {
+  try {
+    const data = await getFromBinance("/futures/data/openInterestHist", {
+      symbol,
+      period,
+      limit,
+    });
+
+    // array [{ sumOpenInterest, sumOpenInterestValue, timestamp, ... }]
+    return (data || []).map((row) => ({
+      t: row.timestamp,
+      sumOpenInterest: Number(row.sumOpenInterest),
+      sumOpenInterestValue: Number(row.sumOpenInterestValue),
+      symbol: row.symbol,
+    }));
+  } catch (err) {
+    console.error("getBinanceOpenInterestHist error:", err.message || err);
+    return [];
+  }
+}
+
+// Taker long/short ratio – futures/data/takerlongshortRatio
+async function getBinanceTakerLongShortRatio(
+  symbol,
+  period = "5m",
+  limit = 50
+) {
+  try {
+    const data = await getFromBinance("/futures/data/takerlongshortRatio", {
+      symbol,
+      period,
+      limit,
+    });
+
+    // array [{ buyVol, sellVol, buySellRatio, timestamp, ... }]
+    return (data || []).map((row) => ({
+      t: row.timestamp,
+      buyVol: Number(row.buyVol),
+      sellVol: Number(row.sellVol),
+      buySellRatio: Number(row.buySellRatio),
+      symbol: row.symbol,
+    }));
+  } catch (err) {
+    console.error("getBinanceTakerLongShortRatio error:", err.message || err);
+    return [];
+  }
+}
+
+// ====================== OKX HELPERS ======================
+
+async function getFromOkx(path, params = {}) {
+  const url = new URL(path, OKX_BASE);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.append(key, String(value));
+    }
+  });
+
+  const res = await fetch(url.toString(), { method: "GET" });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `OKX HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
+    );
+  }
+
+  return res.json();
+}
+
+// Map BYBIT symbol (e.g. BTCUSDT) -> OKX instId (BTC-USDT-SWAP)
+function mapToOkxInstId(symbol) {
+  if (!symbol.endsWith("USDT")) return null;
+  const base = symbol.replace("USDT", "");
+  return `${base}-USDT-SWAP`;
+}
+
+async function getOkxOpenInterestSnapshot(symbol) {
+  try {
+    const instId = mapToOkxInstId(symbol);
+    if (!instId) return null;
+
+    const data = await getFromOkx("/api/v5/public/open-interest", {
+      instType: "SWAP",
+      instId,
+    });
+
+    if (!data || data.code !== "0" || !Array.isArray(data.data)) {
+      return null;
+    }
+
+    const row = data.data[0];
+    if (!row) return null;
+
+    return {
+      instId: row.instId,
+      oi: Number(row.oi),      // open interest (contracts)
+      oiCcy: Number(row.oiCcy), // open interest in coin
+      ts: Number(row.ts),
+    };
+  } catch (err) {
+    console.error("getOkxOpenInterestSnapshot error:", err.message || err);
+    return null;
+  }
+}
+
+// ====================== REACT PAGE ======================
 
 export default function BybitSnapshotPage() {
   const router = useRouter();
   const auth = getAuth(app);
 
-  const [symbolsInput, setSymbolsInput] = useState("BTCUSDT,ETHUSDT");
+  // Bạn có thể chỉnh bộ mặc định ở đây:
+  const [symbolsInput, setSymbolsInput] = useState(
+    "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,NEARUSDT"
+  );
   const [loading, setLoading] = useState(false);
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState("");
@@ -175,23 +336,74 @@ export default function BybitSnapshotPage() {
       const generatedAt = Date.now();
       const symbolsData = [];
 
+      // Chứa derivatives của Binance / OKX theo symbol
+      const binanceDeriv = {};
+      const okxDeriv = {};
+
       for (const sym of symbols) {
         // eslint-disable-next-line no-console
-        console.log("Fetching data for", sym);
-        const data = await collectSymbolData(sym);
-        symbolsData.push(data);
+        console.log("Fetching Bybit data for", sym);
+        const bybitData = await collectSymbolData(sym);
+        symbolsData.push(bybitData);
+
+        // ================= Binance + OKX cho symbol này =================
+        // Lấy song song để nhanh hơn
+        try {
+          // eslint-disable-next-line no-console
+          console.log("Fetching Binance/OKX data for", sym);
+
+          const [
+            binFunding,
+            binOiHist,
+            binTakerLS,
+            okxOiSnap,
+          ] = await Promise.all([
+            getBinanceFundingHistory(sym),
+            getBinanceOpenInterestHist(sym),
+            getBinanceTakerLongShortRatio(sym),
+            getOkxOpenInterestSnapshot(sym),
+          ]);
+
+          binanceDeriv[sym] = {
+            funding_history: binFunding,
+            open_interest_hist_5m: binOiHist,
+            taker_long_short_ratio_5m: binTakerLS,
+          };
+
+          okxDeriv[sym] = {
+            open_interest: okxOiSnap,
+          };
+        } catch (e) {
+          console.error(
+            `Error fetching Binance/OKX data for ${sym}:`,
+            e.message || e
+          );
+          // Nếu lỗi, để trống nhưng không làm hỏng snapshot
+          if (!binanceDeriv[sym]) {
+            binanceDeriv[sym] = {
+              funding_history: [],
+              open_interest_hist_5m: [],
+              taker_long_short_ratio_5m: [],
+            };
+          }
+          if (!okxDeriv[sym]) {
+            okxDeriv[sym] = {
+              open_interest: null,
+            };
+          }
+        }
       }
 
-      // Stub on-chain & global derivatives cho v2 (Phase 1)
+      // Onchain hiện tại không dùng -> để trống
       const onchain = {
         exchange_netflow_daily: [],
         whale_exchange_flows: [],
       };
 
+      // Dùng dữ liệu thật từ Binance + OKX
       const global_derivatives = {
-        total_oi: [],
-        funding_mean: [],
-        estimated_leverage_ratio: [],
+        binance: binanceDeriv,
+        okx: okxDeriv,
       };
 
       const payload = {
@@ -235,7 +447,6 @@ export default function BybitSnapshotPage() {
       const jsonString = JSON.stringify(snapshot, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
 
-      // Tạo tên file: bybit_snapshot_<timestamp>_<symbols>.json
       const ts = snapshot.generated_at || Date.now();
       let symbolsName = "ALL";
       const bybitData = snapshot.per_exchange?.bybit;
@@ -266,12 +477,13 @@ export default function BybitSnapshotPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
         <h1 className="text-2xl md:text-3xl font-semibold mb-2">
-          Bybit Snapshot Tool (Client-side, v2 schema)
+          Bybit Snapshot Tool (Client-side, v2 + Binance + OKX)
         </h1>
         <p className="text-sm md:text-base text-slate-400 mb-6">
-          Trang này gọi trực tiếp Bybit từ trình duyệt của bạn (qua VPN nếu có),
-          không đi qua server Render. Lấy dữ liệu kline / OI / funding / orderbook / trades
-          cho nhiều symbol rồi cho phép copy JSON hoặc tải về file (schema v2) để gửi cho ChatGPT phân tích.
+          Trang này gọi trực tiếp Bybit, Binance và OKX từ trình duyệt của bạn
+          (qua VPN nếu có), không đi qua server Render. Lấy dữ liệu kline / OI /
+          funding / orderbook / trades cho nhiều symbol rồi cho phép copy JSON
+          hoặc tải về file (schema v2 mở rộng) để gửi cho ChatGPT phân tích.
         </p>
 
         {/* Form nhập symbol */}
@@ -288,11 +500,25 @@ export default function BybitSnapshotPage() {
           />
 
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
-            <div className="text-xs md:text-sm text-slate-400">
-              API base:{" "}
-              <span className="font-mono text-[11px] md:text-xs break-all">
-                {BYBIT_BASE}
-              </span>
+            <div className="text-xs md:text-sm text-slate-400 space-y-1">
+              <div>
+                Bybit API:{" "}
+                <span className="font-mono text-[11px] md:text-xs break-all">
+                  {BYBIT_BASE}
+                </span>
+              </div>
+              <div>
+                Binance API:{" "}
+                <span className="font-mono text-[11px] md:text-xs break-all">
+                  {BINANCE_BASE}
+                </span>
+              </div>
+              <div>
+                OKX API:{" "}
+                <span className="font-mono text-[11px] md:text-xs break-all">
+                  {OKX_BASE}
+                </span>
+              </div>
             </div>
             <button
               onClick={handleFetch}
@@ -314,7 +540,7 @@ export default function BybitSnapshotPage() {
         <div className="bg-slate-900/70 border border-slate-700/60 rounded-2xl p-4 md:p-5 shadow-xl shadow-black/30">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
             <h2 className="text-sm md:text-base font-semibold">
-              Kết quả JSON (schema v2)
+              Kết quả JSON (schema v2 + Binance + OKX)
             </h2>
             <div className="flex gap-2">
               <button
