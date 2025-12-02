@@ -39,6 +39,32 @@ async function getFromBybit(path, params = {}) {
   return data.result || {};
 }
 
+// Lấy danh sách top N perpetual USDT trên Bybit (category=linear) theo volume 24h
+async function getTopPerpSymbols(limit = 100) {
+  // lấy dư limit một chút cho chắc
+  const result = await getFromBybit("/v5/market/instruments-info", {
+    category: "linear",
+    limit: 500,
+  });
+
+  const list = Array.isArray(result.list) ? result.list : [];
+
+  const usdtPerps = list.filter((item) => {
+    // Tên field theo Bybit v5: quoteCoin, contractType
+    const quote = item.quoteCoin;
+    const contractType = item.contractType;
+    return quote === "USDT" && contractType === "LinearPerpetual";
+  });
+
+  usdtPerps.sort((a, b) => {
+    const va = Number(a.turnover24h ?? 0);
+    const vb = Number(b.turnover24h ?? 0);
+    return vb - va;
+  });
+
+  return usdtPerps.slice(0, limit).map((item) => item.symbol);
+}
+
 async function getKlines(
   symbol,
   intervals = ["1", "5", "15", "60", "240", "D"],
@@ -122,7 +148,7 @@ async function collectSymbolData(symbol) {
   return {
     symbol,
     klines,
-    indicators: computeAllIndicators(klines), // <== NEW
+    indicators: computeAllIndicators(klines),
     open_interest: await getOpenInterest(symbol),
     long_short_ratio: await getLongShortRatio(symbol),
     funding_history: await getFundingHistory(symbol),
@@ -324,7 +350,7 @@ function computeIndicatorsForInterval(rawList) {
   const last = parsed[parsed.length - 1];
 
   return {
-    last,           // ts, open, high, low, close, volume của cây mới nhất
+    last,
     rsi14,
     ema: { ema20, ema50, ema100, ema200 },
     macd,
@@ -368,7 +394,7 @@ function computeDerivativesMetrics(
   if (Array.isArray(open_interest) && open_interest.length) {
     const latest = open_interest[0];
     const prev = open_interest[1] || null;
-    const pastIdx = Math.min(open_interest.length - 1, 24); // ~24 bước trước nếu có
+    const pastIdx = Math.min(open_interest.length - 1, 24);
     const past = open_interest[pastIdx] || null;
 
     const nowOI = Number(latest.openInterest ?? latest.open_interest ?? 0);
@@ -392,14 +418,13 @@ function computeDerivativesMetrics(
   if (Array.isArray(funding_history) && funding_history.length) {
     const lastF = Number(
       funding_history[0].fundingRate ??
-      funding_history[0].funding_rate ??
-      0
+        funding_history[0].funding_rate ??
+        0
     );
     const avgF =
       funding_history.reduce(
         (sum, fh) =>
-          sum +
-          Number(fh.fundingRate ?? fh.funding_rate ?? 0),
+          sum + Number(fh.fundingRate ?? fh.funding_rate ?? 0),
         0
       ) / funding_history.length;
 
@@ -445,8 +470,7 @@ function computeDerivativesMetrics(
       const lastFr = frHist[frHist.length - 1];
       const avgFr =
         frHist.reduce(
-          (sum, x) =>
-            sum + Number(x.fundingRate ?? 0),
+          (sum, x) => sum + Number(x.fundingRate ?? 0),
           0
         ) / frHist.length;
 
@@ -494,7 +518,6 @@ async function getFromBinance(path, params = {}) {
     );
   }
 
-  // Một số endpoint Binance trả về array trực tiếp
   return res.json();
 }
 
@@ -506,7 +529,6 @@ async function getBinanceFundingHistory(symbol, limit = 50) {
       limit,
     });
 
-    // data là array [{ fundingTime, fundingRate, ... }]
     return (data || []).map((row) => ({
       t: row.fundingTime,
       fundingRate: Number(row.fundingRate),
@@ -531,7 +553,6 @@ async function getBinanceOpenInterestHist(
       limit,
     });
 
-    // array [{ sumOpenInterest, sumOpenInterestValue, timestamp, ... }]
     return (data || []).map((row) => ({
       t: row.timestamp,
       sumOpenInterest: Number(row.sumOpenInterest),
@@ -557,7 +578,6 @@ async function getBinanceTakerLongShortRatio(
       limit,
     });
 
-    // array [{ buyVol, sellVol, buySellRatio, timestamp, ... }]
     return (data || []).map((row) => ({
       t: row.timestamp,
       buyVol: Number(row.buyVol),
@@ -620,8 +640,8 @@ async function getOkxOpenInterestSnapshot(symbol) {
 
     return {
       instId: row.instId,
-      oi: Number(row.oi),      // open interest (contracts)
-      oiCcy: Number(row.oiCcy), // open interest in coin
+      oi: Number(row.oi),
+      oiCcy: Number(row.oiCcy),
       ts: Number(row.ts),
     };
   } catch (err) {
@@ -636,10 +656,9 @@ export default function BybitSnapshotPage() {
   const router = useRouter();
   const auth = getAuth(app);
 
-  // Bạn có thể chỉnh bộ mặc định ở đây:
-  const [symbolsInput, setSymbolsInput] = useState(
-    "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,NEARUSDT"
-  );
+  const [symbolsInput, setSymbolsInput] = useState(""); // không mặc định nữa
+  const [allTopSymbols, setAllTopSymbols] = useState([]);
+  const [selectedSymbols, setSelectedSymbols] = useState([]);
   const [loading, setLoading] = useState(false);
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState("");
@@ -655,10 +674,51 @@ export default function BybitSnapshotPage() {
     return () => unsubscribe();
   }, [auth, router]);
 
+  // Load danh sách top 100 symbol từ Bybit ngay khi vào trang
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTopSymbols() {
+      try {
+        const syms = await getTopPerpSymbols(100);
+        if (!cancelled) {
+          setAllTopSymbols(syms);
+        }
+      } catch (err) {
+        console.error("Không tải được danh sách top symbols:", err);
+        if (!cancelled) {
+          setError((prev) =>
+            prev
+              ? prev +
+                "\nKhông tải được danh sách top 100 symbols từ Bybit."
+              : "Không tải được danh sách top 100 symbols từ Bybit."
+          );
+        }
+      }
+    }
+
+    loadTopSymbols();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleSymbol = (sym) => {
+    setSelectedSymbols((prev) => {
+      const exists = prev.includes(sym);
+      const next = exists ? prev.filter((s) => s !== sym) : [...prev, sym];
+      setSymbolsInput(next.join(","));
+      return next;
+    });
+  };
+
   const handleFetch = async () => {
     const trimmed = symbolsInput.trim();
     if (!trimmed) {
-      setError("Vui lòng nhập ít nhất 1 symbol, ví dụ: BTCUSDT");
+      setError(
+        "Vui lòng chọn symbol từ danh sách top 100 hoặc nhập ít nhất 1 symbol, ví dụ: BTCUSDT"
+      );
       return;
     }
 
@@ -681,7 +741,6 @@ export default function BybitSnapshotPage() {
       const generatedAt = Date.now();
       const symbolsData = [];
 
-      // Chứa raw derivatives của Binance / OKX theo symbol
       const binanceDeriv = {};
       const okxDeriv = {};
 
@@ -713,7 +772,10 @@ export default function BybitSnapshotPage() {
           binTakerLS = _binTakerLS || [];
           okxOiSnap = _okxOiSnap || null;
         } catch (e) {
-          console.error(`Error fetching Binance/OKX data for ${sym}:`, e.message || e);
+          console.error(
+            `Error fetching Binance/OKX data for ${sym}:`,
+            e.message || e
+          );
         }
 
         const binForSym = {
@@ -729,8 +791,11 @@ export default function BybitSnapshotPage() {
         binanceDeriv[sym] = binForSym;
         okxDeriv[sym] = okxForSym;
 
-        // === NEW: tính metrics tổng hợp cho symbol này ===
-        const derived_metrics = computeDerivativesMetrics(bybitData, binForSym, okxForSym);
+        const derived_metrics = computeDerivativesMetrics(
+          bybitData,
+          binForSym,
+          okxForSym
+        );
 
         symbolsData.push({
           ...bybitData,
@@ -738,13 +803,11 @@ export default function BybitSnapshotPage() {
         });
       }
 
-      // Onchain hiện tại không dùng -> để trống
       const onchain = {
         exchange_netflow_daily: [],
         whale_exchange_flows: [],
       };
 
-      // Dùng dữ liệu thật từ Binance + OKX
       const global_derivatives = {
         binance: binanceDeriv,
         okx: okxDeriv,
@@ -830,7 +893,7 @@ export default function BybitSnapshotPage() {
           hoặc tải về file (schema v2 mở rộng) để gửi cho ChatGPT phân tích.
         </p>
 
-        {/* Form nhập symbol */}
+        {/* Form nhập/chọn symbol */}
         <div className="bg-slate-900/70 border border-slate-700/60 rounded-2xl p-4 md:p-5 shadow-xl shadow-black/30 mb-6">
           <label className="block text-sm font-medium mb-2">
             Symbols (phân tách bằng dấu phẩy)
@@ -838,10 +901,61 @@ export default function BybitSnapshotPage() {
           <input
             type="text"
             value={symbolsInput}
-            onChange={(e) => setSymbolsInput(e.target.value)}
-            placeholder="BTCUSDT,ETHUSDT,SOLUSDT"
+            onChange={(e) => {
+              setSymbolsInput(e.target.value);
+              const raw = e.target.value
+                .split(",")
+                .map((s) => s.trim().toUpperCase())
+                .filter(Boolean);
+              setSelectedSymbols(raw);
+            }}
+            placeholder="VD: BTCUSDT,ETHUSDT,SOLUSDT"
             className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm md:text-base outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           />
+
+          {/* Chọn từ top 100 symbol */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-sm font-medium">
+                Chọn từ Top 100 perp USDT trên Bybit
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Sắp xếp theo khối lượng 24h (turnover24h)
+              </span>
+            </div>
+
+            {allTopSymbols.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                Đang tải danh sách top 100 symbols...
+              </p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60 p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 text-xs">
+                {allTopSymbols.map((sym) => {
+                  const isSelected = selectedSymbols.includes(sym);
+                  return (
+                    <button
+                      key={sym}
+                      type="button"
+                      onClick={() => toggleSymbol(sym)}
+                      className={`px-2 py-1 rounded-lg border text-[11px] transition-all ${
+                        isSelected
+                          ? "bg-emerald-500/80 border-emerald-400 text-slate-950 font-semibold"
+                          : "bg-slate-900/80 border-slate-700 text-slate-200 hover:bg-slate-800"
+                      }`}
+                    >
+                      {isSelected ? "✓ " : ""}
+                      {sym}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="mt-2 text-[11px] text-slate-500">
+              Nhấn vào symbol để chọn/bỏ chọn. Các symbol đã chọn sẽ tự động
+              cập nhật vào ô phía trên (có thể chỉnh tay nếu cần).
+            </p>
+          </div>
 
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
             <div className="text-xs md:text-sm text-slate-400 space-y-1">
@@ -906,7 +1020,8 @@ export default function BybitSnapshotPage() {
 
           {!snapshot && !error && !loading && (
             <p className="text-xs md:text-sm text-slate-500">
-              Chưa có dữ liệu. Nhập danh sách symbol rồi bấm{" "}
+              Chưa có dữ liệu. Chọn symbol từ danh sách top 100 hoặc nhập thủ
+              công rồi bấm{" "}
               <span className="font-semibold">Fetch Snapshot</span>.
             </p>
           )}
