@@ -117,9 +117,12 @@ async function getTicker(symbol) {
 }
 
 async function collectSymbolData(symbol) {
+  const klines = await getKlines(symbol);
+
   return {
     symbol,
-    klines: await getKlines(symbol),
+    klines,
+    indicators: computeAllIndicators(klines), // <== NEW
     open_interest: await getOpenInterest(symbol),
     long_short_ratio: await getLongShortRatio(symbol),
     funding_history: await getFundingHistory(symbol),
@@ -127,6 +130,348 @@ async function collectSymbolData(symbol) {
     recent_trades: await getRecentTrades(symbol),
     ticker: await getTicker(symbol),
   };
+}
+
+// ====================== INDICATOR & METRICS HELPERS ======================
+
+// Parse kline Bybit: ["ts","open","high","low","close","volume", ...] -> object number
+function parseKlinesList(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((row) => {
+      const [ts, open, high, low, close, volume] = row;
+      return {
+        ts: Number(ts),
+        open: Number(open),
+        high: Number(high),
+        low: Number(low),
+        close: Number(close),
+        volume: Number(volume),
+      };
+    })
+    .sort((a, b) => a.ts - b.ts);
+}
+
+function calcEMA(values, period) {
+  if (!values || values.length === 0) return null;
+  const k = 2 / (period + 1);
+  let ema = values[0];
+  for (let i = 1; i < values.length; i++) {
+    ema = values[i] * k + ema * (1 - k);
+  }
+  return ema;
+}
+
+function calcRSI(values, period = 14) {
+  if (!values || values.length <= period) return null;
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const diff = values[i] - values[i - 1];
+    if (diff >= 0) gains += diff;
+    else losses -= diff;
+  }
+
+  gains /= period;
+  losses /= period;
+
+  let rs;
+  if (losses === 0) {
+    rs = gains === 0 ? 1 : 100;
+  } else {
+    rs = gains / losses;
+  }
+  let rsi = 100 - 100 / (1 + rs);
+
+  for (let i = period + 1; i < values.length; i++) {
+    const diff = values[i] - values[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+
+    gains = (gains * (period - 1) + gain) / period;
+    losses = (losses * (period - 1) + loss) / period;
+
+    if (losses === 0) {
+      rs = gains === 0 ? 1 : 100;
+    } else {
+      rs = gains / losses;
+    }
+    rsi = 100 - 100 / (1 + rs);
+  }
+
+  return rsi;
+}
+
+function calcMACD(values, shortPeriod = 12, longPeriod = 26, signalPeriod = 9) {
+  if (!values || values.length < longPeriod + signalPeriod) {
+    return { macd: null, signal: null, hist: null };
+  }
+
+  const kShort = 2 / (shortPeriod + 1);
+  const kLong = 2 / (longPeriod + 1);
+  const emaShortArr = [];
+  const emaLongArr = [];
+
+  let emaShort = values[0];
+  let emaLong = values[0];
+
+  for (let i = 0; i < values.length; i++) {
+    const price = values[i];
+    emaShort = i === 0 ? price : price * kShort + emaShort * (1 - kShort);
+    emaLong = i === 0 ? price : price * kLong + emaLong * (1 - kLong);
+    emaShortArr.push(emaShort);
+    emaLongArr.push(emaLong);
+  }
+
+  const macdArr = emaShortArr.map((es, idx) => es - emaLongArr[idx]);
+
+  const kSignal = 2 / (signalPeriod + 1);
+  let emaSignal = macdArr[longPeriod];
+  let signal = emaSignal;
+
+  for (let i = longPeriod + 1; i < macdArr.length; i++) {
+    emaSignal = macdArr[i] * kSignal + emaSignal * (1 - kSignal);
+    signal = emaSignal;
+  }
+
+  const macd = macdArr[macdArr.length - 1];
+  const hist = macd - (signal ?? 0);
+
+  return { macd, signal, hist };
+}
+
+function calcATR(parsedKlines, period = 14) {
+  if (!parsedKlines || parsedKlines.length <= period) return null;
+  const trs = [];
+
+  for (let i = 0; i < parsedKlines.length; i++) {
+    const { high, low, close } = parsedKlines[i];
+    if (i === 0) {
+      trs.push(high - low);
+    } else {
+      const prevClose = parsedKlines[i - 1].close;
+      const tr = Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      );
+      trs.push(tr);
+    }
+  }
+
+  let atr = 0;
+  for (let i = 0; i < period; i++) atr += trs[i];
+  atr /= period;
+
+  for (let i = period; i < trs.length; i++) {
+    atr = (atr * (period - 1) + trs[i]) / period;
+  }
+
+  return atr;
+}
+
+function buildVolumeProfile(parsedKlines, bins = 24) {
+  if (!parsedKlines || !parsedKlines.length) return null;
+
+  const lows = parsedKlines.map((k) => k.low);
+  const highs = parsedKlines.map((k) => k.high);
+  const minPrice = Math.min(...lows);
+  const maxPrice = Math.max(...highs);
+
+  if (!isFinite(minPrice) || !isFinite(maxPrice) || minPrice === maxPrice) {
+    return null;
+  }
+
+  const binSize = (maxPrice - minPrice) / bins;
+  const volumes = new Array(bins).fill(0);
+
+  for (const k of parsedKlines) {
+    const price = (k.high + k.low + k.close) / 3;
+    let idx = Math.floor((price - minPrice) / binSize);
+    if (idx < 0) idx = 0;
+    if (idx >= bins) idx = bins - 1;
+    volumes[idx] += k.volume;
+  }
+
+  const resultBins = [];
+  for (let i = 0; i < bins; i++) {
+    resultBins.push({
+      from: minPrice + i * binSize,
+      to: minPrice + (i + 1) * binSize,
+      volume: volumes[i],
+    });
+  }
+
+  return { minPrice, maxPrice, bins: resultBins };
+}
+
+// Tính indicators cho 1 timeframe (list kline raw từ Bybit)
+function computeIndicatorsForInterval(rawList) {
+  const parsed = parseKlinesList(rawList || []);
+  if (!parsed.length) return null;
+
+  const closes = parsed.map((k) => k.close);
+  const ema20 = calcEMA(closes, 20);
+  const ema50 = calcEMA(closes, 50);
+  const ema100 = calcEMA(closes, 100);
+  const ema200 = calcEMA(closes, 200);
+  const rsi14 = calcRSI(closes, 14);
+  const macd = calcMACD(closes, 12, 26, 9);
+  const atr14 = calcATR(parsed, 14);
+  const volProfile = buildVolumeProfile(parsed, 24);
+
+  const last = parsed[parsed.length - 1];
+
+  return {
+    last,           // ts, open, high, low, close, volume của cây mới nhất
+    rsi14,
+    ema: { ema20, ema50, ema100, ema200 },
+    macd,
+    atr14,
+    vol_profile: volProfile,
+  };
+}
+
+// Tính indicators cho tất cả TF chính
+const DEFAULT_INTERVALS = ["1", "5", "15", "60", "240", "D"];
+
+function computeAllIndicators(klines) {
+  const indicators = {};
+  if (!klines) return indicators;
+
+  for (const tf of DEFAULT_INTERVALS) {
+    const raw = klines[tf];
+    if (!raw || !raw.length) continue;
+    const computed = computeIndicatorsForInterval(raw);
+    if (computed) {
+      indicators[tf] = computed;
+    }
+  }
+  return indicators;
+}
+
+// Tính metrics phái sinh (OI, funding, long/short) + Binance/OKX nếu có
+function computeDerivativesMetrics(
+  bybitData,
+  binanceForSymbol = null,
+  okxForSymbol = null
+) {
+  const { open_interest, long_short_ratio, funding_history } = bybitData || {};
+  const metrics = {
+    bybit: {},
+    binance: {},
+    okx: {},
+  };
+
+  // --- Bybit OI ---
+  if (Array.isArray(open_interest) && open_interest.length) {
+    const latest = open_interest[0];
+    const prev = open_interest[1] || null;
+    const pastIdx = Math.min(open_interest.length - 1, 24); // ~24 bước trước nếu có
+    const past = open_interest[pastIdx] || null;
+
+    const nowOI = Number(latest.openInterest ?? latest.open_interest ?? 0);
+    metrics.bybit.open_interest_now = nowOI;
+
+    if (prev) {
+      const prevOI = Number(prev.openInterest ?? prev.open_interest ?? 0);
+      const diff = nowOI - prevOI;
+      metrics.bybit.open_interest_change_1 = diff;
+      metrics.bybit.open_interest_change_1_pct =
+        prevOI ? (diff / prevOI) * 100 : null;
+    }
+
+    if (past) {
+      const pastOI = Number(past.openInterest ?? past.open_interest ?? 0);
+      metrics.bybit.open_interest_change_n = nowOI - pastOI;
+    }
+  }
+
+  // --- Bybit Funding ---
+  if (Array.isArray(funding_history) && funding_history.length) {
+    const lastF = Number(
+      funding_history[0].fundingRate ??
+      funding_history[0].funding_rate ??
+      0
+    );
+    const avgF =
+      funding_history.reduce(
+        (sum, fh) =>
+          sum +
+          Number(fh.fundingRate ?? fh.funding_rate ?? 0),
+        0
+      ) / funding_history.length;
+
+    metrics.bybit.funding_now = lastF;
+    metrics.bybit.funding_avg = avgF;
+  }
+
+  // --- Bybit Long/Short Ratio ---
+  if (Array.isArray(long_short_ratio) && long_short_ratio.length) {
+    const last = long_short_ratio[0];
+    const recent = long_short_ratio.slice(
+      0,
+      Math.min(10, long_short_ratio.length)
+    );
+    const avgBuy =
+      recent.reduce(
+        (sum, r) =>
+          sum + Number(r.buyRatio ?? r.buy_ratio ?? 0),
+        0
+      ) / recent.length;
+
+    metrics.bybit.long_short_ratio_now = {
+      buyRatio: Number(last.buyRatio ?? last.buy_ratio ?? 0),
+      sellRatio: Number(last.sellRatio ?? last.sell_ratio ?? 0),
+    };
+    metrics.bybit.long_short_ratio_avg_10 = avgBuy;
+  }
+
+  // --- Binance metrics (nếu có) ---
+  if (binanceForSymbol) {
+    const oiHist = binanceForSymbol.open_interest_hist_5m || [];
+    if (oiHist.length) {
+      const lastOI = oiHist[oiHist.length - 1];
+      metrics.binance.open_interest_5m_last = {
+        sumOpenInterest: Number(lastOI.sumOpenInterest ?? 0),
+        sumOpenInterestValue: Number(lastOI.sumOpenInterestValue ?? 0),
+        t: Number(lastOI.t ?? 0),
+      };
+    }
+
+    const frHist = binanceForSymbol.funding_history || [];
+    if (frHist.length) {
+      const lastFr = frHist[frHist.length - 1];
+      const avgFr =
+        frHist.reduce(
+          (sum, x) =>
+            sum + Number(x.fundingRate ?? 0),
+          0
+        ) / frHist.length;
+
+      metrics.binance.funding_last = Number(lastFr.fundingRate ?? 0);
+      metrics.binance.funding_avg = avgFr;
+    }
+
+    const taker = binanceForSymbol.taker_long_short_ratio_5m || [];
+    if (taker.length) {
+      const lt = taker[taker.length - 1];
+      metrics.binance.taker_long_short_ratio_last = {
+        buyVol: Number(lt.buyVol ?? 0),
+        sellVol: Number(lt.sellVol ?? 0),
+        buySellRatio: Number(lt.buySellRatio ?? 0),
+        t: Number(lt.t ?? 0),
+      };
+    }
+  }
+
+  // --- OKX metrics (snapshot OI) ---
+  if (okxForSymbol && okxForSymbol.open_interest) {
+    metrics.okx.open_interest_snapshot = okxForSymbol.open_interest;
+  }
+
+  return metrics;
 }
 
 // ====================== BINANCE HELPERS ======================
@@ -336,27 +681,26 @@ export default function BybitSnapshotPage() {
       const generatedAt = Date.now();
       const symbolsData = [];
 
-      // Chứa derivatives của Binance / OKX theo symbol
+      // Chứa raw derivatives của Binance / OKX theo symbol
       const binanceDeriv = {};
       const okxDeriv = {};
 
       for (const sym of symbols) {
-        // eslint-disable-next-line no-console
         console.log("Fetching Bybit data for", sym);
         const bybitData = await collectSymbolData(sym);
-        symbolsData.push(bybitData);
 
-        // ================= Binance + OKX cho symbol này =================
-        // Lấy song song để nhanh hơn
+        console.log("Fetching Binance/OKX data for", sym);
+        let binFunding = [];
+        let binOiHist = [];
+        let binTakerLS = [];
+        let okxOiSnap = null;
+
         try {
-          // eslint-disable-next-line no-console
-          console.log("Fetching Binance/OKX data for", sym);
-
           const [
-            binFunding,
-            binOiHist,
-            binTakerLS,
-            okxOiSnap,
+            _binFunding,
+            _binOiHist,
+            _binTakerLS,
+            _okxOiSnap,
           ] = await Promise.all([
             getBinanceFundingHistory(sym),
             getBinanceOpenInterestHist(sym),
@@ -364,34 +708,34 @@ export default function BybitSnapshotPage() {
             getOkxOpenInterestSnapshot(sym),
           ]);
 
-          binanceDeriv[sym] = {
-            funding_history: binFunding,
-            open_interest_hist_5m: binOiHist,
-            taker_long_short_ratio_5m: binTakerLS,
-          };
-
-          okxDeriv[sym] = {
-            open_interest: okxOiSnap,
-          };
+          binFunding = _binFunding || [];
+          binOiHist = _binOiHist || [];
+          binTakerLS = _binTakerLS || [];
+          okxOiSnap = _okxOiSnap || null;
         } catch (e) {
-          console.error(
-            `Error fetching Binance/OKX data for ${sym}:`,
-            e.message || e
-          );
-          // Nếu lỗi, để trống nhưng không làm hỏng snapshot
-          if (!binanceDeriv[sym]) {
-            binanceDeriv[sym] = {
-              funding_history: [],
-              open_interest_hist_5m: [],
-              taker_long_short_ratio_5m: [],
-            };
-          }
-          if (!okxDeriv[sym]) {
-            okxDeriv[sym] = {
-              open_interest: null,
-            };
-          }
+          console.error(`Error fetching Binance/OKX data for ${sym}:`, e.message || e);
         }
+
+        const binForSym = {
+          funding_history: binFunding,
+          open_interest_hist_5m: binOiHist,
+          taker_long_short_ratio_5m: binTakerLS,
+        };
+
+        const okxForSym = {
+          open_interest: okxOiSnap,
+        };
+
+        binanceDeriv[sym] = binForSym;
+        okxDeriv[sym] = okxForSym;
+
+        // === NEW: tính metrics tổng hợp cho symbol này ===
+        const derived_metrics = computeDerivativesMetrics(bybitData, binForSym, okxForSym);
+
+        symbolsData.push({
+          ...bybitData,
+          derived_metrics,
+        });
       }
 
       // Onchain hiện tại không dùng -> để trống
