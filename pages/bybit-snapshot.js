@@ -7,6 +7,7 @@ import { app } from "../firebase";
 const BYBIT_BASE = "https://api.bybit.com";
 const BINANCE_BASE = "https://fapi.binance.com";
 const OKX_BASE = "https://www.okx.com";
+const COINGECKO_BASE = "https://api.coingecko.com"; // mới
 
 // ====================== BYBIT HELPERS ======================
 
@@ -37,32 +38,6 @@ async function getFromBybit(path, params = {}) {
   }
 
   return data.result || {};
-}
-
-// Lấy danh sách top N perpetual USDT trên Bybit (category=linear) theo volume 24h
-async function getTopPerpSymbols(limit = 100) {
-  // lấy dư limit một chút cho chắc
-  const result = await getFromBybit("/v5/market/instruments-info", {
-    category: "linear",
-    limit: 500,
-  });
-
-  const list = Array.isArray(result.list) ? result.list : [];
-
-  const usdtPerps = list.filter((item) => {
-    // Tên field theo Bybit v5: quoteCoin, contractType
-    const quote = item.quoteCoin;
-    const contractType = item.contractType;
-    return quote === "USDT" && contractType === "LinearPerpetual";
-  });
-
-  usdtPerps.sort((a, b) => {
-    const va = Number(a.turnover24h ?? 0);
-    const vb = Number(b.turnover24h ?? 0);
-    return vb - va;
-  });
-
-  return usdtPerps.slice(0, limit).map((item) => item.symbol);
 }
 
 async function getKlines(
@@ -112,6 +87,8 @@ async function getFundingHistory(symbol, limit = 50) {
   return result.list || [];
 }
 
+// (Hàm cũ getTopPerpSymbols mình giữ nguyên không dùng tới để khỏi ảnh hưởng logic snapshot)
+
 async function getOrderbook(symbol, limit = 25) {
   const result = await getFromBybit("/v5/market/orderbook", {
     category: "linear",
@@ -158,9 +135,41 @@ async function collectSymbolData(symbol) {
   };
 }
 
+// ====================== COINGECKO HELPER (TOP 100 SPOT MCAP) ======================
+
+// Lấy top 100 spot theo market cap từ CoinGecko,
+// và map thành pair dạng SYMBOLUSDT (BTCUSDT, ETHUSDT...)
+async function getTopSpotSymbolsByMarketCap(limit = 100) {
+  const url = new URL("/api/v3/coins/markets", COINGECKO_BASE);
+  url.searchParams.set("vs_currency", "usd");
+  url.searchParams.set("order", "market_cap_desc");
+  url.searchParams.set("per_page", String(limit));
+  url.searchParams.set("page", "1");
+  url.searchParams.set("sparkline", "false");
+
+  const res = await fetch(url.toString(), { method: "GET" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `CoinGecko HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
+    );
+  }
+
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+
+  // Chuẩn hóa: { pair: "BTCUSDT", symbol: "BTC", name: "Bitcoin", rank: 1 }
+  return data.map((coin) => {
+    const symbol = (coin.symbol || "").toUpperCase(); // btc -> BTC
+    const name = coin.name || symbol;
+    const rank = coin.market_cap_rank || null;
+    const pair = `${symbol}USDT`; // dùng để query Bybit/Binance/OKX
+    return { pair, symbol, name, rank };
+  });
+}
+
 // ====================== INDICATOR & METRICS HELPERS ======================
 
-// Parse kline Bybit: ["ts","open","high","low","close","volume", ...] -> object number
 function parseKlinesList(list) {
   if (!Array.isArray(list)) return [];
   return list
@@ -332,7 +341,6 @@ function buildVolumeProfile(parsedKlines, bins = 24) {
   return { minPrice, maxPrice, bins: resultBins };
 }
 
-// Tính indicators cho 1 timeframe (list kline raw từ Bybit)
 function computeIndicatorsForInterval(rawList) {
   const parsed = parseKlinesList(rawList || []);
   if (!parsed.length) return null;
@@ -359,7 +367,6 @@ function computeIndicatorsForInterval(rawList) {
   };
 }
 
-// Tính indicators cho tất cả TF chính
 const DEFAULT_INTERVALS = ["1", "5", "15", "60", "240", "D"];
 
 function computeAllIndicators(klines) {
@@ -377,7 +384,6 @@ function computeAllIndicators(klines) {
   return indicators;
 }
 
-// Tính metrics phái sinh (OI, funding, long/short) + Binance/OKX nếu có
 function computeDerivativesMetrics(
   bybitData,
   binanceForSymbol = null,
@@ -390,7 +396,6 @@ function computeDerivativesMetrics(
     okx: {},
   };
 
-  // --- Bybit OI ---
   if (Array.isArray(open_interest) && open_interest.length) {
     const latest = open_interest[0];
     const prev = open_interest[1] || null;
@@ -414,7 +419,6 @@ function computeDerivativesMetrics(
     }
   }
 
-  // --- Bybit Funding ---
   if (Array.isArray(funding_history) && funding_history.length) {
     const lastF = Number(
       funding_history[0].fundingRate ??
@@ -432,7 +436,6 @@ function computeDerivativesMetrics(
     metrics.bybit.funding_avg = avgF;
   }
 
-  // --- Bybit Long/Short Ratio ---
   if (Array.isArray(long_short_ratio) && long_short_ratio.length) {
     const last = long_short_ratio[0];
     const recent = long_short_ratio.slice(
@@ -453,7 +456,6 @@ function computeDerivativesMetrics(
     metrics.bybit.long_short_ratio_avg_10 = avgBuy;
   }
 
-  // --- Binance metrics (nếu có) ---
   if (binanceForSymbol) {
     const oiHist = binanceForSymbol.open_interest_hist_5m || [];
     if (oiHist.length) {
@@ -490,7 +492,6 @@ function computeDerivativesMetrics(
     }
   }
 
-  // --- OKX metrics (snapshot OI) ---
   if (okxForSymbol && okxForSymbol.open_interest) {
     metrics.okx.open_interest_snapshot = okxForSymbol.open_interest;
   }
@@ -521,7 +522,6 @@ async function getFromBinance(path, params = {}) {
   return res.json();
 }
 
-// Funding history (perp) – fapi/v1/fundingRate
 async function getBinanceFundingHistory(symbol, limit = 50) {
   try {
     const data = await getFromBinance("/fapi/v1/fundingRate", {
@@ -540,7 +540,6 @@ async function getBinanceFundingHistory(symbol, limit = 50) {
   }
 }
 
-// Open interest history – futures/data/openInterestHist
 async function getBinanceOpenInterestHist(
   symbol,
   period = "5m",
@@ -565,7 +564,6 @@ async function getBinanceOpenInterestHist(
   }
 }
 
-// Taker long/short ratio – futures/data/takerlongshortRatio
 async function getBinanceTakerLongShortRatio(
   symbol,
   period = "5m",
@@ -614,7 +612,6 @@ async function getFromOkx(path, params = {}) {
   return res.json();
 }
 
-// Map BYBIT symbol (e.g. BTCUSDT) -> OKX instId (BTC-USDT-SWAP)
 function mapToOkxInstId(symbol) {
   if (!symbol.endsWith("USDT")) return null;
   const base = symbol.replace("USDT", "");
@@ -656,15 +653,17 @@ export default function BybitSnapshotPage() {
   const router = useRouter();
   const auth = getAuth(app);
 
-  const [symbolsInput, setSymbolsInput] = useState(""); // không mặc định nữa
-  const [allTopSymbols, setAllTopSymbols] = useState([]);
-  const [selectedSymbols, setSelectedSymbols] = useState([]);
+  // Không còn mặc định BTCUSDT,... nữa, để user chọn từ top 100 hoặc gõ tay
+  const [symbolsInput, setSymbolsInput] = useState("");
+  const [allTopSymbols, setAllTopSymbols] = useState([]); // [{pair,symbol,name,rank}]
+  const [selectedSymbols, setSelectedSymbols] = useState([]); // ["BTCUSDT",...]
+  const [searchTerm, setSearchTerm] = useState(""); // search trong top 100
   const [loading, setLoading] = useState(false);
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // Bảo vệ route: chưa login => về /login
+  // Bảo vệ route (GIỮ NGUYÊN)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -674,24 +673,24 @@ export default function BybitSnapshotPage() {
     return () => unsubscribe();
   }, [auth, router]);
 
-  // Load danh sách top 100 symbol từ Bybit ngay khi vào trang
+  // Load top 100 spot market cap (CoinGecko) – MỚI, không đụng logic snapshot
   useEffect(() => {
     let cancelled = false;
 
     async function loadTopSymbols() {
       try {
-        const syms = await getTopPerpSymbols(100);
+        const coins = await getTopSpotSymbolsByMarketCap(100);
         if (!cancelled) {
-          setAllTopSymbols(syms);
+          setAllTopSymbols(coins);
         }
       } catch (err) {
-        console.error("Không tải được danh sách top symbols:", err);
+        console.error("Không tải được danh sách top 100 từ CoinGecko:", err);
         if (!cancelled) {
           setError((prev) =>
             prev
               ? prev +
-                "\nKhông tải được danh sách top 100 symbols từ Bybit."
-              : "Không tải được danh sách top 100 symbols từ Bybit."
+                "\nKhông tải được danh sách top 100 market cap spot từ CoinGecko."
+              : "Không tải được danh sách top 100 market cap spot từ CoinGecko."
           );
         }
       }
@@ -704,10 +703,10 @@ export default function BybitSnapshotPage() {
     };
   }, []);
 
-  const toggleSymbol = (sym) => {
+  const toggleSymbol = (pair) => {
     setSelectedSymbols((prev) => {
-      const exists = prev.includes(sym);
-      const next = exists ? prev.filter((s) => s !== sym) : [...prev, sym];
+      const exists = prev.includes(pair);
+      const next = exists ? prev.filter((s) => s !== pair) : [...prev, pair];
       setSymbolsInput(next.join(","));
       return next;
     });
@@ -717,7 +716,7 @@ export default function BybitSnapshotPage() {
     const trimmed = symbolsInput.trim();
     if (!trimmed) {
       setError(
-        "Vui lòng chọn symbol từ danh sách top 100 hoặc nhập ít nhất 1 symbol, ví dụ: BTCUSDT"
+        "Vui lòng nhập ít nhất 1 symbol (VD: BTCUSDT) hoặc chọn từ danh sách top 100."
       );
       return;
     }
@@ -740,7 +739,6 @@ export default function BybitSnapshotPage() {
     try {
       const generatedAt = Date.now();
       const symbolsData = [];
-
       const binanceDeriv = {};
       const okxDeriv = {};
 
@@ -880,6 +878,16 @@ export default function BybitSnapshotPage() {
     }
   };
 
+  const filteredTopSymbols = allTopSymbols.filter((coin) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.trim().toLowerCase();
+    return (
+      coin.pair.toLowerCase().includes(term) ||
+      coin.symbol.toLowerCase().includes(term) ||
+      (coin.name || "").toLowerCase().includes(term)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
@@ -913,38 +921,61 @@ export default function BybitSnapshotPage() {
             className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm md:text-base outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           />
 
-          {/* Chọn từ top 100 symbol */}
+          {/* Top 100 market cap spot (CoinGecko) + search */}
           <div className="mt-4">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-sm font-medium">
-                Chọn từ Top 100 perp USDT trên Bybit
-              </span>
-              <span className="text-[11px] text-slate-500">
-                Sắp xếp theo khối lượng 24h (turnover24h)
-              </span>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">
+                  Top 100 Spot theo Market Cap (CoinGecko)
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Click để chọn/bỏ chọn. Mỗi dòng là cặp giả định SYMBOLUSDT
+                  dùng cho futures (BYBIT/BINANCE/OKX).
+                </span>
+              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search BTC, ETH, Solana..."
+                className="w-full sm:w-64 rounded-xl bg-slate-950/80 border border-slate-700 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+              />
             </div>
 
             {allTopSymbols.length === 0 ? (
               <p className="text-xs text-slate-500">
-                Đang tải danh sách top 100 symbols...
+                Đang tải danh sách top 100 market cap spot từ CoinGecko...
               </p>
             ) : (
-              <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60 p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 text-xs">
-                {allTopSymbols.map((sym) => {
-                  const isSelected = selectedSymbols.includes(sym);
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60 p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                {filteredTopSymbols.map((coin) => {
+                  const pair = coin.pair;
+                  const isSelected = selectedSymbols.includes(pair);
                   return (
                     <button
-                      key={sym}
+                      key={pair}
                       type="button"
-                      onClick={() => toggleSymbol(sym)}
-                      className={`px-2 py-1 rounded-lg border text-[11px] transition-all ${
+                      onClick={() => toggleSymbol(pair)}
+                      className={`px-2 py-1 rounded-lg border text-[11px] text-left transition-all ${
                         isSelected
                           ? "bg-emerald-500/80 border-emerald-400 text-slate-950 font-semibold"
                           : "bg-slate-900/80 border-slate-700 text-slate-200 hover:bg-slate-800"
                       }`}
                     >
-                      {isSelected ? "✓ " : ""}
-                      {sym}
+                      <div className="flex justify-between items-center">
+                        <span>
+                          {isSelected ? "✓ " : ""}
+                          {pair}
+                        </span>
+                        {coin.rank && (
+                          <span className="text-[10px] text-slate-300">
+                            #{coin.rank}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {coin.name} ({coin.symbol})
+                      </div>
                     </button>
                   );
                 })}
@@ -952,8 +983,9 @@ export default function BybitSnapshotPage() {
             )}
 
             <p className="mt-2 text-[11px] text-slate-500">
-              Nhấn vào symbol để chọn/bỏ chọn. Các symbol đã chọn sẽ tự động
-              cập nhật vào ô phía trên (có thể chỉnh tay nếu cần).
+              Bạn có thể chọn nhiều coin. Danh sách đã chọn sẽ tự động hiển thị
+              trong ô phía trên dạng <code>BTCUSDT,ETHUSDT,...</code> và dùng
+              trực tiếp cho snapshot như trước.
             </p>
           </div>
 
@@ -1020,8 +1052,8 @@ export default function BybitSnapshotPage() {
 
           {!snapshot && !error && !loading && (
             <p className="text-xs md:text-sm text-slate-500">
-              Chưa có dữ liệu. Chọn symbol từ danh sách top 100 hoặc nhập thủ
-              công rồi bấm{" "}
+              Chưa có dữ liệu. Chọn coin từ top 100 market cap spot hoặc nhập
+              thủ công, sau đó bấm{" "}
               <span className="font-semibold">Fetch Snapshot</span>.
             </p>
           )}
