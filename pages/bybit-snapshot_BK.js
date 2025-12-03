@@ -499,6 +499,27 @@ function computeDerivativesMetrics(
   return metrics;
 }
 
+// ===== Helper build filename cho snapshot (dùng chung cho download + macro) =====
+
+function buildSnapshotFilename(snapshot) {
+  if (!snapshot) return null;
+  try {
+    const ts = snapshot.generated_at || Date.now();
+    let symbolsName = "ALL";
+    const bybitData = snapshot.per_exchange?.bybit;
+    if (
+      bybitData &&
+      Array.isArray(bybitData.symbols) &&
+      bybitData.symbols.length > 0
+    ) {
+      symbolsName = bybitData.symbols.map((s) => s.symbol).join("_");
+    }
+    return `bybit_snapshot_${ts}_${symbolsName}.json`;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ====================== BINANCE HELPERS ======================
 
 async function getFromBinance(path, params = {}) {
@@ -662,6 +683,7 @@ export default function BybitSnapshotPage() {
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [macroCopied, setMacroCopied] = useState(false); // trạng thái copy macro
 
   // Bảo vệ route (GIỮ NGUYÊN)
   useEffect(() => {
@@ -735,6 +757,7 @@ export default function BybitSnapshotPage() {
     setError("");
     setSnapshot(null);
     setCopied(false);
+    setMacroCopied(false);
 
     try {
       const generatedAt = Date.now();
@@ -845,6 +868,20 @@ export default function BybitSnapshotPage() {
     }
   };
 
+  const handleCopyMacro = async () => {
+    if (!snapshot) return;
+    const filename = buildSnapshotFilename(snapshot);
+    if (!filename) return;
+    const macro = `[DASH] FILE=${filename}`;
+    try {
+      await navigator.clipboard.writeText(macro);
+      setMacroCopied(true);
+      setTimeout(() => setMacroCopied(false), 2000);
+    } catch (err) {
+      console.error("Copy macro failed:", err);
+    }
+  };
+
   const handleDownload = () => {
     if (!snapshot) return;
 
@@ -852,18 +889,7 @@ export default function BybitSnapshotPage() {
       const jsonString = JSON.stringify(snapshot, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
 
-      const ts = snapshot.generated_at || Date.now();
-      let symbolsName = "ALL";
-      const bybitData = snapshot.per_exchange?.bybit;
-      if (
-        bybitData &&
-        Array.isArray(bybitData.symbols) &&
-        bybitData.symbols.length > 0
-      ) {
-        symbolsName = bybitData.symbols.map((s) => s.symbol).join("_");
-      }
-
-      const filename = `bybit_snapshot_${ts}_${symbolsName}.json`;
+      const filename = buildSnapshotFilename(snapshot) || "bybit_snapshot.json";
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -1041,6 +1067,13 @@ export default function BybitSnapshotPage() {
                 {copied ? "✅ Đã copy" : "Copy JSON"}
               </button>
               <button
+                onClick={handleCopyMacro}
+                disabled={!snapshot}
+                className="text-xs md:text-sm px-3 py-1 rounded-lg border border-indigo-400/70 bg-indigo-600/80 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {macroCopied ? "✅ Đã copy Macro" : "Copy Macro"}
+              </button>
+              <button
                 onClick={handleDownload}
                 disabled={!snapshot}
                 className="text-xs md:text-sm px-3 py-1 rounded-lg border border-emerald-500/60 bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -1049,6 +1082,21 @@ export default function BybitSnapshotPage() {
               </button>
             </div>
           </div>
+
+          {snapshot && (
+            <div className="mt-2 text-[11px] md:text-xs text-slate-300 bg-slate-950/60 border border-slate-700 rounded-xl px-3 py-2">
+              <div className="font-semibold mb-1">
+                Macro để gửi cho ChatGPT:
+              </div>
+              <div className="font-mono break-all text-[11px] md:text-xs">
+                {`[DASH] FILE=${buildSnapshotFilename(snapshot) || "bybit_snapshot.json"}`}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1">
+                Bấm &quot;Copy Macro&quot; để copy chuỗi này và dán vào ChatGPT
+                cùng với file JSON.
+              </div>
+            </div>
+          )}
 
           {!snapshot && !error && !loading && (
             <p className="text-xs md:text-sm text-slate-500">
