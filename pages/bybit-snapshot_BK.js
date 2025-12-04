@@ -1,1116 +1,500 @@
-// pages/bybit-snapshot.js
-import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { app } from "../firebase";
-
-const BYBIT_BASE = "https://api.bybit.com";
-const BINANCE_BASE = "https://fapi.binance.com";
-const OKX_BASE = "https://www.okx.com";
-const COINGECKO_BASE = "https://api.coingecko.com"; // mới
-
-// ====================== BYBIT HELPERS ======================
-
-async function getFromBybit(path, params = {}) {
-  const url = new URL(path, BYBIT_BASE);
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      url.searchParams.append(key, String(value));
-    }
-  });
-
-  const res = await fetch(url.toString(), {
-    method: "GET",
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Bybit HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
-    );
-  }
-
-  const data = await res.json();
-
-  if (data.retCode !== 0) {
-    throw new Error(`Bybit retCode ${data.retCode}: ${data.retMsg}`);
-  }
-
-  return data.result || {};
-}
-
-async function getKlines(
-  symbol,
-  intervals = ["1", "5", "15", "60", "240", "D"],
-  limit = 200
-) {
-  const klines = {};
-  for (const interval of intervals) {
-    const result = await getFromBybit("/v5/market/kline", {
-      category: "linear",
-      symbol,
-      interval,
-      limit,
-    });
-    klines[interval] = result.list || [];
-  }
-  return klines;
-}
-
-async function getOpenInterest(symbol, intervalTime = "5min", limit = 200) {
-  const result = await getFromBybit("/v5/market/open-interest", {
-    category: "linear",
-    symbol,
-    intervalTime,
-    limit,
-  });
-  return result.list || [];
-}
-
-async function getLongShortRatio(symbol, period = "1h", limit = 100) {
-  const result = await getFromBybit("/v5/market/account-ratio", {
-    category: "linear",
-    symbol,
-    period,
-    limit,
-  });
-  return result.list || [];
-}
-
-async function getFundingHistory(symbol, limit = 50) {
-  const result = await getFromBybit("/v5/market/funding/history", {
-    category: "linear",
-    symbol,
-    limit,
-  });
-  return result.list || [];
-}
-
-// (Hàm cũ getTopPerpSymbols mình giữ nguyên không dùng tới để khỏi ảnh hưởng logic snapshot)
-
-async function getOrderbook(symbol, limit = 25) {
-  const result = await getFromBybit("/v5/market/orderbook", {
-    category: "linear",
-    symbol,
-    limit,
-  });
-  return {
-    bids: result.b || [],
-    asks: result.a || [],
-  };
-}
-
-async function getRecentTrades(symbol, limit = 500) {
-  const result = await getFromBybit("/v5/market/recent-trade", {
-    category: "linear",
-    symbol,
-    limit,
-  });
-  return result.list || [];
-}
-
-async function getTicker(symbol) {
-  const result = await getFromBybit("/v5/market/tickers", {
-    category: "linear",
-    symbol,
-  });
-  const list = result.list || [];
-  return list[0] || {};
-}
-
-async function collectSymbolData(symbol) {
-  const klines = await getKlines(symbol);
-
-  return {
-    symbol,
-    klines,
-    indicators: computeAllIndicators(klines),
-    open_interest: await getOpenInterest(symbol),
-    long_short_ratio: await getLongShortRatio(symbol),
-    funding_history: await getFundingHistory(symbol),
-    orderbook: await getOrderbook(symbol),
-    recent_trades: await getRecentTrades(symbol),
-    ticker: await getTicker(symbol),
-  };
-}
-
-// ====================== COINGECKO HELPER (TOP 100 SPOT MCAP) ======================
-
-// Lấy top 100 spot theo market cap từ CoinGecko,
-// và map thành pair dạng SYMBOLUSDT (BTCUSDT, ETHUSDT...)
-async function getTopSpotSymbolsByMarketCap(limit = 100) {
-  const url = new URL("/api/v3/coins/markets", COINGECKO_BASE);
-  url.searchParams.set("vs_currency", "usd");
-  url.searchParams.set("order", "market_cap_desc");
-  url.searchParams.set("per_page", String(limit));
-  url.searchParams.set("page", "1");
-  url.searchParams.set("sparkline", "false");
-
-  const res = await fetch(url.toString(), { method: "GET" });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `CoinGecko HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
-    );
-  }
-
-  const data = await res.json();
-  if (!Array.isArray(data)) return [];
-
-  // Chuẩn hóa: { pair: "BTCUSDT", symbol: "BTC", name: "Bitcoin", rank: 1 }
-  return data.map((coin) => {
-    const symbol = (coin.symbol || "").toUpperCase(); // btc -> BTC
-    const name = coin.name || symbol;
-    const rank = coin.market_cap_rank || null;
-    const pair = `${symbol}USDT`; // dùng để query Bybit/Binance/OKX
-    return { pair, symbol, name, rank };
-  });
-}
-
-// ====================== INDICATOR & METRICS HELPERS ======================
-
-function parseKlinesList(list) {
-  if (!Array.isArray(list)) return [];
-  return list
-    .map((row) => {
-      const [ts, open, high, low, close, volume] = row;
-      return {
-        ts: Number(ts),
-        open: Number(open),
-        high: Number(high),
-        low: Number(low),
-        close: Number(close),
-        volume: Number(volume),
-      };
-    })
-    .sort((a, b) => a.ts - b.ts);
-}
-
-function calcEMA(values, period) {
-  if (!values || values.length === 0) return null;
-  const k = 2 / (period + 1);
-  let ema = values[0];
-  for (let i = 1; i < values.length; i++) {
-    ema = values[i] * k + ema * (1 - k);
-  }
-  return ema;
-}
-
-function calcRSI(values, period = 14) {
-  if (!values || values.length <= period) return null;
-  let gains = 0;
-  let losses = 0;
-
-  for (let i = 1; i <= period; i++) {
-    const diff = values[i] - values[i - 1];
-    if (diff >= 0) gains += diff;
-    else losses -= diff;
-  }
-
-  gains /= period;
-  losses /= period;
-
-  let rs;
-  if (losses === 0) {
-    rs = gains === 0 ? 1 : 100;
-  } else {
-    rs = gains / losses;
-  }
-  let rsi = 100 - 100 / (1 + rs);
-
-  for (let i = period + 1; i < values.length; i++) {
-    const diff = values[i] - values[i - 1];
-    const gain = diff > 0 ? diff : 0;
-    const loss = diff < 0 ? -diff : 0;
-
-    gains = (gains * (period - 1) + gain) / period;
-    losses = (losses * (period - 1) + loss) / period;
-
-    if (losses === 0) {
-      rs = gains === 0 ? 1 : 100;
-    } else {
-      rs = gains / losses;
-    }
-    rsi = 100 - 100 / (1 + rs);
-  }
-
-  return rsi;
-}
-
-function calcMACD(values, shortPeriod = 12, longPeriod = 26, signalPeriod = 9) {
-  if (!values || values.length < longPeriod + signalPeriod) {
-    return { macd: null, signal: null, hist: null };
-  }
-
-  const kShort = 2 / (shortPeriod + 1);
-  const kLong = 2 / (longPeriod + 1);
-  const emaShortArr = [];
-  const emaLongArr = [];
-
-  let emaShort = values[0];
-  let emaLong = values[0];
-
-  for (let i = 0; i < values.length; i++) {
-    const price = values[i];
-    emaShort = i === 0 ? price : price * kShort + emaShort * (1 - kShort);
-    emaLong = i === 0 ? price : price * kLong + emaLong * (1 - kLong);
-    emaShortArr.push(emaShort);
-    emaLongArr.push(emaLong);
-  }
-
-  const macdArr = emaShortArr.map((es, idx) => es - emaLongArr[idx]);
-
-  const kSignal = 2 / (signalPeriod + 1);
-  let emaSignal = macdArr[longPeriod];
-  let signal = emaSignal;
-
-  for (let i = longPeriod + 1; i < macdArr.length; i++) {
-    emaSignal = macdArr[i] * kSignal + emaSignal * (1 - kSignal);
-    signal = emaSignal;
-  }
-
-  const macd = macdArr[macdArr.length - 1];
-  const hist = macd - (signal ?? 0);
-
-  return { macd, signal, hist };
-}
-
-function calcATR(parsedKlines, period = 14) {
-  if (!parsedKlines || parsedKlines.length <= period) return null;
-  const trs = [];
-
-  for (let i = 0; i < parsedKlines.length; i++) {
-    const { high, low, close } = parsedKlines[i];
-    if (i === 0) {
-      trs.push(high - low);
-    } else {
-      const prevClose = parsedKlines[i - 1].close;
-      const tr = Math.max(
-        high - low,
-        Math.abs(high - prevClose),
-        Math.abs(low - prevClose)
-      );
-      trs.push(tr);
-    }
-  }
-
-  let atr = 0;
-  for (let i = 0; i < period; i++) atr += trs[i];
-  atr /= period;
-
-  for (let i = period; i < trs.length; i++) {
-    atr = (atr * (period - 1) + trs[i]) / period;
-  }
-
-  return atr;
-}
-
-function buildVolumeProfile(parsedKlines, bins = 24) {
-  if (!parsedKlines || !parsedKlines.length) return null;
-
-  const lows = parsedKlines.map((k) => k.low);
-  const highs = parsedKlines.map((k) => k.high);
-  const minPrice = Math.min(...lows);
-  const maxPrice = Math.max(...highs);
-
-  if (!isFinite(minPrice) || !isFinite(maxPrice) || minPrice === maxPrice) {
-    return null;
-  }
-
-  const binSize = (maxPrice - minPrice) / bins;
-  const volumes = new Array(bins).fill(0);
-
-  for (const k of parsedKlines) {
-    const price = (k.high + k.low + k.close) / 3;
-    let idx = Math.floor((price - minPrice) / binSize);
-    if (idx < 0) idx = 0;
-    if (idx >= bins) idx = bins - 1;
-    volumes[idx] += k.volume;
-  }
-
-  const resultBins = [];
-  for (let i = 0; i < bins; i++) {
-    resultBins.push({
-      from: minPrice + i * binSize,
-      to: minPrice + (i + 1) * binSize,
-      volume: volumes[i],
-    });
-  }
-
-  return { minPrice, maxPrice, bins: resultBins };
-}
-
-function computeIndicatorsForInterval(rawList) {
-  const parsed = parseKlinesList(rawList || []);
-  if (!parsed.length) return null;
-
-  const closes = parsed.map((k) => k.close);
-  const ema20 = calcEMA(closes, 20);
-  const ema50 = calcEMA(closes, 50);
-  const ema100 = calcEMA(closes, 100);
-  const ema200 = calcEMA(closes, 200);
-  const rsi14 = calcRSI(closes, 14);
-  const macd = calcMACD(closes, 12, 26, 9);
-  const atr14 = calcATR(parsed, 14);
-  const volProfile = buildVolumeProfile(parsed, 24);
-
-  const last = parsed[parsed.length - 1];
-
-  return {
-    last,
-    rsi14,
-    ema: { ema20, ema50, ema100, ema200 },
-    macd,
-    atr14,
-    vol_profile: volProfile,
-  };
-}
-
-const DEFAULT_INTERVALS = ["1", "5", "15", "60", "240", "D"];
-
-function computeAllIndicators(klines) {
-  const indicators = {};
-  if (!klines) return indicators;
-
-  for (const tf of DEFAULT_INTERVALS) {
-    const raw = klines[tf];
-    if (!raw || !raw.length) continue;
-    const computed = computeIndicatorsForInterval(raw);
-    if (computed) {
-      indicators[tf] = computed;
-    }
-  }
-  return indicators;
-}
-
-function computeDerivativesMetrics(
-  bybitData,
-  binanceForSymbol = null,
-  okxForSymbol = null
-) {
-  const { open_interest, long_short_ratio, funding_history } = bybitData || {};
-  const metrics = {
-    bybit: {},
-    binance: {},
-    okx: {},
-  };
-
-  if (Array.isArray(open_interest) && open_interest.length) {
-    const latest = open_interest[0];
-    const prev = open_interest[1] || null;
-    const pastIdx = Math.min(open_interest.length - 1, 24);
-    const past = open_interest[pastIdx] || null;
-
-    const nowOI = Number(latest.openInterest ?? latest.open_interest ?? 0);
-    metrics.bybit.open_interest_now = nowOI;
-
-    if (prev) {
-      const prevOI = Number(prev.openInterest ?? prev.open_interest ?? 0);
-      const diff = nowOI - prevOI;
-      metrics.bybit.open_interest_change_1 = diff;
-      metrics.bybit.open_interest_change_1_pct =
-        prevOI ? (diff / prevOI) * 100 : null;
-    }
-
-    if (past) {
-      const pastOI = Number(past.openInterest ?? past.open_interest ?? 0);
-      metrics.bybit.open_interest_change_n = nowOI - pastOI;
-    }
-  }
-
-  if (Array.isArray(funding_history) && funding_history.length) {
-    const lastF = Number(
-      funding_history[0].fundingRate ??
-        funding_history[0].funding_rate ??
-        0
-    );
-    const avgF =
-      funding_history.reduce(
-        (sum, fh) =>
-          sum + Number(fh.fundingRate ?? fh.funding_rate ?? 0),
-        0
-      ) / funding_history.length;
-
-    metrics.bybit.funding_now = lastF;
-    metrics.bybit.funding_avg = avgF;
-  }
-
-  if (Array.isArray(long_short_ratio) && long_short_ratio.length) {
-    const last = long_short_ratio[0];
-    const recent = long_short_ratio.slice(
-      0,
-      Math.min(10, long_short_ratio.length)
-    );
-    const avgBuy =
-      recent.reduce(
-        (sum, r) =>
-          sum + Number(r.buyRatio ?? r.buy_ratio ?? 0),
-        0
-      ) / recent.length;
-
-    metrics.bybit.long_short_ratio_now = {
-      buyRatio: Number(last.buyRatio ?? last.buy_ratio ?? 0),
-      sellRatio: Number(last.sellRatio ?? last.sell_ratio ?? 0),
-    };
-    metrics.bybit.long_short_ratio_avg_10 = avgBuy;
-  }
-
-  if (binanceForSymbol) {
-    const oiHist = binanceForSymbol.open_interest_hist_5m || [];
-    if (oiHist.length) {
-      const lastOI = oiHist[oiHist.length - 1];
-      metrics.binance.open_interest_5m_last = {
-        sumOpenInterest: Number(lastOI.sumOpenInterest ?? 0),
-        sumOpenInterestValue: Number(lastOI.sumOpenInterestValue ?? 0),
-        t: Number(lastOI.t ?? 0),
-      };
-    }
-
-    const frHist = binanceForSymbol.funding_history || [];
-    if (frHist.length) {
-      const lastFr = frHist[frHist.length - 1];
-      const avgFr =
-        frHist.reduce(
-          (sum, x) => sum + Number(x.fundingRate ?? 0),
-          0
-        ) / frHist.length;
-
-      metrics.binance.funding_last = Number(lastFr.fundingRate ?? 0);
-      metrics.binance.funding_avg = avgFr;
-    }
-
-    const taker = binanceForSymbol.taker_long_short_ratio_5m || [];
-    if (taker.length) {
-      const lt = taker[taker.length - 1];
-      metrics.binance.taker_long_short_ratio_last = {
-        buyVol: Number(lt.buyVol ?? 0),
-        sellVol: Number(lt.sellVol ?? 0),
-        buySellRatio: Number(lt.buySellRatio ?? 0),
-        t: Number(lt.t ?? 0),
-      };
-    }
-  }
-
-  if (okxForSymbol && okxForSymbol.open_interest) {
-    metrics.okx.open_interest_snapshot = okxForSymbol.open_interest;
-  }
-
-  return metrics;
-}
-
-// ===== Helper build filename cho snapshot (dùng chung cho download + macro) =====
-
-function buildSnapshotFilename(snapshot) {
-  if (!snapshot) return null;
-  try {
-    const ts = snapshot.generated_at || Date.now();
-    let symbolsName = "ALL";
-    const bybitData = snapshot.per_exchange?.bybit;
-    if (
-      bybitData &&
-      Array.isArray(bybitData.symbols) &&
-      bybitData.symbols.length > 0
-    ) {
-      symbolsName = bybitData.symbols.map((s) => s.symbol).join("_");
-    }
-    return `bybit_snapshot_${ts}_${symbolsName}.json`;
-  } catch (e) {
-    return null;
-  }
-}
-
-// ====================== BINANCE HELPERS ======================
-
-async function getFromBinance(path, params = {}) {
-  const url = new URL(path, BINANCE_BASE);
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      url.searchParams.append(key, String(value));
-    }
-  });
-
-  const res = await fetch(url.toString(), { method: "GET" });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Binance HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
-    );
-  }
-
-  return res.json();
-}
-
-async function getBinanceFundingHistory(symbol, limit = 50) {
-  try {
-    const data = await getFromBinance("/fapi/v1/fundingRate", {
-      symbol,
-      limit,
-    });
-
-    return (data || []).map((row) => ({
-      t: row.fundingTime,
-      fundingRate: Number(row.fundingRate),
-      symbol: row.symbol,
-    }));
-  } catch (err) {
-    console.error("getBinanceFundingHistory error:", err.message || err);
-    return [];
-  }
-}
-
-async function getBinanceOpenInterestHist(
-  symbol,
-  period = "5m",
-  limit = 50
-) {
-  try {
-    const data = await getFromBinance("/futures/data/openInterestHist", {
-      symbol,
-      period,
-      limit,
-    });
-
-    return (data || []).map((row) => ({
-      t: row.timestamp,
-      sumOpenInterest: Number(row.sumOpenInterest),
-      sumOpenInterestValue: Number(row.sumOpenInterestValue),
-      symbol: row.symbol,
-    }));
-  } catch (err) {
-    console.error("getBinanceOpenInterestHist error:", err.message || err);
-    return [];
-  }
-}
-
-async function getBinanceTakerLongShortRatio(
-  symbol,
-  period = "5m",
-  limit = 50
-) {
-  try {
-    const data = await getFromBinance("/futures/data/takerlongshortRatio", {
-      symbol,
-      period,
-      limit,
-    });
-
-    return (data || []).map((row) => ({
-      t: row.timestamp,
-      buyVol: Number(row.buyVol),
-      sellVol: Number(row.sellVol),
-      buySellRatio: Number(row.buySellRatio),
-      symbol: row.symbol,
-    }));
-  } catch (err) {
-    console.error("getBinanceTakerLongShortRatio error:", err.message || err);
-    return [];
-  }
-}
-
-// ====================== OKX HELPERS ======================
-
-async function getFromOkx(path, params = {}) {
-  const url = new URL(path, OKX_BASE);
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      url.searchParams.append(key, String(value));
-    }
-  });
-
-  const res = await fetch(url.toString(), { method: "GET" });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `OKX HTTP ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
-    );
-  }
-
-  return res.json();
-}
-
-function mapToOkxInstId(symbol) {
-  if (!symbol.endsWith("USDT")) return null;
-  const base = symbol.replace("USDT", "");
-  return `${base}-USDT-SWAP`;
-}
-
-async function getOkxOpenInterestSnapshot(symbol) {
-  try {
-    const instId = mapToOkxInstId(symbol);
-    if (!instId) return null;
-
-    const data = await getFromOkx("/api/v5/public/open-interest", {
-      instType: "SWAP",
-      instId,
-    });
-
-    if (!data || data.code !== "0" || !Array.isArray(data.data)) {
-      return null;
-    }
-
-    const row = data.data[0];
-    if (!row) return null;
-
-    return {
-      instId: row.instId,
-      oi: Number(row.oi),
-      oiCcy: Number(row.oiCcy),
-      ts: Number(row.ts),
-    };
-  } catch (err) {
-    console.error("getOkxOpenInterestSnapshot error:", err.message || err);
-    return null;
-  }
-}
-
-// ====================== REACT PAGE ======================
-
-export default function BybitSnapshotPage() {
-  const router = useRouter();
-  const auth = getAuth(app);
-
-  // Không còn mặc định BTCUSDT,... nữa, để user chọn từ top 100 hoặc gõ tay
-  const [symbolsInput, setSymbolsInput] = useState("");
-  const [allTopSymbols, setAllTopSymbols] = useState([]); // [{pair,symbol,name,rank}]
-  const [selectedSymbols, setSelectedSymbols] = useState([]); // ["BTCUSDT",...]
-  const [searchTerm, setSearchTerm] = useState(""); // search trong top 100
+// pages/bybit-snapshot-v3.js
+// Next.js pages router – React client page sử dụng buildSnapshotV3
+// Output: JSON snapshot version 3 với UI chuyên nghiệp, có copy/download + macro [DASH] FILE=...
+
+import React, { useState, useCallback } from "react";
+import { buildSnapshotV3 } from "../lib/snapshot-v3";
+
+function BybitSnapshotV3Page() {
+  const [symbolsText, setSymbolsText] = useState("BTCUSDT");
   const [loading, setLoading] = useState(false);
-  const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [macroCopied, setMacroCopied] = useState(false); // trạng thái copy macro
+  const [snapshot, setSnapshot] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [dashMacro, setDashMacro] = useState("");
+  const [copiedJson, setCopiedJson] = useState(false);
+  const [copiedMacro, setCopiedMacro] = useState(false);
 
-  // Bảo vệ route (GIỮ NGUYÊN)
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.push("/login");
-      }
-    });
-    return () => unsubscribe();
-  }, [auth, router]);
 
-  // Load top 100 spot market cap (CoinGecko) – MỚI, không đụng logic snapshot
-  useEffect(() => {
-    let cancelled = false;
+  const handleGenerate = useCallback(async () => {
+    setError("");
+    setSnapshot(null);
+    setFileName("");
+    setDashMacro("");
 
-    async function loadTopSymbols() {
-      try {
-        const coins = await getTopSpotSymbolsByMarketCap(100);
-        if (!cancelled) {
-          setAllTopSymbols(coins);
-        }
-      } catch (err) {
-        console.error("Không tải được danh sách top 100 từ CoinGecko:", err);
-        if (!cancelled) {
-          setError((prev) =>
-            prev
-              ? prev +
-                "\nKhông tải được danh sách top 100 market cap spot từ CoinGecko."
-              : "Không tải được danh sách top 100 market cap spot từ CoinGecko."
-          );
-        }
-      }
-    }
-
-    loadTopSymbols();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const toggleSymbol = (pair) => {
-    setSelectedSymbols((prev) => {
-      const exists = prev.includes(pair);
-      const next = exists ? prev.filter((s) => s !== pair) : [...prev, pair];
-      setSymbolsInput(next.join(","));
-      return next;
-    });
-  };
-
-  const handleFetch = async () => {
-    const trimmed = symbolsInput.trim();
-    if (!trimmed) {
-      setError(
-        "Vui lòng nhập ít nhất 1 symbol (VD: BTCUSDT) hoặc chọn từ danh sách top 100."
-      );
-      return;
-    }
-
-    const symbols = trimmed
-      .split(",")
+    const raw = symbolsText || "";
+    const symbols = raw
+      .split(/[,\s]+/)
       .map((s) => s.trim().toUpperCase())
       .filter(Boolean);
 
     if (!symbols.length) {
-      setError("Danh sách symbol không hợp lệ");
+      setError("Vui lòng nhập ít nhất 1 symbol, ví dụ: BTCUSDT.");
       return;
     }
 
-    setLoading(true);
-    setError("");
-    setSnapshot(null);
-    setCopied(false);
-    setMacroCopied(false);
-
     try {
-      const generatedAt = Date.now();
-      const symbolsData = [];
-      const binanceDeriv = {};
-      const okxDeriv = {};
+      setLoading(true);
 
-      for (const sym of symbols) {
-        console.log("Fetching Bybit data for", sym);
-        const bybitData = await collectSymbolData(sym);
+      const result = await buildSnapshotV3(symbols);
 
-        console.log("Fetching Binance/OKX data for", sym);
-        let binFunding = [];
-        let binOiHist = [];
-        let binTakerLS = [];
-        let okxOiSnap = null;
-
-        try {
-          const [
-            _binFunding,
-            _binOiHist,
-            _binTakerLS,
-            _okxOiSnap,
-          ] = await Promise.all([
-            getBinanceFundingHistory(sym),
-            getBinanceOpenInterestHist(sym),
-            getBinanceTakerLongShortRatio(sym),
-            getOkxOpenInterestSnapshot(sym),
-          ]);
-
-          binFunding = _binFunding || [];
-          binOiHist = _binOiHist || [];
-          binTakerLS = _binTakerLS || [];
-          okxOiSnap = _okxOiSnap || null;
-        } catch (e) {
-          console.error(
-            `Error fetching Binance/OKX data for ${sym}:`,
-            e.message || e
-          );
-        }
-
-        const binForSym = {
-          funding_history: binFunding,
-          open_interest_hist_5m: binOiHist,
-          taker_long_short_ratio_5m: binTakerLS,
-        };
-
-        const okxForSym = {
-          open_interest: okxOiSnap,
-        };
-
-        binanceDeriv[sym] = binForSym;
-        okxDeriv[sym] = okxForSym;
-
-        const derived_metrics = computeDerivativesMetrics(
-          bybitData,
-          binForSym,
-          okxForSym
-        );
-
-        symbolsData.push({
-          ...bybitData,
-          derived_metrics,
-        });
+      if (!result || typeof result !== "object") {
+        throw new Error("Snapshot trả về không hợp lệ.");
       }
 
-      const onchain = {
-        exchange_netflow_daily: [],
-        whale_exchange_flows: [],
-      };
+      // Snapshot v3: version, generated_at, per_exchange.bybit.symbols
+      const ts = result.generated_at || Date.now();
+      const firstSymbol =
+        result?.per_exchange?.bybit?.symbols?.[0]?.symbol ||
+        symbols[0] ||
+        "SYMBOL";
 
-      const global_derivatives = {
-        binance: binanceDeriv,
-        okx: okxDeriv,
-      };
+      const name = `bybit_snapshot_${ts}_${firstSymbol}.json`;
+      const macro = `[DASH] FILE=${name}`;
 
-      const payload = {
-        version: 2,
-        generated_at: generatedAt,
-        per_exchange: {
-          bybit: {
-            category: "linear",
-            symbols: symbolsData,
-          },
-        },
-        onchain,
-        global_derivatives,
-      };
-
-      setSnapshot(payload);
-    } catch (err) {
-      console.error("Fetch snapshot error:", err);
-      setError(err.message || "Fetch snapshot error");
-      setSnapshot(null);
+      setSnapshot(result);
+      setFileName(name);
+      setDashMacro(macro);
+    } catch (e) {
+      console.error("buildSnapshotV3 error:", e);
+      setError(e?.message || "Có lỗi xảy ra khi tạo snapshot.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [symbolsText]);
 
-  const handleCopy = async () => {
+  const handleCopyJSON = useCallback(() => {
     if (!snapshot) return;
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Copy failed:", err);
-    }
-  };
+    const text = JSON.stringify(snapshot, null, 2);
 
-  const handleCopyMacro = async () => {
+    const markCopied = () => {
+      setCopiedJson(true);
+      setTimeout(() => setCopiedJson(false), 1500);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(text)
+        .then(markCopied)
+        .catch((err) => {
+          console.error("Copy JSON failed:", err);
+        });
+    } else {
+      // Fallback
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      markCopied();
+    }
+  }, [snapshot]);
+
+  const handleCopyMacro = useCallback(() => {
+    if (!dashMacro) return;
+
+    const markCopied = () => {
+      setCopiedMacro(true);
+      setTimeout(() => setCopiedMacro(false), 1500);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(dashMacro)
+        .then(markCopied)
+        .catch((err) => {
+          console.error("Copy macro failed:", err);
+        });
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = dashMacro;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      markCopied();
+    }
+  }, [dashMacro]);
+
+  const handleDownloadJSON = useCallback(() => {
     if (!snapshot) return;
-    const filename = buildSnapshotFilename(snapshot);
-    if (!filename) return;
-    const macro = `[DASH] FILE=${filename}`;
-    try {
-      await navigator.clipboard.writeText(macro);
-      setMacroCopied(true);
-      setTimeout(() => setMacroCopied(false), 2000);
-    } catch (err) {
-      console.error("Copy macro failed:", err);
-    }
-  };
+    const text = JSON.stringify(snapshot, null, 2);
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName || "snapshot_v3.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [snapshot, fileName]);
 
-  const handleDownload = () => {
-    if (!snapshot) return;
+  const versionLabel =
+    snapshot && snapshot.version ? `v${snapshot.version}` : "chưa có";
 
-    try {
-      const jsonString = JSON.stringify(snapshot, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json" });
-
-      const filename = buildSnapshotFilename(snapshot) || "bybit_snapshot.json";
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Download failed:", err);
-    }
-  };
-
-  const filteredTopSymbols = allTopSymbols.filter((coin) => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.trim().toLowerCase();
-    return (
-      coin.pair.toLowerCase().includes(term) ||
-      coin.symbol.toLowerCase().includes(term) ||
-      (coin.name || "").toLowerCase().includes(term)
-    );
-  });
+  const generatedAtLabel =
+    snapshot && snapshot.generated_at
+      ? new Date(snapshot.generated_at).toLocaleString()
+      : "";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-2xl md:text-3xl font-semibold mb-2">
-          Bybit Snapshot Tool (Client-side, v2 + Binance + OKX)
-        </h1>
-        <p className="text-sm md:text-base text-slate-400 mb-6">
-          Trang này gọi trực tiếp Bybit, Binance và OKX từ trình duyệt của bạn
-          (qua VPN nếu có), không đi qua server Render. Lấy dữ liệu kline / OI /
-          funding / orderbook / trades cho nhiều symbol rồi cho phép copy JSON
-          hoặc tải về file (schema v2 mở rộng) để gửi cho ChatGPT phân tích.
-        </p>
-
-        {/* Form nhập/chọn symbol */}
-        <div className="bg-slate-900/70 border border-slate-700/60 rounded-2xl p-4 md:p-5 shadow-xl shadow-black/30 mb-6">
-          <label className="block text-sm font-medium mb-2">
-            Symbols (phân tách bằng dấu phẩy)
-          </label>
-          <input
-            type="text"
-            value={symbolsInput}
-            onChange={(e) => {
-              setSymbolsInput(e.target.value);
-              const raw = e.target.value
-                .split(",")
-                .map((s) => s.trim().toUpperCase())
-                .filter(Boolean);
-              setSelectedSymbols(raw);
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#050816",
+        color: "#e5e7eb",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        padding: "24px 16px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 960,
+          margin: "0 auto",
+        }}
+      >
+        {/* Header */}
+        <header
+          style={{
+            marginBottom: 24,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <h1
+            style={{
+              fontSize: 28,
+              fontWeight: 700,
+              letterSpacing: 0.5,
             }}
-            placeholder="VD: BTCUSDT,ETHUSDT,SOLUSDT"
-            className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm md:text-base outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          />
+          >
+            Bybit Snapshot v3 – JSON Export
+          </h1>
+          <p
+            style={{
+              fontSize: 14,
+              color: "#9ca3af",
+              maxWidth: 640,
+            }}
+          >
+            Tạo snapshot phiên bản 3 (H1–H4–Daily, derivatives Bybit/Binance/OKX)
+            để sử dụng cho Price Analyzer v3.0. Bao gồm JSON, macro{" "}
+            <code>[DASH] FILE=</code>, copy và download.
+          </p>
+        </header>
 
-          {/* Top 100 market cap spot (CoinGecko) + search */}
-          <div className="mt-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">
-                  Top 100 Spot theo Market Cap (CoinGecko)
+        {/* Input card */}
+        <section
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(236,72,153,0.08))",
+            borderRadius: 12,
+            padding: 16,
+            border: "1px solid rgba(148,163,184,0.25)",
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <label
+              htmlFor="symbols"
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              Symbols (phân tách bởi dấu phẩy hoặc khoảng trắng)
+            </label>
+            <input
+              id="symbols"
+              type="text"
+              value={symbolsText}
+              onChange={(e) => setSymbolsText(e.target.value)}
+              placeholder="Ví dụ: BTCUSDT, ETHUSDT"
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid #4b5563",
+                backgroundColor: "#020617",
+                color: "#e5e7eb",
+                fontSize: 14,
+              }}
+            />
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+                alignItems: "center",
+                marginTop: 8,
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={loading}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  border: "none",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: loading ? "default" : "pointer",
+                  background:
+                    "linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899)",
+                  color: "#f9fafb",
+                  opacity: loading ? 0.6 : 1,
+                  boxShadow:
+                    "0 8px 20px rgba(59,130,246,0.35), 0 0 0 1px rgba(15,23,42,0.8) inset",
+                }}
+              >
+                {loading ? "Đang tạo snapshot v3..." : "Generate Snapshot v3"}
+              </button>
+
+              {snapshot && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: "#9ca3af",
+                  }}
+                >
+                  Version: <strong>{versionLabel}</strong>
+                  {generatedAtLabel && (
+                    <>
+                      {" "}
+                      · Generated at: <strong>{generatedAtLabel}</strong>
+                    </>
+                  )}
                 </span>
-                <span className="text-[11px] text-slate-500">
-                  Click để chọn/bỏ chọn. Mỗi dòng là cặp giả định SYMBOLUSDT
-                  dùng cho futures (BYBIT/BINANCE/OKX).
-                </span>
-              </div>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search BTC, ETH, Solana..."
-                className="w-full sm:w-64 rounded-xl bg-slate-950/80 border border-slate-700 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-              />
+              )}
             </div>
 
-            {allTopSymbols.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                Đang tải danh sách top 100 market cap spot từ CoinGecko...
-              </p>
-            ) : (
-              <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60 p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                {filteredTopSymbols.map((coin) => {
-                  const pair = coin.pair;
-                  const isSelected = selectedSymbols.includes(pair);
-                  return (
-                    <button
-                      key={pair}
-                      type="button"
-                      onClick={() => toggleSymbol(pair)}
-                      className={`px-2 py-1 rounded-lg border text-[11px] text-left transition-all ${
-                        isSelected
-                          ? "bg-emerald-500/80 border-emerald-400 text-slate-950 font-semibold"
-                          : "bg-slate-900/80 border-slate-700 text-slate-200 hover:bg-slate-800"
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span>
-                          {isSelected ? "✓ " : ""}
-                          {pair}
-                        </span>
-                        {coin.rank && (
-                          <span className="text-[10px] text-slate-300">
-                            #{coin.rank}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-slate-400">
-                        {coin.name} ({coin.symbol})
-                      </div>
-                    </button>
-                  );
-                })}
+            {error && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#fecaca",
+                  backgroundColor: "rgba(127,29,29,0.35)",
+                  border: "1px solid rgba(248,113,113,0.5)",
+                }}
+              >
+                {error}
               </div>
             )}
-
-            <p className="mt-2 text-[11px] text-slate-500">
-              Bạn có thể chọn nhiều coin. Danh sách đã chọn sẽ tự động hiển thị
-              trong ô phía trên dạng <code>BTCUSDT,ETHUSDT,...</code> và dùng
-              trực tiếp cho snapshot như trước.
-            </p>
           </div>
+        </section>
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
-            <div className="text-xs md:text-sm text-slate-400 space-y-1">
-              <div>
-                Bybit API:{" "}
-                <span className="font-mono text-[11px] md:text-xs break-all">
-                  {BYBIT_BASE}
-                </span>
-              </div>
-              <div>
-                Binance API:{" "}
-                <span className="font-mono text-[11px] md:text-xs break-all">
-                  {BINANCE_BASE}
-                </span>
-              </div>
-              <div>
-                OKX API:{" "}
-                <span className="font-mono text-[11px] md:text-xs break-all">
-                  {OKX_BASE}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={handleFetch}
-              disabled={loading}
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        {/* Macro + actions */}
+        {snapshot && (
+          <section
+            style={{
+              backgroundColor: "#020617",
+              borderRadius: 12,
+              padding: 16,
+              border: "1px solid rgba(148,163,184,0.4)",
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
             >
-              {loading ? "Đang lấy dữ liệu..." : "Fetch Snapshot"}
-            </button>
-          </div>
-
-          {error && (
-            <div className="mt-3 text-xs md:text-sm text-red-400 bg-red-950/40 border border-red-500/40 rounded-xl px-3 py-2 whitespace-pre-wrap">
-              <span className="font-semibold">Lỗi:</span> {error}
-            </div>
-          )}
-        </div>
-
-        {/* Kết quả */}
-        <div className="bg-slate-900/70 border border-slate-700/60 rounded-2xl p-4 md:p-5 shadow-xl shadow-black/30">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
-            <h2 className="text-sm md:text-base font-semibold">
-              Kết quả JSON (schema v2 + Binance + OKX)
-            </h2>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCopy}
-                disabled={!snapshot}
-                className="text-xs md:text-sm px-3 py-1 rounded-lg border border-slate-600 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
               >
-                {copied ? "✅ Đã copy" : "Copy JSON"}
-              </button>
-              <button
-                onClick={handleCopyMacro}
-                disabled={!snapshot}
-                className="text-xs md:text-sm px-3 py-1 rounded-lg border border-indigo-400/70 bg-indigo-600/80 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {macroCopied ? "✅ Đã copy Macro" : "Copy Macro"}
-              </button>
-              <button
-                onClick={handleDownload}
-                disabled={!snapshot}
-                className="text-xs md:text-sm px-3 py-1 rounded-lg border border-emerald-500/60 bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                ⬇️ Download JSON
-              </button>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  >
+                    File name
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#9ca3af",
+                      marginTop: 2,
+                    }}
+                  >
+                    {fileName || "(chưa có)"}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleCopyJSON}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {copiedJson ? "Đã copy" : "Copy JSON"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadJSON}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Download JSON
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    marginBottom: 4,
+                  }}
+                >
+                  Macro dùng cho Price Analyzer
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  <input
+                    type="text"
+                    readOnly
+                    value={dashMacro}
+                    style={{
+                      flexGrow: 1,
+                      minWidth: 0,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#f9fafb",
+                      fontSize: 13,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyMacro}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {copiedMacro ? "Đã copy" : "Copy macro"}
+                  </button>
+
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#6b7280",
+                    marginTop: 4,
+                  }}
+                >
+                  Dán macro này trực tiếp vào ChatGPT:{" "}
+                  <code>[DASH] FILE={fileName || "your_snapshot.json"}</code>
+                </div>
+              </div>
             </div>
-          </div>
+          </section>
+        )}
 
-          {snapshot && (
-            <div className="mt-2 text-[11px] md:text-xs text-slate-300 bg-slate-950/60 border border-slate-700 rounded-xl px-3 py-2">
-              <div className="font-semibold mb-1">
-                Macro để gửi cho ChatGPT:
-              </div>
-              <div className="font-mono break-all text-[11px] md:text-xs">
-                {`[DASH] FILE=${buildSnapshotFilename(snapshot) || "bybit_snapshot.json"}`}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-1">
-                Bấm &quot;Copy Macro&quot; để copy chuỗi này và dán vào ChatGPT
-                cùng với file JSON.
-              </div>
+        {/* JSON viewer */}
+        {snapshot && (
+          <section
+            style={{
+              backgroundColor: "#020617",
+              borderRadius: 12,
+              padding: 16,
+              border: "1px solid rgba(31,41,55,0.9)",
+              marginBottom: 32,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                marginBottom: 8,
+              }}
+            >
+              Snapshot JSON (version 3)
             </div>
-          )}
-
-          {!snapshot && !error && !loading && (
-            <p className="text-xs md:text-sm text-slate-500">
-              Chưa có dữ liệu. Chọn coin từ top 100 market cap spot hoặc nhập
-              thủ công, sau đó bấm{" "}
-              <span className="font-semibold">Fetch Snapshot</span>.
-            </p>
-          )}
-
-          <pre className="mt-2 max-h-[480px] overflow-auto text-[11px] md:text-xs bg-slate-950/80 rounded-xl p-3 border border-slate-800 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-            {snapshot ? JSON.stringify(snapshot, null, 2) : "// no data"}
-          </pre>
-        </div>
+            <div
+              style={{
+                borderRadius: 8,
+                backgroundColor: "#020617",
+                border: "1px solid #4b5563",
+                maxHeight: "480px",
+                overflow: "auto",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
+                fontSize: 12,
+                padding: 10,
+                lineHeight: 1.5,
+              }}
+            >
+              <pre
+                style={{
+                  margin: 0,
+                  whiteSpace: "pre",
+                }}
+              >
+                {JSON.stringify(snapshot, null, 2)}
+              </pre>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
 }
+
+export default BybitSnapshotV3Page;
