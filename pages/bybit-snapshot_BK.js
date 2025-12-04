@@ -15,7 +15,6 @@ function BybitSnapshotV3Page() {
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedMacro, setCopiedMacro] = useState(false);
 
-
   const handleGenerate = useCallback(async () => {
     setError("");
     setSnapshot(null);
@@ -431,7 +430,6 @@ function BybitSnapshotV3Page() {
                   >
                     {copiedMacro ? "Đã copy" : "Copy macro"}
                   </button>
-
                 </div>
                 <div
                   style={{

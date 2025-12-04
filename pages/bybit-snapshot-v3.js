@@ -12,6 +12,8 @@ function BybitSnapshotV3Page() {
   const [snapshot, setSnapshot] = useState(null);
   const [fileName, setFileName] = useState("");
   const [dashMacro, setDashMacro] = useState("");
+  const [copiedJson, setCopiedJson] = useState(false);
+  const [copiedMacro, setCopiedMacro] = useState(false);
 
   const handleGenerate = useCallback(async () => {
     setError("");
@@ -63,10 +65,19 @@ function BybitSnapshotV3Page() {
   const handleCopyJSON = useCallback(() => {
     if (!snapshot) return;
     const text = JSON.stringify(snapshot, null, 2);
+
+    const markCopied = () => {
+      setCopiedJson(true);
+      setTimeout(() => setCopiedJson(false), 1500);
+    };
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).catch((err) => {
-        console.error("Copy JSON failed:", err);
-      });
+      navigator.clipboard
+        .writeText(text)
+        .then(markCopied)
+        .catch((err) => {
+          console.error("Copy JSON failed:", err);
+        });
     } else {
       // Fallback
       const textarea = document.createElement("textarea");
@@ -75,15 +86,25 @@ function BybitSnapshotV3Page() {
       textarea.select();
       document.execCommand("copy");
       document.body.removeChild(textarea);
+      markCopied();
     }
   }, [snapshot]);
 
   const handleCopyMacro = useCallback(() => {
     if (!dashMacro) return;
+
+    const markCopied = () => {
+      setCopiedMacro(true);
+      setTimeout(() => setCopiedMacro(false), 1500);
+    };
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(dashMacro).catch((err) => {
-        console.error("Copy macro failed:", err);
-      });
+      navigator.clipboard
+        .writeText(dashMacro)
+        .then(markCopied)
+        .catch((err) => {
+          console.error("Copy macro failed:", err);
+        });
     } else {
       const textarea = document.createElement("textarea");
       textarea.value = dashMacro;
@@ -91,6 +112,7 @@ function BybitSnapshotV3Page() {
       textarea.select();
       document.execCommand("copy");
       document.body.removeChild(textarea);
+      markCopied();
     }
   }, [dashMacro]);
 
@@ -339,7 +361,7 @@ function BybitSnapshotV3Page() {
                       cursor: "pointer",
                     }}
                   >
-                    Copy JSON
+                    {copiedJson ? "Đã copy" : "Copy JSON"}
                   </button>
                   <button
                     type="button"
@@ -406,7 +428,7 @@ function BybitSnapshotV3Page() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    Copy macro
+                    {copiedMacro ? "Đã copy" : "Copy macro"}
                   </button>
                 </div>
                 <div
