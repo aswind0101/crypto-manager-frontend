@@ -4,10 +4,10 @@ import { AsYouType, parsePhoneNumberFromString } from "libphonenumber-js";
 import { Phone, Mail, User, CalendarDays, MapPin, MessageCircle, Briefcase } from "lucide-react";
 import { FaLeaf } from "react-icons/fa";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
-//import { getAuth, signOut, getApps } from "firebase/auth";
+import { getAuth, signOut, getApps } from "firebase/auth";
 
-import { getAuth, signOut } from "firebase/auth";
-import { getApps } from "firebase/app";
+//import { getAuth, signOut } from "firebase/auth";
+//import { getApps } from "firebase/app";
 
 export default function FreelancerRegister() {
   const router = useRouter();
