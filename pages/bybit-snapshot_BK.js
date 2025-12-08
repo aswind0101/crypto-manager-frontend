@@ -15,6 +15,12 @@ function BybitSnapshotV3Page() {
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedMacro, setCopiedMacro] = useState(false);
 
+  // NEW: state cho command section
+  const [copiedCommandId, setCopiedCommandId] = useState("");
+  const [positionSide, setPositionSide] = useState("LONG");
+  const [entryPrice, setEntryPrice] = useState("");
+  const [stopPrice, setStopPrice] = useState("");
+
   const handleGenerate = useCallback(async () => {
     setError("");
     setSnapshot(null);
@@ -130,6 +136,39 @@ function BybitSnapshotV3Page() {
     URL.revokeObjectURL(url);
   }, [snapshot, fileName]);
 
+  // NEW: copy helper cho các command
+  const handleCopyCommand = useCallback(
+    (id, rawText) => {
+      if (!rawText) return;
+
+      const prefix = dashMacro ? `${dashMacro}\n` : "";
+      const finalText = `${prefix}${rawText}`;
+
+      const markCopied = () => {
+        setCopiedCommandId(id);
+        setTimeout(() => setCopiedCommandId(""), 1500);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard
+          .writeText(finalText)
+          .then(markCopied)
+          .catch((err) => {
+            console.error("Copy command failed:", err);
+          });
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = finalText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        markCopied();
+      }
+    },
+    [dashMacro]
+  );
+
   const versionLabel =
     snapshot && snapshot.version ? `v${snapshot.version}` : "chưa có";
 
@@ -137,6 +176,60 @@ function BybitSnapshotV3Page() {
     snapshot && snapshot.generated_at
       ? new Date(snapshot.generated_at).toLocaleString()
       : "";
+
+  // NEW: danh sách command tĩnh (không cần param)
+  const staticCommands = [
+    {
+      id: "cmd-full-dashboard",
+      label: "XUẤT FULL DASHBOARD",
+      text: "XUẤT FULL DASHBOARD",
+    },
+    {
+      id: "cmd-quick-setup-1",
+      label: "CHECK NHANH SETUP 1",
+      text: "CHECK NHANH SETUP 1",
+    },
+    {
+      id: "cmd-quick-setup-2",
+      label: "CHECK NHANH SETUP 2",
+      text: "CHECK NHANH SETUP 2",
+    },
+    {
+      id: "cmd-quick-setup-3",
+      label: "CHECK NHANH SETUP 3",
+      text: "CHECK NHANH SETUP 3",
+    },
+    {
+      id: "cmd-trend-1-4h",
+      label: "XU HƯỚNG 1–4H TỚI",
+      text: "XU HƯỚNG 1–4H TỚI (H1/H4) DỰA TRÊN SNAPSHOT TRÊN.",
+    },
+    {
+      id: "cmd-trend-overview",
+      label: "XU HƯỚNG CHUNG",
+      text: "TÓM TẮT XU HƯỚNG NGẮN/TRUNG/DÀI HẠN + KỊCH BẢN CHÍNH.",
+    },
+    {
+      id: "cmd-quick-risk",
+      label: "RISK & SQUEEZE",
+      text: "CHECK NHANH RỦI RO SQUEEZE, TRAP, VOLATILITY & CẢNH BÁO CHÍNH.",
+    },
+    {
+      id: "cmd-trade-zones",
+      label: "TRADE ZONE TERMINAL",
+      text: "XUẤT ĐẦY ĐỦ PHẦN TRADE ZONE TERMINAL VỚI TẤT CẢ SETUP.",
+    },
+    {
+      id: "cmd-position-mgmt",
+      label: "QUẢN LÝ LỆNH",
+      text: "TƯ VẤN QUẢN LÝ LỆNH HIỆN TẠI DỰA TRÊN SNAPSHOT.",
+    },
+  ];
+
+  const dynamicPositionCommand =
+    entryPrice && stopPrice
+      ? `ĐANG ${positionSide.toUpperCase()} @ ${entryPrice}, STOPLOSS @ ${stopPrice}. PHÂN TÍCH LẠI RỦI RO & KỊCH BẢN CHÍNH.`
+      : `ĐANG LONG/SHORT @ <entry>, STOPLOSS @ <SL>. PHÂN TÍCH LẠI RỦI RO & KỊCH BẢN CHÍNH.`;
 
   return (
     <div
@@ -438,8 +531,274 @@ function BybitSnapshotV3Page() {
                     marginTop: 4,
                   }}
                 >
-                  Dán macro này trực tiếp vào ChatGPT:{" "}
-                  <code>[DASH] FILE={fileName || "your_snapshot.json"}</code>
+                  Khi copy command bên dưới, dòng macro{" "}
+                  <code>[DASH] FILE=...</code> sẽ được tự động thêm ở đầu nội
+                  dung (nếu đã có snapshot).
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* NEW: Command shortcuts cho Dashboard / Position */}
+        {snapshot && (
+          <section
+            style={{
+              backgroundColor: "#020617",
+              borderRadius: 12,
+              padding: 16,
+              border: "1px solid rgba(148,163,184,0.4)",
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                  }}
+                >
+                  Command nhanh cho Dashboard
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#6b7280",
+                  }}
+                >
+                  Chọn command để copy, dán thẳng vào ChatGPT. Hệ thống sẽ tự
+                  động kèm theo macro <code>[DASH] FILE={fileName}</code> ở
+                  phía trên.
+                </div>
+              </div>
+
+              {/* Command list */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {staticCommands.map((cmd) => (
+                  <div
+                    key={cmd.id}
+                    style={{
+                      borderRadius: 10,
+                      border: "1px solid #4b5563",
+                      padding: 10,
+                      background:
+                        "radial-gradient(circle at top left, rgba(59,130,246,0.15), transparent)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {cmd.label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#9ca3af",
+                        minHeight: 32,
+                      }}
+                    >
+                      {cmd.text}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCommand(cmd.id, cmd.text)}
+                      style={{
+                        marginTop: 2,
+                        alignSelf: "flex-start",
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        border: "1px solid #4b5563",
+                        backgroundColor: "#020617",
+                        color: "#e5e7eb",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedCommandId === cmd.id ? "Đã copy" : "Copy command"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Dynamic position command */}
+              <div
+                style={{
+                  marginTop: 12,
+                  borderRadius: 10,
+                  border: "1px solid #4b5563",
+                  padding: 12,
+                  background:
+                    "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(56,189,248,0.05))",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                  }}
+                >
+                  Command cho lệnh đang giữ (ĐANG LONG/SHORT @ ..., STOPLOSS @
+                  ...)
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: 12,
+                      color: "#9ca3af",
+                    }}
+                  >
+                    Side:
+                  </label>
+                  <select
+                    value={positionSide}
+                    onChange={(e) => setPositionSide(e.target.value)}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 12,
+                    }}
+                  >
+                    <option value="LONG">LONG</option>
+                    <option value="SHORT">SHORT</option>
+                  </select>
+
+                  <label
+                    style={{
+                      fontSize: 12,
+                      color: "#9ca3af",
+                      marginLeft: 4,
+                    }}
+                  >
+                    Entry @
+                  </label>
+                  <input
+                    type="text"
+                    value={entryPrice}
+                    onChange={(e) => setEntryPrice(e.target.value)}
+                    placeholder="Ví dụ: 90000"
+                    style={{
+                      width: 90,
+                      padding: "4px 6px",
+                      borderRadius: 8,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 12,
+                    }}
+                  />
+
+                  <label
+                    style={{
+                      fontSize: 12,
+                      color: "#9ca3af",
+                      marginLeft: 4,
+                    }}
+                  >
+                    SL @
+                  </label>
+                  <input
+                    type="text"
+                    value={stopPrice}
+                    onChange={(e) => setStopPrice(e.target.value)}
+                    placeholder="Ví dụ: 88000"
+                    style={{
+                      width: 90,
+                      padding: "4px 6px",
+                      borderRadius: 8,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 12,
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#9ca3af",
+                    marginTop: 4,
+                  }}
+                >
+                  Xem trước:
+                </div>
+                <div
+                  style={{
+                    fontFamily:
+                      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
+                    fontSize: 12,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(148,163,184,0.6)",
+                    backgroundColor: "#020617",
+                  }}
+                >
+                  {dynamicPositionCommand}
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCopyCommand(
+                        "cmd-position-dynamic",
+                        dynamicPositionCommand
+                      )
+                    }
+                    style={{
+                      marginTop: 6,
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {copiedCommandId === "cmd-position-dynamic"
+                      ? "Đã copy"
+                      : "Copy command (kèm macro)"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -473,7 +832,8 @@ function BybitSnapshotV3Page() {
                 border: "1px solid #4b5563",
                 maxHeight: "480px",
                 overflow: "auto",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
+                fontFamily:
+                  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
                 fontSize: 12,
                 padding: 10,
                 lineHeight: 1.5,
