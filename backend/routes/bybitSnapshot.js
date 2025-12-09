@@ -7,12 +7,12 @@ const router = express.Router();
 // Có thể đổi sang process.env.BYBIT_BASE nếu muốn cấu hình linh hoạt
 const BYBIT_BASE = "https://api.bybit.com";
 
-// Chuẩn hóa input (BTC, BTCUSDT, ETHUSDT...) về base asset (BTC, ETH, SOL...)
+// Chuẩn hóa input (BTC, BTCUSDT, ETHUSDT...) về base asset (BTC, ETH, LINK...)
 function normalizeToBaseAsset(value = "BTC") {
     const raw = value.toString().toUpperCase().trim();
     if (!raw) return "BTC";
 
-    // Một số hậu tố phổ biến: USDT, USDC, BUSD, USD, PERP
+    // Một số hậu tố phổ biến trên perp
     const suffixes = ["USDT", "USDC", "BUSD", "USD", "PERP"];
 
     for (const suf of suffixes) {
@@ -21,7 +21,7 @@ function normalizeToBaseAsset(value = "BTC") {
         }
     }
 
-    // Nếu không khớp hậu tố nào -> coi như đã là asset (BTC, ETH...)
+    // Nếu không khớp hậu tố nào -> coi như đã là asset (BTC, ETH, LINK...)
     return raw;
 }
 
@@ -189,8 +189,12 @@ function normalizeToMs(value) {
     return null;
 }
 
-// Gọi Dune bằng flow execute -> get result, có hỗ trợ query params ({{asset}})
-async function getFromDune(queryId, params = {}) {
+// Gọi Dune bằng flow execute -> poll kết quả, có hỗ trợ query params ({{asset}})
+async function getFromDune(
+    queryId,
+    params = {},
+    options = {}
+) {
     if (!DUNE_API_KEY) {
         console.warn("[Dune] DUNE_API_KEY is not set – onchain will be empty.");
         return [];
@@ -200,13 +204,16 @@ async function getFromDune(queryId, params = {}) {
         return [];
     }
 
+    // Có thể custom theo từng loại query
+    const maxAttempts = options.maxAttempts ?? 30;   // mặc định: poll tối đa 30 lần
+    const delayMs = options.delayMs ?? 2000;         // mỗi lần cách nhau 2s  -> ~60s
+
     try {
         // 1) Execute query với query_parameters
         const execUrl = new URL(`query/${queryId}/execute`, DUNE_BASE);
 
         const execBody = {
             query_parameters: params, // ví dụ: { asset: "LINK" }
-            // có thể thêm performance: "medium" | "large" nếu muốn
         };
 
         const execRes = await axios.post(execUrl.toString(), execBody, {
@@ -228,9 +235,6 @@ async function getFromDune(queryId, params = {}) {
         }
 
         // 2) Poll kết quả qua /execution/{execution_id}/results
-        const maxAttempts = 10;
-        const delayMs = 1000;
-
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const resultUrl = new URL(
                 `execution/${executionId}/results`,
@@ -288,12 +292,13 @@ async function getFromDune(queryId, params = {}) {
 async function fetchExchangeNetflowDailyFromDune(asset = "BTC") {
     if (!DUNE_QUERY_ID_EXCHANGE_NETFLOW_BTC) return [];
 
-    // Không cắt USDT nữa – dùng đúng string client gửi lên (BTC, ETH, LINK, LINKUSDT…)
-    const assetParam = asset.toString().toUpperCase().trim();
+    const base = normalizeToBaseAsset(asset);        // LINKUSDT -> LINK
 
-    const rows = await getFromDune(DUNE_QUERY_ID_EXCHANGE_NETFLOW_BTC, {
-        asset: assetParam,
-    });
+    const rows = await getFromDune(
+        DUNE_QUERY_ID_EXCHANGE_NETFLOW_BTC,
+        { asset: base.toUpperCase() },              // {{asset}} = 'LINK'
+        { maxAttempts: 20, delayMs: 1500 }          // netflow thường nhẹ hơn
+    );
 
     return (rows || [])
         .map((r) => {
@@ -301,7 +306,7 @@ async function fetchExchangeNetflowDailyFromDune(asset = "BTC") {
             if (!t) return null;
 
             const sym =
-                (r.asset || r.token_symbol || assetParam).toString().toUpperCase();
+                (r.asset || r.token_symbol || base).toString().toUpperCase();
 
             return {
                 asset: sym,
@@ -315,16 +320,19 @@ async function fetchExchangeNetflowDailyFromDune(asset = "BTC") {
         .filter(Boolean);
 }
 
+
 // Whale flows cho 1 asset từ query cex_whale_exchange_flows_by_asset
 // PARAM trên Dune: {{asset}} (text)
 async function fetchWhaleExchangeFlowsFromDune(asset = "BTC") {
     if (!DUNE_QUERY_ID_WHALE_FLOWS_BTC) return [];
 
-    const assetParam = asset.toString().toUpperCase().trim();
+    const base = normalizeToBaseAsset(asset);
 
-    const rows = await getFromDune(DUNE_QUERY_ID_WHALE_FLOWS_BTC, {
-        asset: assetParam,
-    });
+    const rows = await getFromDune(
+        DUNE_QUERY_ID_WHALE_FLOWS_BTC,
+        { asset: base.toUpperCase() },
+        { maxAttempts: 40, delayMs: 2000 }          // cho whale nhiều thời gian hơn
+    );
 
     return (rows || [])
         .map((r) => {
@@ -333,7 +341,7 @@ async function fetchWhaleExchangeFlowsFromDune(asset = "BTC") {
             if (!t || !Number.isFinite(amount) || amount <= 0) return null;
 
             const sym =
-                (r.asset || r.token_symbol || assetParam).toString().toUpperCase();
+                (r.asset || r.token_symbol || base).toString().toUpperCase();
 
             let direction = (r.direction || "").toLowerCase();
             if (!direction) {
@@ -350,7 +358,7 @@ async function fetchWhaleExchangeFlowsFromDune(asset = "BTC") {
             return {
                 asset: sym,
                 t,
-                direction, // "deposit" | "withdraw" | "net"
+                direction,
                 exchange:
                     r.exchange || r.to_exchange || r.from_exchange || "all",
                 amount,
@@ -362,6 +370,7 @@ async function fetchWhaleExchangeFlowsFromDune(asset = "BTC") {
         })
         .filter(Boolean);
 }
+
 
 // Tóm tắt whale flow theo 24h / 3d / 7d
 function buildWhaleSummary(whaleRows = []) {
