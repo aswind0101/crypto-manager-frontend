@@ -418,12 +418,39 @@ function BybitSnapshotV3Page() {
       text: "XUẤT ĐẦY ĐỦ PHẦN TRADE ZONE TERMINAL VỚI TẤT CẢ SETUP.",
     },
 
+    // LTF Timing – M5/M15
+    {
+      id: "cmd-ltf-overview",
+      label: "LTF Timing – Tổng quan M5/M15",
+      text:
+        "LTF TIMING OVERVIEW\n" +
+        "Dùng snapshot LTF (M5/M15) phía trên để tóm tắt xu hướng, cấu trúc giá và vùng quan trọng " +
+        "phục vụ timing vào lệnh (không cần phân tích lại HTF).",
+    },
+    {
+      id: "cmd-ltf-entry-filter",
+      label: "LTF Timing – Lọc điểm vào lệnh",
+      text:
+        "LTF ENTRY FILTER\n" +
+        "Dùng snapshot LTF (M5/M15) để lọc điểm vào lệnh tốt nhất theo HTF context hiện tại. " +
+        "Chỉ rõ vùng giá ưu tiên, kiểu vào lệnh (limit/market) và điều kiện xác nhận nến.",
+    },
+    {
+      id: "cmd-ltf-position-mgmt",
+      label: "LTF Timing – Quản lý lệnh đang giữ",
+      text:
+        "LTF POSITION MANAGEMENT\n" +
+        "Dùng snapshot LTF (M5/M15) để cập nhật kịch bản, đề xuất dời SL, chốt non, chốt phần, " +
+        "và vùng invalidation cho lệnh đang giữ.",
+    },
+
     // Position Management
     {
       id: "cmd-position",
       label: "Quản lý lệnh hiện tại",
       text: "CHECK POSITION\nTư vấn quản lý lệnh hiện tại dựa trên snapshot.",
     },
+
   ];
 
   // ===== Macro Event Risk Module – Command Set =====
