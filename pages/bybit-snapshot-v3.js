@@ -382,6 +382,108 @@ function BybitSnapshotV3Page() {
     },
   ];
 
+  // ===== Macro Event Risk Module – Command Set =====
+  const eventCommands = [
+    {
+      id: "cmd-event-risk-on",
+      label: "Bật EVENT RISK MODULE",
+      text: "EVENT RISK = ON\nKích hoạt Macro Event Risk Module cho snapshot trên.",
+    },
+    {
+      id: "cmd-event-risk-off",
+      label: "Tắt EVENT RISK MODULE",
+      text: "EVENT RISK = OFF\nKhông chạy phân tích rủi ro sự kiện vĩ mô.",
+    },
+
+    // ----- Event Types -----
+    {
+      id: "cmd-event-fed",
+      label: "Sự kiện: FED / FOMC",
+      text: "EVENT_TYPE = FED\nPhân tích rủi ro liên quan đến FED/FOMC.",
+    },
+    {
+      id: "cmd-event-cpi",
+      label: "Sự kiện: CPI",
+      text: "EVENT_TYPE = CPI\nPhân tích rủi ro liên quan đến báo cáo CPI.",
+    },
+    {
+      id: "cmd-event-nfp",
+      label: "Sự kiện: NFP",
+      text: "EVENT_TYPE = NFP\nPhân tích rủi ro liên quan đến Non-Farm Payroll.",
+    },
+    {
+      id: "cmd-event-etf",
+      label: "Sự kiện: ETF",
+      text: "EVENT_TYPE = ETF\nPhân tích rủi ro liên quan đến ETF approval/reject.",
+    },
+
+    // ----- Event Importance -----
+    {
+      id: "cmd-event-low",
+      label: "Mức độ ảnh hưởng: LOW",
+      text: "EVENT_IMPORTANCE = LOW\nSự kiện ảnh hưởng thấp.",
+    },
+    {
+      id: "cmd-event-medium",
+      label: "Mức độ ảnh hưởng: MEDIUM",
+      text: "EVENT_IMPORTANCE = MEDIUM\nSự kiện có ảnh hưởng trung bình.",
+    },
+    {
+      id: "cmd-event-high",
+      label: "Mức độ ảnh hưởng: HIGH",
+      text: "EVENT_IMPORTANCE = HIGH\nSự kiện ảnh hưởng mạnh, dễ gây biến động cao.",
+    },
+
+    // ----- Event Timing -----
+    {
+      id: "cmd-event-pre",
+      label: "Thời điểm: PRE-EVENT",
+      text: "EVENT_TIMING = PRE_EVENT\nĐang ở giai đoạn trước khi tin được công bố.",
+    },
+    {
+      id: "cmd-event-window",
+      label: "Thời điểm: EVENT WINDOW",
+      text: "EVENT_TIMING = EVENT_WINDOW\nĐang trong thời điểm tin được công bố (khoảng biến động mạnh).",
+    },
+    {
+      id: "cmd-event-post",
+      label: "Thời điểm: POST-EVENT",
+      text: "EVENT_TIMING = POST_EVENT\nSau khi tin đã ra, đang phân tích hướng đi thật.",
+    },
+
+    // ----- Event Risk Summary -----
+    {
+      id: "cmd-event-summary",
+      label: "Kiểm tra EVENT RISK",
+      text: "EVENT RISK CHECK\nTóm tắt squeeze risk, trap risk, volatility và các cảnh báo chính dựa trên sự kiện vĩ mô.",
+    },
+
+    // ----- Combined Commands (tiện dụng) -----
+    {
+      id: "cmd-fed-full",
+      label: "Phân tích FED đầy đủ",
+      text:
+        "EVENT RISK = ON\n" +
+        "EVENT_TYPE = FED\n" +
+        "EVENT_IMPORTANCE = HIGH\n" +
+        "EVENT_TIMING = PRE_EVENT\n" +
+        "EVENT RISK CHECK\n" +
+        "Kết hợp snapshot và rủi ro FED để đánh giá squeeze, trap, volatility.",
+    },
+    {
+      id: "cmd-cpi-full",
+      label: "Phân tích CPI đầy đủ",
+      text:
+        "EVENT RISK = ON\n" +
+        "EVENT_TYPE = CPI\n" +
+        "EVENT_IMPORTANCE = HIGH\n" +
+        "EVENT_TIMING = PRE_EVENT\n" +
+        "EVENT RISK CHECK",
+    },
+  ];
+  // Gộp lệnh Event Risk vào danh sách command chung
+  staticCommands.push(...eventCommands);
+
   // Filter command theo ô search (tiếng Việt hoặc keyword)
   const filteredCommands = staticCommands.filter((cmd) => {
     if (!commandSearch.trim()) return true;
