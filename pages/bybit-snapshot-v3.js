@@ -21,6 +21,9 @@ function BybitSnapshotV3Page() {
   const [entryPrice, setEntryPrice] = useState("");
   const [stopPrice, setStopPrice] = useState("");
 
+  const [commandSearch, setCommandSearch] = useState("");
+
+
   // ===== Button style helpers (đồng bộ giao diện) =====
   const primaryButtonStyle = (extra = {}) => ({
     padding: "8px 14px",
@@ -213,57 +216,181 @@ function BybitSnapshotV3Page() {
 
   // NEW: danh sách command tĩnh (không cần param)
   // FULL MACRO COMMAND SET – Price Analyzer v3.2-FULL
+  // BỘ LỆNH TIẾNG VIỆT – TƯƠNG THÍCH Price Analyzer v3.2
   const staticCommands = [
-    // DASH Macros
-    { id: "cmd-dash", label: "Dashboard COMPACT", text: "[DASH]" },
-    { id: "cmd-dash-full", label: "Dashboard FULL", text: "[DASH_FULL]" },
-    { id: "cmd-dash-setup", label: "Setup Engine Only", text: "[DASH_SETUP]" },
-    { id: "cmd-dash-context", label: "Market Context Only", text: "[DASH_CONTEXT]" },
+    // Nhóm DASHBOARD
+    {
+      id: "cmd-dash-compact",
+      label: "Chạy DASHBOARD (COMPACT)",
+      text: "Chạy DASHBOARD 6 phần ở chế độ COMPACT cho snapshot trên.",
+    },
+    {
+      id: "cmd-dash-full",
+      label: "Chạy DASHBOARD FULL",
+      text: "MODE = FULL\nXUẤT FULL DASHBOARD 6 phần với toàn bộ chi tiết.",
+    },
+    {
+      id: "cmd-dash-setup-only",
+      label: "Chỉ phân tích SETUP",
+      text: "Chỉ phân tích SETUP ENGINE (Setup 1–3) cho snapshot trên, không cần các phần khác.",
+    },
+    {
+      id: "cmd-dash-context-only",
+      label: "Chỉ bối cảnh thị trường",
+      text: "Chỉ phân tích MARKET MODE + TREND RADAR cho snapshot trên, không cần Setup.",
+    },
 
-    // MODE Macros
-    { id: "cmd-mode-compact", label: "MODE = COMPACT", text: "MODE = COMPACT" },
-    { id: "cmd-mode-full", label: "MODE = FULL", text: "MODE = FULL" },
-    { id: "cmd-mode-auto", label: "MODE = AUTO", text: "MODE = AUTO" },
-    { id: "cmd-mode-hybrid", label: "MODE = HYBRID", text: "MODE = HYBRID" },
-    { id: "cmd-mode-snapshot", label: "MODE = SNAPSHOT_ONLY", text: "MODE = SNAPSHOT_ONLY" },
+    // Nhóm MODE
+    {
+      id: "cmd-mode-compact",
+      label: "Đặt MODE = COMPACT",
+      text: "MODE = COMPACT",
+    },
+    {
+      id: "cmd-mode-full",
+      label: "Đặt MODE = FULL",
+      text: "MODE = FULL",
+    },
+    {
+      id: "cmd-mode-auto",
+      label: "Đặt MODE = AUTO",
+      text: "MODE = AUTO",
+    },
+    {
+      id: "cmd-mode-hybrid",
+      label: "Bật HYBRID MODE",
+      text: "MODE = HYBRID\nBật Hybrid Mode để dùng thêm External Context.",
+    },
+    {
+      id: "cmd-mode-snapshot-only",
+      label: "Chỉ dùng SNAPSHOT",
+      text: "MODE = SNAPSHOT_ONLY\nPhân tích chỉ dựa trên snapshot, không dùng external.",
+    },
 
-    // Setup checks
-    { id: "cmd-check-setup-1", label: "CHECK SETUP 1", text: "CHECK SETUP 1" },
-    { id: "cmd-check-setup-2", label: "CHECK SETUP 2", text: "CHECK SETUP 2" },
-    { id: "cmd-check-setup-3", label: "CHECK SETUP 3", text: "CHECK SETUP 3" },
+    // Nhóm CHECK SETUP
+    {
+      id: "cmd-check-setup-1",
+      label: "Kiểm tra SETUP 1",
+      text: "CHECK SETUP 1\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 1.",
+    },
+    {
+      id: "cmd-check-setup-2",
+      label: "Kiểm tra SETUP 2",
+      text: "CHECK SETUP 2\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 2.",
+    },
+    {
+      id: "cmd-check-setup-3",
+      label: "Kiểm tra SETUP 3",
+      text: "CHECK SETUP 3\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 3.",
+    },
 
-    // Ready filter / trap
-    { id: "cmd-check-ready-1", label: "CHECK READY FILTER 1", text: "CHECK READY FILTER 1" },
-    { id: "cmd-check-ready-2", label: "CHECK READY FILTER 2", text: "CHECK READY FILTER 2" },
-    { id: "cmd-check-ready-3", label: "CHECK READY FILTER 3", text: "CHECK READY FILTER 3" },
+    // Ready Filter & Trap
+    {
+      id: "cmd-check-ready-1",
+      label: "Ready Filter – Setup 1",
+      text: "CHECK READY FILTER 1\nGiải thích vì sao Setup 1 được/không được coi là READY.",
+    },
+    {
+      id: "cmd-check-ready-2",
+      label: "Ready Filter – Setup 2",
+      text: "CHECK READY FILTER 2\nGiải thích vì sao Setup 2 được/không được coi là READY.",
+    },
+    {
+      id: "cmd-check-ready-3",
+      label: "Ready Filter – Setup 3",
+      text: "CHECK READY FILTER 3\nGiải thích vì sao Setup 3 được/không được coi là READY.",
+    },
+    {
+      id: "cmd-check-trap-1",
+      label: "Momentum Trap – Setup 1",
+      text: "CHECK TRAP 1\nKiểm tra xem Setup 1 có dấu hiệu MOMENTUM TRAP hay không.",
+    },
+    {
+      id: "cmd-check-trap-2",
+      label: "Momentum Trap – Setup 2",
+      text: "CHECK TRAP 2\nKiểm tra xem Setup 2 có dấu hiệu MOMENTUM TRAP hay không.",
+    },
+    {
+      id: "cmd-check-trap-3",
+      label: "Momentum Trap – Setup 3",
+      text: "CHECK TRAP 3\nKiểm tra xem Setup 3 có dấu hiệu MOMENTUM TRAP hay không.",
+    },
 
-    { id: "cmd-check-trap-1", label: "CHECK TRAP 1", text: "CHECK TRAP 1" },
-    { id: "cmd-check-trap-2", label: "CHECK TRAP 2", text: "CHECK TRAP 2" },
-    { id: "cmd-check-trap-3", label: "CHECK TRAP 3", text: "CHECK TRAP 3" },
-
-    // Market Mode / Trend
-    { id: "cmd-market-mode", label: "CHECK MARKET MODE", text: "CHECK MARKET MODE" },
-    { id: "cmd-trend-radar", label: "CHECK TREND RADAR", text: "CHECK TREND RADAR" },
+    // Market Mode / Trend Radar
+    {
+      id: "cmd-market-mode",
+      label: "Kiểm tra MARKET MODE",
+      text: "CHECK MARKET MODE\nTóm tắt Market Mode theo snapshot trên.",
+    },
+    {
+      id: "cmd-trend-radar",
+      label: "Kiểm tra TREND RADAR",
+      text: "CHECK TREND RADAR\nTóm tắt xu hướng ngắn hạn / trung hạn / dài hạn.",
+    },
 
     // Risk & Summary
-    { id: "cmd-summary", label: "ACTION SUMMARY", text: "SUMMARY" },
-    { id: "cmd-risk-check", label: "RISK CHECK", text: "RISK CHECK" },
-    { id: "cmd-external-conflict", label: "CHECK EXTERNAL CONFLICT", text: "CHECK EXTERNAL CONFLICT" },
+    {
+      id: "cmd-summary",
+      label: "Chỉ xem ACTION SUMMARY",
+      text: "SUMMARY\nChỉ xuất phần Action Summary quan trọng nhất.",
+    },
+    {
+      id: "cmd-risk-check",
+      label: "Kiểm tra nhanh RISK",
+      text: "RISK CHECK\nKiểm tra nhanh rủi ro squeeze, trap, volatility và cảnh báo chính.",
+    },
+    {
+      id: "cmd-external-conflict",
+      label: "Xung đột với External",
+      text: "CHECK EXTERNAL CONFLICT\nKiểm tra xem snapshot trên có xung đột với dữ liệu external hay không.",
+    },
 
     // Indicator queries
-    { id: "cmd-check-atr", label: "CHECK ATR", text: "CHECK ATR" },
-    { id: "cmd-check-ema", label: "CHECK EMA", text: "CHECK EMA" },
-    { id: "cmd-check-rsi", label: "CHECK RSI", text: "CHECK RSI" },
+    {
+      id: "cmd-check-atr",
+      label: "Xem ATR",
+      text: "CHECK ATR\nTóm tắt ATR các timeframe chính và cách dùng cho SL.",
+    },
+    {
+      id: "cmd-check-ema",
+      label: "Xem EMA",
+      text: "CHECK EMA\nTóm tắt cấu trúc EMA (20/50/100/200) H1/H4/D1.",
+    },
+    {
+      id: "cmd-check-rsi",
+      label: "Xem RSI",
+      text: "CHECK RSI\nTóm tắt RSI các timeframe và bias chính.",
+    },
 
-    // Trend queries
-    { id: "cmd-timeline-setup-1", label: "TIMELINE SETUP 1", text: "TIMELINE SETUP 1" },
+    // Timeline & Trade Zone
+    {
+      id: "cmd-timeline-setup-1",
+      label: "Timeline Setup 1",
+      text: "TIMELINE SETUP 1\nTóm tắt diễn biến Setup 1 theo thời gian (nếu có lịch sử).",
+    },
+    {
+      id: "cmd-trade-zone",
+      label: "Chỉ TRADE ZONE TERMINAL",
+      text: "XUẤT ĐẦY ĐỦ PHẦN TRADE ZONE TERMINAL VỚI TẤT CẢ SETUP.",
+    },
 
-    // Trade Zone Terminal
-    { id: "cmd-trade-zone", label: "TRADE ZONE TERMINAL", text: "TRADE ZONE TERMINAL" },
-
-    // Position management
-    { id: "cmd-position", label: "QUẢN LÝ LỆNH", text: "CHECK POSITION" },
+    // Position Management
+    {
+      id: "cmd-position",
+      label: "Quản lý lệnh hiện tại",
+      text: "CHECK POSITION\nTư vấn quản lý lệnh hiện tại dựa trên snapshot.",
+    },
   ];
+
+  // Filter command theo ô search (tiếng Việt hoặc keyword)
+  const filteredCommands = staticCommands.filter((cmd) => {
+    if (!commandSearch.trim()) return true;
+    const q = commandSearch.toLowerCase();
+    return (
+      cmd.label.toLowerCase().includes(q) ||
+      cmd.text.toLowerCase().includes(q)
+    );
+  });
 
 
   const dynamicPositionCommand =
@@ -591,16 +718,50 @@ function BybitSnapshotV3Page() {
                   </div>
                 </div>
 
+                {/* Ô search lệnh */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={commandSearch}
+                    onChange={(e) => setCommandSearch(e.target.value)}
+                    placeholder="Tìm lệnh theo tên hoặc nội dung (ví dụ: setup, risk, mode...)"
+                    style={{
+                      flexGrow: 1,
+                      minWidth: 0,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #4b5563",
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 12,
+                    }}
+                  />
+                  {commandSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setCommandSearch("")}
+                      style={tinySecondaryButtonStyle()}
+                    >
+                      Xoá search
+                    </button>
+                  )}
+                </div>
+
                 {/* Command list */}
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(220px, 1fr))",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                     gap: 10,
                   }}
                 >
-                  {staticCommands.map((cmd) => (
+                  {filteredCommands.map((cmd) => (
                     <div
                       key={cmd.id}
                       style={{
@@ -627,6 +788,7 @@ function BybitSnapshotV3Page() {
                           fontSize: 12,
                           color: "#9ca3af",
                           minHeight: 32,
+                          whiteSpace: "pre-line",
                         }}
                       >
                         {cmd.text}
@@ -639,9 +801,7 @@ function BybitSnapshotV3Page() {
                           marginTop: 2,
                         })}
                       >
-                        {copiedCommandId === cmd.id
-                          ? "✓ Đã copy"
-                          : "Copy command"}
+                        {copiedCommandId === cmd.id ? "✓ Đã copy" : "Copy lệnh"}
                       </button>
                     </div>
                   ))}
