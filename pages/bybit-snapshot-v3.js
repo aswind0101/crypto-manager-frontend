@@ -1,9 +1,8 @@
 // pages/bybit-snapshot-v3.js
 // Next.js pages router – React client page sử dụng buildSnapshotV3
 // Output: JSON snapshot version 3 với UI chuyên nghiệp, có copy/download + macro [DASH] FILE=...
-
 import React, { useState, useCallback } from "react";
-import { buildSnapshotV3 } from "../lib/snapshot-v3";
+import { buildSnapshotV3, buildLtfSnapshotV3 } from "../lib/snapshot-v3";
 
 function BybitSnapshotV3Page() {
   const [symbolsText, setSymbolsText] = useState("BTCUSDT");
@@ -104,6 +103,51 @@ function BybitSnapshotV3Page() {
       setLoading(false);
     }
   }, [symbolsText]);
+
+  const handleGenerateLtf = useCallback(async () => {
+    setError("");
+    setSnapshot(null);
+    setFileName("");
+    setDashMacro("");
+
+    const raw = symbolsText || "";
+    const symbols = raw
+      .split(/[,\s]+/)
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+
+    if (!symbols.length) {
+      setError("Vui lòng nhập ít nhất 1 symbol, ví dụ: BTCUSDT.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const result = await buildLtfSnapshotV3(symbols);
+
+      if (!result || typeof result !== "object") {
+        throw new Error("LTF snapshot trả về không hợp lệ.");
+      }
+
+      const ts = result.generated_at || Date.now();
+      const firstSymbol =
+        symbols[0] || "SYMBOL";
+
+      const name = `bybit_ltf_snapshot_${ts}_${firstSymbol}.json`;
+      const macro = `[DASH] FILE=${name}`;
+
+      setSnapshot(result);
+      setFileName(name);
+      setDashMacro(macro);
+    } catch (e) {
+      console.error("buildLtfSnapshotV3 error:", e);
+      setError(e?.message || "Có lỗi xảy ra khi tạo LTF snapshot.");
+    } finally {
+      setLoading(false);
+    }
+  }, [symbolsText]);
+
 
   const handleCopyJSON = useCallback(() => {
     if (!snapshot) return;
@@ -610,6 +654,14 @@ function BybitSnapshotV3Page() {
                   style={primaryButtonStyle()}
                 >
                   {loading ? "Đang tạo snapshot v3..." : "Generate Snapshot v3"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateLtf}
+                  disabled={loading}
+                  style={secondaryButtonStyle({ marginLeft: 8 })}
+                >
+                  {loading ? "Đang tạo LTF..." : "Generate LTF Snapshot (M5/M15)"}
                 </button>
 
                 {snapshot && (
