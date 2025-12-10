@@ -212,53 +212,59 @@ function BybitSnapshotV3Page() {
       : "";
 
   // NEW: danh sách command tĩnh (không cần param)
+  // FULL MACRO COMMAND SET – Price Analyzer v3.2-FULL
   const staticCommands = [
-    {
-      id: "cmd-full-dashboard",
-      label: "XUẤT FULL DASHBOARD",
-      text: "XUẤT FULL DASHBOARD",
-    },
-    {
-      id: "cmd-quick-setup-1",
-      label: "CHECK NHANH SETUP 1",
-      text: "CHECK NHANH SETUP 1",
-    },
-    {
-      id: "cmd-quick-setup-2",
-      label: "CHECK NHANH SETUP 2",
-      text: "CHECK NHANH SETUP 2",
-    },
-    {
-      id: "cmd-quick-setup-3",
-      label: "CHECK NHANH SETUP 3",
-      text: "CHECK NHANH SETUP 3",
-    },
-    {
-      id: "cmd-trend-1-4h",
-      label: "XU HƯỚNG 1–4H TỚI",
-      text: "XU HƯỚNG 1–4H TỚI (H1/H4) DỰA TRÊN SNAPSHOT TRÊN.",
-    },
-    {
-      id: "cmd-trend-overview",
-      label: "XU HƯỚNG CHUNG",
-      text: "TÓM TẮT XU HƯỚNG NGẮN/TRUNG/DÀI HẠN + KỊCH BẢN CHÍNH.",
-    },
-    {
-      id: "cmd-quick-risk",
-      label: "RISK & SQUEEZE",
-      text: "CHECK NHANH RỦI RO SQUEEZE, TRAP, VOLATILITY & CẢNH BÁO CHÍNH.",
-    },
-    {
-      id: "cmd-trade-zones",
-      label: "TRADE ZONE TERMINAL",
-      text: "XUẤT ĐẦY ĐỦ PHẦN TRADE ZONE TERMINAL VỚI TẤT CẢ SETUP.",
-    },
-    {
-      id: "cmd-position-mgmt",
-      label: "QUẢN LÝ LỆNH",
-      text: "TƯ VẤN QUẢN LÝ LỆNH HIỆN TẠI DỰA TRÊN SNAPSHOT.",
-    },
+    // DASH Macros
+    { id: "cmd-dash", label: "Dashboard COMPACT", text: "[DASH]" },
+    { id: "cmd-dash-full", label: "Dashboard FULL", text: "[DASH_FULL]" },
+    { id: "cmd-dash-setup", label: "Setup Engine Only", text: "[DASH_SETUP]" },
+    { id: "cmd-dash-context", label: "Market Context Only", text: "[DASH_CONTEXT]" },
+
+    // MODE Macros
+    { id: "cmd-mode-compact", label: "MODE = COMPACT", text: "MODE = COMPACT" },
+    { id: "cmd-mode-full", label: "MODE = FULL", text: "MODE = FULL" },
+    { id: "cmd-mode-auto", label: "MODE = AUTO", text: "MODE = AUTO" },
+    { id: "cmd-mode-hybrid", label: "MODE = HYBRID", text: "MODE = HYBRID" },
+    { id: "cmd-mode-snapshot", label: "MODE = SNAPSHOT_ONLY", text: "MODE = SNAPSHOT_ONLY" },
+
+    // Setup checks
+    { id: "cmd-check-setup-1", label: "CHECK SETUP 1", text: "CHECK SETUP 1" },
+    { id: "cmd-check-setup-2", label: "CHECK SETUP 2", text: "CHECK SETUP 2" },
+    { id: "cmd-check-setup-3", label: "CHECK SETUP 3", text: "CHECK SETUP 3" },
+
+    // Ready filter / trap
+    { id: "cmd-check-ready-1", label: "CHECK READY FILTER 1", text: "CHECK READY FILTER 1" },
+    { id: "cmd-check-ready-2", label: "CHECK READY FILTER 2", text: "CHECK READY FILTER 2" },
+    { id: "cmd-check-ready-3", label: "CHECK READY FILTER 3", text: "CHECK READY FILTER 3" },
+
+    { id: "cmd-check-trap-1", label: "CHECK TRAP 1", text: "CHECK TRAP 1" },
+    { id: "cmd-check-trap-2", label: "CHECK TRAP 2", text: "CHECK TRAP 2" },
+    { id: "cmd-check-trap-3", label: "CHECK TRAP 3", text: "CHECK TRAP 3" },
+
+    // Market Mode / Trend
+    { id: "cmd-market-mode", label: "CHECK MARKET MODE", text: "CHECK MARKET MODE" },
+    { id: "cmd-trend-radar", label: "CHECK TREND RADAR", text: "CHECK TREND RADAR" },
+
+    // Risk & Summary
+    { id: "cmd-summary", label: "ACTION SUMMARY", text: "SUMMARY" },
+    { id: "cmd-risk-check", label: "RISK CHECK", text: "RISK CHECK" },
+    { id: "cmd-external-conflict", label: "CHECK EXTERNAL CONFLICT", text: "CHECK EXTERNAL CONFLICT" },
+
+    // Indicator queries
+    { id: "cmd-check-atr", label: "CHECK ATR", text: "CHECK ATR" },
+    { id: "cmd-check-ema", label: "CHECK EMA", text: "CHECK EMA" },
+    { id: "cmd-check-rsi", label: "CHECK RSI", text: "CHECK RSI" },
+
+    // Trend queries
+    { id: "cmd-timeline-setup-1", label: "TIMELINE SETUP 1", text: "TIMELINE SETUP 1" },
+
+    // Trade Zone Terminal
+    { id: "cmd-trade-zone", label: "TRADE ZONE TERMINAL", text: "TRADE ZONE TERMINAL" },
+
+    // Position management
+    { id: "cmd-position", label: "QUẢN LÝ LỆNH", text: "CHECK POSITION" },
   ];
+
 
   const dynamicPositionCommand =
     entryPrice && stopPrice
