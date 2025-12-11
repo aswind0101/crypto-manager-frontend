@@ -333,6 +333,16 @@ function BybitSnapshotV3Page() {
     snapshot && snapshot.generated_at
       ? new Date(snapshot.generated_at).toLocaleString()
       : "";
+  const searchResults = useMemo(() => {
+    const q = commandSearch.trim().toLowerCase();
+    if (!q) return [];
+    return allCommands.filter((cmd) => {
+      return (
+        cmd.label.toLowerCase().includes(q) ||
+        cmd.text.toLowerCase().includes(q)
+      );
+    });
+  }, [commandSearch, allCommands]);
 
   const dynamicPositionCommand =
     entryPrice && stopPrice
@@ -378,6 +388,22 @@ function BybitSnapshotV3Page() {
       fontSize: 12,
       ...extra,
     });
+  const ltfButtonStyle = (extra = {}) => ({
+    padding: "9px 16px",
+    borderRadius: 999,
+    border: "none",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: loading ? "default" : "pointer",
+    // Gold gradient nổi bật trên nền dark + phù hợp với blue/purple
+    background: "linear-gradient(135deg, #facc15, #eab308, #ca8a04)",
+    color: "#1c1917",
+    opacity: loading ? 0.8 : 1,
+    boxShadow: "0 8px 20px rgba(250, 204, 21, 0.45)",
+    minWidth: 210,
+    textAlign: "center",
+    ...extra,
+  });
 
   const showCopyToast = (msg = "Đã copy vào clipboard") => {
     setCopyFeedback(msg);
@@ -797,14 +823,13 @@ function BybitSnapshotV3Page() {
                     type="button"
                     onClick={handleGenerateLtf}
                     disabled={loading}
-                    style={secondaryButtonStyle({
-                      minWidth: 210,
-                    })}
+                    style={ltfButtonStyle()}
                   >
                     {loading
                       ? "Đang tạo LTF..."
                       : "Generate LTF Snapshot (M5/M15)"}
                   </button>
+
                 </div>
 
                 {snapshot && (
@@ -1130,51 +1155,40 @@ function BybitSnapshotV3Page() {
                 </div>
 
                 {/* Accordion nhóm command */}
-                {commandGroups.map((group) => {
-                  const visibleItems = group.items.filter((cmd) => {
-                    if (!commandSearch.trim()) return true;
-                    const q = commandSearch.toLowerCase();
-                    return (
-                      cmd.label.toLowerCase().includes(q) ||
-                      cmd.text.toLowerCase().includes(q)
-                    );
-                  });
-
-                  if (!visibleItems.length) return null;
-
-                  return (
-                    <details
-                      key={group.id}
+                {/* Nếu có search → hiển thị danh sách kết quả phẳng */}
+                {commandSearch.trim() && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div
                       style={{
-                        backgroundColor: "#020617",
-                        borderRadius: 12,
-                        padding: 12,
-                        border: "1px solid #334155",
+                        fontSize: 13,
+                        color: "#9ca3af",
                       }}
                     >
-                      <summary
+                      Kết quả tìm kiếm:{" "}
+                      <strong>{searchResults.length}</strong> command
+                    </div>
+
+                    {searchResults.length === 0 && (
+                      <div
                         style={{
-                          cursor: "pointer",
-                          fontSize: 14,
-                          fontWeight: 600,
-                          userSelect: "none",
-                          listStyle: "none",
-                          outline: "none",
+                          fontSize: 12,
+                          color: "#6b7280",
                         }}
                       >
-                        {group.label}
-                      </summary>
+                        Không tìm thấy command phù hợp với từ khóa hiện tại.
+                      </div>
+                    )}
 
+                    {searchResults.length > 0 && (
                       <div
                         style={{
                           display: "grid",
                           gridTemplateColumns:
                             "repeat(auto-fit, minmax(240px, 1fr))",
                           gap: 10,
-                          marginTop: 8,
                         }}
                       >
-                        {visibleItems.map((cmd) => (
+                        {searchResults.map((cmd) => (
                           <div
                             key={cmd.id}
                             style={{
@@ -1238,10 +1252,115 @@ function BybitSnapshotV3Page() {
                           </div>
                         ))}
                       </div>
-                    </details>
-                  );
-                })}
+                    )}
+                  </div>
+                )}
 
+                {/* Nếu không search → hiển thị theo group (accordion) như cũ */}
+                {!commandSearch.trim() &&
+                  commandGroups.map((group) => {
+                    const visibleItems = group.items;
+                    if (!visibleItems.length) return null;
+
+                    return (
+                      <details
+                        key={group.id}
+                        style={{
+                          backgroundColor: "#020617",
+                          borderRadius: 12,
+                          padding: 12,
+                          border: "1px solid #334155",
+                        }}
+                      >
+                        <summary
+                          style={{
+                            cursor: "pointer",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            userSelect: "none",
+                            listStyle: "none",
+                            outline: "none",
+                          }}
+                        >
+                          {group.label}
+                        </summary>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(240px, 1fr))",
+                            gap: 10,
+                            marginTop: 8,
+                          }}
+                        >
+                          {visibleItems.map((cmd) => (
+                            <div
+                              key={cmd.id}
+                              style={{
+                                borderRadius: 10,
+                                border: "1px solid #4b5563",
+                                padding: 10,
+                                background:
+                                  "radial-gradient(circle at top left, rgba(59,130,246,0.10), transparent)",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 6,
+                                position: "relative",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {cmd.label}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: "#9ca3af",
+                                  minHeight: 40,
+                                  maxHeight: 80,
+                                  overflow: "hidden",
+                                  whiteSpace: "pre-line",
+                                  position: "relative",
+                                }}
+                              >
+                                {cmd.text}
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    height: 16,
+                                    background:
+                                      "linear-gradient(transparent, #020617)",
+                                  }}
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopyCommand(cmd.id, cmd.text)
+                                }
+                                style={tinySecondaryButtonStyle({
+                                  alignSelf: "flex-start",
+                                  marginTop: 2,
+                                })}
+                              >
+                                {copiedCommandId === cmd.id
+                                  ? "✓ Đã copy"
+                                  : "Copy"}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  })}
                 {/* Dynamic position command */}
                 <div
                   style={{
