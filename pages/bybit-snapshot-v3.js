@@ -376,14 +376,17 @@ function BybitSnapshotV3Page() {
   const secondaryButtonStyle = (extra = {}) => ({
     padding: "7px 13px",
     borderRadius: 999,
-    border: "1px solid #475569",
-    backgroundColor: "#020617",
-    color: "#e5e7eb",
+    // BLUE ACCENT STYLE
+    border: "1px solid #3b82f6",      // viền xanh dương nổi bật
+    backgroundColor: "#0f172a",       // nền xanh đậm (midnight blue)
+    color: "#dbeafe",                 // text xanh nhạt, dễ đọc
     fontSize: 13,
     cursor: "pointer",
-    transition: "background-color 0.15s ease, border-color 0.15s ease",
+    transition:
+      "background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease",
     ...extra,
   });
+
 
   const tinySecondaryButtonStyle = (extra = {}) =>
     secondaryButtonStyle({
