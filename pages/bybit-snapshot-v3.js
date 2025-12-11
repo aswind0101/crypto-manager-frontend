@@ -376,14 +376,26 @@ function BybitSnapshotV3Page() {
   const secondaryButtonStyle = (extra = {}) => ({
     padding: "7px 13px",
     borderRadius: 999,
-    // BLUE ACCENT STYLE
-    border: "1px solid #3b82f6",      // viền xanh dương nổi bật
-    backgroundColor: "#0f172a",       // nền xanh đậm (midnight blue)
-    color: "#dbeafe",                 // text xanh nhạt, dễ đọc
+    border: "none",
+
+    // === GREEN SNAPSHOT v3 STYLE (giống primaryButtonStyle đã đổi) ===
+    background: "linear-gradient(135deg, #34d399, #10b981, #059669)",
+    color: "#052e16",
+    boxShadow: "0 8px 20px rgba(16,185,129,0.45)",
+    opacity: 0.95,
+
     fontSize: 13,
+    fontWeight: 600,
     cursor: "pointer",
     transition:
-      "background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease",
+      "opacity 0.15s ease, transform 0.1s ease",
+
+    // Hover + active effect nhẹ (không phá UI)
+    ...(!extra.noHover && {
+      ':hover': { opacity: 1 },
+      ':active': { transform: "scale(0.97)" }
+    }),
+
     ...extra,
   });
 
