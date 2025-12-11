@@ -831,6 +831,7 @@ function BybitSnapshotV3Page() {
                 >
                   <button
                     type="button"
+                    className="primary-btn"
                     onClick={handleGenerate}
                     disabled={loading}
                     style={primaryButtonStyle()}
@@ -839,6 +840,7 @@ function BybitSnapshotV3Page() {
                   </button>
                   <button
                     type="button"
+                    className="ltf-btn"
                     onClick={handleGenerateLtf}
                     disabled={loading}
                     style={ltfButtonStyle()}
@@ -1665,15 +1667,24 @@ function BybitSnapshotV3Page() {
 
       {/* Global spinner animation */}
       <style jsx global>{`
-        @keyframes snapshot-spin {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
+  @keyframes snapshot-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* OPTION A — MOBILE BUTTON FIX */
+  @media (max-width: 480px) {
+    .primary-btn,
+    .ltf-btn {
+      width: 100% !important;
+      min-width: unset !important;
+      justify-content: center !important;
+      text-align: center !important;
+      display: flex !important;
+    }
+  }
+`}</style>
+
     </>
   );
 }
