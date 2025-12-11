@@ -571,6 +571,19 @@ function BybitSnapshotV3Page() {
   const commandGroups = useMemo(
     () => [
       {
+        id: "grp-mode",
+        label: "0. MODE (COMPACT / FULL / HYBRID)",
+        items: allCommands.filter((c) =>
+          [
+            "cmd-mode-compact",
+            "cmd-mode-full",
+            "cmd-mode-auto",
+            "cmd-mode-hybrid",
+            "cmd-mode-snapshot-only",
+          ].includes(c.id)
+        ),
+      },
+      {
         id: "grp-htf",
         label: "1. HTF Dashboard & Market Context",
         items: allCommands.filter((c) =>
@@ -654,6 +667,7 @@ function BybitSnapshotV3Page() {
     ],
     [allCommands]
   );
+
 
   // =========
   // RENDER UI
@@ -993,6 +1007,17 @@ function BybitSnapshotV3Page() {
                           "Chạy DASHBOARD 6 phần ở chế độ COMPACT cho snapshot trên.",
                       },
                       {
+                        label: "MODE = HYBRID",
+                        cmd:
+                          "MODE = HYBRID\nBật Hybrid Mode để dùng thêm External Context.",
+                      },
+                      {
+                        label: "FULL + HYBRID",
+                        cmd:
+                          "MODE = FULL + HYBRID\n" +
+                          "XUẤT FULL DASHBOARD 6 phần với toàn bộ chi tiết và thêm PHẦN 5.7 – External Market Context.",
+                      },
+                      {
                         label: "Setup Only",
                         cmd:
                           "Chỉ phân tích SETUP ENGINE (Setup 1–3) cho snapshot trên, không cần các phần khác.",
@@ -1007,6 +1032,7 @@ function BybitSnapshotV3Page() {
                         cmd: "EVENT RISK CHECK",
                       },
                     ].map((q) => (
+
                       <button
                         key={q.label}
                         type="button"
