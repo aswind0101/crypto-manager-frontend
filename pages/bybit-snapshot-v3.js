@@ -1,8 +1,307 @@
 // pages/bybit-snapshot-v3.js
-// Next.js pages router – React client page sử dụng buildSnapshotV3
-// Output: JSON snapshot version 3 với UI chuyên nghiệp, có copy/download + macro [DASH] FILE=...
-import React, { useState, useCallback } from "react";
+// Bybit Snapshot v3 – UI v2.0
+// Next.js pages router – React client page sử dụng buildSnapshotV3 & buildLtfSnapshotV3
+
+import React, { useState, useCallback, useMemo } from "react";
 import { buildSnapshotV3, buildLtfSnapshotV3 } from "../lib/snapshot-v3";
+
+// ==========================
+// STATIC COMMAND DEFINITIONS
+// ==========================
+
+// Base commands (không bao gồm Event Risk)
+const BASE_COMMANDS = [
+  // ===== Nhóm DASHBOARD =====
+  {
+    id: "cmd-dash-compact",
+    label: "Chạy DASHBOARD (COMPACT)",
+    text: "Chạy DASHBOARD 6 phần ở chế độ COMPACT cho snapshot trên.",
+  },
+  {
+    id: "cmd-dash-full",
+    label: "Chạy DASHBOARD FULL",
+    text: "MODE = FULL\nXUẤT FULL DASHBOARD 6 phần với toàn bộ chi tiết.",
+  },
+  {
+    id: "cmd-dash-setup-only",
+    label: "Chỉ phân tích SETUP",
+    text: "Chỉ phân tích SETUP ENGINE (Setup 1–3) cho snapshot trên, không cần các phần khác.",
+  },
+  {
+    id: "cmd-dash-context-only",
+    label: "Chỉ bối cảnh thị trường",
+    text: "Chỉ phân tích MARKET MODE + TREND RADAR cho snapshot trên, không cần Setup.",
+  },
+
+  // ===== Nhóm MODE =====
+  {
+    id: "cmd-mode-compact",
+    label: "Đặt MODE = COMPACT",
+    text: "MODE = COMPACT",
+  },
+  {
+    id: "cmd-mode-full",
+    label: "Đặt MODE = FULL",
+    text: "MODE = FULL",
+  },
+  {
+    id: "cmd-mode-auto",
+    label: "Đặt MODE = AUTO",
+    text: "MODE = AUTO",
+  },
+  {
+    id: "cmd-mode-hybrid",
+    label: "Bật HYBRID MODE",
+    text: "MODE = HYBRID\nBật Hybrid Mode để dùng thêm External Context.",
+  },
+  {
+    id: "cmd-mode-snapshot-only",
+    label: "Chỉ dùng SNAPSHOT",
+    text: "MODE = SNAPSHOT_ONLY\nPhân tích chỉ dựa trên snapshot, không dùng external.",
+  },
+
+  // ===== CHECK SETUP =====
+  {
+    id: "cmd-check-setup-1",
+    label: "Kiểm tra SETUP 1",
+    text: "CHECK SETUP 1\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 1.",
+  },
+  {
+    id: "cmd-check-setup-2",
+    label: "Kiểm tra SETUP 2",
+    text: "CHECK SETUP 2\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 2.",
+  },
+  {
+    id: "cmd-check-setup-3",
+    label: "Kiểm tra SETUP 3",
+    text: "CHECK SETUP 3\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 3.",
+  },
+
+  // Ready Filter & Trap
+  {
+    id: "cmd-check-ready-1",
+    label: "Ready Filter – Setup 1",
+    text: "CHECK READY FILTER 1\nGiải thích vì sao Setup 1 được/không được coi là READY.",
+  },
+  {
+    id: "cmd-check-ready-2",
+    label: "Ready Filter – Setup 2",
+    text: "CHECK READY FILTER 2\nGiải thích vì sao Setup 2 được/không được coi là READY.",
+  },
+  {
+    id: "cmd-check-ready-3",
+    label: "Ready Filter – Setup 3",
+    text: "CHECK READY FILTER 3\nGiải thích vì sao Setup 3 được/không được coi là READY.",
+  },
+  {
+    id: "cmd-check-trap-1",
+    label: "Momentum Trap – Setup 1",
+    text: "CHECK TRAP 1\nKiểm tra xem Setup 1 có dấu hiệu MOMENTUM TRAP hay không.",
+  },
+  {
+    id: "cmd-check-trap-2",
+    label: "Momentum Trap – Setup 2",
+    text: "CHECK TRAP 2\nKiểm tra xem Setup 2 có dấu hiệu MOMENTUM TRAP hay không.",
+  },
+  {
+    id: "cmd-check-trap-3",
+    label: "Momentum Trap – Setup 3",
+    text: "CHECK TRAP 3\nKiểm tra xem Setup 3 có dấu hiệu MOMENTUM TRAP hay không.",
+  },
+
+  // Market Mode / Trend Radar
+  {
+    id: "cmd-market-mode",
+    label: "Kiểm tra MARKET MODE",
+    text: "CHECK MARKET MODE\nTóm tắt Market Mode theo snapshot trên.",
+  },
+  {
+    id: "cmd-trend-radar",
+    label: "Kiểm tra TREND RADAR",
+    text: "CHECK TREND RADAR\nTóm tắt xu hướng ngắn hạn / trung hạn / dài hạn.",
+  },
+
+  // Risk & Summary
+  {
+    id: "cmd-summary",
+    label: "Chỉ xem ACTION SUMMARY",
+    text: "SUMMARY\nChỉ xuất phần Action Summary quan trọng nhất.",
+  },
+  {
+    id: "cmd-risk-check",
+    label: "Kiểm tra nhanh RISK",
+    text: "RISK CHECK\nKiểm tra nhanh rủi ro squeeze, trap, volatility và cảnh báo chính.",
+  },
+  {
+    id: "cmd-external-conflict",
+    label: "Xung đột với External",
+    text: "CHECK EXTERNAL CONFLICT\nKiểm tra xem snapshot trên có xung đột với dữ liệu external hay không.",
+  },
+
+  // Indicator queries
+  {
+    id: "cmd-check-atr",
+    label: "Xem ATR",
+    text: "CHECK ATR\nTóm tắt ATR các timeframe chính và cách dùng cho SL.",
+  },
+  {
+    id: "cmd-check-ema",
+    label: "Xem EMA",
+    text: "CHECK EMA\nTóm tắt cấu trúc EMA (20/50/100/200) H1/H4/D1.",
+  },
+  {
+    id: "cmd-check-rsi",
+    label: "Xem RSI",
+    text: "CHECK RSI\nTóm tắt RSI các timeframe và bias chính.",
+  },
+
+  // Timeline & Trade Zone
+  {
+    id: "cmd-timeline-setup-1",
+    label: "Timeline Setup 1",
+    text: "TIMELINE SETUP 1\nTóm tắt diễn biến Setup 1 theo thời gian (nếu có lịch sử).",
+  },
+  {
+    id: "cmd-trade-zone",
+    label: "Chỉ TRADE ZONE TERMINAL",
+    text: "XUẤT ĐẦY ĐỦ PHẦN TRADE ZONE TERMINAL VỚI TẤT CẢ SETUP.",
+  },
+
+  // LTF Timing – M5/M15
+  {
+    id: "cmd-ltf-overview",
+    label: "LTF Timing – Tổng quan M5/M15",
+    text:
+      "LTF TIMING OVERVIEW\n" +
+      "Dùng snapshot LTF (M5/M15) phía trên để tóm tắt xu hướng, cấu trúc giá và vùng quan trọng " +
+      "phục vụ timing vào lệnh (không cần phân tích lại HTF).",
+  },
+  {
+    id: "cmd-ltf-entry-filter",
+    label: "LTF Timing – Lọc điểm vào lệnh",
+    text:
+      "LTF ENTRY FILTER\n" +
+      "Dùng snapshot LTF (M5/M15) để lọc điểm vào lệnh tốt nhất theo HTF context hiện tại. " +
+      "Chỉ rõ vùng giá ưu tiên, kiểu vào lệnh (limit/market) và điều kiện xác nhận nến.",
+  },
+  {
+    id: "cmd-ltf-position-mgmt",
+    label: "LTF Timing – Quản lý lệnh đang giữ",
+    text:
+      "LTF POSITION MANAGEMENT\n" +
+      "Dùng snapshot LTF (M5/M15) để cập nhật kịch bản, đề xuất dời SL, chốt non, chốt phần, " +
+      "và vùng invalidation cho lệnh đang giữ.",
+  },
+
+  // Position Management
+  {
+    id: "cmd-position",
+    label: "Quản lý lệnh hiện tại",
+    text: "CHECK POSITION\nTư vấn quản lý lệnh hiện tại dựa trên snapshot.",
+  },
+];
+
+// Event Risk Module – Command Set
+const EVENT_COMMANDS = [
+  {
+    id: "cmd-event-risk-on",
+    label: "Bật EVENT RISK MODULE",
+    text: "EVENT RISK = ON\nKích hoạt Macro Event Risk Module cho snapshot trên.",
+  },
+  {
+    id: "cmd-event-risk-off",
+    label: "Tắt EVENT RISK MODULE",
+    text: "EVENT RISK = OFF\nKhông chạy phân tích rủi ro sự kiện vĩ mô.",
+  },
+
+  // Event Types
+  {
+    id: "cmd-event-fed",
+    label: "Sự kiện: FED / FOMC",
+    text: "EVENT_TYPE = FED\nPhân tích rủi ro liên quan đến FED/FOMC.",
+  },
+  {
+    id: "cmd-event-cpi",
+    label: "Sự kiện: CPI",
+    text: "EVENT_TYPE = CPI\nPhân tích rủi ro liên quan đến báo cáo CPI.",
+  },
+  {
+    id: "cmd-event-nfp",
+    label: "Sự kiện: NFP",
+    text: "EVENT_TYPE = NFP\nPhân tích rủi ro liên quan đến Non-Farm Payroll.",
+  },
+  {
+    id: "cmd-event-etf",
+    label: "Sự kiện: ETF",
+    text: "EVENT_TYPE = ETF\nPhân tích rủi ro liên quan đến ETF approval/reject.",
+  },
+
+  // Event Importance
+  {
+    id: "cmd-event-low",
+    label: "Mức độ ảnh hưởng: LOW",
+    text: "EVENT_IMPORTANCE = LOW\nSự kiện ảnh hưởng thấp.",
+  },
+  {
+    id: "cmd-event-medium",
+    label: "Mức độ ảnh hưởng: MEDIUM",
+    text: "EVENT_IMPORTANCE = MEDIUM\nSự kiện có ảnh hưởng trung bình.",
+  },
+  {
+    id: "cmd-event-high",
+    label: "Mức độ ảnh hưởng: HIGH",
+    text: "EVENT_IMPORTANCE = HIGH\nSự kiện ảnh hưởng mạnh, dễ gây biến động cao.",
+  },
+
+  // Event Timing
+  {
+    id: "cmd-event-pre",
+    label: "Thời điểm: PRE-EVENT",
+    text: "EVENT_TIMING = PRE_EVENT\nĐang ở giai đoạn trước khi tin được công bố.",
+  },
+  {
+    id: "cmd-event-window",
+    label: "Thời điểm: EVENT WINDOW",
+    text: "EVENT_TIMING = EVENT_WINDOW\nĐang trong thời điểm tin được công bố (khoảng biến động mạnh).",
+  },
+  {
+    id: "cmd-event-post",
+    label: "Thời điểm: POST-EVENT",
+    text: "EVENT_TIMING = POST_EVENT\nSau khi tin đã ra, đang phân tích hướng đi thật.",
+  },
+
+  // Event Risk Summary
+  {
+    id: "cmd-event-summary",
+    label: "Kiểm tra EVENT RISK",
+    text:
+      "EVENT RISK CHECK\n" +
+      "Tóm tắt squeeze risk, trap risk, volatility và các cảnh báo chính dựa trên sự kiện vĩ mô.",
+  },
+
+  // Combined Commands
+  {
+    id: "cmd-fed-full",
+    label: "Phân tích FED đầy đủ",
+    text:
+      "EVENT RISK = ON\n" +
+      "EVENT_TYPE = FED\n" +
+      "EVENT_IMPORTANCE = HIGH\n" +
+      "EVENT_TIMING = PRE_EVENT\n" +
+      "EVENT RISK CHECK\n" +
+      "Kết hợp snapshot và rủi ro FED để đánh giá squeeze, trap, volatility.",
+  },
+  {
+    id: "cmd-cpi-full",
+    label: "Phân tích CPI đầy đủ",
+    text:
+      "EVENT RISK = ON\n" +
+      "EVENT_TYPE = CPI\n" +
+      "EVENT_IMPORTANCE = HIGH\n" +
+      "EVENT_TIMING = PRE_EVENT\n" +
+      "EVENT RISK CHECK",
+  },
+];
 
 function BybitSnapshotV3Page() {
   const [symbolsText, setSymbolsText] = useState("BTCUSDT");
@@ -11,50 +310,83 @@ function BybitSnapshotV3Page() {
   const [snapshot, setSnapshot] = useState(null);
   const [fileName, setFileName] = useState("");
   const [dashMacro, setDashMacro] = useState("");
+
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedMacro, setCopiedMacro] = useState(false);
-
-  // NEW: state cho command section
   const [copiedCommandId, setCopiedCommandId] = useState("");
+  const [copyFeedback, setCopyFeedback] = useState("");
+
   const [positionSide, setPositionSide] = useState("LONG");
   const [entryPrice, setEntryPrice] = useState("");
   const [stopPrice, setStopPrice] = useState("");
-
   const [commandSearch, setCommandSearch] = useState("");
 
-  // ===== Button style helpers (đồng bộ giao diện) =====
+  const allCommands = useMemo(
+    () => [...BASE_COMMANDS, ...EVENT_COMMANDS],
+    []
+  );
+
+  const versionLabel =
+    snapshot && snapshot.version ? `v${snapshot.version}` : "chưa có";
+
+  const generatedAtLabel =
+    snapshot && snapshot.generated_at
+      ? new Date(snapshot.generated_at).toLocaleString()
+      : "";
+
+  const dynamicPositionCommand =
+    entryPrice && stopPrice
+      ? `ĐANG ${positionSide.toUpperCase()} @ ${entryPrice}, STOPLOSS @ ${stopPrice}. PHÂN TÍCH LẠI RỦI RO & KỊCH BẢN CHÍNH.`
+      : `ĐANG LONG/SHORT @ <entry>, STOPLOSS @ <SL>. PHÂN TÍCH LẠI RỦI RO & KỊCH BẢN CHÍNH.`;
+
+  // =====================
+  // STYLE HELPER FUNCTIONS
+  // =====================
+
   const primaryButtonStyle = (extra = {}) => ({
-    padding: "8px 14px",
+    padding: "9px 16px",
     borderRadius: 999,
     border: "none",
     fontSize: 14,
     fontWeight: 600,
     cursor: loading ? "default" : "pointer",
-    background: "linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899)",
-    color: "#f9fafb",
-    opacity: loading ? 0.6 : 1,
+    background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+    color: "#e2e8f0",
+    opacity: loading ? 0.7 : 1,
     boxShadow:
-      "0 8px 20px rgba(59,130,246,0.35), 0 0 0 1px rgba(15,23,42,0.8) inset",
+      "0 10px 25px rgba(15,23,42,0.75), 0 0 0 1px rgba(15,23,42,1) inset",
+    minWidth: 190,
+    textAlign: "center",
     ...extra,
   });
 
   const secondaryButtonStyle = (extra = {}) => ({
-    padding: "6px 12px",
+    padding: "7px 13px",
     borderRadius: 999,
-    border: "1px solid #4b5563",
+    border: "1px solid #475569",
     backgroundColor: "#020617",
     color: "#e5e7eb",
     fontSize: 13,
     cursor: "pointer",
+    transition: "background-color 0.15s ease, border-color 0.15s ease",
     ...extra,
   });
 
   const tinySecondaryButtonStyle = (extra = {}) =>
     secondaryButtonStyle({
-      padding: "4px 10px",
+      padding: "5px 11px",
       fontSize: 12,
       ...extra,
     });
+
+  const showCopyToast = (msg = "Đã copy vào clipboard") => {
+    setCopyFeedback(msg);
+    setTimeout(() => setCopyFeedback(""), 1500);
+  };
+
+  // =============
+  // CORE HANDLERS
+  // =============
 
   const handleGenerate = useCallback(async () => {
     setError("");
@@ -82,7 +414,6 @@ function BybitSnapshotV3Page() {
         throw new Error("Snapshot trả về không hợp lệ.");
       }
 
-      // Snapshot v3: version, generated_at, per_exchange.bybit.symbols
       const ts = result.generated_at || Date.now();
       const firstSymbol =
         result?.per_exchange?.bybit?.symbols?.[0]?.symbol ||
@@ -152,18 +483,13 @@ function BybitSnapshotV3Page() {
 
     const markCopied = () => {
       setCopiedJson(true);
-      setTimeout(() => setCopiedJson(false), 1500);
+      showCopyToast("Đã copy JSON snapshot.");
+      setTimeout(() => setCopiedJson(false), 1200);
     };
 
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard
-        .writeText(text)
-        .then(markCopied)
-        .catch((err) => {
-          console.error("Copy JSON failed:", err);
-        });
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(markCopied).catch(console.error);
     } else {
-      // Fallback
       const textarea = document.createElement("textarea");
       textarea.value = text;
       document.body.appendChild(textarea);
@@ -179,16 +505,12 @@ function BybitSnapshotV3Page() {
 
     const markCopied = () => {
       setCopiedMacro(true);
-      setTimeout(() => setCopiedMacro(false), 1500);
+      showCopyToast("Đã copy macro [DASH] FILE=...");
+      setTimeout(() => setCopiedMacro(false), 1200);
     };
 
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard
-        .writeText(dashMacro)
-        .then(markCopied)
-        .catch((err) => {
-          console.error("Copy macro failed:", err);
-        });
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(dashMacro).then(markCopied).catch(console.error);
     } else {
       const textarea = document.createElement("textarea");
       textarea.value = dashMacro;
@@ -214,7 +536,6 @@ function BybitSnapshotV3Page() {
     URL.revokeObjectURL(url);
   }, [snapshot, fileName]);
 
-  // NEW: copy helper cho các command
   const handleCopyCommand = useCallback(
     (id, rawText) => {
       if (!rawText) return;
@@ -224,16 +545,12 @@ function BybitSnapshotV3Page() {
 
       const markCopied = () => {
         setCopiedCommandId(id);
-        setTimeout(() => setCopiedCommandId(""), 1500);
+        showCopyToast("Đã copy command (kèm macro nếu có).");
+        setTimeout(() => setCopiedCommandId(""), 1200);
       };
 
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard
-          .writeText(finalText)
-          .then(markCopied)
-          .catch((err) => {
-            console.error("Copy command failed:", err);
-          });
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(finalText).then(markCopied).catch(console.error);
       } else {
         const textarea = document.createElement("textarea");
         textarea.value = finalText;
@@ -247,420 +564,116 @@ function BybitSnapshotV3Page() {
     [dashMacro]
   );
 
-  const versionLabel =
-    snapshot && snapshot.version ? `v${snapshot.version}` : "chưa có";
+  // ==========================
+  // COMMAND GROUP CONFIG (UI)
+  // ==========================
 
-  const generatedAtLabel =
-    snapshot && snapshot.generated_at
-      ? new Date(snapshot.generated_at).toLocaleString()
-      : "";
+  const commandGroups = useMemo(
+    () => [
+      {
+        id: "grp-htf",
+        label: "1. HTF Dashboard & Market Context",
+        items: allCommands.filter((c) =>
+          [
+            "cmd-dash-compact",
+            "cmd-dash-full",
+            "cmd-dash-context-only",
+            "cmd-trade-zone",
+            "cmd-market-mode",
+            "cmd-trend-radar",
+            "cmd-summary",
+            "cmd-risk-check",
+          ].includes(c.id)
+        ),
+      },
+      {
+        id: "grp-setup",
+        label: "2. Setup Engine (Setup 1–3, Ready Filter, Trap)",
+        items: allCommands.filter((c) =>
+          [
+            "cmd-dash-setup-only",
+            "cmd-check-setup-1",
+            "cmd-check-setup-2",
+            "cmd-check-setup-3",
+            "cmd-check-ready-1",
+            "cmd-check-ready-2",
+            "cmd-check-ready-3",
+            "cmd-check-trap-1",
+            "cmd-check-trap-2",
+            "cmd-check-trap-3",
+          ].includes(c.id)
+        ),
+      },
+      {
+        id: "grp-entry",
+        label: "3. Timing Entry (LTF M5/M15)",
+        items: allCommands.filter((c) =>
+          [
+            "cmd-ltf-overview",
+            "cmd-ltf-entry-filter",
+            "cmd-check-ema",
+            "cmd-check-rsi",
+            "cmd-check-atr",
+          ].includes(c.id)
+        ),
+      },
+      {
+        id: "grp-position",
+        label: "4. Position Management (LTF)",
+        items: allCommands.filter((c) =>
+          [
+            "cmd-ltf-position-mgmt",
+            "cmd-position",
+            "cmd-external-conflict",
+          ].includes(c.id)
+        ),
+      },
+      {
+        id: "grp-event",
+        label: "5. Event Risk Module (FED/CPI/NFP/ETF)",
+        items: allCommands.filter((c) =>
+          [
+            "cmd-event-risk-on",
+            "cmd-event-risk-off",
+            "cmd-event-fed",
+            "cmd-event-cpi",
+            "cmd-event-nfp",
+            "cmd-event-etf",
+            "cmd-event-low",
+            "cmd-event-medium",
+            "cmd-event-high",
+            "cmd-event-pre",
+            "cmd-event-window",
+            "cmd-event-post",
+            "cmd-event-summary",
+            "cmd-fed-full",
+            "cmd-cpi-full",
+          ].includes(c.id)
+        ),
+      },
+    ],
+    [allCommands]
+  );
 
-  // NEW: danh sách command tĩnh (không cần param)
-  // FULL MACRO COMMAND SET – Price Analyzer v3.2-FULL
-  // BỘ LỆNH TIẾNG VIỆT – TƯƠNG THÍCH Price Analyzer v3.2
-  const staticCommands = [
-    // Nhóm DASHBOARD
-    {
-      id: "cmd-dash-compact",
-      label: "Chạy DASHBOARD (COMPACT)",
-      text: "Chạy DASHBOARD 6 phần ở chế độ COMPACT cho snapshot trên.",
-    },
-    {
-      id: "cmd-dash-full",
-      label: "Chạy DASHBOARD FULL",
-      text: "MODE = FULL\nXUẤT FULL DASHBOARD 6 phần với toàn bộ chi tiết.",
-    },
-    {
-      id: "cmd-dash-setup-only",
-      label: "Chỉ phân tích SETUP",
-      text: "Chỉ phân tích SETUP ENGINE (Setup 1–3) cho snapshot trên, không cần các phần khác.",
-    },
-    {
-      id: "cmd-dash-context-only",
-      label: "Chỉ bối cảnh thị trường",
-      text: "Chỉ phân tích MARKET MODE + TREND RADAR cho snapshot trên, không cần Setup.",
-    },
-
-    // Nhóm MODE
-    {
-      id: "cmd-mode-compact",
-      label: "Đặt MODE = COMPACT",
-      text: "MODE = COMPACT",
-    },
-    {
-      id: "cmd-mode-full",
-      label: "Đặt MODE = FULL",
-      text: "MODE = FULL",
-    },
-    {
-      id: "cmd-mode-auto",
-      label: "Đặt MODE = AUTO",
-      text: "MODE = AUTO",
-    },
-    {
-      id: "cmd-mode-hybrid",
-      label: "Bật HYBRID MODE",
-      text: "MODE = HYBRID\nBật Hybrid Mode để dùng thêm External Context.",
-    },
-    {
-      id: "cmd-mode-snapshot-only",
-      label: "Chỉ dùng SNAPSHOT",
-      text: "MODE = SNAPSHOT_ONLY\nPhân tích chỉ dựa trên snapshot, không dùng external.",
-    },
-
-    // Nhóm CHECK SETUP
-    {
-      id: "cmd-check-setup-1",
-      label: "Kiểm tra SETUP 1",
-      text: "CHECK SETUP 1\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 1.",
-    },
-    {
-      id: "cmd-check-setup-2",
-      label: "Kiểm tra SETUP 2",
-      text: "CHECK SETUP 2\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 2.",
-    },
-    {
-      id: "cmd-check-setup-3",
-      label: "Kiểm tra SETUP 3",
-      text: "CHECK SETUP 3\nGiải thích rõ SETUP_STATE và ENTRY_VALIDITY của Setup 3.",
-    },
-
-    // Ready Filter & Trap
-    {
-      id: "cmd-check-ready-1",
-      label: "Ready Filter – Setup 1",
-      text: "CHECK READY FILTER 1\nGiải thích vì sao Setup 1 được/không được coi là READY.",
-    },
-    {
-      id: "cmd-check-ready-2",
-      label: "Ready Filter – Setup 2",
-      text: "CHECK READY FILTER 2\nGiải thích vì sao Setup 2 được/không được coi là READY.",
-    },
-    {
-      id: "cmd-check-ready-3",
-      label: "Ready Filter – Setup 3",
-      text: "CHECK READY FILTER 3\nGiải thích vì sao Setup 3 được/không được coi là READY.",
-    },
-    {
-      id: "cmd-check-trap-1",
-      label: "Momentum Trap – Setup 1",
-      text: "CHECK TRAP 1\nKiểm tra xem Setup 1 có dấu hiệu MOMENTUM TRAP hay không.",
-    },
-    {
-      id: "cmd-check-trap-2",
-      label: "Momentum Trap – Setup 2",
-      text: "CHECK TRAP 2\nKiểm tra xem Setup 2 có dấu hiệu MOMENTUM TRAP hay không.",
-    },
-    {
-      id: "cmd-check-trap-3",
-      label: "Momentum Trap – Setup 3",
-      text: "CHECK TRAP 3\nKiểm tra xem Setup 3 có dấu hiệu MOMENTUM TRAP hay không.",
-    },
-
-    // Market Mode / Trend Radar
-    {
-      id: "cmd-market-mode",
-      label: "Kiểm tra MARKET MODE",
-      text: "CHECK MARKET MODE\nTóm tắt Market Mode theo snapshot trên.",
-    },
-    {
-      id: "cmd-trend-radar",
-      label: "Kiểm tra TREND RADAR",
-      text: "CHECK TREND RADAR\nTóm tắt xu hướng ngắn hạn / trung hạn / dài hạn.",
-    },
-
-    // Risk & Summary
-    {
-      id: "cmd-summary",
-      label: "Chỉ xem ACTION SUMMARY",
-      text: "SUMMARY\nChỉ xuất phần Action Summary quan trọng nhất.",
-    },
-    {
-      id: "cmd-risk-check",
-      label: "Kiểm tra nhanh RISK",
-      text: "RISK CHECK\nKiểm tra nhanh rủi ro squeeze, trap, volatility và cảnh báo chính.",
-    },
-    {
-      id: "cmd-external-conflict",
-      label: "Xung đột với External",
-      text: "CHECK EXTERNAL CONFLICT\nKiểm tra xem snapshot trên có xung đột với dữ liệu external hay không.",
-    },
-
-    // Indicator queries
-    {
-      id: "cmd-check-atr",
-      label: "Xem ATR",
-      text: "CHECK ATR\nTóm tắt ATR các timeframe chính và cách dùng cho SL.",
-    },
-    {
-      id: "cmd-check-ema",
-      label: "Xem EMA",
-      text: "CHECK EMA\nTóm tắt cấu trúc EMA (20/50/100/200) H1/H4/D1.",
-    },
-    {
-      id: "cmd-check-rsi",
-      label: "Xem RSI",
-      text: "CHECK RSI\nTóm tắt RSI các timeframe và bias chính.",
-    },
-
-    // Timeline & Trade Zone
-    {
-      id: "cmd-timeline-setup-1",
-      label: "Timeline Setup 1",
-      text: "TIMELINE SETUP 1\nTóm tắt diễn biến Setup 1 theo thời gian (nếu có lịch sử).",
-    },
-    {
-      id: "cmd-trade-zone",
-      label: "Chỉ TRADE ZONE TERMINAL",
-      text: "XUẤT ĐẦY ĐỦ PHẦN TRADE ZONE TERMINAL VỚI TẤT CẢ SETUP.",
-    },
-
-    // LTF Timing – M5/M15
-    {
-      id: "cmd-ltf-overview",
-      label: "LTF Timing – Tổng quan M5/M15",
-      text:
-        "LTF TIMING OVERVIEW\n" +
-        "Dùng snapshot LTF (M5/M15) phía trên để tóm tắt xu hướng, cấu trúc giá và vùng quan trọng " +
-        "phục vụ timing vào lệnh (không cần phân tích lại HTF).",
-    },
-    {
-      id: "cmd-ltf-entry-filter",
-      label: "LTF Timing – Lọc điểm vào lệnh",
-      text:
-        "LTF ENTRY FILTER\n" +
-        "Dùng snapshot LTF (M5/M15) để lọc điểm vào lệnh tốt nhất theo HTF context hiện tại. " +
-        "Chỉ rõ vùng giá ưu tiên, kiểu vào lệnh (limit/market) và điều kiện xác nhận nến.",
-    },
-    {
-      id: "cmd-ltf-position-mgmt",
-      label: "LTF Timing – Quản lý lệnh đang giữ",
-      text:
-        "LTF POSITION MANAGEMENT\n" +
-        "Dùng snapshot LTF (M5/M15) để cập nhật kịch bản, đề xuất dời SL, chốt non, chốt phần, " +
-        "và vùng invalidation cho lệnh đang giữ.",
-    },
-
-    // Position Management
-    {
-      id: "cmd-position",
-      label: "Quản lý lệnh hiện tại",
-      text: "CHECK POSITION\nTư vấn quản lý lệnh hiện tại dựa trên snapshot.",
-    },
-  ];
-
-  // ===== Macro Event Risk Module – Command Set =====
-  const eventCommands = [
-    {
-      id: "cmd-event-risk-on",
-      label: "Bật EVENT RISK MODULE",
-      text: "EVENT RISK = ON\nKích hoạt Macro Event Risk Module cho snapshot trên.",
-    },
-    {
-      id: "cmd-event-risk-off",
-      label: "Tắt EVENT RISK MODULE",
-      text: "EVENT RISK = OFF\nKhông chạy phân tích rủi ro sự kiện vĩ mô.",
-    },
-
-    // ----- Event Types -----
-    {
-      id: "cmd-event-fed",
-      label: "Sự kiện: FED / FOMC",
-      text: "EVENT_TYPE = FED\nPhân tích rủi ro liên quan đến FED/FOMC.",
-    },
-    {
-      id: "cmd-event-cpi",
-      label: "Sự kiện: CPI",
-      text: "EVENT_TYPE = CPI\nPhân tích rủi ro liên quan đến báo cáo CPI.",
-    },
-    {
-      id: "cmd-event-nfp",
-      label: "Sự kiện: NFP",
-      text: "EVENT_TYPE = NFP\nPhân tích rủi ro liên quan đến Non-Farm Payroll.",
-    },
-    {
-      id: "cmd-event-etf",
-      label: "Sự kiện: ETF",
-      text: "EVENT_TYPE = ETF\nPhân tích rủi ro liên quan đến ETF approval/reject.",
-    },
-
-    // ----- Event Importance -----
-    {
-      id: "cmd-event-low",
-      label: "Mức độ ảnh hưởng: LOW",
-      text: "EVENT_IMPORTANCE = LOW\nSự kiện ảnh hưởng thấp.",
-    },
-    {
-      id: "cmd-event-medium",
-      label: "Mức độ ảnh hưởng: MEDIUM",
-      text: "EVENT_IMPORTANCE = MEDIUM\nSự kiện có ảnh hưởng trung bình.",
-    },
-    {
-      id: "cmd-event-high",
-      label: "Mức độ ảnh hưởng: HIGH",
-      text: "EVENT_IMPORTANCE = HIGH\nSự kiện ảnh hưởng mạnh, dễ gây biến động cao.",
-    },
-
-    // ----- Event Timing -----
-    {
-      id: "cmd-event-pre",
-      label: "Thời điểm: PRE-EVENT",
-      text: "EVENT_TIMING = PRE_EVENT\nĐang ở giai đoạn trước khi tin được công bố.",
-    },
-    {
-      id: "cmd-event-window",
-      label: "Thời điểm: EVENT WINDOW",
-      text: "EVENT_TIMING = EVENT_WINDOW\nĐang trong thời điểm tin được công bố (khoảng biến động mạnh).",
-    },
-    {
-      id: "cmd-event-post",
-      label: "Thời điểm: POST-EVENT",
-      text: "EVENT_TIMING = POST_EVENT\nSau khi tin đã ra, đang phân tích hướng đi thật.",
-    },
-
-    // ----- Event Risk Summary -----
-    {
-      id: "cmd-event-summary",
-      label: "Kiểm tra EVENT RISK",
-      text: "EVENT RISK CHECK\nTóm tắt squeeze risk, trap risk, volatility và các cảnh báo chính dựa trên sự kiện vĩ mô.",
-    },
-
-    // ----- Combined Commands (tiện dụng) -----
-    {
-      id: "cmd-fed-full",
-      label: "Phân tích FED đầy đủ",
-      text:
-        "EVENT RISK = ON\n" +
-        "EVENT_TYPE = FED\n" +
-        "EVENT_IMPORTANCE = HIGH\n" +
-        "EVENT_TIMING = PRE_EVENT\n" +
-        "EVENT RISK CHECK\n" +
-        "Kết hợp snapshot và rủi ro FED để đánh giá squeeze, trap, volatility.",
-    },
-    {
-      id: "cmd-cpi-full",
-      label: "Phân tích CPI đầy đủ",
-      text:
-        "EVENT RISK = ON\n" +
-        "EVENT_TYPE = CPI\n" +
-        "EVENT_IMPORTANCE = HIGH\n" +
-        "EVENT_TIMING = PRE_EVENT\n" +
-        "EVENT RISK CHECK",
-    },
-  ];
-
-  // Gộp lệnh Event Risk vào danh sách command chung (CHỈ 1 LẦN)
-  staticCommands.push(...eventCommands);
-
-  // NHÓM COMMAND THEO WORKFLOW – GIÚP UI GỌN HƠN
-  const commandGroups = [
-    {
-      id: "grp-htf",
-      label: "1. HTF Dashboard & Market Context",
-      items: staticCommands.filter((c) =>
-        [
-          "cmd-dash-compact",
-          "cmd-dash-full",
-          "cmd-dash-context-only",
-          "cmd-trade-zone",
-          "cmd-market-mode",
-          "cmd-trend-radar",
-          "cmd-summary",
-          "cmd-risk-check",
-        ].includes(c.id)
-      ),
-    },
-
-    {
-      id: "grp-setup",
-      label: "2. Setup Engine (Setup 1–3, Ready Filter, Trap)",
-      items: staticCommands.filter((c) =>
-        [
-          "cmd-dash-setup-only",
-          "cmd-check-setup-1",
-          "cmd-check-setup-2",
-          "cmd-check-setup-3",
-          "cmd-check-ready-1",
-          "cmd-check-ready-2",
-          "cmd-check-ready-3",
-          "cmd-check-trap-1",
-          "cmd-check-trap-2",
-          "cmd-check-trap-3",
-        ].includes(c.id)
-      ),
-    },
-
-    {
-      id: "grp-entry",
-      label: "3. Timing Entry (LTF M5/M15)",
-      items: staticCommands.filter((c) =>
-        [
-          "cmd-ltf-overview",
-          "cmd-ltf-entry-filter",
-          "cmd-check-ema",
-          "cmd-check-rsi",
-          "cmd-check-atr",
-        ].includes(c.id)
-      ),
-    },
-
-    {
-      id: "grp-position",
-      label: "4. Position Management (LTF)",
-      items: staticCommands.filter((c) =>
-        [
-          "cmd-ltf-position-mgmt",
-          "cmd-position",
-          "cmd-external-conflict",
-        ].includes(c.id)
-      ),
-    },
-
-    {
-      id: "grp-event",
-      label: "5. Event Risk Module (FED/CPI/NFP/ETF)",
-      items: staticCommands.filter((c) =>
-        [
-          "cmd-event-risk-on",
-          "cmd-event-risk-off",
-          "cmd-event-fed",
-          "cmd-event-cpi",
-          "cmd-event-nfp",
-          "cmd-event-etf",
-          "cmd-event-low",
-          "cmd-event-medium",
-          "cmd-event-high",
-          "cmd-event-pre",
-          "cmd-event-window",
-          "cmd-event-post",
-          "cmd-event-summary",
-          "cmd-fed-full",
-          "cmd-cpi-full",
-        ].includes(c.id)
-      ),
-    },
-  ];
-
-  const dynamicPositionCommand =
-    entryPrice && stopPrice
-      ? `ĐANG ${positionSide.toUpperCase()} @ ${entryPrice}, STOPLOSS @ ${stopPrice}. PHÂN TÍCH LẠI RỦI RO & KỊCH BẢN CHÍNH.`
-      : `ĐANG LONG/SHORT @ <entry>, STOPLOSS @ <SL>. PHÂN TÍCH LẠI RỦI RO & KỊCH BẢN CHÍNH.`;
+  // =========
+  // RENDER UI
+  // =========
 
   return (
     <>
       <div
         style={{
           minHeight: "100vh",
-          backgroundColor: "#050816",
+          backgroundColor: "#020617",
           color: "#e5e7eb",
           fontFamily:
             "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-          padding: "24px 16px",
+          padding: "24px 16px 32px",
         }}
       >
         <div
           style={{
-            maxWidth: 960,
+            maxWidth: 980,
             margin: "0 auto",
           }}
         >
@@ -677,21 +690,22 @@ function BybitSnapshotV3Page() {
               style={{
                 fontSize: 28,
                 fontWeight: 700,
-                letterSpacing: 0.5,
+                letterSpacing: 0.4,
               }}
             >
-              Bybit Snapshot v3 – JSON Export
+              Bybit Snapshot v3 – JSON Export (UI v2.0)
             </h1>
             <p
               style={{
                 fontSize: 14,
                 color: "#9ca3af",
-                maxWidth: 640,
+                maxWidth: 650,
               }}
             >
-              Tạo snapshot phiên bản 3 (H1–H4–Daily, derivatives
-              Bybit/Binance/OKX) để sử dụng cho Price Analyzer v3.0. Bao gồm
-              JSON, macro <code>[DASH] FILE=</code>, copy và download.
+              Tạo snapshot phiên bản 3 (H1–H4–D1, derivatives Bybit/Binance/OKX)
+              để sử dụng cho Price Analyzer v3.x. Bao gồm JSON, macro{" "}
+              <code>[DASH] FILE=...</code>, bộ lệnh nhanh (command set) và
+              download.
             </p>
           </header>
 
@@ -699,11 +713,11 @@ function BybitSnapshotV3Page() {
           <section
             style={{
               background:
-                "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(236,72,153,0.08))",
-              borderRadius: 12,
+                "linear-gradient(135deg, rgba(37,99,235,0.16), rgba(236,72,153,0.08))",
+              borderRadius: 14,
               padding: 16,
-              border: "1px solid rgba(148,163,184,0.25)",
-              marginBottom: 16,
+              border: "1px solid rgba(148,163,184,0.35)",
+              marginBottom: 18,
             }}
           >
             <div
@@ -730,8 +744,8 @@ function BybitSnapshotV3Page() {
                 placeholder="Ví dụ: BTCUSDT, ETHUSDT"
                 disabled={loading}
                 style={{
-                  padding: "8px 10px",
-                  borderRadius: 8,
+                  padding: "9px 11px",
+                  borderRadius: 10,
                   border: "1px solid #4b5563",
                   backgroundColor: "#020617",
                   color: "#e5e7eb",
@@ -746,31 +760,45 @@ function BybitSnapshotV3Page() {
                   flexWrap: "wrap",
                   gap: 8,
                   alignItems: "center",
+                  justifyContent: "space-between",
                   marginTop: 8,
                 }}
               >
-                <button
-                  type="button"
-                  onClick={handleGenerate}
-                  disabled={loading}
-                  style={primaryButtonStyle()}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                  }}
                 >
-                  {loading ? "Đang tạo snapshot v3..." : "Generate Snapshot v3"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerateLtf}
-                  disabled={loading}
-                  style={secondaryButtonStyle({ marginLeft: 8 })}
-                >
-                  {loading ? "Đang tạo LTF..." : "Generate LTF Snapshot (M5/M15)"}
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={loading}
+                    style={primaryButtonStyle()}
+                  >
+                    {loading ? "Đang tạo snapshot v3..." : "Generate Snapshot v3"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerateLtf}
+                    disabled={loading}
+                    style={secondaryButtonStyle({
+                      minWidth: 210,
+                    })}
+                  >
+                    {loading
+                      ? "Đang tạo LTF..."
+                      : "Generate LTF Snapshot (M5/M15)"}
+                  </button>
+                </div>
 
                 {snapshot && (
-                  <span
+                  <div
                     style={{
                       fontSize: 12,
                       color: "#9ca3af",
+                      marginTop: 4,
                     }}
                   >
                     Version: <strong>{versionLabel}</strong>
@@ -780,7 +808,7 @@ function BybitSnapshotV3Page() {
                         · Generated at: <strong>{generatedAtLabel}</strong>
                       </>
                     )}
-                  </span>
+                  </div>
                 )}
               </div>
 
@@ -789,11 +817,11 @@ function BybitSnapshotV3Page() {
                   style={{
                     marginTop: 8,
                     padding: "8px 10px",
-                    borderRadius: 8,
+                    borderRadius: 10,
                     fontSize: 13,
                     color: "#fecaca",
-                    backgroundColor: "rgba(127,29,29,0.35)",
-                    border: "1px solid rgba(248,113,113,0.5)",
+                    backgroundColor: "rgba(127,29,29,0.45)",
+                    border: "1px solid rgba(248,113,113,0.7)",
                   }}
                 >
                   {error}
@@ -802,29 +830,30 @@ function BybitSnapshotV3Page() {
             </div>
           </section>
 
-          {/* Macro + actions */}
+          {/* Macro + actions + Quick Commands */}
           {snapshot && (
             <section
               style={{
                 backgroundColor: "#020617",
-                borderRadius: 12,
+                borderRadius: 14,
                 padding: 16,
-                border: "1px solid rgba(148,163,184,0.4)",
-                marginBottom: 16,
+                border: "1px solid rgba(148,163,184,0.45)",
+                marginBottom: 18,
               }}
             >
               <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 10,
+                  gap: 12,
                 }}
               >
+                {/* File & JSON actions */}
                 <div
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
-                    gap: 8,
+                    gap: 10,
                     alignItems: "center",
                     justifyContent: "space-between",
                   }}
@@ -842,7 +871,8 @@ function BybitSnapshotV3Page() {
                       style={{
                         fontSize: 13,
                         color: "#9ca3af",
-                        marginTop: 2,
+                        marginTop: 3,
+                        wordBreak: "break-all",
                       }}
                     >
                       {fileName || "(chưa có)"}
@@ -860,7 +890,7 @@ function BybitSnapshotV3Page() {
                       onClick={handleCopyJSON}
                       style={secondaryButtonStyle()}
                     >
-                      {copiedJson ? "✓ Đã copy" : "Copy JSON"}
+                      {copiedJson ? "✓ Đã copy JSON" : "Copy JSON"}
                     </button>
                     <button
                       type="button"
@@ -872,6 +902,7 @@ function BybitSnapshotV3Page() {
                   </div>
                 </div>
 
+                {/* Macro */}
                 <div>
                   <div
                     style={{
@@ -897,8 +928,8 @@ function BybitSnapshotV3Page() {
                       style={{
                         flexGrow: 1,
                         minWidth: 0,
-                        padding: "6px 8px",
-                        borderRadius: 8,
+                        padding: "7px 9px",
+                        borderRadius: 10,
                         border: "1px solid #4b5563",
                         backgroundColor: "#020617",
                         color: "#f9fafb",
@@ -910,7 +941,7 @@ function BybitSnapshotV3Page() {
                       onClick={handleCopyMacro}
                       style={secondaryButtonStyle({ whiteSpace: "nowrap" })}
                     >
-                      {copiedMacro ? "✓ Đã copy" : "Copy macro"}
+                      {copiedMacro ? "✓ Đã copy macro" : "Copy macro"}
                     </button>
                   </div>
                   <div
@@ -925,19 +956,87 @@ function BybitSnapshotV3Page() {
                     dung (nếu đã có snapshot).
                   </div>
                 </div>
+
+                {/* Quick command bar */}
+                <div
+                  style={{
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTop: "1px solid #1f2937",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      marginBottom: 6,
+                    }}
+                  >
+                    Lệnh hay dùng (Quick Commands)
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    {[
+                      {
+                        label: "Dashboard FULL",
+                        cmd:
+                          "MODE = FULL\nXUẤT FULL DASHBOARD 6 phần với toàn bộ chi tiết.",
+                      },
+                      {
+                        label: "Dashboard COMPACT",
+                        cmd:
+                          "Chạy DASHBOARD 6 phần ở chế độ COMPACT cho snapshot trên.",
+                      },
+                      {
+                        label: "Setup Only",
+                        cmd:
+                          "Chỉ phân tích SETUP ENGINE (Setup 1–3) cho snapshot trên, không cần các phần khác.",
+                      },
+                      {
+                        label: "LTF ENTRY FILTER",
+                        cmd:
+                          "LTF ENTRY FILTER\nDùng snapshot LTF (M5/M15) để lọc điểm vào lệnh tốt nhất.",
+                      },
+                      {
+                        label: "EVENT RISK CHECK",
+                        cmd: "EVENT RISK CHECK",
+                      },
+                    ].map((q) => (
+                      <button
+                        key={q.label}
+                        type="button"
+                        onClick={() =>
+                          handleCopyCommand(`quick-${q.label}`, q.cmd)
+                        }
+                        style={tinySecondaryButtonStyle({
+                          borderRadius: 999,
+                          padding: "6px 13px",
+                          backgroundColor: "#020617",
+                        })}
+                      >
+                        {q.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </section>
           )}
 
-          {/* CLEAN: Command panel theo nhóm (accordion) */}
+          {/* Command panel theo nhóm */}
           {snapshot && (
             <section
               style={{
                 backgroundColor: "#020617",
-                borderRadius: 12,
+                borderRadius: 14,
                 padding: 16,
-                border: "1px solid rgba(148,163,184,0.4)",
-                marginBottom: 16,
+                border: "1px solid rgba(148,163,184,0.45)",
+                marginBottom: 18,
               }}
             >
               <div
@@ -985,8 +1084,8 @@ function BybitSnapshotV3Page() {
                     style={{
                       flexGrow: 1,
                       minWidth: 0,
-                      padding: "6px 8px",
-                      borderRadius: 8,
+                      padding: "7px 9px",
+                      borderRadius: 10,
                       border: "1px solid #4b5563",
                       backgroundColor: "#020617",
                       color: "#e5e7eb",
@@ -1022,7 +1121,7 @@ function BybitSnapshotV3Page() {
                       key={group.id}
                       style={{
                         backgroundColor: "#020617",
-                        borderRadius: 10,
+                        borderRadius: 12,
                         padding: 12,
                         border: "1px solid #334155",
                       }}
@@ -1032,9 +1131,9 @@ function BybitSnapshotV3Page() {
                           cursor: "pointer",
                           fontSize: 14,
                           fontWeight: 600,
-                          marginBottom: 8,
                           userSelect: "none",
                           listStyle: "none",
+                          outline: "none",
                         }}
                       >
                         {group.label}
@@ -1044,9 +1143,9 @@ function BybitSnapshotV3Page() {
                         style={{
                           display: "grid",
                           gridTemplateColumns:
-                            "repeat(auto-fit, minmax(230px, 1fr))",
+                            "repeat(auto-fit, minmax(240px, 1fr))",
                           gap: 10,
-                          marginTop: 6,
+                          marginTop: 8,
                         }}
                       >
                         {visibleItems.map((cmd) => (
@@ -1057,10 +1156,11 @@ function BybitSnapshotV3Page() {
                               border: "1px solid #4b5563",
                               padding: 10,
                               background:
-                                "radial-gradient(circle at top left, rgba(59,130,246,0.12), transparent)",
+                                "radial-gradient(circle at top left, rgba(59,130,246,0.10), transparent)",
                               display: "flex",
                               flexDirection: "column",
                               gap: 6,
+                              position: "relative",
                             }}
                           >
                             <div
@@ -1075,11 +1175,25 @@ function BybitSnapshotV3Page() {
                               style={{
                                 fontSize: 12,
                                 color: "#9ca3af",
-                                minHeight: 36,
+                                minHeight: 40,
+                                maxHeight: 80,
+                                overflow: "hidden",
                                 whiteSpace: "pre-line",
+                                position: "relative",
                               }}
                             >
                               {cmd.text}
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  height: 16,
+                                  background:
+                                    "linear-gradient(transparent, #020617)",
+                                }}
+                              />
                             </div>
                             <button
                               type="button"
@@ -1102,11 +1216,11 @@ function BybitSnapshotV3Page() {
                   );
                 })}
 
-                {/* Dynamic position command – giữ nguyên logic, đặt dưới cùng */}
+                {/* Dynamic position command */}
                 <div
                   style={{
                     marginTop: 4,
-                    borderRadius: 10,
+                    borderRadius: 12,
                     border: "1px solid #4b5563",
                     padding: 12,
                     background:
@@ -1225,7 +1339,7 @@ function BybitSnapshotV3Page() {
                       fontSize: 12,
                       padding: "6px 8px",
                       borderRadius: 8,
-                      border: "1px solid rgba(148,163,184,0.6)",
+                      border: "1px solid rgba(148,163,184,0.7)",
                       backgroundColor: "#020617",
                     }}
                   >
@@ -1256,60 +1370,65 @@ function BybitSnapshotV3Page() {
             </section>
           )}
 
-          {/* JSON viewer */}
+          {/* JSON viewer – collapsible */}
           {snapshot && (
             <section
               style={{
                 backgroundColor: "#020617",
-                borderRadius: 12,
+                borderRadius: 14,
                 padding: 16,
                 border: "1px solid rgba(31,41,55,0.9)",
-                marginBottom: 32,
+                marginBottom: 28,
               }}
             >
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  marginBottom: 8,
-                }}
-              >
-                Snapshot JSON (version 3)
-              </div>
-              <div
-                style={{
-                  borderRadius: 8,
-                  backgroundColor: "#020617",
-                  border: "1px solid #4b5563",
-                  maxHeight: "480px",
-                  overflow: "auto",
-                  fontFamily:
-                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
-                  fontSize: 12,
-                  padding: 10,
-                  lineHeight: 1.5,
-                }}
-              >
-                <pre
+              <details open={false}>
+                <summary
                   style={{
-                    margin: 0,
-                    whiteSpace: "pre",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    userSelect: "none",
+                    listStyle: "none",
                   }}
                 >
-                  {JSON.stringify(snapshot, null, 2)}
-                </pre>
-              </div>
+                  Snapshot JSON (version 3) – nhấn để mở / đóng
+                </summary>
+                <div
+                  style={{
+                    borderRadius: 10,
+                    backgroundColor: "#020617",
+                    border: "1px solid #4b5563",
+                    maxHeight: "480px",
+                    overflow: "auto",
+                    fontFamily:
+                      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
+                    fontSize: 12,
+                    padding: 10,
+                    lineHeight: 1.5,
+                    marginTop: 10,
+                  }}
+                >
+                  <pre
+                    style={{
+                      margin: 0,
+                      whiteSpace: "pre",
+                    }}
+                  >
+                    {JSON.stringify(snapshot, null, 2)}
+                  </pre>
+                </div>
+              </details>
             </section>
           )}
         </div>
 
-        {/* Loading overlay chuyên nghiệp */}
+        {/* Loading overlay */}
         {loading && (
           <div
             style={{
               position: "fixed",
               inset: 0,
-              backgroundColor: "rgba(15,23,42,0.85)",
+              backgroundColor: "rgba(15,23,42,0.88)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -1327,8 +1446,8 @@ function BybitSnapshotV3Page() {
             >
               <div
                 style={{
-                  width: 40,
-                  height: 40,
+                  width: 42,
+                  height: 42,
                   borderRadius: "999px",
                   border: "4px solid rgba(148,163,184,0.4)",
                   borderTopColor: "#3b82f6",
@@ -1356,6 +1475,27 @@ function BybitSnapshotV3Page() {
                 JSON snapshot.
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Copy toast */}
+        {copyFeedback && (
+          <div
+            style={{
+              position: "fixed",
+              bottom: 20,
+              right: 20,
+              background:
+                "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(124,58,237,0.95))",
+              color: "#f9fafb",
+              padding: "9px 14px",
+              borderRadius: 999,
+              fontSize: 12,
+              boxShadow: "0 10px 25px rgba(15,23,42,0.9)",
+              zIndex: 10000,
+            }}
+          >
+            {copyFeedback}
           </div>
         )}
       </div>
