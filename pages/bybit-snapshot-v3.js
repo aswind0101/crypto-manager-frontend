@@ -22,7 +22,6 @@ function BybitSnapshotV3Page() {
 
   const [commandSearch, setCommandSearch] = useState("");
 
-
   // ===== Button style helpers (đồng bộ giao diện) =====
   const primaryButtonStyle = (extra = {}) => ({
     padding: "8px 14px",
@@ -131,8 +130,7 @@ function BybitSnapshotV3Page() {
       }
 
       const ts = result.generated_at || Date.now();
-      const firstSymbol =
-        symbols[0] || "SYMBOL";
+      const firstSymbol = symbols[0] || "SYMBOL";
 
       const name = `bybit_ltf_snapshot_${ts}_${firstSymbol}.json`;
       const macro = `[DASH] FILE=${name}`;
@@ -147,7 +145,6 @@ function BybitSnapshotV3Page() {
       setLoading(false);
     }
   }, [symbolsText]);
-
 
   const handleCopyJSON = useCallback(() => {
     if (!snapshot) return;
@@ -450,7 +447,6 @@ function BybitSnapshotV3Page() {
       label: "Quản lý lệnh hiện tại",
       text: "CHECK POSITION\nTư vấn quản lý lệnh hiện tại dựa trên snapshot.",
     },
-
   ];
 
   // ===== Macro Event Risk Module – Command Set =====
@@ -552,10 +548,8 @@ function BybitSnapshotV3Page() {
         "EVENT RISK CHECK",
     },
   ];
-  // Gộp lệnh Event Risk vào danh sách command chung
-  staticCommands.push(...eventCommands);
 
-    // Gộp lệnh Event Risk vào danh sách command chung
+  // Gộp lệnh Event Risk vào danh sách command chung (CHỈ 1 LẦN)
   staticCommands.push(...eventCommands);
 
   // NHÓM COMMAND THEO WORKFLOW – GIÚP UI GỌN HƠN
@@ -935,7 +929,7 @@ function BybitSnapshotV3Page() {
             </section>
           )}
 
-                    {/* CLEAN: Command panel theo nhóm (accordion) */}
+          {/* CLEAN: Command panel theo nhóm (accordion) */}
           {snapshot && (
             <section
               style={{
@@ -1108,7 +1102,7 @@ function BybitSnapshotV3Page() {
                   );
                 })}
 
-                {/* Dynamic position command – giữ nguyên logic, chỉ đặt dưới cùng */}
+                {/* Dynamic position command – giữ nguyên logic, đặt dưới cùng */}
                 <div
                   style={{
                     marginTop: 4,
@@ -1261,6 +1255,7 @@ function BybitSnapshotV3Page() {
               </div>
             </section>
           )}
+
           {/* JSON viewer */}
           {snapshot && (
             <section
