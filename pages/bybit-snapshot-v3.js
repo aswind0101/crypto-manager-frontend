@@ -360,15 +360,18 @@ function BybitSnapshotV3Page() {
     fontSize: 14,
     fontWeight: 600,
     cursor: loading ? "default" : "pointer",
-    background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
-    color: "#e2e8f0",
-    opacity: loading ? 0.7 : 1,
-    boxShadow:
-      "0 10px 25px rgba(15,23,42,0.75), 0 0 0 1px rgba(15,23,42,1) inset",
+
+    // === NEW GREEN STYLE (giống LTF gold style nhưng chuyển sang green) ===
+    background: "linear-gradient(135deg, #34d399, #10b981, #059669)",
+    color: "#052e16",
+    opacity: loading ? 0.8 : 1,
+    boxShadow: "0 8px 20px rgba(16,185,129,0.45)",
+
     minWidth: 190,
     textAlign: "center",
     ...extra,
   });
+
 
   const secondaryButtonStyle = (extra = {}) => ({
     padding: "7px 13px",
