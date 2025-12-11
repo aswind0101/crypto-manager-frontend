@@ -555,16 +555,97 @@ function BybitSnapshotV3Page() {
   // Gộp lệnh Event Risk vào danh sách command chung
   staticCommands.push(...eventCommands);
 
-  // Filter command theo ô search (tiếng Việt hoặc keyword)
-  const filteredCommands = staticCommands.filter((cmd) => {
-    if (!commandSearch.trim()) return true;
-    const q = commandSearch.toLowerCase();
-    return (
-      cmd.label.toLowerCase().includes(q) ||
-      cmd.text.toLowerCase().includes(q)
-    );
-  });
+    // Gộp lệnh Event Risk vào danh sách command chung
+  staticCommands.push(...eventCommands);
 
+  // NHÓM COMMAND THEO WORKFLOW – GIÚP UI GỌN HƠN
+  const commandGroups = [
+    {
+      id: "grp-htf",
+      label: "1. HTF Dashboard & Market Context",
+      items: staticCommands.filter((c) =>
+        [
+          "cmd-dash-compact",
+          "cmd-dash-full",
+          "cmd-dash-context-only",
+          "cmd-trade-zone",
+          "cmd-market-mode",
+          "cmd-trend-radar",
+          "cmd-summary",
+          "cmd-risk-check",
+        ].includes(c.id)
+      ),
+    },
+
+    {
+      id: "grp-setup",
+      label: "2. Setup Engine (Setup 1–3, Ready Filter, Trap)",
+      items: staticCommands.filter((c) =>
+        [
+          "cmd-dash-setup-only",
+          "cmd-check-setup-1",
+          "cmd-check-setup-2",
+          "cmd-check-setup-3",
+          "cmd-check-ready-1",
+          "cmd-check-ready-2",
+          "cmd-check-ready-3",
+          "cmd-check-trap-1",
+          "cmd-check-trap-2",
+          "cmd-check-trap-3",
+        ].includes(c.id)
+      ),
+    },
+
+    {
+      id: "grp-entry",
+      label: "3. Timing Entry (LTF M5/M15)",
+      items: staticCommands.filter((c) =>
+        [
+          "cmd-ltf-overview",
+          "cmd-ltf-entry-filter",
+          "cmd-check-ema",
+          "cmd-check-rsi",
+          "cmd-check-atr",
+        ].includes(c.id)
+      ),
+    },
+
+    {
+      id: "grp-position",
+      label: "4. Position Management (LTF)",
+      items: staticCommands.filter((c) =>
+        [
+          "cmd-ltf-position-mgmt",
+          "cmd-position",
+          "cmd-external-conflict",
+        ].includes(c.id)
+      ),
+    },
+
+    {
+      id: "grp-event",
+      label: "5. Event Risk Module (FED/CPI/NFP/ETF)",
+      items: staticCommands.filter((c) =>
+        [
+          "cmd-event-risk-on",
+          "cmd-event-risk-off",
+          "cmd-event-fed",
+          "cmd-event-cpi",
+          "cmd-event-nfp",
+          "cmd-event-etf",
+          "cmd-event-low",
+          "cmd-event-medium",
+          "cmd-event-high",
+          "cmd-event-pre",
+          "cmd-event-window",
+          "cmd-event-post",
+          "cmd-event-summary",
+          "cmd-fed-full",
+          "cmd-cpi-full",
+        ].includes(c.id)
+      ),
+    },
+  ];
 
   const dynamicPositionCommand =
     entryPrice && stopPrice
@@ -854,7 +935,7 @@ function BybitSnapshotV3Page() {
             </section>
           )}
 
-          {/* NEW: Command shortcuts cho Dashboard / Position */}
+                    {/* CLEAN: Command panel theo nhóm (accordion) */}
           {snapshot && (
             <section
               style={{
@@ -869,37 +950,32 @@ function BybitSnapshotV3Page() {
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 12,
+                  gap: 16,
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 4,
-                  }}
-                >
+                {/* Header */}
+                <div>
                   <div
                     style={{
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: 600,
                     }}
                   >
-                    Command nhanh cho Dashboard
+                    Command theo nhóm (Workflow HTF → LTF)
                   </div>
                   <div
                     style={{
                       fontSize: 12,
                       color: "#6b7280",
+                      marginTop: 4,
                     }}
                   >
-                    Chọn command để copy, dán thẳng vào ChatGPT. Hệ thống sẽ tự
-                    động kèm theo macro <code>[DASH] FILE={fileName}</code> ở
-                    phía trên.
+                    Mỗi nhóm tương ứng một bước: 1) HTF Dashboard, 2) Setup,
+                    3) LTF Entry, 4) Position Management, 5) Event Risk.
                   </div>
                 </div>
 
-                {/* Ô search lệnh */}
+                {/* Search box */}
                 <div
                   style={{
                     display: "flex",
@@ -911,7 +987,7 @@ function BybitSnapshotV3Page() {
                     type="text"
                     value={commandSearch}
                     onChange={(e) => setCommandSearch(e.target.value)}
-                    placeholder="Tìm lệnh theo tên hoặc nội dung (ví dụ: setup, risk, mode...)"
+                    placeholder="Tìm command theo tên / nội dung (vd: setup, risk, ltf...)"
                     style={{
                       flexGrow: 1,
                       minWidth: 0,
@@ -929,69 +1005,113 @@ function BybitSnapshotV3Page() {
                       onClick={() => setCommandSearch("")}
                       style={tinySecondaryButtonStyle()}
                     >
-                      Xoá search
+                      Xoá
                     </button>
                   )}
                 </div>
 
-                {/* Command list */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {filteredCommands.map((cmd) => (
-                    <div
-                      key={cmd.id}
+                {/* Accordion nhóm command */}
+                {commandGroups.map((group) => {
+                  const visibleItems = group.items.filter((cmd) => {
+                    if (!commandSearch.trim()) return true;
+                    const q = commandSearch.toLowerCase();
+                    return (
+                      cmd.label.toLowerCase().includes(q) ||
+                      cmd.text.toLowerCase().includes(q)
+                    );
+                  });
+
+                  if (!visibleItems.length) return null;
+
+                  return (
+                    <details
+                      key={group.id}
                       style={{
+                        backgroundColor: "#020617",
                         borderRadius: 10,
-                        border: "1px solid #4b5563",
-                        padding: 10,
-                        background:
-                          "radial-gradient(circle at top left, rgba(59,130,246,0.15), transparent)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
+                        padding: 12,
+                        border: "1px solid #334155",
                       }}
                     >
-                      <div
+                      <summary
                         style={{
-                          fontSize: 13,
+                          cursor: "pointer",
+                          fontSize: 14,
                           fontWeight: 600,
+                          marginBottom: 8,
+                          userSelect: "none",
+                          listStyle: "none",
                         }}
                       >
-                        {cmd.label}
-                      </div>
+                        {group.label}
+                      </summary>
+
                       <div
                         style={{
-                          fontSize: 12,
-                          color: "#9ca3af",
-                          minHeight: 32,
-                          whiteSpace: "pre-line",
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(230px, 1fr))",
+                          gap: 10,
+                          marginTop: 6,
                         }}
                       >
-                        {cmd.text}
+                        {visibleItems.map((cmd) => (
+                          <div
+                            key={cmd.id}
+                            style={{
+                              borderRadius: 10,
+                              border: "1px solid #4b5563",
+                              padding: 10,
+                              background:
+                                "radial-gradient(circle at top left, rgba(59,130,246,0.12), transparent)",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 6,
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                              }}
+                            >
+                              {cmd.label}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#9ca3af",
+                                minHeight: 36,
+                                whiteSpace: "pre-line",
+                              }}
+                            >
+                              {cmd.text}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCopyCommand(cmd.id, cmd.text)
+                              }
+                              style={tinySecondaryButtonStyle({
+                                alignSelf: "flex-start",
+                                marginTop: 2,
+                              })}
+                            >
+                              {copiedCommandId === cmd.id
+                                ? "✓ Đã copy"
+                                : "Copy"}
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyCommand(cmd.id, cmd.text)}
-                        style={tinySecondaryButtonStyle({
-                          alignSelf: "flex-start",
-                          marginTop: 2,
-                        })}
-                      >
-                        {copiedCommandId === cmd.id ? "✓ Đã copy" : "Copy lệnh"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                    </details>
+                  );
+                })}
 
-                {/* Dynamic position command */}
+                {/* Dynamic position command – giữ nguyên logic, chỉ đặt dưới cùng */}
                 <div
                   style={{
-                    marginTop: 12,
+                    marginTop: 4,
                     borderRadius: 10,
                     border: "1px solid #4b5563",
                     padding: 12,
@@ -1008,8 +1128,8 @@ function BybitSnapshotV3Page() {
                       fontWeight: 600,
                     }}
                   >
-                    Command cho lệnh đang giữ (ĐANG LONG/SHORT @ ..., STOPLOSS @
-                    ...)
+                    Command cho lệnh đang giữ (ĐANG LONG/SHORT @ ..., STOPLOSS
+                    @ ...)
                   </div>
 
                   <div
@@ -1057,7 +1177,7 @@ function BybitSnapshotV3Page() {
                       type="text"
                       value={entryPrice}
                       onChange={(e) => setEntryPrice(e.target.value)}
-                      placeholder="Ví dụ: 90000"
+                      placeholder="Ví dụ: 3335"
                       style={{
                         width: 90,
                         padding: "4px 6px",
@@ -1082,7 +1202,7 @@ function BybitSnapshotV3Page() {
                       type="text"
                       value={stopPrice}
                       onChange={(e) => setStopPrice(e.target.value)}
-                      placeholder="Ví dụ: 88000"
+                      placeholder="Ví dụ: 3270"
                       style={{
                         width: 90,
                         padding: "4px 6px",
@@ -1141,7 +1261,6 @@ function BybitSnapshotV3Page() {
               </div>
             </section>
           )}
-
           {/* JSON viewer */}
           {snapshot && (
             <section
