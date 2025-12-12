@@ -321,6 +321,8 @@ function BybitSnapshotV3Page() {
   const [stopPrice, setStopPrice] = useState("");
   const [commandSearch, setCommandSearch] = useState("");
 
+  const [lastHtfGeneratedAt, setLastHtfGeneratedAt] = useState(null);
+
   const allCommands = useMemo(
     () => [...BASE_COMMANDS, ...EVENT_COMMANDS],
     []
@@ -459,6 +461,7 @@ function BybitSnapshotV3Page() {
       }
 
       const ts = result.generated_at || Date.now();
+      setLastHtfGeneratedAt(ts);
       const firstSymbol =
         result?.per_exchange?.bybit?.symbols?.[0]?.symbol ||
         symbols[0] ||
@@ -498,7 +501,12 @@ function BybitSnapshotV3Page() {
     try {
       setLoading(true);
 
-      const result = await buildLtfSnapshotV3(symbols);
+      if (!lastHtfGeneratedAt) {
+        setError("Bạn chưa tạo HTF snapshot trong session này. Hãy tạo lại HTF mới nhất trước rồi mới tạo LTF.");
+        return;
+      }
+
+      const result = await buildLtfSnapshotV3(symbols, lastHtfGeneratedAt);
 
       if (!result || typeof result !== "object") {
         throw new Error("LTF snapshot trả về không hợp lệ.");
@@ -519,7 +527,7 @@ function BybitSnapshotV3Page() {
     } finally {
       setLoading(false);
     }
-  }, [symbolsText]);
+  }, [symbolsText, lastHtfGeneratedAt]);
 
   const handleCopyJSON = useCallback(() => {
     if (!snapshot) return;
