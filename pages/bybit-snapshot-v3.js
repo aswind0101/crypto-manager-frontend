@@ -526,11 +526,6 @@ function BybitSnapshotV3Page() {
     try {
       setLoading(true);
 
-      if (!lastHtfGeneratedAt) {
-        setError("Bạn chưa tạo HTF snapshot trong session này. Hãy tạo lại HTF mới nhất trước rồi mới tạo LTF.");
-        return;
-      }
-
       // Lấy HTF ref từ state trước, nếu không có thì fallback localStorage
       let htfRef = lastHtfGeneratedAt;
 
