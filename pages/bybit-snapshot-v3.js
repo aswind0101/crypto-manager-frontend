@@ -303,6 +303,18 @@ const EVENT_COMMANDS = [
   },
 ];
 
+// Scope cho từng command: mặc định = "htf", riêng LTF dùng "ltf"
+const COMMAND_SCOPES = {
+  // LTF Timing – M5/M15
+  "cmd-ltf-overview": "ltf",
+  "cmd-ltf-entry-filter": "ltf",
+  "cmd-ltf-position-mgmt": "ltf",
+
+  // Có thể bổ sung thêm nếu sau này có command LTF khác
+  // "cmd-something-ltf": "ltf",
+};
+
+
 function BybitSnapshotV3Page() {
   const [symbolsText, setSymbolsText] = useState("BTCUSDT");
   const [loading, setLoading] = useState(false);
@@ -320,6 +332,21 @@ function BybitSnapshotV3Page() {
   const [entryPrice, setEntryPrice] = useState("");
   const [stopPrice, setStopPrice] = useState("");
   const [commandSearch, setCommandSearch] = useState("");
+
+  // Tách riêng file HTF / LTF
+  const [htfFileName, setHtfFileName] = useState("");
+  const [ltfFileName, setLtfFileName] = useState("");
+
+  const htfMacro = useMemo(
+    () => (htfFileName ? `[DASH] FILE=${htfFileName}` : ""),
+    [htfFileName]
+  );
+
+  const ltfMacro = useMemo(
+    () => (ltfFileName ? `[DASH] FILE=${ltfFileName}` : ""),
+    [ltfFileName]
+  );
+
 
   const allCommands = useMemo(
     () => [...BASE_COMMANDS, ...EVENT_COMMANDS],
@@ -469,8 +496,14 @@ function BybitSnapshotV3Page() {
 
       setSnapshot(result);
       setFileName(name);
+
+      // Ghi nhận đây là file HTF
+      setHtfFileName(name);
+
+      // Macro hiển thị phía trên: luôn là snapshot mới nhất
       setDashMacro(macro);
     } catch (e) {
+
       console.error("buildSnapshotV3 error:", e);
       setError(e?.message || "Có lỗi xảy ra khi tạo snapshot.");
     } finally {
@@ -512,8 +545,14 @@ function BybitSnapshotV3Page() {
 
       setSnapshot(result);
       setFileName(name);
+
+      // Ghi nhận đây là file LTF
+      setLtfFileName(name);
+
+      // Macro hiển thị phía trên: luôn là snapshot mới nhất
       setDashMacro(macro);
     } catch (e) {
+
       console.error("buildLtfSnapshotV3 error:", e);
       setError(e?.message || "Có lỗi xảy ra khi tạo LTF snapshot.");
     } finally {
@@ -581,15 +620,62 @@ function BybitSnapshotV3Page() {
   }, [snapshot, fileName]);
 
   const handleCopyCommand = useCallback(
-    (id, rawText) => {
+    (id, rawText, scopeOverride) => {
       if (!rawText) return;
 
-      const prefix = dashMacro ? `${dashMacro}\n` : "";
+      // 1) Xác định scope của command: htf / ltf
+      const scope = scopeOverride || COMMAND_SCOPES[id] || "htf";
+
+      let macro = "";
+
+      if (scope === "ltf") {
+        if (!ltfMacro) {
+          // Chưa có LTF → hỏi user có muốn copy KHÔNG macro không
+          const ok = window.confirm(
+            "Chưa có LTF snapshot.\n" +
+            "Bạn có muốn copy command nhưng KHÔNG kèm dòng [DASH] FILE=... không?\n\n" +
+            "Chọn No để quay lại và Generate LTF Snapshot (M5/M15) trước."
+          );
+          if (!ok) {
+            setCopyFeedback(
+              "Vui lòng Generate LTF Snapshot (M5/M15) trước khi dùng command LTF."
+            );
+            return;
+          }
+          macro = ""; // copy thuần command
+        } else {
+          macro = ltfMacro;
+        }
+      } else {
+        // HTF
+        if (!htfMacro) {
+          const ok = window.confirm(
+            "Chưa có HTF snapshot.\n" +
+            "Bạn có muốn copy command nhưng KHÔNG kèm dòng [DASH] FILE=... không?\n\n" +
+            "Chọn No để quay lại và Generate Snapshot v3 (HTF) trước."
+          );
+          if (!ok) {
+            setCopyFeedback(
+              "Vui lòng Generate Snapshot v3 (HTF) trước khi dùng command này."
+            );
+            return;
+          }
+          macro = "";
+        } else {
+          macro = htfMacro;
+        }
+      }
+
+      const prefix = macro ? `${macro}\n` : "";
       const finalText = `${prefix}${rawText}`;
 
       const markCopied = () => {
         setCopiedCommandId(id);
-        showCopyToast("Đã copy command (kèm macro nếu có).");
+        showCopyToast(
+          macro
+            ? "Đã copy command (kèm đúng macro HTF/LTF)."
+            : "Đã copy command (không kèm macro)."
+        );
         setTimeout(() => setCopiedCommandId(""), 1200);
       };
 
@@ -605,7 +691,7 @@ function BybitSnapshotV3Page() {
         markCopied();
       }
     },
-    [dashMacro]
+    [htfMacro, ltfMacro]
   );
 
   // ==========================
@@ -712,6 +798,27 @@ function BybitSnapshotV3Page() {
     [allCommands]
   );
 
+  const [selectedGroupId, setSelectedGroupId] = useState("grp-mode");
+  const [selectedCommandId, setSelectedCommandId] = useState("");
+
+  const usingSearch = commandSearch.trim().length > 0;
+
+  const visibleCommands = useMemo(() => {
+    if (usingSearch) {
+      return searchResults;
+    }
+    const group =
+      commandGroups.find((g) => g.id === selectedGroupId) ||
+      commandGroups[0];
+    return group ? group.items : [];
+  }, [usingSearch, searchResults, commandGroups, selectedGroupId]);
+
+  const selectedCommand = useMemo(() => {
+    if (!visibleCommands.length) return null;
+    if (!selectedCommandId) return visibleCommands[0];
+    const found = visibleCommands.find((c) => c.id === selectedCommandId);
+    return found || visibleCommands[0];
+  }, [visibleCommands, selectedCommandId]);
 
   // =========
   // RENDER UI
@@ -1010,10 +1117,12 @@ function BybitSnapshotV3Page() {
                       marginTop: 4,
                     }}
                   >
-                    Khi copy command bên dưới, dòng macro{" "}
-                    <code>[DASH] FILE=...</code> sẽ được tự động thêm ở đầu nội
-                    dung (nếu đã có snapshot).
+                    Khi copy command, app sẽ tự chọn macro{" "}
+                    <code>[DASH] FILE=...</code> theo HTF hoặc LTF tùy loại
+                    command. Nếu chưa có file tương ứng, bạn sẽ được nhắc
+                    Generate trước hoặc chọn copy không kèm macro.
                   </div>
+
                 </div>
 
                 {/* Quick command bar */}
@@ -1045,44 +1154,50 @@ function BybitSnapshotV3Page() {
                         label: "Dashboard FULL",
                         cmd:
                           "MODE = FULL\nXUẤT FULL DASHBOARD 6 phần với toàn bộ chi tiết.",
+                        scope: "htf",
                       },
                       {
                         label: "Dashboard COMPACT",
                         cmd:
                           "Chạy DASHBOARD 6 phần ở chế độ COMPACT cho snapshot trên.",
+                        scope: "htf",
                       },
                       {
                         label: "MODE = HYBRID",
                         cmd:
                           "MODE = HYBRID\nBật Hybrid Mode để dùng thêm External Context.",
+                        scope: "htf",
                       },
                       {
                         label: "FULL + HYBRID",
                         cmd:
                           "MODE = FULL + HYBRID\n" +
                           "XUẤT FULL DASHBOARD 6 phần với toàn bộ chi tiết và thêm PHẦN 5.7 – External Market Context.",
+                        scope: "htf",
                       },
                       {
                         label: "Setup Only",
                         cmd:
                           "Chỉ phân tích SETUP ENGINE (Setup 1–3) cho snapshot trên, không cần các phần khác.",
+                        scope: "htf",
                       },
                       {
                         label: "LTF ENTRY FILTER",
                         cmd:
                           "LTF ENTRY FILTER\nDùng snapshot LTF (M5/M15) để lọc điểm vào lệnh tốt nhất.",
+                        scope: "ltf",
                       },
                       {
                         label: "EVENT RISK CHECK",
                         cmd: "EVENT RISK CHECK",
+                        scope: "htf",
                       },
                     ].map((q) => (
-
                       <button
                         key={q.label}
                         type="button"
                         onClick={() =>
-                          handleCopyCommand(`quick-${q.label}`, q.cmd)
+                          handleCopyCommand(`quick-${q.label}`, q.cmd, q.scope)
                         }
                         style={tinySecondaryButtonStyle({
                           borderRadius: 999,
@@ -1093,6 +1208,7 @@ function BybitSnapshotV3Page() {
                         {q.label}
                       </button>
                     ))}
+
                   </div>
                 </div>
               </div>
@@ -1100,6 +1216,7 @@ function BybitSnapshotV3Page() {
           )}
 
           {/* Command panel theo nhóm */}
+          {/* Command panel – dạng menu gọn */}
           {snapshot && (
             <section
               style={{
@@ -1114,7 +1231,7 @@ function BybitSnapshotV3Page() {
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 16,
+                  gap: 12,
                 }}
               >
                 {/* Header */}
@@ -1125,7 +1242,7 @@ function BybitSnapshotV3Page() {
                       fontWeight: 600,
                     }}
                   >
-                    Command theo nhóm (Workflow HTF → LTF)
+                    Command Menu (HTF → LTF)
                   </div>
                   <div
                     style={{
@@ -1134,262 +1251,125 @@ function BybitSnapshotV3Page() {
                       marginTop: 4,
                     }}
                   >
-                    Mỗi nhóm tương ứng một bước: 1) HTF Dashboard, 2) Setup,
-                    3) LTF Entry, 4) Position Management, 5) Event Risk.
+                    Chọn nhóm, chọn command rồi bấm copy. Macro{" "}
+                    <code>[DASH] FILE=...</code> sẽ tự động chọn đúng
+                    HTF / LTF.
                   </div>
                 </div>
 
-                {/* Search box */}
+                {/* Search + menu */}
                 <div
                   style={{
                     display: "flex",
-                    alignItems: "center",
+                    flexDirection: "column",
                     gap: 8,
                   }}
                 >
-                  <input
-                    type="text"
-                    value={commandSearch}
-                    onChange={(e) => setCommandSearch(e.target.value)}
-                    placeholder="Tìm command theo tên / nội dung (vd: setup, risk, ltf...)"
+                  {/* Search box */}
+                  <div
                     style={{
-                      flexGrow: 1,
-                      minWidth: 0,
-                      padding: "7px 9px",
-                      borderRadius: 10,
-                      border: "1px solid #4b5563",
-                      backgroundColor: "#020617",
-                      color: "#e5e7eb",
-                      fontSize: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
                     }}
-                  />
-                  {commandSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setCommandSearch("")}
-                      style={tinySecondaryButtonStyle()}
-                    >
-                      Xoá
-                    </button>
-                  )}
-                </div>
-
-                {/* Accordion nhóm command */}
-                {/* Nếu có search → hiển thị danh sách kết quả phẳng */}
-                {commandSearch.trim() && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <div
+                  >
+                    <input
+                      type="text"
+                      value={commandSearch}
+                      onChange={(e) =>
+                        setCommandSearch(e.target.value)
+                      }
+                      placeholder="Tìm nhanh (vd: setup, risk, ltf...)"
                       style={{
-                        fontSize: 13,
-                        color: "#9ca3af",
+                        flexGrow: 1,
+                        minWidth: 0,
+                        padding: "7px 9px",
+                        borderRadius: 10,
+                        border: "1px solid #4b5563",
+                        backgroundColor: "#020617",
+                        color: "#e5e7eb",
+                        fontSize: 12,
                       }}
-                    >
-                      Kết quả tìm kiếm:{" "}
-                      <strong>{searchResults.length}</strong> command
-                    </div>
-
-                    {searchResults.length === 0 && (
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#6b7280",
+                    />
+                    {commandSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCommandSearch("");
+                          setSelectedCommandId("");
                         }}
+                        style={tinySecondaryButtonStyle()}
                       >
-                        Không tìm thấy command phù hợp với từ khóa hiện tại.
-                      </div>
-                    )}
-
-                    {searchResults.length > 0 && (
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fit, minmax(240px, 1fr))",
-                          gap: 10,
-                        }}
-                      >
-                        {searchResults.map((cmd) => (
-                          <div
-                            key={cmd.id}
-                            style={{
-                              borderRadius: 10,
-                              border: "1px solid #4b5563",
-                              padding: 10,
-                              background:
-                                "radial-gradient(circle at top left, rgba(59,130,246,0.10), transparent)",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 6,
-                              position: "relative",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {cmd.label}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                color: "#9ca3af",
-                                minHeight: 40,
-                                maxHeight: 80,
-                                overflow: "hidden",
-                                whiteSpace: "pre-line",
-                                position: "relative",
-                              }}
-                            >
-                              {cmd.text}
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  height: 16,
-                                  background:
-                                    "linear-gradient(transparent, #020617)",
-                                }}
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleCopyCommand(cmd.id, cmd.text)
-                              }
-                              style={tinySecondaryButtonStyle({
-                                alignSelf: "flex-start",
-                                marginTop: 2,
-                              })}
-                            >
-                              {copiedCommandId === cmd.id
-                                ? "✓ Đã copy"
-                                : "Copy"}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                        Xoá
+                      </button>
                     )}
                   </div>
-                )}
 
-                {/* Nếu không search → hiển thị theo group (accordion) như cũ */}
-                {!commandSearch.trim() &&
-                  commandGroups.map((group) => {
-                    const visibleItems = group.items;
-                    if (!visibleItems.length) return null;
-
-                    return (
-                      <details
-                        key={group.id}
+                  {/* Group + Command select */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    {!usingSearch && (
+                      <select
+                        value={selectedGroupId}
+                        onChange={(e) => {
+                          setSelectedGroupId(e.target.value);
+                          setSelectedCommandId("");
+                        }}
                         style={{
+                          flexBasis: "180px",
+                          padding: "6px 8px",
+                          borderRadius: 10,
+                          border: "1px solid #4b5563",
                           backgroundColor: "#020617",
-                          borderRadius: 12,
-                          padding: 12,
-                          border: "1px solid #334155",
+                          color: "#e5e7eb",
+                          fontSize: 12,
                         }}
                       >
-                        <summary
-                          style={{
-                            cursor: "pointer",
-                            fontSize: 14,
-                            fontWeight: 600,
-                            userSelect: "none",
-                            listStyle: "none",
-                            outline: "none",
-                          }}
-                        >
-                          {group.label}
-                        </summary>
+                        {commandGroups.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
 
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "repeat(auto-fit, minmax(240px, 1fr))",
-                            gap: 10,
-                            marginTop: 8,
-                          }}
-                        >
-                          {visibleItems.map((cmd) => (
-                            <div
-                              key={cmd.id}
-                              style={{
-                                borderRadius: 10,
-                                border: "1px solid #4b5563",
-                                padding: 10,
-                                background:
-                                  "radial-gradient(circle at top left, rgba(59,130,246,0.10), transparent)",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 6,
-                                position: "relative",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {cmd.label}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 12,
-                                  color: "#9ca3af",
-                                  minHeight: 40,
-                                  maxHeight: 80,
-                                  overflow: "hidden",
-                                  whiteSpace: "pre-line",
-                                  position: "relative",
-                                }}
-                              >
-                                {cmd.text}
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    height: 16,
-                                    background:
-                                      "linear-gradient(transparent, #020617)",
-                                  }}
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleCopyCommand(cmd.id, cmd.text)
-                                }
-                                style={tinySecondaryButtonStyle({
-                                  alignSelf: "flex-start",
-                                  marginTop: 2,
-                                })}
-                              >
-                                {copiedCommandId === cmd.id
-                                  ? "✓ Đã copy"
-                                  : "Copy"}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                    );
-                  })}
-                {/* Dynamic position command */}
+                    <select
+                      value={selectedCommand?.id || ""}
+                      onChange={(e) =>
+                        setSelectedCommandId(e.target.value)
+                      }
+                      style={{
+                        flexGrow: 1,
+                        minWidth: usingSearch ? "220px" : "160px",
+                        padding: "6px 8px",
+                        borderRadius: 10,
+                        border: "1px solid #4b5563",
+                        backgroundColor: "#020617",
+                        color: "#e5e7eb",
+                        fontSize: 12,
+                      }}
+                    >
+                      {visibleCommands.map((cmd) => (
+                        <option key={cmd.id} value={cmd.id}>
+                          {cmd.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Preview + Copy */}
                 <div
                   style={{
-                    marginTop: 4,
-                    borderRadius: 12,
+                    borderRadius: 10,
                     border: "1px solid #4b5563",
-                    padding: 12,
-                    background:
-                      "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(56,189,248,0.05))",
+                    padding: 10,
+                    backgroundColor: "#020617",
                     display: "flex",
                     flexDirection: "column",
                     gap: 8,
@@ -1397,143 +1377,55 @@ function BybitSnapshotV3Page() {
                 >
                   <div
                     style={{
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: 600,
                     }}
                   >
-                    Command cho lệnh đang giữ (ĐANG LONG/SHORT @ ..., STOPLOSS
-                    @ ...)
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                      alignItems: "center",
-                    }}
-                  >
-                    <label
-                      style={{
-                        fontSize: 12,
-                        color: "#9ca3af",
-                      }}
-                    >
-                      Side:
-                    </label>
-                    <select
-                      value={positionSide}
-                      onChange={(e) => setPositionSide(e.target.value)}
-                      style={{
-                        padding: "4px 8px",
-                        borderRadius: 8,
-                        border: "1px solid #4b5563",
-                        backgroundColor: "#020617",
-                        color: "#e5e7eb",
-                        fontSize: 12,
-                      }}
-                    >
-                      <option value="LONG">LONG</option>
-                      <option value="SHORT">SHORT</option>
-                    </select>
-
-                    <label
-                      style={{
-                        fontSize: 12,
-                        color: "#9ca3af",
-                        marginLeft: 4,
-                      }}
-                    >
-                      Entry @
-                    </label>
-                    <input
-                      type="text"
-                      value={entryPrice}
-                      onChange={(e) => setEntryPrice(e.target.value)}
-                      placeholder="Ví dụ: 3335"
-                      style={{
-                        width: 90,
-                        padding: "4px 6px",
-                        borderRadius: 8,
-                        border: "1px solid #4b5563",
-                        backgroundColor: "#020617",
-                        color: "#e5e7eb",
-                        fontSize: 12,
-                      }}
-                    />
-
-                    <label
-                      style={{
-                        fontSize: 12,
-                        color: "#9ca3af",
-                        marginLeft: 4,
-                      }}
-                    >
-                      SL @
-                    </label>
-                    <input
-                      type="text"
-                      value={stopPrice}
-                      onChange={(e) => setStopPrice(e.target.value)}
-                      placeholder="Ví dụ: 3270"
-                      style={{
-                        width: 90,
-                        padding: "4px 6px",
-                        borderRadius: 8,
-                        border: "1px solid #4b5563",
-                        backgroundColor: "#020617",
-                        color: "#e5e7eb",
-                        fontSize: 12,
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "#9ca3af",
-                      marginTop: 4,
-                    }}
-                  >
-                    Xem trước:
+                    {selectedCommand?.label || "Chưa có command"}
                   </div>
                   <div
                     style={{
                       fontFamily:
                         "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
                       fontSize: 12,
+                      color: "#9ca3af",
+                      whiteSpace: "pre-wrap",
+                      maxHeight: 140,
+                      overflowY: "auto",
                       padding: "6px 8px",
                       borderRadius: 8,
-                      border: "1px solid rgba(148,163,184,0.7)",
-                      backgroundColor: "#020617",
+                      border: "1px solid rgba(148,163,184,0.5)",
                     }}
                   >
-                    {dynamicPositionCommand}
+                    {selectedCommand?.text || "—"}
                   </div>
-
                   <div>
                     <button
                       type="button"
+                      disabled={!selectedCommand}
                       onClick={() =>
+                        selectedCommand &&
                         handleCopyCommand(
-                          "cmd-position-dynamic",
-                          dynamicPositionCommand
+                          selectedCommand.id,
+                          selectedCommand.text
                         )
                       }
                       style={secondaryButtonStyle({
-                        marginTop: 6,
                         fontSize: 12,
+                        marginTop: 4,
                       })}
                     >
-                      {copiedCommandId === "cmd-position-dynamic"
-                        ? "✓ Đã copy"
-                        : "Copy command (kèm macro)"}
+                      {selectedCommand &&
+                        copiedCommandId === selectedCommand.id
+                        ? "✓ Đã copy command"
+                        : "Copy command (tự chọn HTF/LTF)"}
                     </button>
                   </div>
                 </div>
               </div>
             </section>
           )}
+
 
           {/* JSON viewer – collapsible */}
           {snapshot && (
