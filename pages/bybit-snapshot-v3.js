@@ -8,6 +8,27 @@ import { buildSnapshotV3, buildLtfSnapshotV3 } from "../lib/snapshot-v3";
 
 const HTF_REF_KEY = "PA_LAST_HTF_REF_V3";
 
+// Lưu HTF ref theo từng symbol để tránh nhầm ETH/BTC khi generate LTF
+const HTF_REF_MAP_KEY = `${HTF_REF_KEY}_MAP`;
+
+const readHtfRefMap = () => {
+  try {
+    const raw = localStorage.getItem(HTF_REF_MAP_KEY);
+    if (!raw) return {};
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === "object" ? obj : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeHtfRefMap = (mapObj) => {
+  try {
+    localStorage.setItem(HTF_REF_MAP_KEY, JSON.stringify(mapObj || {}));
+  } catch {
+    // ignore
+  }
+};
 
 
 // ==========================
@@ -481,11 +502,20 @@ function BybitSnapshotV3Page() {
       const ts = result.generated_at || Date.now();
       setLastHtfGeneratedAt(ts);
 
+      // Backward-compatible: vẫn lưu key cũ (1 ref gần nhất)
       try {
         localStorage.setItem(HTF_REF_KEY, String(ts));
       } catch (e) {
         // ignore
       }
+
+      // NEW: lưu theo symbol để LTF không bị nhầm ref giữa ETH/BTC
+      const htfMap = readHtfRefMap();
+      for (const sym of symbols) {
+        htfMap[sym] = ts;
+      }
+      writeHtfRefMap(htfMap);
+
 
       const firstSymbol =
         result?.per_exchange?.bybit?.symbols?.[0]?.symbol ||
@@ -527,22 +557,55 @@ function BybitSnapshotV3Page() {
       setLoading(true);
 
       // Lấy HTF ref từ state trước, nếu không có thì fallback localStorage
-      let htfRef = lastHtfGeneratedAt;
+      // Ưu tiên HTF ref theo symbol để tránh nhầm ETH/BTC khi generate LTF
+      let htfRef = null;
 
-      if (!htfRef) {
-        try {
-          const saved = localStorage.getItem(HTF_REF_KEY);
-          if (saved) htfRef = Number(saved);
-        } catch (e) {
-          // ignore
+      // 1) Thử lấy theo symbol map
+      const htfMap = readHtfRefMap();
+      const missing = symbols.filter((s) => !htfMap[s]);
+
+      if (missing.length) {
+        setError(
+          `Chưa có HTF reference cho: ${missing.join(", ")}. Hãy bấm Generate HTF cho đúng symbol trước.`
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Nếu nhiều symbol, bắt buộc cùng 1 HTF ref (cùng phiên HTF snapshot)
+      const refs = Array.from(new Set(symbols.map((s) => Number(htfMap[s])))).filter(Number.isFinite);
+
+      if (refs.length !== 1) {
+        setError(
+          `HTF reference của các symbol không đồng nhất (${refs.join(", ")}). ` +
+          `Hãy Generate HTF lại với đúng nhóm symbol bạn muốn timing LTF.`
+        );
+        setLoading(false);
+        return;
+      }
+
+      htfRef = refs[0];
+
+      // 2) Fallback cuối cùng (backward-compatible): state hoặc key cũ
+      if (!htfRef || !Number.isFinite(htfRef)) {
+        if (Number.isFinite(lastHtfGeneratedAt)) {
+          htfRef = lastHtfGeneratedAt;
+        } else {
+          try {
+            const saved = localStorage.getItem(HTF_REF_KEY);
+            if (saved) htfRef = Number(saved);
+          } catch (e) {
+            // ignore
+          }
         }
       }
 
       if (!htfRef || !Number.isFinite(htfRef)) {
-        setError("Chưa có HTF reference. Hãy bấm Generate HTF trước (hoặc refresh đã xóa state).");
+        setError("Chưa có HTF reference. Hãy bấm Generate HTF trước.");
         setLoading(false);
         return;
       }
+
 
       const result = await buildLtfSnapshotV3(symbols, htfRef);
 
