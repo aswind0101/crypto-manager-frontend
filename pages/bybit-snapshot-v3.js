@@ -2,8 +2,13 @@
 // Bybit Snapshot v3 – UI v2.0
 // Next.js pages router – React client page sử dụng buildSnapshotV3 & buildLtfSnapshotV3
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
+
 import { buildSnapshotV3, buildLtfSnapshotV3 } from "../lib/snapshot-v3";
+
+const HTF_REF_KEY = "PA_LAST_HTF_REF_V3";
+
+
 
 // ==========================
 // STATIC COMMAND DEFINITIONS
@@ -323,6 +328,19 @@ function BybitSnapshotV3Page() {
 
   const [lastHtfGeneratedAt, setLastHtfGeneratedAt] = useState(null);
 
+  // HTF reference restore (để refresh không bắt generate HTF lại)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(HTF_REF_KEY);
+      if (saved) {
+        const n = Number(saved);
+        if (Number.isFinite(n)) setLastHtfGeneratedAt(n);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
   const allCommands = useMemo(
     () => [...BASE_COMMANDS, ...EVENT_COMMANDS],
     []
@@ -462,6 +480,13 @@ function BybitSnapshotV3Page() {
 
       const ts = result.generated_at || Date.now();
       setLastHtfGeneratedAt(ts);
+
+      try {
+        localStorage.setItem(HTF_REF_KEY, String(ts));
+      } catch (e) {
+        // ignore
+      }
+
       const firstSymbol =
         result?.per_exchange?.bybit?.symbols?.[0]?.symbol ||
         symbols[0] ||
@@ -506,7 +531,26 @@ function BybitSnapshotV3Page() {
         return;
       }
 
-      const result = await buildLtfSnapshotV3(symbols, lastHtfGeneratedAt);
+      // Lấy HTF ref từ state trước, nếu không có thì fallback localStorage
+      let htfRef = lastHtfGeneratedAt;
+
+      if (!htfRef) {
+        try {
+          const saved = localStorage.getItem(HTF_REF_KEY);
+          if (saved) htfRef = Number(saved);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      if (!htfRef || !Number.isFinite(htfRef)) {
+        setError("Chưa có HTF reference. Hãy bấm Generate HTF trước (hoặc refresh đã xóa state).");
+        setLoading(false);
+        return;
+      }
+
+      const result = await buildLtfSnapshotV3(symbols, htfRef);
+
 
       if (!result || typeof result !== "object") {
         throw new Error("LTF snapshot trả về không hợp lệ.");
