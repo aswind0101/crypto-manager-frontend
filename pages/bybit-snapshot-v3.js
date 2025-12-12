@@ -607,12 +607,6 @@ function BybitSnapshotV3Page() {
 
     try {
       setLoading(true);
-
-      if (!lastHtfGeneratedAt) {
-        setError("Bạn chưa tạo HTF snapshot trong session này. Hãy tạo lại HTF mới nhất trước rồi mới tạo LTF.");
-        return;
-      }
-
       // Ưu tiên HTF ref theo symbol để tránh nhầm ETH/BTC khi generate LTF
       let htfRef = null;
 
