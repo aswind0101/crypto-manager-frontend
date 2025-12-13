@@ -30,7 +30,7 @@ function Categories() {
     const uid = user.uid;
     const CACHE_KEY = `categories_cache_${uid}`;
     const CACHE_EXPIRY_KEY = `categories_cache_expiry_${uid}`;
-    const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 giờ
+    const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 giờ.
 
     try {
       const idToken = await user.getIdToken();
