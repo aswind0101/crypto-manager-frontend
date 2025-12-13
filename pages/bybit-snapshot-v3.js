@@ -25,7 +25,7 @@ const readHtfRefMap = () => {
     return {};
   }
 };
-
+//
 const writeHtfRefMap = (mapObj) => {
   try {
     localStorage.setItem(HTF_REF_MAP_KEY, JSON.stringify(mapObj || {}));
