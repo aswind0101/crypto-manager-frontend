@@ -191,7 +191,7 @@ function normalizeToMs(value) {
     return null;
 }
 
-// Gọi Dune bằng flow execute -> poll kết quả, có hỗ trợ query params ({{asset}})
+// Gọi Dune bằng flow execute -> poll kết quả, có hỗ trợ query params ({{asset}}).
 async function getFromDune(
     queryId,
     params = {},
