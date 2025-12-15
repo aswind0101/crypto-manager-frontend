@@ -2,75 +2,8 @@
 // Bybit Snapshot v3 – UI v2.0
 // Next.js pages router – React client page sử dụng buildSnapshotV3 & buildLtfSnapshotV3
 
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { buildSnapshotV3, buildLtfSnapshotV3 } from "../lib/snapshot-v3";
-
-const HTF_REF_KEY = "PA_LAST_HTF_REF_V3";
-
-// Lưu HTF ref theo từng symbol để tránh nhầm ETH/BTC khi generate LTF
-const HTF_REF_MAP_KEY = `${HTF_REF_KEY}_MAP`;
-
-// Lưu draft snapshot vào localStorage để không mất dữ liệu nếu chưa kịp Download
-// Lưu ý: localStorage có giới hạn dung lượng (~5MB). Tool này chỉ lưu "last draft" cho HTF/LTF.
-const DRAFT_HTF_SNAPSHOT_KEY = "PA_DRAFT_HTF_SNAPSHOT_V3";
-const DRAFT_LTF_SNAPSHOT_KEY = "PA_DRAFT_LTF_SNAPSHOT_V3";
-
-const readHtfRefMap = () => {
-  try {
-    const raw = localStorage.getItem(HTF_REF_MAP_KEY);
-    if (!raw) return {};
-    const obj = JSON.parse(raw);
-    return obj && typeof obj === "object" ? obj : {};
-  } catch {
-    return {};
-  }
-};
-//
-const writeHtfRefMap = (mapObj) => {
-  try {
-    localStorage.setItem(HTF_REF_MAP_KEY, JSON.stringify(mapObj || {}));
-  } catch {
-    // ignore
-  }
-};
-
-const saveDraftSnapshot = (key, payload) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(payload));
-    return true;
-  } catch (e) {
-    console.warn("[bybit-snapshot-v3] saveDraftSnapshot failed:", e?.message || e);
-    return false;
-  }
-};
-
-const readDraftSnapshot = (key) => {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    return obj && typeof obj === "object" ? obj : null;
-  } catch {
-    return null;
-  }
-};
-
-const downloadJsonObject = (obj, filename = "snapshot.json") => {
-  const text = JSON.stringify(obj, null, 2);
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
-
-
-// NOTE: do not use React hooks outside the component.
-
 
 // ==========================
 // STATIC COMMAND DEFINITIONS
@@ -388,21 +321,6 @@ function BybitSnapshotV3Page() {
   const [stopPrice, setStopPrice] = useState("");
   const [commandSearch, setCommandSearch] = useState("");
 
-  const [lastHtfGeneratedAt, setLastHtfGeneratedAt] = useState(null);
-
-  // Restore last HTF ref after page refresh (backward-compatible)
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(HTF_REF_KEY);
-      if (saved) {
-        const n = Number(saved);
-        if (Number.isFinite(n)) setLastHtfGeneratedAt(n);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
   const allCommands = useMemo(
     () => [...BASE_COMMANDS, ...EVENT_COMMANDS],
     []
@@ -541,22 +459,6 @@ function BybitSnapshotV3Page() {
       }
 
       const ts = result.generated_at || Date.now();
-      setLastHtfGeneratedAt(ts);
-
-      try {
-        localStorage.setItem(HTF_REF_KEY, String(ts));
-      } catch (e) {
-        // ignore
-      }
-
-      // NEW: lưu HTF ref theo từng symbol để tránh nhầm khi generate LTF (ETH/BTC...)
-      const htfMap = readHtfRefMap();
-      for (const sym of symbols) {
-        htfMap[sym] = ts;
-      }
-      writeHtfRefMap(htfMap);
-
-
       const firstSymbol =
         result?.per_exchange?.bybit?.symbols?.[0]?.symbol ||
         symbols[0] ||
@@ -564,18 +466,6 @@ function BybitSnapshotV3Page() {
 
       const name = `bybit_snapshot_${ts}_${firstSymbol}.json`;
       const macro = `[DASH] FILE=${name}`;
-
-      // Lưu draft để nếu chưa kịp Download vẫn còn trong localStorage
-      saveDraftSnapshot(DRAFT_HTF_SNAPSHOT_KEY, {
-        type: "HTF",
-        generated_at: ts,
-        symbols,
-        fileName: name,
-        snapshot: result,
-      });
-
-      // PHƯƠNG ÁN A: Auto-download ngay sau khi generate (tránh quên bấm Download)
-      downloadJsonObject(result, name);
 
       setSnapshot(result);
       setFileName(name);
@@ -607,57 +497,8 @@ function BybitSnapshotV3Page() {
 
     try {
       setLoading(true);
-      // Ưu tiên HTF ref theo symbol để tránh nhầm ETH/BTC khi generate LTF
-      let htfRef = null;
 
-      // 1) Thử lấy theo symbol map
-      const htfMap = readHtfRefMap();
-      const missing = symbols.filter((s) => !htfMap[s]);
-
-      if (missing.length) {
-        setError(
-          `Chưa có HTF reference cho: ${missing.join(", ")}. Hãy bấm Generate HTF cho đúng symbol trước.`
-        );
-        setLoading(false);
-        return;
-      }
-
-      // Nếu nhiều symbol, bắt buộc cùng 1 HTF ref (cùng phiên HTF snapshot)
-      const refs = Array.from(new Set(symbols.map((s) => Number(htfMap[s])))).filter(Number.isFinite);
-
-      if (refs.length !== 1) {
-        setError(
-          `HTF reference của các symbol không đồng nhất (${refs.join(", ")}). ` +
-            `Hãy Generate HTF lại với đúng nhóm symbol bạn muốn timing LTF.`
-        );
-        setLoading(false);
-        return;
-      }
-
-      htfRef = refs[0];
-
-      // 2) Fallback cuối cùng (backward-compatible): state hoặc key cũ
-      if (!htfRef || !Number.isFinite(htfRef)) {
-        if (Number.isFinite(lastHtfGeneratedAt)) {
-          htfRef = lastHtfGeneratedAt;
-        } else {
-          try {
-            const saved = localStorage.getItem(HTF_REF_KEY);
-            if (saved) htfRef = Number(saved);
-          } catch (e) {
-            // ignore
-          }
-        }
-      }
-
-      if (!htfRef || !Number.isFinite(htfRef)) {
-        setError("Chưa có HTF reference. Hãy bấm Generate HTF trước.");
-        setLoading(false);
-        return;
-      }
-
-      const result = await buildLtfSnapshotV3(symbols, htfRef);
-
+      const result = await buildLtfSnapshotV3(symbols);
 
       if (!result || typeof result !== "object") {
         throw new Error("LTF snapshot trả về không hợp lệ.");
@@ -669,18 +510,6 @@ function BybitSnapshotV3Page() {
       const name = `bybit_ltf_snapshot_${ts}_${firstSymbol}.json`;
       const macro = `[DASH] FILE=${name}`;
 
-      saveDraftSnapshot(DRAFT_LTF_SNAPSHOT_KEY, {
-        type: "LTF",
-        parent_htf_generated_at: htfRef,
-        generated_at: ts,
-        symbols,
-        fileName: name,
-        snapshot: result,
-      });
-
-      // PHƯƠNG ÁN A: Auto-download ngay sau khi generate (tránh quên bấm Download)
-      downloadJsonObject(result, name);
-
       setSnapshot(result);
       setFileName(name);
       setDashMacro(macro);
@@ -690,7 +519,7 @@ function BybitSnapshotV3Page() {
     } finally {
       setLoading(false);
     }
-  }, [symbolsText, lastHtfGeneratedAt]);
+  }, [symbolsText]);
 
   const handleCopyJSON = useCallback(() => {
     if (!snapshot) return;
@@ -739,7 +568,16 @@ function BybitSnapshotV3Page() {
 
   const handleDownloadJSON = useCallback(() => {
     if (!snapshot) return;
-    downloadJsonObject(snapshot, fileName || "snapshot_v3.json");
+    const text = JSON.stringify(snapshot, null, 2);
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName || "snapshot_v3.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }, [snapshot, fileName]);
 
   const handleCopyCommand = useCallback(
