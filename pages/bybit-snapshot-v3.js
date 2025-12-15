@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { buildSnapshotV3, buildLtfSnapshotV3 } from "../lib/snapshot-v3";
 import WorkflowStepper from "../components/snapshot/WorkflowStepper";
 import Card from "../components/snapshot/Card";
@@ -45,6 +45,43 @@ Tổng kết phiên theo rulebook:
 - Setup có đúng quy trình 2 bước không?
 - Sai ở đâu (nếu có) và cách sửa.`,
 };
+const LS_KEY = "snapshot_console_v3_session";
+
+function safeParse(json) {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeSession(raw) {
+  // Tránh crash nếu schema thay đổi
+  if (!raw || typeof raw !== "object") return null;
+
+  const s = {
+    stage: raw.stage || "SESSION_START",
+    symbolsText: raw.symbolsText || "BTCUSDT",
+    step1Status: raw.step1Status || "",
+    step2Status: raw.step2Status || "",
+    posSide: raw.posSide || "SHORT",
+    posEntry: raw.posEntry || "",
+    posStop: raw.posStop || "",
+    posSize: raw.posSize || "0.5R",
+    htf: raw.htf || { snapshot: null, fileName: "", generatedAt: 0 },
+    ltf: raw.ltf || { snapshot: null, fileName: "", generatedAt: 0 },
+    // Option: lưu/tắt snapshot để tránh vượt quota
+    persistSnapshots: raw.persistSnapshots ?? true,
+  };
+
+  // Nếu user tắt persistSnapshots thì bỏ snapshot data khi restore
+  if (!s.persistSnapshots) {
+    s.htf = { ...s.htf, snapshot: null };
+    s.ltf = { ...s.ltf, snapshot: null };
+  }
+
+  return s;
+}
 
 function normalizeSymbols(input) {
   return (input || "")
@@ -76,6 +113,80 @@ export default function BybitSnapshotV3New() {
 
   // UI
   const [toast, setToast] = useState("");
+  const [persistSnapshots, setPersistSnapshots] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = safeParse(localStorage.getItem(LS_KEY));
+    const restored = sanitizeSession(raw);
+    if (!restored) return;
+
+    setStage(restored.stage);
+    setSymbolsText(restored.symbolsText);
+    setStep1Status(restored.step1Status);
+    setStep2Status(restored.step2Status);
+    setPosSide(restored.posSide);
+    setPosEntry(restored.posEntry);
+    setPosStop(restored.posStop);
+    setPosSize(restored.posSize);
+    setPersistSnapshots(restored.persistSnapshots);
+
+    // restore snapshots if allowed
+    if (restored.persistSnapshots) {
+      setHtf(restored.htf);
+      setLtf(restored.ltf);
+    }
+
+    setToast("Session restored.");
+    setTimeout(() => setToast(""), 1400);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const payload = {
+      stage,
+      symbolsText,
+      step1Status,
+      step2Status,
+      posSide,
+      posEntry,
+      posStop,
+      posSize,
+      persistSnapshots,
+      htf: persistSnapshots ? htf : { ...htf, snapshot: null },
+      ltf: persistSnapshots ? ltf : { ...ltf, snapshot: null },
+    };
+
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(payload));
+    } catch (e) {
+      // Nếu vượt quota: tự fallback sang “không lưu snapshot JSON”
+      console.warn("localStorage quota exceeded; saving without snapshots.", e);
+      const fallback = {
+        ...payload,
+        persistSnapshots: false,
+        htf: { ...htf, snapshot: null },
+        ltf: { ...ltf, snapshot: null },
+      };
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(fallback));
+      } catch { }
+    }
+  }, [
+    stage,
+    symbolsText,
+    step1Status,
+    step2Status,
+    posSide,
+    posEntry,
+    posStop,
+    posSize,
+    persistSnapshots,
+    htf,
+    ltf,
+  ]);
 
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
@@ -313,6 +424,47 @@ export default function BybitSnapshotV3New() {
               <div className="text-xs text-slate-500">
                 UI sẽ tự khóa/mở Step2 và Position theo hai trạng thái này.
               </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-slate-300">Persist on Refresh</div>
+                <label className="flex items-center gap-2 text-xs text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={persistSnapshots}
+                    onChange={(e) => setPersistSnapshots(e.target.checked)}
+                  />
+                  Save snapshots
+                </label>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                Tắt “Save snapshots” nếu lo quota localStorage: tool vẫn nhớ workflow nhưng không giữ JSON.
+              </div>
+            </div>
+
+            <div className="mt-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  try { localStorage.removeItem(LS_KEY); } catch { }
+
+                  setStage("SESSION_START");
+                  setSymbolsText("BTCUSDT");
+                  setHtf({ snapshot: null, fileName: "", generatedAt: 0 });
+                  setLtf({ snapshot: null, fileName: "", generatedAt: 0 });
+                  setStep1Status("");
+                  setStep2Status("");
+                  setPosSide("SHORT");
+                  setPosEntry("");
+                  setPosStop("");
+                  setPosSize("0.5R");
+                  setPersistSnapshots(true);
+
+                  showToast("Session reset.");
+                }}
+              >
+                Reset Session
+              </Button>
             </div>
           </Card>
         </div>
