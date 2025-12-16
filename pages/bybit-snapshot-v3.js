@@ -22,16 +22,18 @@ export default function BybitSnapshotV3New() {
 
   const [toast, setToast] = useState("");
 
-  // NEW: track which copy button is currently showing "Copied ✓"
+  // per-button "Copied ✓"
   const [copiedKey, setCopiedKey] = useState("");
   const COPIED_RESET_MS = 1200;
+
+  // UI state (new)
+  const [openCommands, setOpenCommands] = useState(false);
 
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 1400);
   };
 
-  // NEW: copy + set per-button copied state
   const copyText = async (text, okMsg, key) => {
     try {
       if (!text) return;
@@ -47,7 +49,6 @@ export default function BybitSnapshotV3New() {
         document.body.removeChild(ta);
       }
 
-      // per-button feedback
       if (key) {
         setCopiedKey(key);
         setTimeout(() => {
@@ -70,6 +71,8 @@ export default function BybitSnapshotV3New() {
 
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
+
+  const ready = Boolean(htf.fileName && ltf.fileName);
 
   /**
    * SPEC: FULL dashboard macro MUST be one line with 2 files
@@ -116,7 +119,6 @@ export default function BybitSnapshotV3New() {
     return "";
   }, [htf.fileName, ltf.fileName, primarySymbol]);
 
-  // NEW: helper to render a copy button with inline "Copied ✓"
   const CopyBtn = ({ copyKey, label, onClick, disabled }) => (
     <Button variant="secondary" onClick={onClick} disabled={disabled}>
       {copiedKey === copyKey ? "Copied ✓" : label}
@@ -143,7 +145,6 @@ export default function BybitSnapshotV3New() {
   const downloadBoth = () => {
     if (!htf.snapshot || !ltf.snapshot) return;
 
-    // 1 click → browser sẽ tải 2 file liên tiếp (có thể cần allow multiple downloads lần đầu)
     downloadJson(htf.snapshot, htf.fileName);
     setTimeout(() => {
       downloadJson(ltf.snapshot, ltf.fileName);
@@ -197,193 +198,339 @@ export default function BybitSnapshotV3New() {
     }
   }, [symbols, primarySymbol]);
 
+  // Small helper: chip-like status
+  const StatusChip = () => (
+    <div
+      className={[
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs",
+        ready
+          ? "border-emerald-800/60 bg-emerald-950/30 text-emerald-200"
+          : "border-slate-700 bg-slate-900 text-slate-300",
+      ].join(" ")}
+      title={ready ? "Đã sẵn sàng (có đủ 2 file)" : "Chưa có đủ file"}
+    >
+      <span
+        className={[
+          "h-2 w-2 rounded-full",
+          ready ? "bg-emerald-400" : "bg-slate-500",
+        ].join(" ")}
+      />
+      {ready ? "Ready" : "No files"}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Toast message={toast} />
 
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-lg font-semibold tracking-tight">
-                Snapshot Console v3 — Minimal
+      {/* Page container */}
+      <div className="mx-auto max-w-3xl px-3 pb-28 pt-5 sm:px-4 sm:pb-8 sm:pt-8">
+        {/* Card */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-950">
+          {/* Header (more compact) */}
+          <div className="flex items-start justify-between gap-3 px-4 py-4 sm:px-5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <div className="text-base font-semibold tracking-tight sm:text-lg">
+                  Snapshot Console v3
+                </div>
+                <div className="text-xs text-slate-500">Mobile-first</div>
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                1-click Generate (HTF+LTF) · Download 2 files · Copy macros
+                1-click Generate · Download 2 files · Copy macros
+              </div>
+            </div>
+            <div className="shrink-0">
+              <StatusChip />
+            </div>
+          </div>
+
+          <div className="border-t border-slate-800" />
+
+          {/* Content */}
+          <div className="px-4 py-4 sm:px-5">
+            {/* Symbols input */}
+            <div className="rounded-2xl border border-slate-800 bg-black/20 p-3 sm:p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Symbols</div>
+                  <div className="mt-0.5 text-xs text-slate-400">
+                    Phân tách bằng dấu phẩy hoặc khoảng trắng
+                  </div>
+                </div>
+                <div className="hidden sm:block text-xs text-slate-500">
+                  Primary:{" "}
+                  <span className="text-slate-300">{primarySymbol}</span>
+                </div>
+              </div>
+
+              <input
+                className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm outline-none focus:border-slate-600"
+                value={symbolsText}
+                onChange={(e) => setSymbolsText(e.target.value)}
+                placeholder="Ví dụ: BTCUSDT, ETHUSDT"
+                disabled={loading}
+                inputMode="text"
+                autoCapitalize="characters"
+              />
+
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 sm:hidden">
+                Primary: <span className="text-slate-300">{primarySymbol}</span>
               </div>
             </div>
 
-            <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-300">
-              {htf.fileName && ltf.fileName ? "Ready" : "No files"}
-            </div>
-          </div>
+            {/* File names (tight + readable on mobile) */}
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
+                <div className="text-xs text-slate-400">HTF file</div>
+                <div className="mt-1 break-all text-sm">
+                  {htf.fileName || "—"}
+                </div>
+              </div>
 
-          <div className="mt-4">
-            <div className="text-sm font-semibold">Symbols</div>
-            <div className="text-xs text-slate-400">
-              Phân tách bằng dấu phẩy hoặc khoảng trắng
+              <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
+                <div className="text-xs text-slate-400">LTF file</div>
+                <div className="mt-1 break-all text-sm">
+                  {ltf.fileName || "—"}
+                </div>
+              </div>
             </div>
-            <input
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-600"
-              value={symbolsText}
-              onChange={(e) => setSymbolsText(e.target.value)}
-              placeholder="Ví dụ: BTCUSDT, ETHUSDT"
-              disabled={loading}
-            />
-          </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
-            <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
-              <div className="text-xs text-slate-400">HTF file</div>
-              <div className="mt-1 break-all text-sm">{htf.fileName || "—"}</div>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
-              <div className="text-xs text-slate-400">LTF file</div>
-              <div className="mt-1 break-all text-sm">{ltf.fileName || "—"}</div>
-            </div>
-          </div>
+            {/* Quick actions (compact, mobile-friendly) */}
+            <div className="mt-4 rounded-2xl border border-slate-800 bg-black/20 p-3 sm:p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Quick Actions</div>
+                  <div className="mt-0.5 text-xs text-slate-400">
+                    Tối ưu cho thao tác nhanh (phone/iPad)
+                  </div>
+                </div>
+                <div className="hidden sm:block text-xs text-slate-500">
+                  FULL format:{" "}
+                  <span className="text-slate-300">
+                    [DASH] FILE=HTF FILE=LTF
+                  </span>
+                </div>
+              </div>
 
-          {/* Primary action buttons (KEEP download button) */}
-          <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Button
+                  variant="primary"
+                  onClick={handleGenerateBoth}
+                  disabled={loading}
+                >
+                  {loading ? "Generating..." : "Generate (HTF + LTF)"}
+                </Button>
+
+                <CopyBtn
+                  copyKey="copy_full_macro"
+                  label="Copy FULL Macro"
+                  disabled={!macroFULL}
+                  onClick={() =>
+                    copyText(macroFULL, "Copied FULL macro", "copy_full_macro")
+                  }
+                />
+
+                <Button
+                  variant="secondary"
+                  onClick={downloadBoth}
+                  disabled={!htf.snapshot || !ltf.snapshot}
+                >
+                  Download HTF + LTF
+                </Button>
+              </div>
+
+              {/* Mobile helper note (short) */}
+              <div className="mt-3 text-xs text-slate-500 sm:hidden">
+                Tip: “Copy FULL Macro” để dán nhanh vào ChatGPT.
+              </div>
+            </div>
+
+            {/* Accordion: Copy Commands */}
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setOpenCommands((v) => !v)}
+                className="flex w-full items-center justify-between rounded-2xl border border-slate-800 bg-black/20 px-3 py-3 text-left"
+              >
+                <div>
+                  <div className="text-sm font-semibold">Copy Commands</div>
+                  <div className="mt-0.5 text-xs text-slate-400">
+                    Nâng cao · mở khi cần
+                  </div>
+                </div>
+                <div className="text-xs text-slate-400">
+                  {openCommands ? "Ẩn ▲" : "Mở ▼"}
+                </div>
+              </button>
+
+              {openCommands && (
+                <div className="mt-2 rounded-2xl border border-slate-800 bg-black/20 p-3 sm:p-4">
+                  <div className="text-xs text-slate-400">
+                    Copy–paste trực tiếp vào ChatGPT. Lệnh có{" "}
+                    <span className="text-slate-300">[DASH]</span> sẽ kích hoạt
+                    dashboard; “no DASH” dùng để hỏi riêng setup.
+                  </div>
+
+                  {/* Group: Quick */}
+                  <div className="mt-4">
+                    <div className="text-xs font-semibold text-slate-300">
+                      QUICK
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <CopyBtn
+                        copyKey="copy_setup1_only"
+                        label="Setup 1 only (no DASH)"
+                        disabled={false}
+                        onClick={() =>
+                          copyText(
+                            macroSetup1Only,
+                            "Copied: Setup 1 only",
+                            "copy_setup1_only"
+                          )
+                        }
+                      />
+                      <CopyBtn
+                        copyKey="copy_part_i_ii"
+                        label="PHẦN I + II (Bias/Trend)"
+                        disabled={!macroPartIandII}
+                        onClick={() =>
+                          copyText(
+                            macroPartIandII,
+                            "Copied: PHẦN I+II",
+                            "copy_part_i_ii"
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div className="mt-2 hidden text-xs text-slate-500 sm:block">
+                      Setup 1 (no DASH) không bị rule ≥ 3 setup. PHẦN I+II để
+                      quyết định ưu tiên Long/Short trước.
+                    </div>
+                  </div>
+
+                  {/* Group: Trading */}
+                  <div className="mt-5">
+                    <div className="text-xs font-semibold text-slate-300">
+                      TRADING
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <CopyBtn
+                        copyKey="copy_part_iv"
+                        label="PHẦN IV (Trade Zone)"
+                        disabled={!macroPartIV}
+                        onClick={() =>
+                          copyText(macroPartIV, "Copied: PHẦN IV", "copy_part_iv")
+                        }
+                      />
+
+                      <CopyBtn
+                        copyKey="copy_part_iv_setup1"
+                        label="PHẦN IV · Focus Setup 1"
+                        disabled={!macroPartIVSetup1}
+                        onClick={() =>
+                          copyText(
+                            macroPartIVSetup1,
+                            "Copied: PHẦN IV (Setup 1)",
+                            "copy_part_iv_setup1"
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div className="mt-2 hidden text-xs text-slate-500 sm:block">
+                      PHẦN IV để xem entry/SL/TP nhanh; bản “Focus Setup 1” vẫn
+                      giữ output tối giản cho setup 2 & 3 để hợp lệ SPEC.
+                    </div>
+                  </div>
+
+                  {/* Group: Position */}
+                  <div className="mt-5">
+                    <div className="text-xs font-semibold text-slate-300">
+                      POSITION
+                    </div>
+                    <div className="mt-2">
+                      <CopyBtn
+                        copyKey="copy_position_template"
+                        label="Position Template (Short)"
+                        disabled={!macroPositionShort}
+                        onClick={() =>
+                          copyText(
+                            macroPositionShort,
+                            "Copied: Position template",
+                            "copy_position_template"
+                          )
+                        }
+                      />
+                      <div className="mt-2 hidden text-xs text-slate-500 sm:block">
+                        Điền ENTRY/SL để AI tập trung quản lý vị thế theo snapshot.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer note */}
+                  <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-500">
+                    FULL macro format:&nbsp;
+                    <span className="text-slate-300">
+                      [DASH] FILE=HTF FILE=LTF
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="mt-4 rounded-xl border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                {error}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Sticky bottom actions (mobile-first) */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/90 backdrop-blur sm:hidden">
+        <div className="mx-auto max-w-3xl px-3 py-3">
+          <div className="grid grid-cols-2 gap-2">
             <Button
               variant="primary"
               onClick={handleGenerateBoth}
               disabled={loading}
             >
-              {loading ? "Generating..." : "Generate (HTF + LTF)"}
+              {loading ? "Generating..." : "Generate"}
             </Button>
 
-            <Button
-              variant="secondary"
-              onClick={downloadBoth}
-              disabled={!htf.snapshot || !ltf.snapshot}
-            >
-              Download HTF + LTF
-            </Button>
-
-            {/* Copy button with inline status */}
             <CopyBtn
-              copyKey="copy_full_macro"
-              label="Copy FULL Macro"
+              copyKey="copy_full_macro_sticky"
+              label="Copy FULL"
               disabled={!macroFULL}
               onClick={() =>
-                copyText(macroFULL, "Copied FULL macro", "copy_full_macro")
+                copyText(
+                  macroFULL,
+                  "Copied FULL macro",
+                  "copy_full_macro_sticky"
+                )
               }
             />
           </div>
 
-          {/* NEW: Copy Commands panel with explanations */}
-          <div className="mt-3 rounded-2xl border border-slate-800 bg-black/20 p-3">
-            <div className="text-sm font-semibold">Copy Commands</div>
-            <div className="mt-1 text-xs text-slate-400">
-              Copy–paste trực tiếp vào ChatGPT. Mỗi nút tạo một “câu lệnh chuẩn”
-              cho đúng mode phân tích. Các lệnh có [DASH] sẽ kích hoạt dashboard
-              theo SPEC; lệnh “no DASH” chỉ dùng để hỏi riêng setup.
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3">
-              <div className="flex flex-col gap-1">
-                <CopyBtn
-                  copyKey="copy_part_iv"
-                  label="Copy PHẦN IV"
-                  disabled={!macroPartIV}
-                  onClick={() =>
-                    copyText(macroPartIV, "Copied: PHẦN IV", "copy_part_iv")
-                  }
-                />
-                <div className="text-xs text-slate-400">
-                  Chỉ render **PHẦN IV (Trade Zone Terminal)** để xem entry/SL/TP
-                  nhanh. Vẫn giữ đúng rule ≥ 3 setup.
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <CopyBtn
-                  copyKey="copy_part_iv_setup1"
-                  label="Copy PHẦN IV · Setup 1"
-                  disabled={!macroPartIVSetup1}
-                  onClick={() =>
-                    copyText(
-                      macroPartIVSetup1,
-                      "Copied: PHẦN IV (Setup 1)",
-                      "copy_part_iv_setup1"
-                    )
-                  }
-                />
-                <div className="text-xs text-slate-400">
-                  Chỉ render PHẦN IV và yêu cầu AI **tập trung Setup 1** (setup 2
-                  & 3 vẫn xuất tối giản để hợp lệ theo SPEC).
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <CopyBtn
-                  copyKey="copy_part_i_ii"
-                  label="Copy PHẦN I + II"
-                  disabled={!macroPartIandII}
-                  onClick={() =>
-                    copyText(
-                      macroPartIandII,
-                      "Copied: PHẦN I+II",
-                      "copy_part_i_ii"
-                    )
-                  }
-                />
-                <div className="text-xs text-slate-400">
-                  Chỉ xem **Market Mode + Trend Radar** (bias & trend) để quyết
-                  định ưu tiên Long/Short trước khi vào chi tiết setup.
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <CopyBtn
-                  copyKey="copy_setup1_only"
-                  label="Copy Setup 1 only (no DASH)"
-                  disabled={false}
-                  onClick={() =>
-                    copyText(
-                      macroSetup1Only,
-                      "Copied: Setup 1 only",
-                      "copy_setup1_only"
-                    )
-                  }
-                />
-                <div className="text-xs text-slate-400">
-                  Hỏi riêng **Setup 1** mà **không kích hoạt dashboard** (không
-                  bị rule ≥ 3 setup). Dùng khi bạn chỉ muốn biết READY/INVALID.
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <CopyBtn
-                  copyKey="copy_position_template"
-                  label="Copy Position Template"
-                  disabled={!macroPositionShort}
-                  onClick={() =>
-                    copyText(
-                      macroPositionShort,
-                      "Copied: Position template",
-                      "copy_position_template"
-                    )
-                  }
-                />
-                <div className="text-xs text-slate-400">
-                  Template để bạn điền **ENTRY/SL** khi đang có lệnh. AI sẽ chuyển
-                  trọng tâm sang **quản lý vị thế** theo snapshot.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {error && (
-            <div className="mt-4 rounded-xl border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-3 text-xs text-slate-500">
-            FULL macro format:&nbsp;
-            <span className="text-slate-300">[DASH] FILE=HTF FILE=LTF</span>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+            <span className="truncate">
+              {ready ? "Ready: HTF + LTF files" : "Chưa có đủ HTF + LTF"}
+            </span>
+            <button
+              type="button"
+              className="underline underline-offset-2"
+              onClick={() => {
+                if (!openCommands) setOpenCommands(true);
+                // scroll a bit up so user sees the accordion content
+                window.scrollTo({ top: 999999, behavior: "smooth" });
+              }}
+            >
+              Commands
+            </button>
           </div>
         </div>
       </div>
