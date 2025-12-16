@@ -59,8 +59,7 @@ export default function BybitSnapshotV3New() {
   const primarySymbol = symbols[0] || "SYMBOL";
 
   /**
-   * SPEC: FULL dashboard macro
-   * MUST be ONE line with 2 files
+   * SPEC: FULL dashboard macro MUST be one line with 2 files
    */
   const macroFULL = useMemo(() => {
     if (htf.fileName && ltf.fileName) {
@@ -68,75 +67,6 @@ export default function BybitSnapshotV3New() {
     }
     return "";
   }, [htf.fileName, ltf.fileName]);
-
-  const handleGenerateHTF = useCallback(async () => {
-    setError("");
-    if (!symbols.length) {
-      setError("Vui lòng nhập ít nhất 1 symbol, ví dụ: BTCUSDT.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const result = await buildSnapshotV3(symbols);
-      if (!result || typeof result !== "object") {
-        throw new Error("Snapshot HTF trả về không hợp lệ.");
-      }
-
-      const ts = result.generated_at || Date.now();
-      const firstSymbol =
-        result?.per_exchange?.bybit?.symbols?.[0]?.symbol || primarySymbol;
-
-      const name = `bybit_snapshot_${ts}_${firstSymbol}.json`;
-
-      setHtf({
-        snapshot: result,
-        fileName: name,
-        generatedAt: ts,
-      });
-
-      showToast("HTF snapshot created.");
-    } catch (e) {
-      console.error(e);
-      setError(e?.message || "Có lỗi khi tạo HTF snapshot.");
-    } finally {
-      setLoading(false);
-    }
-  }, [symbols, primarySymbol]);
-
-  const handleGenerateLTF = useCallback(async () => {
-    setError("");
-    if (!symbols.length) {
-      setError("Vui lòng nhập ít nhất 1 symbol, ví dụ: BTCUSDT.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const result = await buildLtfSnapshotV3(symbols);
-      if (!result || typeof result !== "object") {
-        throw new Error("Snapshot LTF trả về không hợp lệ.");
-      }
-
-      const ts = result.generated_at || Date.now();
-      const name = `bybit_ltf_snapshot_${ts}_${primarySymbol}.json`;
-
-      setLtf({
-        snapshot: result,
-        fileName: name,
-        generatedAt: ts,
-      });
-
-      showToast("LTF snapshot created.");
-    } catch (e) {
-      console.error(e);
-      setError(e?.message || "Có lỗi khi tạo LTF snapshot.");
-    } finally {
-      setLoading(false);
-    }
-  }, [symbols, primarySymbol]);
 
   const downloadJson = (obj, name) => {
     if (!obj) return;
@@ -158,12 +88,58 @@ export default function BybitSnapshotV3New() {
   const downloadBoth = () => {
     if (!htf.snapshot || !ltf.snapshot) return;
 
-    // Browser sẽ tải 2 file liên tiếp (1 click)
+    // 1 click → browser sẽ tải 2 file liên tiếp (có thể cần allow multiple downloads lần đầu)
     downloadJson(htf.snapshot, htf.fileName);
     setTimeout(() => {
       downloadJson(ltf.snapshot, ltf.fileName);
     }, 150);
   };
+
+  /**
+   * NEW: One button generates BOTH HTF + LTF
+   */
+  const handleGenerateBoth = useCallback(async () => {
+    setError("");
+    if (!symbols.length) {
+      setError("Vui lòng nhập ít nhất 1 symbol, ví dụ: BTCUSDT.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const [htfSnap, ltfSnap] = await Promise.all([
+        buildSnapshotV3(symbols),
+        buildLtfSnapshotV3(symbols),
+      ]);
+
+      if (!htfSnap || typeof htfSnap !== "object") {
+        throw new Error("Snapshot HTF trả về không hợp lệ.");
+      }
+      if (!ltfSnap || typeof ltfSnap !== "object") {
+        throw new Error("Snapshot LTF trả về không hợp lệ.");
+      }
+
+      // HTF filename: keep symbol pulled from HTF snapshot when possible
+      const htfTs = htfSnap.generated_at || Date.now();
+      const htfSymbol = htfSnap?.per_exchange?.bybit?.symbols?.[0]?.symbol || primarySymbol;
+      const htfName = `bybit_snapshot_${htfTs}_${htfSymbol}.json`;
+
+      // LTF filename: keep primary symbol (the input) for consistency
+      const ltfTs = ltfSnap.generated_at || Date.now();
+      const ltfName = `bybit_ltf_snapshot_${ltfTs}_${primarySymbol}.json`;
+
+      setHtf({ snapshot: htfSnap, fileName: htfName, generatedAt: htfTs });
+      setLtf({ snapshot: ltfSnap, fileName: ltfName, generatedAt: ltfTs });
+
+      showToast("HTF + LTF snapshots created.");
+    } catch (e) {
+      console.error(e);
+      setError(e?.message || "Có lỗi khi tạo snapshots.");
+    } finally {
+      setLoading(false);
+    }
+  }, [symbols, primarySymbol]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -177,7 +153,7 @@ export default function BybitSnapshotV3New() {
                 Snapshot Console v3 — Minimal
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Generate HTF / LTF · Download 2 files · Copy FULL macro
+                1-click Generate (HTF+LTF) · Download 2 files · Copy FULL macro
               </div>
             </div>
 
@@ -203,33 +179,17 @@ export default function BybitSnapshotV3New() {
           <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
             <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
               <div className="text-xs text-slate-400">HTF file</div>
-              <div className="mt-1 break-all text-sm">
-                {htf.fileName || "—"}
-              </div>
+              <div className="mt-1 break-all text-sm">{htf.fileName || "—"}</div>
             </div>
             <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
               <div className="text-xs text-slate-400">LTF file</div>
-              <div className="mt-1 break-all text-sm">
-                {ltf.fileName || "—"}
-              </div>
+              <div className="mt-1 break-all text-sm">{ltf.fileName || "—"}</div>
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              onClick={handleGenerateHTF}
-              disabled={loading}
-            >
-              {loading ? "Generating..." : "Generate HTF"}
-            </Button>
-
-            <Button
-              variant="gold"
-              onClick={handleGenerateLTF}
-              disabled={loading}
-            >
-              {loading ? "Generating..." : "Generate LTF"}
+            <Button variant="primary" onClick={handleGenerateBoth} disabled={loading}>
+              {loading ? "Generating..." : "Generate (HTF + LTF)"}
             </Button>
 
             <Button
@@ -242,9 +202,7 @@ export default function BybitSnapshotV3New() {
 
             <Button
               variant="secondary"
-              onClick={() =>
-                copyText(macroFULL, "Copied FULL macro")
-              }
+              onClick={() => copyText(macroFULL, "Copied FULL macro")}
               disabled={!macroFULL}
             >
               Copy FULL Macro
@@ -259,9 +217,7 @@ export default function BybitSnapshotV3New() {
 
           <div className="mt-3 text-xs text-slate-500">
             FULL macro format:&nbsp;
-            <span className="text-slate-300">
-              [DASH] FILE=HTF FILE=LTF
-            </span>
+            <span className="text-slate-300">[DASH] FILE=HTF FILE=LTF</span>
           </div>
         </div>
       </div>
