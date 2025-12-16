@@ -68,6 +68,41 @@ export default function BybitSnapshotV3New() {
     return "";
   }, [htf.fileName, ltf.fileName]);
 
+  // --- NEW: canned copy macros (ready-to-paste commands) ---
+  const macroPartIV = useMemo(() => {
+    if (htf.fileName && ltf.fileName) {
+      return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}\nchỉ render PHẦN IV`;
+    }
+    return "";
+  }, [htf.fileName, ltf.fileName]);
+
+  const macroPartIVSetup1 = useMemo(() => {
+    if (htf.fileName && ltf.fileName) {
+      return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}\nchỉ render PHẦN IV, tập trung Setup 1`;
+    }
+    return "";
+  }, [htf.fileName, ltf.fileName]);
+
+  const macroPartIandII = useMemo(() => {
+    if (htf.fileName) {
+      return `[DASH] FILE=${htf.fileName}\nchỉ render PHẦN I và PHẦN II`;
+    }
+    return "";
+  }, [htf.fileName]);
+
+  // Non-DASH (always usable; doesn't require files)
+  const macroSetup1Only = useMemo(() => {
+    return `Kiểm tra Setup 1 ${primarySymbol} theo snapshot mới (không dùng [DASH])`;
+  }, [primarySymbol]);
+
+  // Position template (requires files)
+  const macroPositionShort = useMemo(() => {
+    if (htf.fileName && ltf.fileName) {
+      return `Mình đang Short ${primarySymbol} @<ENTRY>, SL <SL>\n[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}`;
+    }
+    return "";
+  }, [htf.fileName, ltf.fileName, primarySymbol]);
+
   const downloadJson = (obj, name) => {
     if (!obj) return;
 
@@ -122,7 +157,8 @@ export default function BybitSnapshotV3New() {
 
       // HTF filename: keep symbol pulled from HTF snapshot when possible
       const htfTs = htfSnap.generated_at || Date.now();
-      const htfSymbol = htfSnap?.per_exchange?.bybit?.symbols?.[0]?.symbol || primarySymbol;
+      const htfSymbol =
+        htfSnap?.per_exchange?.bybit?.symbols?.[0]?.symbol || primarySymbol;
       const htfName = `bybit_snapshot_${htfTs}_${htfSymbol}.json`;
 
       // LTF filename: keep primary symbol (the input) for consistency
@@ -153,7 +189,7 @@ export default function BybitSnapshotV3New() {
                 Snapshot Console v3 — Minimal
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                1-click Generate (HTF+LTF) · Download 2 files · Copy FULL macro
+                1-click Generate (HTF+LTF) · Download 2 files · Copy macros
               </div>
             </div>
 
@@ -188,7 +224,11 @@ export default function BybitSnapshotV3New() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button variant="primary" onClick={handleGenerateBoth} disabled={loading}>
+            <Button
+              variant="primary"
+              onClick={handleGenerateBoth}
+              disabled={loading}
+            >
               {loading ? "Generating..." : "Generate (HTF + LTF)"}
             </Button>
 
@@ -207,6 +247,60 @@ export default function BybitSnapshotV3New() {
             >
               Copy FULL Macro
             </Button>
+          </div>
+
+          {/* NEW: Copy Commands panel */}
+          <div className="mt-3 rounded-2xl border border-slate-800 bg-black/20 p-3">
+            <div className="text-sm font-semibold">Copy Commands</div>
+            <div className="mt-1 text-xs text-slate-400">
+              Copy–paste trực tiếp vào ChatGPT. Một số lệnh yêu cầu đủ HTF+LTF
+              file.
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => copyText(macroPartIV, "Copied: PHẦN IV")}
+                disabled={!macroPartIV}
+              >
+                Copy PHẦN IV
+              </Button>
+
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  copyText(macroPartIVSetup1, "Copied: PHẦN IV (Setup 1)")
+                }
+                disabled={!macroPartIVSetup1}
+              >
+                Copy PHẦN IV · Setup 1
+              </Button>
+
+              <Button
+                variant="secondary"
+                onClick={() => copyText(macroPartIandII, "Copied: PHẦN I+II")}
+                disabled={!macroPartIandII}
+              >
+                Copy PHẦN I + II
+              </Button>
+
+              <Button
+                variant="secondary"
+                onClick={() => copyText(macroSetup1Only, "Copied: Setup 1 only")}
+              >
+                Copy Setup 1 only (no DASH)
+              </Button>
+
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  copyText(macroPositionShort, "Copied: Position template")
+                }
+                disabled={!macroPositionShort}
+              >
+                Copy Position Template
+              </Button>
+            </div>
           </div>
 
           {error && (
