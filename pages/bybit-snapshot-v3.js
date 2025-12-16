@@ -17,10 +17,12 @@ const STAGES = [
 ];
 
 const PROMPTS = {
-  SESSION_START: `MODE = SNAPSHOT_ONLY
-[SESSION START]
-XUẤT FULL DASHBOARD 6 phần.
-Kết luận: Market Mode, Bias chính của phiên, Setup ưu tiên (1–3).`,
+  SESSION_START: `[SESSION START]
+XUẤT FULL DASHBOARD 6 phần theo SPEC.
+- Nếu có 2 file (HTF+LTF): dùng đúng 1 dòng [DASH] với 2 FILE.
+- Không dùng MODE/macro khác.
+Kết luận: Market Mode, Bias chính, Setup #1-#3.`,
+
 
   STEP1: `[STEP1]
 CHECK SETUP 1
@@ -213,6 +215,15 @@ export default function BybitSnapshotV3New() {
     return ltf.fileName ? `[DASH] FILE=${ltf.fileName}` : "";
   }, [ltf.fileName]);
 
+  // SPEC: FULL dashboard with 2 files must be in ONE [DASH] line
+  const macroFULL = useMemo(() => {
+    if (htf.fileName && ltf.fileName) {
+      return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}`;
+    }
+    return "";
+  }, [htf.fileName, ltf.fileName]);
+
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 1400);
@@ -327,10 +338,18 @@ export default function BybitSnapshotV3New() {
   const stagePrompt = useMemo(() => PROMPTS[stage] || "", [stage]);
 
   const stageMacro = useMemo(() => {
-    // Step2 uses LTF file; others use HTF file by default
-    if (stage === "STEP2") return macroLTF || macroHTF;
-    return macroHTF || macroLTF;
-  }, [stage, macroHTF, macroLTF]);
+    // SPEC-aligned macro routing
+    // - FULL sections: prefer combined [DASH] FILE=HTF FILE=LTF when available
+    // - STEP1: HTF only (SETUP_STATE)
+    // - STEP2: LTF only (ENTRY_VALIDITY gate)
+    // - POSITION/END: prefer FULL for context if available
+    if (stage === "STEP1") return macroHTF || macroFULL || macroLTF;
+    if (stage === "STEP2") return macroLTF || macroFULL || macroHTF;
+
+    // SESSION_START / MONITOR / POSITION / END (and others): prefer FULL
+    return macroFULL || macroHTF || macroLTF;
+  }, [stage, macroHTF, macroLTF, macroFULL]);
+
 
   const finalPrompt = useMemo(() => {
     const prefix = stageMacro ? `${stageMacro}\n` : "";
@@ -600,6 +619,14 @@ export default function BybitSnapshotV3New() {
                 >
                   Copy Prompt
                 </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => copyText(`${macroFULL}\nXuất FULL DASHBOARD`, "Copied FULL DASHBOARD command")}
+                  disabled={!macroFULL}
+                >
+                  Copy FULL DASHBOARD
+                </Button>
+
               </div>
             </div>
 
