@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildSnapshotV3, buildLtfSnapshotV3 } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
 import Toast from "../components/snapshot/Toast";
@@ -25,6 +25,22 @@ export default function BybitSnapshotV3New() {
   ======================= */
   const [openCommands, setOpenCommands] = useState(false);
   const [cmdTab, setCmdTab] = useState("quick"); // quick | trading | position
+
+  // Generate status
+  const [progressPct, setProgressPct] = useState(0);
+  const [dots, setDots] = useState("");
+
+  /* =======================
+     TOP 100 COINS (Autocomplete)
+  ======================= */
+  const [topCoins, setTopCoins] = useState([]); // [{id,name,symbol,market_cap_rank}]
+  const [coinsLoading, setCoinsLoading] = useState(false);
+  const [coinsErr, setCoinsErr] = useState("");
+
+  const [showSug, setShowSug] = useState(false);
+  const [activeSugIndex, setActiveSugIndex] = useState(-1);
+  const inputRef = useRef(null);
+  const sugRef = useRef(null);
 
   /* =======================
      HELPERS
@@ -83,6 +99,146 @@ export default function BybitSnapshotV3New() {
   const ready = Boolean(htf.fileName && ltf.fileName);
 
   /* =======================
+     FETCH TOP 100 COINS
+  ======================= */
+  useEffect(() => {
+    let alive = true;
+    const ac = new AbortController();
+
+    const load = async () => {
+      try {
+        setCoinsErr("");
+        setCoinsLoading(true);
+
+        // CoinGecko: top coins by market cap
+        // Docs: /coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1 :contentReference[oaicite:2]{index=2}
+        const url =
+          "https://api.coingecko.com/api/v3/coins/markets" +
+          "?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false";
+
+        const res = await fetch(url, {
+          method: "GET",
+          signal: ac.signal,
+          headers: { accept: "application/json" },
+        });
+
+        if (!res.ok) throw new Error(`Coin list fetch failed (${res.status}).`);
+
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error("Coin list response invalid.");
+
+        const mapped = data
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            symbol: (c.symbol || "").toUpperCase(),
+            market_cap_rank: c.market_cap_rank ?? null,
+          }))
+          // avoid weird suggestions like USDTUSDT
+          .filter((c) => c.symbol && c.symbol !== "USDT");
+
+        if (alive) setTopCoins(mapped);
+      } catch (e) {
+        if (!alive) return;
+        if (e?.name === "AbortError") return;
+        console.error(e);
+        setCoinsErr("Không load được Top 100 coins (CoinGecko).");
+      } finally {
+        if (alive) setCoinsLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      alive = false;
+      ac.abort();
+    };
+  }, []);
+
+  /* =======================
+     AUTOCOMPLETE LOGIC
+  ======================= */
+
+  // get last token user is typing (after last space/comma)
+  const currentToken = useMemo(() => {
+    const t = (symbolsText || "").trimEnd();
+    const m = t.match(/([^,\s]+)$/);
+    return (m?.[1] || "").toUpperCase();
+  }, [symbolsText]);
+
+  const suggestions = useMemo(() => {
+    const q = currentToken;
+    if (!q || q.length < 1) return [];
+
+    const norm = q.toLowerCase();
+    const out = topCoins
+      .filter((c) => {
+        const sym = (c.symbol || "").toLowerCase();
+        const name = (c.name || "").toLowerCase();
+        return sym.includes(norm) || name.includes(norm);
+      })
+      .slice(0, 10);
+
+    return out;
+  }, [topCoins, currentToken]);
+
+  const insertSymbol = (baseSymbolUpper) => {
+    const pair = `${baseSymbolUpper}USDT`;
+
+    // Replace the last token with pair
+    const raw = symbolsText || "";
+    const trimmedEnd = raw.replace(/\s+$/, "");
+    const m = trimmedEnd.match(/^(.*?)([^,\s]*)$/);
+    const prefix = m?.[1] ?? "";
+    const newText = `${prefix}${pair}`;
+
+    // if user already had multiple tokens separated, keep UX consistent:
+    // if prefix ends with comma-less separator? (prefix usually already includes sep)
+    setSymbolsText(newText);
+
+    setShowSug(false);
+    setActiveSugIndex(-1);
+
+    // keep focus for fast multi-select
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const onInputKeyDown = (e) => {
+    if (!showSug || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSugIndex((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSugIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      // If a suggestion is active, pick it
+      if (activeSugIndex >= 0 && activeSugIndex < suggestions.length) {
+        e.preventDefault();
+        insertSymbol(suggestions[activeSugIndex].symbol);
+      }
+    } else if (e.key === "Escape") {
+      setShowSug(false);
+      setActiveSugIndex(-1);
+    }
+  };
+
+  // click outside to close suggestions
+  useEffect(() => {
+    const onDoc = (ev) => {
+      const inInput = inputRef.current?.contains(ev.target);
+      const inSug = sugRef.current?.contains(ev.target);
+      if (!inInput && !inSug) {
+        setShowSug(false);
+        setActiveSugIndex(-1);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  /* =======================
      MACROS
   ======================= */
   const macroFULL = useMemo(() => {
@@ -127,6 +283,22 @@ export default function BybitSnapshotV3New() {
   }, [htf.fileName, ltf.fileName, primarySymbol]);
 
   /* =======================
+     GENERATE STATUS (dots)
+  ======================= */
+  useEffect(() => {
+    if (!loading) {
+      setDots("");
+      return;
+    }
+    let i = 0;
+    const t = setInterval(() => {
+      i = (i + 1) % 4; // 0..3
+      setDots(i === 0 ? "" : " " + ". ".repeat(i).trim());
+    }, 350);
+    return () => clearInterval(t);
+  }, [loading]);
+
+  /* =======================
      SNAPSHOT GENERATION
   ======================= */
   const handleGenerateBoth = useCallback(async () => {
@@ -137,14 +309,24 @@ export default function BybitSnapshotV3New() {
 
     setError("");
     setLoading(true);
+    setProgressPct(0);
 
     try {
-      const [htfSnap, ltfSnap] = await Promise.all([
-        buildSnapshotV3(symbols),
-        buildLtfSnapshotV3(symbols),
-      ]);
+      setProgressPct(15);
 
-      // Keep naming predictable (same as current logic baseline)
+      // Track progress in coarse steps (cannot know real progress inside builder)
+      const htfP = buildSnapshotV3(symbols).then((r) => {
+        setProgressPct(55);
+        return r;
+      });
+
+      const ltfP = buildLtfSnapshotV3(symbols).then((r) => {
+        setProgressPct(90);
+        return r;
+      });
+
+      const [htfSnap, ltfSnap] = await Promise.all([htfP, ltfP]);
+
       const htfTs = htfSnap?.generated_at || Date.now();
       const ltfTs = ltfSnap?.generated_at || Date.now();
 
@@ -154,12 +336,16 @@ export default function BybitSnapshotV3New() {
       setHtf({ snapshot: htfSnap, fileName: htfName });
       setLtf({ snapshot: ltfSnap, fileName: ltfName });
 
+      setProgressPct(100);
       showToast("HTF + LTF snapshots created.");
     } catch (e) {
       console.error(e);
       setError("Có lỗi khi tạo snapshot.");
+      setProgressPct(0);
     } finally {
       setLoading(false);
+      // optionally keep 100% a moment, then reset to 0
+      setTimeout(() => setProgressPct(0), 800);
     }
   }, [symbols, primarySymbol]);
 
@@ -263,7 +449,7 @@ export default function BybitSnapshotV3New() {
                 Snapshot Console v3
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Mobile-first · Tabs · Command hints · Per-button copied state
+                Autocomplete Top 100 (Market Cap) · Generate progress · Per-button copied state
               </div>
             </div>
 
@@ -285,19 +471,93 @@ export default function BybitSnapshotV3New() {
           <div className="p-4">
             <div className="text-sm font-semibold">Symbols</div>
             <div className="mt-1 text-xs text-slate-400">
-              Nhập nhiều symbol bằng dấu phẩy hoặc khoảng trắng. Primary:{" "}
+              Gõ coin name/symbol để auto-fill (Top 100 MC). Primary:{" "}
               <span className="text-slate-200">{primarySymbol}</span>
             </div>
 
-            <input
-              className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm outline-none focus:border-slate-600"
-              value={symbolsText}
-              onChange={(e) => setSymbolsText(e.target.value)}
-              placeholder="BTCUSDT, ETHUSDT"
-              disabled={loading}
-              inputMode="text"
-              autoCapitalize="characters"
-            />
+            <div className="relative mt-3">
+              <input
+                ref={inputRef}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm outline-none focus:border-slate-600"
+                value={symbolsText}
+                onChange={(e) => {
+                  setSymbolsText(e.target.value);
+                  setShowSug(true);
+                  setActiveSugIndex(-1);
+                }}
+                onFocus={() => setShowSug(true)}
+                onKeyDown={onInputKeyDown}
+                placeholder="BTCUSDT, ETHUSDT"
+                disabled={loading}
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+              />
+
+              {/* Suggestions */}
+              {showSug && (coinsLoading || coinsErr || suggestions.length > 0) && (
+                <div
+                  ref={sugRef}
+                  className="absolute z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-lg"
+                >
+                  {coinsLoading ? (
+                    <div className="px-3 py-3 text-sm text-slate-300">
+                      Loading Top 100 coins…
+                    </div>
+                  ) : coinsErr ? (
+                    <div className="px-3 py-3 text-sm text-red-200">
+                      {coinsErr}
+                    </div>
+                  ) : suggestions.length === 0 ? (
+                    <div className="px-3 py-3 text-sm text-slate-400">
+                      Không có gợi ý cho “{currentToken}”.
+                    </div>
+                  ) : (
+                    <div className="max-h-72 overflow-auto">
+                      {suggestions.map((c, idx) => {
+                        const pair = `${c.symbol}USDT`;
+                        const active = idx === activeSugIndex;
+                        return (
+                          <button
+                            type="button"
+                            key={c.id}
+                            onMouseEnter={() => setActiveSugIndex(idx)}
+                            onClick={() => insertSymbol(c.symbol)}
+                            className={[
+                              "flex w-full items-center justify-between px-3 py-2 text-left",
+                              active
+                                ? "bg-slate-800/60"
+                                : "hover:bg-slate-800/40",
+                            ].join(" ")}
+                          >
+                            <div className="min-w-0">
+                              <div className="text-sm text-slate-100">
+                                {c.name}{" "}
+                                <span className="text-xs text-slate-400">
+                                  ({c.symbol})
+                                </span>
+                              </div>
+                              <div className="text-xs text-slate-400">
+                                Auto-fill:{" "}
+                                <span className="text-slate-200">{pair}</span>
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-xs text-slate-400">
+                              {c.market_cap_rank ? `#${c.market_cap_rank}` : ""}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="border-t border-slate-800 px-3 py-2 text-xs text-slate-500">
+                    Tip: dùng ↑ ↓ để chọn, Enter để insert, Esc để đóng.
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* File names */}
@@ -317,9 +577,11 @@ export default function BybitSnapshotV3New() {
           </div>
 
           {/* Quick actions */}
-          <div className="px-4 pb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <Button variant="primary" onClick={handleGenerateBoth} disabled={loading}>
-              {loading ? "Generating..." : "Generate (HTF + LTF)"}
+              {loading
+                ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
+                : "Generate (HTF + LTF)"}
             </Button>
 
             <Button
@@ -339,6 +601,20 @@ export default function BybitSnapshotV3New() {
             </Button>
           </div>
 
+          {/* Progress hint line */}
+          <div className="px-4 pb-4 text-xs text-slate-500">
+            {loading ? (
+              <span>
+                Đang generate snapshot{dots}{" "}
+                {progressPct ? `(ước lượng ${progressPct}%)` : ""}
+              </span>
+            ) : (
+              <span>
+                Tip: Generate xong → Copy FULL Macro để dán vào ChatGPT.
+              </span>
+            )}
+          </div>
+
           {/* Copy Commands */}
           <div className="px-4 pb-4">
             <button
@@ -353,7 +629,7 @@ export default function BybitSnapshotV3New() {
                 </span>
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Mỗi lệnh có chú thích; bấm 1 lần để copy.
+                Mỗi lệnh có chú thích; bấm 1 lần để copy. (Copy xong không tự đóng)
               </div>
             </button>
 
@@ -371,7 +647,7 @@ export default function BybitSnapshotV3New() {
                   <div className="space-y-2">
                     <CommandButton
                       title="FULL Macro"
-                      subtitle="Kích hoạt dashboard theo SPEC: dùng cả 2 file HTF + LTF (1 dòng). замен"
+                      subtitle="Kích hoạt dashboard theo SPEC: dùng cả 2 file HTF + LTF (1 dòng)."
                       text={macroFULL}
                       copyKey="cmd_full"
                       disabled={!macroFULL}
@@ -454,7 +730,9 @@ export default function BybitSnapshotV3New() {
               onClick={handleGenerateBoth}
               disabled={loading}
             >
-              {loading ? "Generating..." : "Generate"}
+              {loading
+                ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
+                : "Generate"}
             </Button>
 
             <Button
@@ -468,7 +746,11 @@ export default function BybitSnapshotV3New() {
 
           <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
             <span className="truncate">
-              {ready ? "Ready: HTF + LTF files" : "Chưa có đủ HTF + LTF"}
+              {loading
+                ? `Đang generate${dots}${progressPct ? ` (${progressPct}%)` : ""}`
+                : ready
+                ? "Ready: HTF + LTF files"
+                : "Chưa có đủ HTF + LTF"}
             </span>
             <button
               type="button"
