@@ -16,13 +16,38 @@ const STAGES = [
   { id: "END", label: "Session End", desc: "Tổng kết phiên" },
 ];
 
+// SPEC output guard (Appendix A/B). Inject into prompts when user expects FULL dashboard.
+const DASHBOARD_RENDER_GUARD = `[DASHBOARD_RENDER_GUARD_v1_vi]
+BẮT BUỘC (FULL DASHBOARD):
+1) Render đủ 6 phần theo đúng thứ tự & tiêu đề + icon:
+   📌 PHẦN 0 — DATA CHECK (FROM JSON)
+   📌 I. MARKET MODE LABEL
+   📌 II. TREND RADAR (Short–Mid–Long)
+   📌 III. MARKET PARTICIPANT MAP
+   📌 IV. TRADE ZONE TERMINAL (Setup Engine)
+   📌 V. ACTION SUMMARY
+   📌 VI. QUẢN LÝ LỆNH HIỆN TẠI
+
+2) Mỗi setup (>=3 setup: #1/#2/#3) phải có đủ:
+   Direction, Priority, SETUP_STATE, ENTRY_VALIDITY, CONFIDENCE SCORE,
+   Entry Zone, Stoploss, TP1/TP2/TP3 (nếu state != BUILD-UP), WHY (3–6 bullet gắn JSON path), NEXT CONDITION.
+
+3) Nếu thiếu field bắt buộc: ghi rõ “MISSING FIELD: <json_path>” và default an toàn theo SPEC.
+4) Kết thúc bằng QA CHECK theo SPEC.
+`;
+
 const PROMPTS = {
+  // NOTE (SPEC): Do NOT use MODE=... for dashboard routing.
+  // FULL dashboard is triggered ONLY by: [DASH] FILE=<HTF> FILE=<LTF>
   SESSION_START: `[SESSION START]
 XUẤT FULL DASHBOARD 6 phần theo SPEC.
-- Nếu có 2 file (HTF+LTF): dùng đúng 1 dòng [DASH] với 2 FILE.
-- Không dùng MODE/macro khác.
-Kết luận: Market Mode, Bias chính, Setup #1-#3.`,
+Kết luận: Market Mode, Bias chính của phiên, Setup ưu tiên (#1–#3).
+${DASHBOARD_RENDER_GUARD}`,
 
+  MONITOR: `[MONITOR]
+XUẤT FULL DASHBOARD 6 phần theo SPEC.
+Tập trung: zone, trigger candle đã đóng, điều kiện NEXT CONDITION cho Setup #1/#2/#3.
+${DASHBOARD_RENDER_GUARD}`,
 
   STEP1: `[STEP1]
 CHECK SETUP 1
@@ -45,8 +70,14 @@ Yêu cầu: cập nhật risk, invalidation, kế hoạch chốt TP1/TP2.`,
 Tổng kết phiên theo rulebook:
 - Bias có đổi không?
 - Setup có đúng quy trình 2 bước không?
-- Sai ở đâu (nếu có) và cách sửa.`,
+- Sai ở đâu (nếu có) và cách sửa.
+${DASHBOARD_RENDER_GUARD}`,
 };
+
+
+// Optional: a dedicated prompt to force FULL dashboard output consistency.
+const FULL_DASHBOARD_PROMPT = `Xuất FULL DASHBOARD 6 phần theo SPEC.
+${DASHBOARD_RENDER_GUARD}`;
 const LS_KEY = "snapshot_console_v3_session";
 
 function safeParse(json) {
@@ -215,14 +246,13 @@ export default function BybitSnapshotV3New() {
     return ltf.fileName ? `[DASH] FILE=${ltf.fileName}` : "";
   }, [ltf.fileName]);
 
-  // SPEC: FULL dashboard with 2 files must be in ONE [DASH] line
+  // SPEC: FULL dashboard with 2 files must be in ONE [DASH] line.
   const macroFULL = useMemo(() => {
     if (htf.fileName && ltf.fileName) {
       return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}`;
     }
     return "";
   }, [htf.fileName, ltf.fileName]);
-
 
   const showToast = (msg) => {
     setToast(msg);
@@ -342,14 +372,10 @@ export default function BybitSnapshotV3New() {
     // - FULL sections: prefer combined [DASH] FILE=HTF FILE=LTF when available
     // - STEP1: HTF only (SETUP_STATE)
     // - STEP2: LTF only (ENTRY_VALIDITY gate)
-    // - POSITION/END: prefer FULL for context if available
     if (stage === "STEP1") return macroHTF || macroFULL || macroLTF;
     if (stage === "STEP2") return macroLTF || macroFULL || macroHTF;
-
-    // SESSION_START / MONITOR / POSITION / END (and others): prefer FULL
     return macroFULL || macroHTF || macroLTF;
   }, [stage, macroHTF, macroLTF, macroFULL]);
-
 
   const finalPrompt = useMemo(() => {
     const prefix = stageMacro ? `${stageMacro}\n` : "";
@@ -619,14 +645,18 @@ export default function BybitSnapshotV3New() {
                 >
                   Copy Prompt
                 </Button>
+
                 <Button
                   variant="secondary"
-                  onClick={() => copyText(`${macroFULL}\nXuất FULL DASHBOARD`, "Copied FULL DASHBOARD command")}
+                  onClick={() => {
+                    // Always produce a single-line [DASH] with 2 FILEs, per SPEC.
+                    const text = `${macroFULL}\n${FULL_DASHBOARD_PROMPT}`.trim();
+                    copyText(text, "Copied FULL DASHBOARD command");
+                  }}
                   disabled={!macroFULL}
                 >
                   Copy FULL DASHBOARD
                 </Button>
-
               </div>
             </div>
 
