@@ -19,14 +19,14 @@ const STAGES = [
 // SPEC output guard (Appendix A/B). Inject into prompts when user expects FULL dashboard.
 const DASHBOARD_RENDER_GUARD = `[DASHBOARD_RENDER_GUARD_v1_vi]
 BẮT BUỘC (FULL DASHBOARD):
-1) Render đủ 6 phần theo đúng thứ tự & tiêu đề + icon:
-   📌 PHẦN 0 — DATA CHECK (FROM JSON)
-   📌 I. MARKET MODE LABEL
-   📌 II. TREND RADAR (Short–Mid–Long)
-   📌 III. MARKET PARTICIPANT MAP
-   📌 IV. TRADE ZONE TERMINAL (Setup Engine)
-   📌 V. ACTION SUMMARY
-   📌 VI. QUẢN LÝ LỆNH HIỆN TẠI
+1) Render đủ 6 phần theo đúng thứ tự & tiêu đề + icon được quy định trong file SPEC của project files:
+   PHẦN 0 — DATA CHECK (FROM JSON)
+   I. MARKET MODE LABEL
+   II. TREND RADAR (Short–Mid–Long)
+   III. MARKET PARTICIPANT MAP
+   IV. TRADE ZONE TERMINAL (Setup Engine)
+   V. ACTION SUMMARY
+   VI. QUẢN LÝ LỆNH HIỆN TẠI
 
 2) Mỗi setup (>=3 setup: #1/#2/#3) phải có đủ:
    Direction, Priority, SETUP_STATE, ENTRY_VALIDITY, CONFIDENCE SCORE,
