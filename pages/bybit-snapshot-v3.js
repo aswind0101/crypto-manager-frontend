@@ -30,7 +30,7 @@ export default function BybitSnapshotV3New() {
   /* =======================
      TOP 100 COINS (Autocomplete)
   ======================= */
-  const [topCoins, setTopCoins] = useState([]); // [{id,name,symbol,market_cap_rank}]
+  const [topCoins, setTopCoins] = useState([]);
   const [coinsLoading, setCoinsLoading] = useState(false);
   const [coinsErr, setCoinsErr] = useState("");
 
@@ -71,11 +71,8 @@ export default function BybitSnapshotV3New() {
           setCopiedKey((prev) => (prev === key ? "" : prev));
         }, COPIED_RESET_MS);
       }
-
-      // IMPORTANT: Không toast, không auto-close theo yêu cầu
     } catch (e) {
       console.error(e);
-      // Không toast; nếu muốn có thể setError nhẹ ở đây, nhưng hiện giữ im lặng đúng yêu cầu “bỏ toast”
     }
   };
 
@@ -88,6 +85,14 @@ export default function BybitSnapshotV3New() {
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
   const ready = Boolean(htf.fileName && ltf.fileName);
+
+  // Simple mobile detection for download behavior/UI
+  const isMobile = useMemo(() => {
+    if (typeof navigator === "undefined") return false;
+    const ua = navigator.userAgent || "";
+    const touch = (navigator.maxTouchPoints || 0) > 1;
+    return /Android|iPhone|iPad|iPod/i.test(ua) || touch;
+  }, []);
 
   /* =======================
      FETCH TOP 100 COINS
@@ -123,7 +128,6 @@ export default function BybitSnapshotV3New() {
             symbol: (c.symbol || "").toUpperCase(),
             market_cap_rank: c.market_cap_rank ?? null,
           }))
-          // avoid weird suggestions like USDTUSDT
           .filter((c) => c.symbol && c.symbol !== "USDT");
 
         if (alive) setTopCoins(mapped);
@@ -147,8 +151,6 @@ export default function BybitSnapshotV3New() {
   /* =======================
      AUTOCOMPLETE LOGIC
   ======================= */
-
-  // get last token user is typing (after last space/comma)
   const currentToken = useMemo(() => {
     const t = (symbolsText || "").trimEnd();
     const m = t.match(/([^,\s]+)$/);
@@ -158,35 +160,29 @@ export default function BybitSnapshotV3New() {
   const suggestions = useMemo(() => {
     const q = currentToken;
     if (!q || q.length < 1) return [];
-
     const norm = q.toLowerCase();
-    const out = topCoins
+
+    return topCoins
       .filter((c) => {
         const sym = (c.symbol || "").toLowerCase();
         const name = (c.name || "").toLowerCase();
         return sym.includes(norm) || name.includes(norm);
       })
       .slice(0, 10);
-
-    return out;
   }, [topCoins, currentToken]);
 
   const insertSymbol = (baseSymbolUpper) => {
     const pair = `${baseSymbolUpper}USDT`;
 
-    // Replace the last token with pair
     const raw = symbolsText || "";
     const trimmedEnd = raw.replace(/\s+$/, "");
     const m = trimmedEnd.match(/^(.*?)([^,\s]*)$/);
     const prefix = m?.[1] ?? "";
-    const newText = `${prefix}${pair}`;
 
-    setSymbolsText(newText);
-
+    setSymbolsText(`${prefix}${pair}`);
     setShowSug(false);
     setActiveSugIndex(-1);
 
-    // keep focus for fast multi-select
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
@@ -210,7 +206,6 @@ export default function BybitSnapshotV3New() {
     }
   };
 
-  // click outside to close suggestions
   useEffect(() => {
     const onDoc = (ev) => {
       const inInput = inputRef.current?.contains(ev.target);
@@ -255,12 +250,10 @@ export default function BybitSnapshotV3New() {
     return "";
   }, [htf.fileName]);
 
-  // Non-DASH (always usable; doesn't require files)
   const macroSetup1Only = useMemo(() => {
     return `Kiểm tra Setup 1 ${primarySymbol} theo snapshot mới (không dùng [DASH])`;
   }, [primarySymbol]);
 
-  // Position template (requires files)
   const macroPositionShort = useMemo(() => {
     if (htf.fileName && ltf.fileName) {
       return `Mình đang Short ${primarySymbol} @<ENTRY>, SL <SL>\n[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}`;
@@ -278,7 +271,7 @@ export default function BybitSnapshotV3New() {
     }
     let i = 0;
     const t = setInterval(() => {
-      i = (i + 1) % 4; // 0..3
+      i = (i + 1) % 4;
       setDots(i === 0 ? "" : " " + ". ".repeat(i).trim());
     }, 350);
     return () => clearInterval(t);
@@ -300,7 +293,6 @@ export default function BybitSnapshotV3New() {
     try {
       setProgressPct(15);
 
-      // Track progress in coarse steps (cannot know real progress inside builder)
       const htfP = buildSnapshotV3(symbols).then((r) => {
         setProgressPct(55);
         return r;
@@ -336,26 +328,36 @@ export default function BybitSnapshotV3New() {
   /* =======================
      DOWNLOAD
   ======================= */
-  const downloadJson = (obj, name) => {
-    if (!obj) return;
-
-    const text = JSON.stringify(obj, null, 2);
-    const blob = new Blob([text], { type: "application/json" });
+  const downloadBlob = (blob, name) => {
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement("a");
     a.href = url;
-    a.download = name || "snapshot.json";
+    a.download = name || "download.json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-
     URL.revokeObjectURL(url);
   };
 
-  const downloadBoth = () => {
-    if (!htf.snapshot || !ltf.snapshot) return;
+  const downloadJson = (obj, name) => {
+    if (!obj) return;
+    const text = JSON.stringify(obj, null, 2);
+    const blob = new Blob([text], { type: "application/json" });
+    downloadBlob(blob, name);
+  };
 
+  const downloadHTF = () => {
+    if (!htf.snapshot || !htf.fileName) return;
+    downloadJson(htf.snapshot, htf.fileName);
+  };
+
+  const downloadLTF = () => {
+    if (!ltf.snapshot || !ltf.fileName) return;
+    downloadJson(ltf.snapshot, ltf.fileName);
+  };
+
+  const downloadBothDesktop = () => {
+    if (!htf.snapshot || !ltf.snapshot) return;
     downloadJson(htf.snapshot, htf.fileName);
     setTimeout(() => downloadJson(ltf.snapshot, ltf.fileName), 150);
   };
@@ -431,7 +433,7 @@ export default function BybitSnapshotV3New() {
                 Snapshot Console v3
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Autocomplete Top 100 (Market Cap) · Generate progress · Per-button copied state · No toast
+                Autocomplete Top 100 · Generate progress · Mobile: separate download buttons
               </div>
             </div>
 
@@ -570,20 +572,38 @@ export default function BybitSnapshotV3New() {
                 : "Generate (HTF + LTF)"}
             </Button>
 
-            <Button
-              variant="secondary"
-              onClick={downloadBoth}
-              disabled={!htf.snapshot || !ltf.snapshot}
-            >
-              Download HTF + LTF
-            </Button>
+            {/* Download area: Mobile = 2 buttons, Desktop = 1 combined */}
+            {isMobile ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={downloadHTF}
+                  disabled={!htf.snapshot || !htf.fileName}
+                >
+                  Download HTF
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={downloadLTF}
+                  disabled={!ltf.snapshot || !ltf.fileName}
+                >
+                  Download LTF
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={downloadBothDesktop}
+                disabled={!htf.snapshot || !ltf.snapshot}
+              >
+                Download HTF + LTF
+              </Button>
+            )}
 
             <Button
               variant="secondary"
               disabled={!macroFULL}
-              onClick={() =>
-                copyText(macroFULL, "Copied FULL macro", "quick_full")
-              }
+              onClick={() => copyText(macroFULL, "Copied FULL macro", "quick_full")}
             >
               {copiedKey === "quick_full" ? "Copied ✓" : "Copy FULL Macro"}
             </Button>
@@ -596,6 +616,8 @@ export default function BybitSnapshotV3New() {
                 Đang generate snapshot{dots}{" "}
                 {progressPct ? `(ước lượng ${progressPct}%)` : ""}
               </span>
+            ) : isMobile ? (
+              <span>Mobile: tách 2 nút Download để tránh bị chặn download lần 2.</span>
             ) : (
               <span>Tip: Generate xong → Copy FULL Macro để dán vào ChatGPT.</span>
             )}
@@ -638,7 +660,6 @@ export default function BybitSnapshotV3New() {
                       copyKey="cmd_full"
                       disabled={!macroFULL}
                     />
-
                     <CommandButton
                       title="Setup 1 only (no DASH)"
                       subtitle="Hỏi riêng Setup 1 mà không bật dashboard (không bị rule ≥ 3 setup)."
@@ -646,7 +667,6 @@ export default function BybitSnapshotV3New() {
                       copyKey="cmd_setup1"
                       disabled={false}
                     />
-
                     <CommandButton
                       title="PHẦN I + II (Bias/Trend)"
                       subtitle="Chỉ render Market Mode + Trend Radar để quyết định ưu tiên Long/Short."
@@ -666,7 +686,6 @@ export default function BybitSnapshotV3New() {
                       copyKey="cmd_iv"
                       disabled={!macroPartIV}
                     />
-
                     <CommandButton
                       title="PHẦN IV · Focus Setup 1"
                       subtitle="Tập trung Setup 1; setup 2 & 3 vẫn xuất tối giản để hợp lệ SPEC."
@@ -711,24 +730,37 @@ export default function BybitSnapshotV3New() {
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/90 backdrop-blur sm:hidden">
         <div className="mx-auto max-w-3xl px-3 py-3">
           <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="primary"
-              onClick={handleGenerateBoth}
-              disabled={loading}
-            >
+            <Button variant="primary" onClick={handleGenerateBoth} disabled={loading}>
               {loading
                 ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
                 : "Generate"}
             </Button>
 
+            {/* Mobile sticky: open a small “download” affordance via 2nd row */}
             <Button
               variant="secondary"
               disabled={!macroFULL}
-              onClick={() =>
-                copyText(macroFULL, "Copied FULL macro", "sticky_full")
-              }
+              onClick={() => copyText(macroFULL, "Copied FULL macro", "sticky_full")}
             >
               {copiedKey === "sticky_full" ? "Copied ✓" : "Copy FULL"}
+            </Button>
+          </div>
+
+          {/* Extra row: two download buttons on mobile */}
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Button
+              variant="secondary"
+              onClick={downloadHTF}
+              disabled={!htf.snapshot || !htf.fileName}
+            >
+              Download HTF
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={downloadLTF}
+              disabled={!ltf.snapshot || !ltf.fileName}
+            >
+              Download LTF
             </Button>
           </div>
 
