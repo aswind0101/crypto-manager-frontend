@@ -22,12 +22,17 @@ export default function BybitSnapshotV3New() {
 
   const [toast, setToast] = useState("");
 
+  // NEW: track which copy button is currently showing "Copied ✓"
+  const [copiedKey, setCopiedKey] = useState("");
+  const COPIED_RESET_MS = 1200;
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 1400);
   };
 
-  const copyText = async (text, okMsg) => {
+  // NEW: copy + set per-button copied state
+  const copyText = async (text, okMsg, key) => {
     try {
       if (!text) return;
 
@@ -40,6 +45,14 @@ export default function BybitSnapshotV3New() {
         ta.select();
         document.execCommand("copy");
         document.body.removeChild(ta);
+      }
+
+      // per-button feedback
+      if (key) {
+        setCopiedKey(key);
+        setTimeout(() => {
+          setCopiedKey((prev) => (prev === key ? "" : prev));
+        }, COPIED_RESET_MS);
       }
 
       showToast(okMsg || "Copied.");
@@ -67,6 +80,48 @@ export default function BybitSnapshotV3New() {
     }
     return "";
   }, [htf.fileName, ltf.fileName]);
+
+  // --- canned copy macros (ready-to-paste commands) ---
+  const macroPartIV = useMemo(() => {
+    if (htf.fileName && ltf.fileName) {
+      return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}\nchỉ render PHẦN IV`;
+    }
+    return "";
+  }, [htf.fileName, ltf.fileName]);
+
+  const macroPartIVSetup1 = useMemo(() => {
+    if (htf.fileName && ltf.fileName) {
+      return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}\nchỉ render PHẦN IV, tập trung Setup 1`;
+    }
+    return "";
+  }, [htf.fileName, ltf.fileName]);
+
+  const macroPartIandII = useMemo(() => {
+    if (htf.fileName) {
+      return `[DASH] FILE=${htf.fileName}\nchỉ render PHẦN I và PHẦN II`;
+    }
+    return "";
+  }, [htf.fileName]);
+
+  // Non-DASH (always usable; doesn't require files)
+  const macroSetup1Only = useMemo(() => {
+    return `Kiểm tra Setup 1 ${primarySymbol} theo snapshot mới (không dùng [DASH])`;
+  }, [primarySymbol]);
+
+  // Position template (requires files)
+  const macroPositionShort = useMemo(() => {
+    if (htf.fileName && ltf.fileName) {
+      return `Mình đang Short ${primarySymbol} @<ENTRY>, SL <SL>\n[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}`;
+    }
+    return "";
+  }, [htf.fileName, ltf.fileName, primarySymbol]);
+
+  // NEW: helper to render a copy button with inline "Copied ✓"
+  const CopyBtn = ({ copyKey, label, onClick, disabled }) => (
+    <Button variant="secondary" onClick={onClick} disabled={disabled}>
+      {copiedKey === copyKey ? "Copied ✓" : label}
+    </Button>
+  );
 
   const downloadJson = (obj, name) => {
     if (!obj) return;
@@ -96,7 +151,7 @@ export default function BybitSnapshotV3New() {
   };
 
   /**
-   * NEW: One button generates BOTH HTF + LTF
+   * One button generates BOTH HTF + LTF
    */
   const handleGenerateBoth = useCallback(async () => {
     setError("");
@@ -122,7 +177,8 @@ export default function BybitSnapshotV3New() {
 
       // HTF filename: keep symbol pulled from HTF snapshot when possible
       const htfTs = htfSnap.generated_at || Date.now();
-      const htfSymbol = htfSnap?.per_exchange?.bybit?.symbols?.[0]?.symbol || primarySymbol;
+      const htfSymbol =
+        htfSnap?.per_exchange?.bybit?.symbols?.[0]?.symbol || primarySymbol;
       const htfName = `bybit_snapshot_${htfTs}_${htfSymbol}.json`;
 
       // LTF filename: keep primary symbol (the input) for consistency
@@ -153,7 +209,7 @@ export default function BybitSnapshotV3New() {
                 Snapshot Console v3 — Minimal
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                1-click Generate (HTF+LTF) · Download 2 files · Copy FULL macro
+                1-click Generate (HTF+LTF) · Download 2 files · Copy macros
               </div>
             </div>
 
@@ -187,8 +243,13 @@ export default function BybitSnapshotV3New() {
             </div>
           </div>
 
+          {/* Primary action buttons (KEEP download button) */}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button variant="primary" onClick={handleGenerateBoth} disabled={loading}>
+            <Button
+              variant="primary"
+              onClick={handleGenerateBoth}
+              disabled={loading}
+            >
               {loading ? "Generating..." : "Generate (HTF + LTF)"}
             </Button>
 
@@ -200,13 +261,118 @@ export default function BybitSnapshotV3New() {
               Download HTF + LTF
             </Button>
 
-            <Button
-              variant="secondary"
-              onClick={() => copyText(macroFULL, "Copied FULL macro")}
+            {/* Copy button with inline status */}
+            <CopyBtn
+              copyKey="copy_full_macro"
+              label="Copy FULL Macro"
               disabled={!macroFULL}
-            >
-              Copy FULL Macro
-            </Button>
+              onClick={() =>
+                copyText(macroFULL, "Copied FULL macro", "copy_full_macro")
+              }
+            />
+          </div>
+
+          {/* NEW: Copy Commands panel with explanations */}
+          <div className="mt-3 rounded-2xl border border-slate-800 bg-black/20 p-3">
+            <div className="text-sm font-semibold">Copy Commands</div>
+            <div className="mt-1 text-xs text-slate-400">
+              Copy–paste trực tiếp vào ChatGPT. Mỗi nút tạo một “câu lệnh chuẩn”
+              cho đúng mode phân tích. Các lệnh có [DASH] sẽ kích hoạt dashboard
+              theo SPEC; lệnh “no DASH” chỉ dùng để hỏi riêng setup.
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              <div className="flex flex-col gap-1">
+                <CopyBtn
+                  copyKey="copy_part_iv"
+                  label="Copy PHẦN IV"
+                  disabled={!macroPartIV}
+                  onClick={() =>
+                    copyText(macroPartIV, "Copied: PHẦN IV", "copy_part_iv")
+                  }
+                />
+                <div className="text-xs text-slate-400">
+                  Chỉ render **PHẦN IV (Trade Zone Terminal)** để xem entry/SL/TP
+                  nhanh. Vẫn giữ đúng rule ≥ 3 setup.
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <CopyBtn
+                  copyKey="copy_part_iv_setup1"
+                  label="Copy PHẦN IV · Setup 1"
+                  disabled={!macroPartIVSetup1}
+                  onClick={() =>
+                    copyText(
+                      macroPartIVSetup1,
+                      "Copied: PHẦN IV (Setup 1)",
+                      "copy_part_iv_setup1"
+                    )
+                  }
+                />
+                <div className="text-xs text-slate-400">
+                  Chỉ render PHẦN IV và yêu cầu AI **tập trung Setup 1** (setup 2
+                  & 3 vẫn xuất tối giản để hợp lệ theo SPEC).
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <CopyBtn
+                  copyKey="copy_part_i_ii"
+                  label="Copy PHẦN I + II"
+                  disabled={!macroPartIandII}
+                  onClick={() =>
+                    copyText(
+                      macroPartIandII,
+                      "Copied: PHẦN I+II",
+                      "copy_part_i_ii"
+                    )
+                  }
+                />
+                <div className="text-xs text-slate-400">
+                  Chỉ xem **Market Mode + Trend Radar** (bias & trend) để quyết
+                  định ưu tiên Long/Short trước khi vào chi tiết setup.
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <CopyBtn
+                  copyKey="copy_setup1_only"
+                  label="Copy Setup 1 only (no DASH)"
+                  disabled={false}
+                  onClick={() =>
+                    copyText(
+                      macroSetup1Only,
+                      "Copied: Setup 1 only",
+                      "copy_setup1_only"
+                    )
+                  }
+                />
+                <div className="text-xs text-slate-400">
+                  Hỏi riêng **Setup 1** mà **không kích hoạt dashboard** (không
+                  bị rule ≥ 3 setup). Dùng khi bạn chỉ muốn biết READY/INVALID.
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <CopyBtn
+                  copyKey="copy_position_template"
+                  label="Copy Position Template"
+                  disabled={!macroPositionShort}
+                  onClick={() =>
+                    copyText(
+                      macroPositionShort,
+                      "Copied: Position template",
+                      "copy_position_template"
+                    )
+                  }
+                />
+                <div className="text-xs text-slate-400">
+                  Template để bạn điền **ENTRY/SL** khi đang có lệnh. AI sẽ chuyển
+                  trọng tâm sang **quản lý vị thế** theo snapshot.
+                </div>
+              </div>
+            </div>
           </div>
 
           {error && (
