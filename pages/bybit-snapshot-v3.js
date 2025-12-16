@@ -31,7 +31,7 @@ BẮT BUỘC (FULL DASHBOARD):
 2) Mỗi setup (>=3 setup: #1/#2/#3) phải có đủ:
    Direction, Priority, SETUP_STATE, ENTRY_VALIDITY, CONFIDENCE SCORE,
    Entry Zone, Stoploss, TP1/TP2/TP3 (nếu state != BUILD-UP), WHY (3–6 bullet gắn JSON path), NEXT CONDITION.
-
+   Tất cả các phần Entry Zone, Stoploss, TP1/TP2/TP3 cần phải là con số dứt khoác, cụ thể và cho biết cách tính 
 3) Nếu thiếu field bắt buộc: ghi rõ “MISSING FIELD: <json_path>” và default an toàn theo SPEC.
 4) Kết thúc bằng QA CHECK theo SPEC.
 `;
