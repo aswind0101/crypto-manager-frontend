@@ -353,6 +353,16 @@ export default function BybitSnapshotV3New() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+  const downloadBoth = () => {
+    if (!htf.snapshot || !ltf.snapshot) return;
+
+    // 1 click → browser sẽ tải 2 file liên tiếp
+    downloadJson(htf.snapshot, htf.fileName);
+    setTimeout(() => {
+      downloadJson(ltf.snapshot, ltf.fileName);
+    }, 150);
+  };
+
 
   // Which snapshot to show in viewer
   const activeSnapshot = useMemo(() => {
@@ -543,21 +553,42 @@ export default function BybitSnapshotV3New() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="primary"
-                    onClick={handleGenerateHTF}
-                    disabled={loading}
-                  >
-                    {loading ? "Generating HTF..." : "Generate HTF Snapshot"}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="primary"
+                      onClick={handleGenerateHTF}
+                      disabled={loading}
+                    >
+                      {loading ? "Generating HTF..." : "Generate HTF Snapshot"}
+                    </Button>
 
-                  <Button
-                    variant="gold"
-                    onClick={handleGenerateLTF}
-                    disabled={loading}
-                  >
-                    {loading ? "Generating LTF..." : "Generate LTF (M5/M15)"}
-                  </Button>
+                    <Button
+                      variant="gold"
+                      onClick={handleGenerateLTF}
+                      disabled={loading}
+                    >
+                      {loading ? "Generating LTF..." : "Generate LTF (M5/M15)"}
+                    </Button>
+
+                    {/* NEW: 1 click download 2 files */}
+                    <Button
+                      variant="secondary"
+                      onClick={downloadBoth}
+                      disabled={!htf.snapshot || !ltf.snapshot}
+                    >
+                      Download HTF + LTF
+                    </Button>
+
+                    {/* NEW: copy macro FULL (2 files in ONE [DASH] line) */}
+                    <Button
+                      variant="secondary"
+                      onClick={() => copyText(macroFULL, "Copied FULL macro")}
+                      disabled={!macroFULL}
+                    >
+                      Copy FULL Macro
+                    </Button>
+                  </div>
+
                 </div>
               </div>
 
