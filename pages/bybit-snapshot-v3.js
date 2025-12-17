@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildSnapshotV3, buildLtfSnapshotV3 } from "../lib/snapshot-v3";
+import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
 
 export default function BybitSnapshotV3New() {
@@ -10,8 +10,7 @@ export default function BybitSnapshotV3New() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [htf, setHtf] = useState({ snapshot: null, fileName: "" });
-  const [ltf, setLtf] = useState({ snapshot: null, fileName: "" });
+  const [full, setFull] = useState({ snapshot: null, fileName: "" });
 
   // per-button copied state
   const [copiedKey, setCopiedKey] = useState("");
@@ -84,7 +83,7 @@ export default function BybitSnapshotV3New() {
 
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
-  const ready = Boolean(htf.fileName && ltf.fileName);
+  const ready = Boolean(full.fileName);
 
   // Simple mobile detection for download behavior/UI
   const isMobile = useMemo(() => {
@@ -223,43 +222,35 @@ export default function BybitSnapshotV3New() {
      MACROS
   ======================= */
   const macroFULL = useMemo(() => {
-    if (htf.fileName && ltf.fileName) {
-      return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}`;
-    }
+    if (full.fileName) return `[DASH] FILE=${full.fileName}`;
     return "";
-  }, [htf.fileName, ltf.fileName]);
+  }, [full.fileName]);
 
   const macroPartIV = useMemo(() => {
-    if (htf.fileName && ltf.fileName) {
-      return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}\nchỉ render PHẦN IV`;
-    }
+    if (full.fileName) return `[DASH] FILE=${full.fileName}\nchỉ render PHẦN IV`;
     return "";
-  }, [htf.fileName, ltf.fileName]);
+  }, [full.fileName]);
 
   const macroPartIVSetup1 = useMemo(() => {
-    if (htf.fileName && ltf.fileName) {
-      return `[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}\nchỉ render PHẦN IV, tập trung Setup 1`;
-    }
+    if (full.fileName)
+      return `[DASH] FILE=${full.fileName}\nchỉ render PHẦN IV, tập trung Setup 1`;
     return "";
-  }, [htf.fileName, ltf.fileName]);
+  }, [full.fileName]);
 
   const macroPartIandII = useMemo(() => {
-    if (htf.fileName) {
-      return `[DASH] FILE=${htf.fileName}\nchỉ render PHẦN I và PHẦN II`;
-    }
+    if (full.fileName) return `[DASH] FILE=${full.fileName}\nchỉ render PHẦN I và PHẦN II`;
     return "";
-  }, [htf.fileName]);
+  }, [full.fileName]);
 
   const macroSetup1Only = useMemo(() => {
     return `Kiểm tra Setup 1 ${primarySymbol} theo snapshot mới (không dùng [DASH])`;
   }, [primarySymbol]);
 
   const macroPositionShort = useMemo(() => {
-    if (htf.fileName && ltf.fileName) {
-      return `Mình đang Short ${primarySymbol} @<ENTRY>, SL <SL>\n[DASH] FILE=${htf.fileName} FILE=${ltf.fileName}`;
-    }
+    if (full.fileName)
+      return `Mình đang Short ${primarySymbol} @<ENTRY>, SL <SL>\n[DASH] FILE=${full.fileName}`;
     return "";
-  }, [htf.fileName, ltf.fileName, primarySymbol]);
+  }, [full.fileName, primarySymbol]);
 
   /* =======================
      GENERATE STATUS (dots)
@@ -280,7 +271,7 @@ export default function BybitSnapshotV3New() {
   /* =======================
      SNAPSHOT GENERATION
   ======================= */
-  const handleGenerateBoth = useCallback(async () => {
+  const handleGenerateFull = useCallback(async () => {
     if (!symbols.length) {
       setError("Vui lòng nhập ít nhất 1 symbol.");
       return;
@@ -293,26 +284,14 @@ export default function BybitSnapshotV3New() {
     try {
       setProgressPct(15);
 
-      const htfP = buildSnapshotV3(symbols).then((r) => {
-        setProgressPct(55);
-        return r;
-      });
-
-      const ltfP = buildLtfSnapshotV3(symbols).then((r) => {
+      const fullSnap = await buildFullSnapshotV3(symbols).then((r) => {
         setProgressPct(90);
         return r;
       });
 
-      const [htfSnap, ltfSnap] = await Promise.all([htfP, ltfP]);
-
-      const htfTs = htfSnap?.generated_at || Date.now();
-      const ltfTs = ltfSnap?.generated_at || Date.now();
-
-      const htfName = `bybit_snapshot_${htfTs}_${primarySymbol}.json`;
-      const ltfName = `bybit_ltf_snapshot_${ltfTs}_${primarySymbol}.json`;
-
-      setHtf({ snapshot: htfSnap, fileName: htfName });
-      setLtf({ snapshot: ltfSnap, fileName: ltfName });
+      const ts = fullSnap?.generated_at || Date.now();
+      const name = `bybit_full_snapshot_${ts}_${primarySymbol}.json`;
+      setFull({ snapshot: fullSnap, fileName: name });
 
       setProgressPct(100);
     } catch (e) {
@@ -346,20 +325,9 @@ export default function BybitSnapshotV3New() {
     downloadBlob(blob, name);
   };
 
-  const downloadHTF = () => {
-    if (!htf.snapshot || !htf.fileName) return;
-    downloadJson(htf.snapshot, htf.fileName);
-  };
-
-  const downloadLTF = () => {
-    if (!ltf.snapshot || !ltf.fileName) return;
-    downloadJson(ltf.snapshot, ltf.fileName);
-  };
-
-  const downloadBothDesktop = () => {
-    if (!htf.snapshot || !ltf.snapshot) return;
-    downloadJson(htf.snapshot, htf.fileName);
-    setTimeout(() => downloadJson(ltf.snapshot, ltf.fileName), 150);
+  const downloadFULL = () => {
+    if (!full.snapshot || !full.fileName) return;
+    downloadJson(full.snapshot, full.fileName);
   };
 
   /* =======================
@@ -544,19 +512,11 @@ export default function BybitSnapshotV3New() {
             </div>
           </div>
 
-          {/* File names */}
-          <div className="px-4 pb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {/* File name */}
+          <div className="px-4 pb-4">
             <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
-              <div className="text-xs text-slate-400">HTF file</div>
-              <div className="mt-1 break-all text-sm">
-                {htf.fileName || "—"}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
-              <div className="text-xs text-slate-400">LTF file</div>
-              <div className="mt-1 break-all text-sm">
-                {ltf.fileName || "—"}
-              </div>
+              <div className="text-xs text-slate-400">Snapshot file (FULL)</div>
+              <div className="mt-1 break-all text-sm">{full.fileName || "—"}</div>
             </div>
           </div>
 
@@ -564,41 +524,21 @@ export default function BybitSnapshotV3New() {
           <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <Button
               variant="primary"
-              onClick={handleGenerateBoth}
+              onClick={handleGenerateFull}
               disabled={loading}
             >
               {loading
                 ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
-                : "Generate (HTF + LTF)"}
+                : "Generate (FULL snapshot)"}
             </Button>
 
-            {/* Download area: Mobile = 2 buttons, Desktop = 1 combined */}
-            {isMobile ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={downloadHTF}
-                  disabled={!htf.snapshot || !htf.fileName}
-                >
-                  Download HTF
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={downloadLTF}
-                  disabled={!ltf.snapshot || !ltf.fileName}
-                >
-                  Download LTF
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="secondary"
-                onClick={downloadBothDesktop}
-                disabled={!htf.snapshot || !ltf.snapshot}
-              >
-                Download HTF + LTF
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              onClick={downloadFULL}
+              disabled={!full.snapshot || !full.fileName}
+            >
+              Download JSON
+            </Button>
 
             <Button
               variant="secondary"
@@ -616,10 +556,8 @@ export default function BybitSnapshotV3New() {
                 Đang generate snapshot{dots}{" "}
                 {progressPct ? `(ước lượng ${progressPct}%)` : ""}
               </span>
-            ) : isMobile ? (
-              <span>Mobile: tách 2 nút Download để tránh bị chặn download lần 2.</span>
             ) : (
-              <span>Tip: Generate xong → Copy FULL Macro để dán vào ChatGPT.</span>
+              <span>Tip: Generate xong → Download JSON → Copy FULL Macro để dán vào ChatGPT.</span>
             )}
           </div>
 
@@ -655,7 +593,7 @@ export default function BybitSnapshotV3New() {
                   <div className="space-y-2">
                     <CommandButton
                       title="FULL Macro"
-                      subtitle="Kích hoạt dashboard theo SPEC: dùng cả 2 file HTF + LTF (1 dòng)."
+                      subtitle="Kích hoạt dashboard theo SPEC: dùng 1 file FULL (1 dòng)."
                       text={macroFULL}
                       copyKey="cmd_full"
                       disabled={!macroFULL}
@@ -711,7 +649,7 @@ export default function BybitSnapshotV3New() {
                 <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-500">
                   FULL macro format:&nbsp;
                   <span className="text-slate-300">
-                    [DASH] FILE=HTF FILE=LTF
+                    [DASH] FILE=FULL
                   </span>
                 </div>
               </div>
@@ -730,7 +668,7 @@ export default function BybitSnapshotV3New() {
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/90 backdrop-blur sm:hidden">
         <div className="mx-auto max-w-3xl px-3 py-3">
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="primary" onClick={handleGenerateBoth} disabled={loading}>
+            <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
               {loading
                 ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
                 : "Generate"}
@@ -746,21 +684,14 @@ export default function BybitSnapshotV3New() {
             </Button>
           </div>
 
-          {/* Extra row: two download buttons on mobile */}
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="mt-2">
             <Button
               variant="secondary"
-              onClick={downloadHTF}
-              disabled={!htf.snapshot || !htf.fileName}
+              onClick={downloadFULL}
+              disabled={!full.snapshot || !full.fileName}
+              className="w-full"
             >
-              Download HTF
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={downloadLTF}
-              disabled={!ltf.snapshot || !ltf.fileName}
-            >
-              Download LTF
+              Download JSON
             </Button>
           </div>
 
@@ -769,8 +700,8 @@ export default function BybitSnapshotV3New() {
               {loading
                 ? `Đang generate${dots}${progressPct ? ` (${progressPct}%)` : ""}`
                 : ready
-                ? "Ready: HTF + LTF files"
-                : "Chưa có đủ HTF + LTF"}
+                ? "Ready: FULL snapshot"
+                : "Chưa có snapshot"}
             </span>
             <button
               type="button"
