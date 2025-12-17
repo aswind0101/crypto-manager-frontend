@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
-import { buildCopyCommands } from "..components/ui/helpers/bybit-snapshot-v3-ui-macros";
+import { buildCopyCommands } from "../components/ui/helpers/bybit-snapshot-v3-ui-macros";
 
 export default function BybitSnapshotV3New() {
   /* =======================
