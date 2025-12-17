@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
+//import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
 import { buildCopyCommands } from "../components/ui/helpers/bybit-snapshot-v3-ui-macros";
+import { buildFullSnapshotV3, normalizeToV33FullForDash, validateV33FullForDash } from "../lib/snapshot-v3";
 
 export default function BybitSnapshotV3New() {
   /* =======================
@@ -45,7 +46,7 @@ export default function BybitSnapshotV3New() {
   const haptic = () => {
     try {
       if (navigator?.vibrate) navigator.vibrate(10);
-    } catch {}
+    } catch { }
   };
 
   const copyText = async (text, key) => {
@@ -267,15 +268,18 @@ export default function BybitSnapshotV3New() {
     try {
       setProgressPct(15);
 
-      const fullSnap = await buildFullSnapshotV3(symbols).then((r) => {
+      const rawSnap = await buildFullSnapshotV3(symbols).then((r) => {
         setProgressPct(90);
         return r;
       });
 
-      const ts = fullSnap?.generated_at || Date.now();
-      const name = `bybit_full_snapshot_${ts}_${primarySymbol}.json`;
-      setFull({ snapshot: fullSnap, fileName: name });
+      // Normalize + Validate theo SPEC v3.3-full trước khi cho phép download
+      const normalized = normalizeToV33FullForDash(rawSnap, primarySymbol);
+      validateV33FullForDash(normalized, primarySymbol);
 
+      const ts = normalized?.generated_at || Date.now();
+      const name = `bybit_full_snapshot_${ts}_${primarySymbol}.json`;
+      setFull({ snapshot: normalized, fileName: name });
       setProgressPct(100);
     } catch (e) {
       console.error(e);
@@ -687,8 +691,8 @@ export default function BybitSnapshotV3New() {
               {loading
                 ? `Đang generate${dots}${progressPct ? ` (${progressPct}%)` : ""}`
                 : ready
-                ? "Ready: FULL snapshot"
-                : "Chưa có snapshot"}
+                  ? "Ready: FULL snapshot"
+                  : "Chưa có snapshot"}
             </span>
             <button
               type="button"
