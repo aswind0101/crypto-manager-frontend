@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-//import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
+import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
-import { buildCopyCommands } from "../components/ui/helpers/bybit-snapshot-v3-ui-macros";
-import { buildFullSnapshotV3, normalizeToV33FullForDash, validateV33FullForDash } from "../lib/snapshot-v3";
 
 export default function BybitSnapshotV3New() {
   /* =======================
@@ -22,7 +20,7 @@ export default function BybitSnapshotV3New() {
      UI STATE
   ======================= */
   const [openCommands, setOpenCommands] = useState(false);
-  const [cmdTab, setCmdTab] = useState("quick"); // quick | analysis | trading | position
+  const [cmdTab, setCmdTab] = useState("quick"); // quick | trading | position
 
   // Generate status
   const [progressPct, setProgressPct] = useState(0);
@@ -46,10 +44,10 @@ export default function BybitSnapshotV3New() {
   const haptic = () => {
     try {
       if (navigator?.vibrate) navigator.vibrate(10);
-    } catch { }
+    } catch {}
   };
 
-  const copyText = async (text, key) => {
+  const copyText = async (text, _okMsg, key) => {
     try {
       if (!text) return;
 
@@ -86,13 +84,6 @@ export default function BybitSnapshotV3New() {
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
   const ready = Boolean(full.fileName);
-
-  // Commands (SPEC modes) — chỉ dùng trigger hợp lệ
-  const snapshotFileName = full.fileName || "";
-  const copyCommands = useMemo(() => {
-    if (!snapshotFileName) return null;
-    return buildCopyCommands(snapshotFileName);
-  }, [snapshotFileName]);
 
   // Simple mobile detection for download behavior/UI
   const isMobile = useMemo(() => {
@@ -228,12 +219,37 @@ export default function BybitSnapshotV3New() {
   }, []);
 
   /* =======================
-     POSITION TEMPLATE (optional helper)
-     - không phải mode riêng trong SPEC, nhưng hữu ích khi user đã có lệnh
+     MACROS
   ======================= */
+  const macroFULL = useMemo(() => {
+    if (full.fileName) return `[DASH] FILE=${full.fileName}`;
+    return "";
+  }, [full.fileName]);
+
+  const macroPartIV = useMemo(() => {
+    if (full.fileName) return `[DASH] FILE=${full.fileName}\nchỉ render PHẦN IV`;
+    return "";
+  }, [full.fileName]);
+
+  const macroPartIVSetup1 = useMemo(() => {
+    if (full.fileName)
+      return `[DASH] FILE=${full.fileName}\nchỉ render PHẦN IV, tập trung Setup 1`;
+    return "";
+  }, [full.fileName]);
+
+  const macroPartIandII = useMemo(() => {
+    if (full.fileName) return `[DASH] FILE=${full.fileName}\nchỉ render PHẦN I và PHẦN II`;
+    return "";
+  }, [full.fileName]);
+
+  const macroSetup1Only = useMemo(() => {
+    return `Kiểm tra Setup 1 ${primarySymbol} theo snapshot mới (không dùng [DASH])`;
+  }, [primarySymbol]);
+
   const macroPositionShort = useMemo(() => {
-    if (!full.fileName) return "";
-    return `Mình đang Short ${primarySymbol} @<ENTRY>, SL <SL>\n[DASH] FILE=${full.fileName}`;
+    if (full.fileName)
+      return `Mình đang Short ${primarySymbol} @<ENTRY>, SL <SL>\n[DASH] FILE=${full.fileName}`;
+    return "";
   }, [full.fileName, primarySymbol]);
 
   /* =======================
@@ -268,18 +284,15 @@ export default function BybitSnapshotV3New() {
     try {
       setProgressPct(15);
 
-      const rawSnap = await buildFullSnapshotV3(symbols).then((r) => {
+      const fullSnap = await buildFullSnapshotV3(symbols).then((r) => {
         setProgressPct(90);
         return r;
       });
 
-      // Normalize + Validate theo SPEC v3.3-full trước khi cho phép download
-      const normalized = normalizeToV33FullForDash(rawSnap, primarySymbol);
-      validateV33FullForDash(normalized, primarySymbol);
-
-      const ts = normalized?.generated_at || Date.now();
+      const ts = fullSnap?.generated_at || Date.now();
       const name = `bybit_full_snapshot_${ts}_${primarySymbol}.json`;
-      setFull({ snapshot: normalized, fileName: name });
+      setFull({ snapshot: fullSnap, fileName: name });
+
       setProgressPct(100);
     } catch (e) {
       console.error(e);
@@ -342,7 +355,7 @@ export default function BybitSnapshotV3New() {
       <button
         type="button"
         disabled={disabled}
-        onClick={() => copyText(text, copyKey)}
+        onClick={() => copyText(text, `Copied: ${title}`, copyKey)}
         className={[
           "w-full rounded-2xl border px-4 py-3 text-left transition",
           disabled
@@ -355,11 +368,6 @@ export default function BybitSnapshotV3New() {
             <div className="text-sm font-semibold text-slate-100">{title}</div>
             {subtitle ? (
               <div className="mt-1 text-xs text-slate-400">{subtitle}</div>
-            ) : null}
-            {text ? (
-              <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-slate-800 bg-slate-950/40 p-3 text-[12px] text-slate-200">
-                {text}
-              </pre>
             ) : null}
           </div>
 
@@ -390,10 +398,10 @@ export default function BybitSnapshotV3New() {
           <div className="flex items-start justify-between gap-3 px-4 py-4">
             <div>
               <div className="text-lg font-semibold tracking-tight">
-                📡 Snapshot Console (FULL) — Bybit v3
+                Snapshot Console v3
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Một file snapshot FULL · Copy commands theo SPEC (DASH/CHECK/PART/SETUPS)
+                Autocomplete Top 100 · Generate progress · Mobile: separate download buttons
               </div>
             </div>
 
@@ -405,7 +413,7 @@ export default function BybitSnapshotV3New() {
                   : "border border-slate-700 bg-slate-900 text-slate-300",
               ].join(" ")}
             >
-              {ready ? "Ready" : "No snapshot"}
+              {ready ? "Ready" : "No files"}
             </span>
           </div>
 
@@ -450,7 +458,9 @@ export default function BybitSnapshotV3New() {
                       Loading Top 100 coins…
                     </div>
                   ) : coinsErr ? (
-                    <div className="px-3 py-3 text-sm text-red-200">{coinsErr}</div>
+                    <div className="px-3 py-3 text-sm text-red-200">
+                      {coinsErr}
+                    </div>
                   ) : suggestions.length === 0 ? (
                     <div className="px-3 py-3 text-sm text-slate-400">
                       Không có gợi ý cho “{currentToken}”.
@@ -468,16 +478,21 @@ export default function BybitSnapshotV3New() {
                             onClick={() => insertSymbol(c.symbol)}
                             className={[
                               "flex w-full items-center justify-between px-3 py-2 text-left",
-                              active ? "bg-slate-800/60" : "hover:bg-slate-800/40",
+                              active
+                                ? "bg-slate-800/60"
+                                : "hover:bg-slate-800/40",
                             ].join(" ")}
                           >
                             <div className="min-w-0">
                               <div className="text-sm text-slate-100">
                                 {c.name}{" "}
-                                <span className="text-xs text-slate-400">({c.symbol})</span>
+                                <span className="text-xs text-slate-400">
+                                  ({c.symbol})
+                                </span>
                               </div>
                               <div className="text-xs text-slate-400">
-                                Auto-fill: <span className="text-slate-200">{pair}</span>
+                                Auto-fill:{" "}
+                                <span className="text-slate-200">{pair}</span>
                               </div>
                             </div>
                             <div className="shrink-0 text-xs text-slate-400">
@@ -507,7 +522,11 @@ export default function BybitSnapshotV3New() {
 
           {/* Quick actions */}
           <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
+            <Button
+              variant="primary"
+              onClick={handleGenerateFull}
+              disabled={loading}
+            >
               {loading
                 ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
                 : "Generate (FULL snapshot)"}
@@ -523,10 +542,10 @@ export default function BybitSnapshotV3New() {
 
             <Button
               variant="secondary"
-              disabled={!copyCommands?.fullDashboard?.command}
-              onClick={() => copyText(copyCommands?.fullDashboard?.command, "quick_dash")}
+              disabled={!macroFULL}
+              onClick={() => copyText(macroFULL, "Copied FULL macro", "quick_full")}
             >
-              {copiedKey === "quick_dash" ? "Copied ✓" : "Copy [DASH]"}
+              {copiedKey === "quick_full" ? "Copied ✓" : "Copy FULL Macro"}
             </Button>
           </div>
 
@@ -538,9 +557,7 @@ export default function BybitSnapshotV3New() {
                 {progressPct ? `(ước lượng ${progressPct}%)` : ""}
               </span>
             ) : (
-              <span>
-                Tip: Generate → Download JSON → Upload vào ChatGPT → dùng các lệnh copy đúng mode (DASH/CHECK/PART/SETUPS).
-              </span>
+              <span>Tip: Generate xong → Download JSON → Copy FULL Macro để dán vào ChatGPT.</span>
             )}
           </div>
 
@@ -552,84 +569,76 @@ export default function BybitSnapshotV3New() {
               className="w-full rounded-2xl border border-slate-800 bg-black/20 px-3 py-3 text-left text-sm"
             >
               <div className="flex items-center justify-between">
-                <span className="font-semibold">📋 Copy Commands (chuẩn SPEC)</span>
-                <span className="text-xs text-slate-400">{openCommands ? "Ẩn ▲" : "Mở ▼"}</span>
+                <span className="font-semibold">Copy Commands</span>
+                <span className="text-xs text-slate-400">
+                  {openCommands ? "Ẩn ▲" : "Mở ▼"}
+                </span>
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Chỉ có trigger hợp lệ: <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS]</span>. Bấm 1 lần để copy.
+                Mỗi lệnh có chú thích; bấm 1 lần để copy. (Copy xong không tự đóng)
               </div>
             </button>
 
             {openCommands && (
               <div className="mt-3 space-y-3">
                 {/* Tabs */}
-                <div className="grid grid-cols-4 gap-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-2">
-                  <TabBtn id="quick" label="⚡ Quick" />
-                  <TabBtn id="analysis" label="🧠 Analysis" />
-                  <TabBtn id="trading" label="🎯 Trading" />
-                  <TabBtn id="position" label="🧷 Position" />
+                <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-2">
+                  <TabBtn id="quick" label="Quick" />
+                  <TabBtn id="trading" label="Trading" />
+                  <TabBtn id="position" label="Position" />
                 </div>
 
                 {/* Tab content */}
                 {cmdTab === "quick" && (
                   <div className="space-y-2">
                     <CommandButton
-                      title="📊 FULL Dashboard"
-                      subtitle="MODE A — Xuất 6 phần + ≥3 setup"
-                      text={copyCommands?.fullDashboard?.command || ""}
-                      copyKey="cmd_dash"
-                      disabled={!copyCommands?.fullDashboard?.command}
+                      title="FULL Macro"
+                      subtitle="Kích hoạt dashboard theo SPEC: dùng 1 file FULL (1 dòng)."
+                      text={macroFULL}
+                      copyKey="cmd_full"
+                      disabled={!macroFULL}
                     />
-
                     <CommandButton
-                      title="📋 Setup Summary"
-                      subtitle="MODE D — Tóm tắt ≥3 setup (có ENTRY/SL/TP/RR/Score/GO-NO)"
-                      text={copyCommands?.setupSummary?.command || ""}
-                      copyKey="cmd_setups"
-                      disabled={!copyCommands?.setupSummary?.command}
+                      title="Setup 1 only (no DASH)"
+                      subtitle="Hỏi riêng Setup 1 mà không bật dashboard (không bị rule ≥ 3 setup)."
+                      text={macroSetup1Only}
+                      copyKey="cmd_setup1"
+                      disabled={false}
                     />
-                  </div>
-                )}
-
-                {cmdTab === "analysis" && (
-                  <div className="space-y-2">
-                    {copyCommands?.partialDashboard?.map((c, idx) => (
-                      <CommandButton
-                        key={c.command}
-                        title={`🧩 ${c.label}`}
-                        subtitle={`MODE C — ${c.description}`}
-                        text={c.command}
-                        copyKey={`cmd_part_${idx}`}
-                        disabled={!c.command}
-                      />
-                    ))}
+                    <CommandButton
+                      title="PHẦN I + II (Bias/Trend)"
+                      subtitle="Chỉ render Market Mode + Trend Radar để quyết định ưu tiên Long/Short."
+                      text={macroPartIandII}
+                      copyKey="cmd_i_ii"
+                      disabled={!macroPartIandII}
+                    />
                   </div>
                 )}
 
                 {cmdTab === "trading" && (
                   <div className="space-y-2">
-                    {copyCommands?.quickCheck?.map((c, idx) => (
-                      <CommandButton
-                        key={c.command}
-                        title={`⚡ ${c.label}`}
-                        subtitle={`MODE B — ${c.description}`}
-                        text={c.command}
-                        copyKey={`cmd_check_${idx}`}
-                        disabled={!c.command}
-                      />
-                    ))}
-
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-500">
-                      Gợi ý: muốn check “đúng trạng thái mới nhất” → hãy generate snapshot FULL mới trước khi dùng [CHECK].
-                    </div>
+                    <CommandButton
+                      title="PHẦN IV (Trade Zone)"
+                      subtitle="Chỉ render Trade Zone Terminal để xem entry/SL/TP nhanh (vẫn đúng rule ≥ 3 setup)."
+                      text={macroPartIV}
+                      copyKey="cmd_iv"
+                      disabled={!macroPartIV}
+                    />
+                    <CommandButton
+                      title="PHẦN IV · Focus Setup 1"
+                      subtitle="Tập trung Setup 1; setup 2 & 3 vẫn xuất tối giản để hợp lệ SPEC."
+                      text={macroPartIVSetup1}
+                      copyKey="cmd_iv_s1"
+                      disabled={!macroPartIVSetup1}
+                    />
                   </div>
                 )}
 
                 {cmdTab === "position" && (
                   <div className="space-y-2">
                     <CommandButton
-                      title="🧷 Position Template (Short)"
-                      subtitle="Dùng khi bạn đang có lệnh. Điền ENTRY/SL, rồi dán vào ChatGPT để AI quản lý theo snapshot."
+                      title="Position Template (Short)"
+                      subtitle="Dùng khi bạn đang có lệnh: điền ENTRY/SL để AI ưu tiên quản lý vị thế theo snapshot."
                       text={macroPositionShort}
                       copyKey="cmd_pos"
                       disabled={!macroPositionShort}
@@ -638,11 +647,10 @@ export default function BybitSnapshotV3New() {
                 )}
 
                 <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-500">
-                  Chuẩn mode theo SPEC:&nbsp;
-                  <span className="text-slate-300">[DASH]</span>,{" "}
-                  <span className="text-slate-300">[CHECK]</span>,{" "}
-                  <span className="text-slate-300">[PART]</span>,{" "}
-                  <span className="text-slate-300">[SETUPS]</span>
+                  FULL macro format:&nbsp;
+                  <span className="text-slate-300">
+                    [DASH] FILE=FULL
+                  </span>
                 </div>
               </div>
             )}
@@ -666,12 +674,13 @@ export default function BybitSnapshotV3New() {
                 : "Generate"}
             </Button>
 
+            {/* Mobile sticky: open a small “download” affordance via 2nd row */}
             <Button
               variant="secondary"
-              disabled={!copyCommands?.fullDashboard?.command}
-              onClick={() => copyText(copyCommands?.fullDashboard?.command || "", "sticky_dash")}
+              disabled={!macroFULL}
+              onClick={() => copyText(macroFULL, "Copied FULL macro", "sticky_full")}
             >
-              {copiedKey === "sticky_dash" ? "Copied ✓" : "Copy [DASH]"}
+              {copiedKey === "sticky_full" ? "Copied ✓" : "Copy FULL"}
             </Button>
           </div>
 
@@ -691,8 +700,8 @@ export default function BybitSnapshotV3New() {
               {loading
                 ? `Đang generate${dots}${progressPct ? ` (${progressPct}%)` : ""}`
                 : ready
-                  ? "Ready: FULL snapshot"
-                  : "Chưa có snapshot"}
+                ? "Ready: FULL snapshot"
+                : "Chưa có snapshot"}
             </span>
             <button
               type="button"
