@@ -87,6 +87,20 @@ export default function TradeZonesVPNMultiTFV2Page() {
     const meta = data?.meta || {};
     const report = data?.report || null;
     const zones = data?.tradeZones || [];
+    const noZonesReason = (() => {
+        // Ưu tiên giải thích theo chế độ trend-only
+        const h1Ctx = report?.contexts?.H1;
+        const m15Ctx = report?.contexts?.M15;
+
+        if (report && (h1Ctx !== "trend" || m15Ctx !== "trend")) {
+            return `No trade zones: Trend-only mode (H1=${h1Ctx || "—"}, M15=${m15Ctx || "—"}).`;
+        }
+
+        // Nếu backend có warnings, hiển thị để dễ debug
+        if (meta?.warnings?.length) return `No trade zones: ${meta.warnings.join(", ")}`;
+
+        return "No trade zones (RR guard / strict filters / insufficient data).";
+    })();
 
     return (
         <div style={{ padding: 20, maxWidth: 1150, margin: "0 auto" }}>
@@ -128,7 +142,7 @@ export default function TradeZonesVPNMultiTFV2Page() {
 
             {zones.length === 0 ? (
                 <div style={{ padding: 14, border: "1px solid #ddd" }}>
-                    No trade zones (RR guard / strict filters / insufficient data).
+                              {noZonesReason}
                 </div>
             ) : (
                 zones.map((z) => (
