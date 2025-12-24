@@ -95,6 +95,11 @@ function SetupCard({ s, isBest }) {
                     <KV k="RR (vs TP2)" v={fmt(s.risk?.rr)} />
                     <KV k="Confidence" v={s.confidence?.score ?? "—"} />
                 </Card>
+                {(z.low == null || z.high == null) ? (
+                    <div style={{ marginTop: 6, color: "crimson", opacity: 0.9 }}>
+                        Zone chưa tính được (thiếu anchor). Xem Why/Facts → Missing/Guards.
+                    </div>
+                ) : null}
             </div>
 
             <details style={{ marginTop: 10 }}>
