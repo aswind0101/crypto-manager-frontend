@@ -38,17 +38,47 @@ function KV({ k, v }) {
     );
 }
 
-function SetupCard({ s }) {
+function SetupCard({ s, isBest }) {
     const z = s.entry?.zone || {};
     const tp = s.risk?.tp || [];
     return (
-        <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12, marginBottom: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                <div style={{ fontWeight: 700 }}>{s.name}</div>
+        <div
+            style={{
+                border: isBest ? "2px solid #111" : "1px solid #eee",
+                borderRadius: 10,
+                padding: 12,
+                marginBottom: 10,
+                background: isBest ? "#fff" : "transparent",
+                boxShadow: isBest ? "0 6px 18px rgba(0,0,0,0.08)" : "none",
+            }}
+        >
+            <div
+                data-best={isBest ? "1" : "0"}
+                style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ fontWeight: 700 }}>{s.name}</div>
+                    {isBest ? (
+                        <span
+                            style={{
+                                fontSize: 12,
+                                fontWeight: 800,
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                border: "1px solid #111",
+                                background: "#111",
+                                color: "#fff",
+                            }}
+                        >
+                            BEST
+                        </span>
+                    ) : null}
+                </div>
+
                 <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
                     TF {s.timeframe} | {s.state} | {s.entry_validity}
                 </div>
             </div>
+
 
             <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <Card title="Entry">
@@ -94,7 +124,8 @@ export default function TradeZonesVpnMultiTFv2() {
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState("");
     const [resp, setResp] = useState(null);
-
+    const bestId = resp?.actionSummary?.best?.id || null;
+    const actionReason = resp?.actionSummary?.reason || null;
     const meta = resp?.meta || {};
     const uiBlocks = resp?.uiBlocks || [];
     const setups = resp?.setups || [];
@@ -140,6 +171,10 @@ export default function TradeZonesVpnMultiTFv2() {
 
             const json = await res.json();
             setResp(json);
+            setTimeout(() => {
+                const el = document.querySelector('[data-best="1"]');
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 50);
         } catch (e) {
             setErr(e?.message || String(e));
             setResp(null);
@@ -212,10 +247,39 @@ export default function TradeZonesVpnMultiTFv2() {
             </div>
 
             <div style={{ marginTop: 14 }}>
+                <Card title="Action Summary">
+                    {resp?.actionSummary?.best ? (
+                        <>
+                            <KV k="Best Setup" v={resp.actionSummary.best.name} />
+                            <KV k="TF" v={resp.actionSummary.best.timeframe} />
+                            <KV k="State" v={resp.actionSummary.best.state} />
+                            <KV k="Entry Validity" v={resp.actionSummary.best.entry_validity} />
+                            <KV k="Direction" v={resp.actionSummary.best.direction} />
+                            <KV k="Confidence" v={resp.actionSummary.best.confidence?.score ?? "—"} />
+                            <div style={{ marginTop: 8, opacity: 0.8 }}>
+                                Reason: {actionReason || "—"}
+                            </div>
+                        </>
+                    ) : (
+                        <div style={{ opacity: 0.8 }}>
+                            Không có setup nào actionable. Reason: {actionReason || "—"}
+                        </div>
+                    )}
+                </Card>
+
+                <div style={{ height: 12 }} />
+
                 <Card title="Setups">
-                    {setups.length ? setups.map((s) => <SetupCard key={s.id} s={s} />) : <div>Chưa có dữ liệu.</div>}
+                    {setups.length ? (
+                        setups.map((s) => (
+                            <SetupCard key={s.id} s={s} isBest={bestId === s.id} />
+                        ))
+                    ) : (
+                        <div>Chưa có dữ liệu.</div>
+                    )}
                 </Card>
             </div>
+
 
             <div style={{ marginTop: 14 }}>
                 <Card title="Rendered Markdown (optional audit)">
