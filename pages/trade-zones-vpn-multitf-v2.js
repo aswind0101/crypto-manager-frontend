@@ -1,231 +1,206 @@
 // crypto-manager-frontend/pages/trade-zones-vpn-multitf-v2.js
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { fetchBybitKlines, fetchMarketContext } from "../lib/bybitBrowserFetch.js";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
-const BYBIT_BASE = "https://api.bybit.com";
 
 function fmt(n) {
-    if (n == null || Number.isNaN(Number(n))) return "—";
-    const x = Number(n);
-    if (!Number.isFinite(x)) return "—";
-    return x.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  if (n == null || Number.isNaN(Number(n))) return "—";
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return x.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-function mapBybitKlineRow(r) {
-    return { t: Number(r[0]), o: Number(r[1]), h: Number(r[2]), l: Number(r[3]), c: Number(r[4]), v: Number(r[5]) };
+function Card({ title, children }) {
+  return (
+    <div style={{ border: "1px solid #e5e5e5", borderRadius: 12, padding: 14, background: "white" }}>
+      <div style={{ fontWeight: 700, marginBottom: 10 }}>{title}</div>
+      {children}
+    </div>
+  );
 }
 
-async function fetchBybitKlines({ symbol, interval, limit }) {
-    const url = new URL("/v5/market/kline", BYBIT_BASE);
-    url.searchParams.set("category", "linear");
-    url.searchParams.set("symbol", symbol);
-    url.searchParams.set("interval", interval);
-    url.searchParams.set("limit", String(limit));
-
-    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
-    if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Bybit HTTP ${res.status}: ${text || "request failed"}`);
-    }
-    const json = await res.json();
-    if (json?.retCode !== 0) throw new Error(`Bybit retCode ${json?.retCode}: ${json?.retMsg}`);
-
-    const list = json?.result?.list || [];
-    return list.map(mapBybitKlineRow).sort((a, b) => a.t - b.t);
+function KV({ k, v }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "4px 0" }}>
+      <div style={{ opacity: 0.75 }}>{k}</div>
+      <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{v}</div>
+    </div>
+  );
 }
 
-export default function TradeZonesVPNMultiTFV2Page() {
-    const [symbol, setSymbol] = useState("ETHUSDT");
-    const [loading, setLoading] = useState(false);
-    const [err, setErr] = useState("");
-    const [data, setData] = useState(null);
-
-    const postUrl = useMemo(() => `${BACKEND_URL}/api/trade-zones-client-multitf-v2`, []);
-
-    async function load() {
-        setLoading(true);
-        setErr("");
-        setData(null);
-
-        try {
-            const sym = (symbol || "ETHUSDT").trim().toUpperCase();
-
-            // Payload-friendly but still SPEC-grade
-            const [M5, M15, H1, H4, D1] = await Promise.all([
-                fetchBybitKlines({ symbol: sym, interval: "5", limit: 320 }),
-                fetchBybitKlines({ symbol: sym, interval: "15", limit: 260 }),
-                fetchBybitKlines({ symbol: sym, interval: "60", limit: 260 }),
-                fetchBybitKlines({ symbol: sym, interval: "240", limit: 200 }),
-                fetchBybitKlines({ symbol: sym, interval: "D", limit: 160 }),
-            ]);
-
-            const res = await fetch(postUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    symbol: sym,
-                    receivedAt: Date.now(),
-                    klinesByTF: { M5, M15, H1, H4, D1 },
-                }),
-            });
-
-            const json = await res.json();
-            if (!res.ok) throw new Error(json?.error || "Analyze request failed");
-            setData(json);
-        } catch (e) {
-            setErr(e.message || "Error");
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const meta = data?.meta || {};
-    const report = data?.report || null;
-    const zones = data?.tradeZones || [];
-    const noZonesReason = (() => {
-        // Ưu tiên giải thích theo chế độ trend-only
-        const h1Ctx = report?.contexts?.H1;
-        const m15Ctx = report?.contexts?.M15;
-
-        if (report && (h1Ctx !== "trend" || m15Ctx !== "trend")) {
-            return `No trade zones: Trend-only mode (H1=${h1Ctx || "—"}, M15=${m15Ctx || "—"}).`;
-        }
-
-        // Nếu backend có warnings, hiển thị để dễ debug
-        if (meta?.warnings?.length) return `No trade zones: ${meta.warnings.join(", ")}`;
-
-        return "No trade zones (RR guard / strict filters / insufficient data).";
-    })();
-
-    return (
-        <div style={{ padding: 20, maxWidth: 1150, margin: "0 auto" }}>
-            <h1 style={{ marginBottom: 8 }}>Trade Zones (Balanced) — SPEC Multi-TF V2</h1>
-            <div style={{ opacity: 0.8, marginBottom: 18 }}>
-                Backend: {BACKEND_URL} | Symbol: {meta.symbol || "—"} | Generated:{" "}
-                {meta.generatedAt ? new Date(meta.generatedAt).toLocaleString() : "—"}
-            </div>
-
-            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
-                <input value={symbol} onChange={(e) => setSymbol(e.target.value)} style={{ padding: 10, width: 220 }} />
-                <button onClick={load} style={{ padding: "10px 14px" }} disabled={loading}>
-                    {loading ? "Loading..." : "Refresh"}
-                </button>
-                {err ? <span style={{ color: "crimson" }}>{err}</span> : null}
-            </div>
-
-            {meta?.warnings?.length ? (
-                <div style={{ marginBottom: 14, padding: 12, border: "1px solid #ddd" }}>
-                    <b>Warnings:</b> {meta.warnings.join(", ")}
-                </div>
-            ) : null}
-
-            {report ? (
-                <div style={{ marginBottom: 18, padding: 12, border: "1px solid #ddd" }}>
-                    <div style={{ fontWeight: 700, marginBottom: 6 }}>Context</div>
-                    <div>
-                        HTF: <b>{report.htf?.tf}</b> regime=<b>{report.htf?.regime}</b> rsi={fmt(report.htf?.rsi)} stack={report.htf?.emaStack}
-                    </div>
-                    <div style={{ marginTop: 6 }}>
-                        Contexts: H1=<b>{report.contexts?.H1}</b>, M15=<b>{report.contexts?.M15}</b>
-                    </div>
-                    <details style={{ marginTop: 8 }}>
-                        <summary>TF states</summary>
-                        <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(report.tf, null, 2)}</pre>
-                    </details>
-                </div>
-            ) : null}
-
-            {zones.length === 0 ? (
-                <div style={{ padding: 14, border: "1px solid #ddd" }}>
-                              {noZonesReason}
-                </div>
-            ) : (
-                zones.map((z) => (
-                    <div key={z.id} style={{ border: "1px solid #ddd", padding: 14, marginBottom: 12, borderRadius: 6 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                            <div style={{ fontWeight: 700 }}>
-                                {z.direction.toUpperCase()} — {z.type} — {z.tf}
-                            </div>
-                            <div>
-                                Confidence: <b>{fmt(z.confidence)}</b> | Risk: <b>{z.risk?.tier}</b>
-                            </div>
-                        </div>
-                        <div style={{ marginTop: 6 }}>
-                            <b>Status:</b> <b>{z.status || "pending"}</b>
-                            {z.entry ? (
-                                <>
-                                    {" "} | <b>Entry now:</b> {String(!!z.entry.entry_now)}
-                                    {" "} | <b>Order:</b> {z.entry.order_type}
-                                </>
-                            ) : null}
-                        </div>
-
-                        {z.entry ? (
-                            <div style={{ marginTop: 6, opacity: 0.9 }}>
-                                <b>Entry plan:</b>{" "}
-                                {z.entry.suggested_entry != null ? fmt(z.entry.suggested_entry) : "—"}{" "}
-                                <span style={{ opacity: 0.75 }}>({z.entry.note})</span>
-                            </div>
-                        ) : null}
-
-                        {z.entry_validity ? (
-                            <div style={{ marginTop: 6, opacity: 0.9 }}>
-                                <b>Entry validity:</b> {z.entry_validity.is_valid ? "valid" : "invalid"} | far_state=
-                                {z.entry_validity.far_state} | until{" "}
-                                {z.entry_validity.valid_until ? new Date(z.entry_validity.valid_until).toLocaleString() : "—"}
-                            </div>
-                        ) : null}
-
-                        <div style={{ marginTop: 8 }}>
-                            <b>Zone:</b> {fmt(z.zone?.low)} → {fmt(z.zone?.high)}
-                        </div>
-
-                        <div style={{ marginTop: 6 }}>
-                            <b>Invalidation:</b> {z.invalidation?.type} @ {fmt(z.invalidation?.level)}{" "}
-                            <span style={{ opacity: 0.8 }}>({z.invalidation?.rule})</span>
-                        </div>
-
-                        <div style={{ marginTop: 6 }}>
-                            <b>Triggers:</b>
-                            <ul style={{ marginTop: 6 }}>
-                                {(z.triggers || []).map((t, i) => (
-                                    <li key={i}>
-                                        <code>{t.type}</code> — {t.rule}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <div style={{ marginTop: 6 }}>
-                            <b>Targets:</b>{" "}
-                            {(z.targets || []).map((t, i) => (
-                                <span key={i} style={{ marginRight: 10 }}>
-                                    <b>{t.label}</b>: {fmt(t.level)} <span style={{ opacity: 0.7 }}>({t.basis})</span>
-                                </span>
-                            ))}
-                        </div>
-
-                        <div style={{ marginTop: 10 }}>
-                            <b>Rationale:</b>
-                            <ul style={{ marginTop: 6 }}>
-                                {(z.rationale?.bullets || []).map((b, i) => (
-                                    <li key={i}>{b}</li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <details style={{ marginTop: 8 }}>
-                            <summary>Facts</summary>
-                            <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(z.rationale?.facts || {}, null, 2)}</pre>
-                        </details>
-                    </div>
-                ))
-            )}
+function SetupCard({ s }) {
+  const z = s.entry?.zone || {};
+  const tp = s.risk?.tp || [];
+  return (
+    <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12, marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+        <div style={{ fontWeight: 700 }}>{s.name}</div>
+        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+          TF {s.timeframe} | {s.state} | {s.entry_validity}
         </div>
-    );
+      </div>
+
+      <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Card title="Entry">
+          <KV k="Direction" v={s.direction} />
+          <KV k="Zone" v={`${fmt(z.low)} → ${fmt(z.high)}`} />
+          <KV k="Order" v={s.entry?.plan?.order_type || "—"} />
+          <KV k="Suggested" v={fmt(s.entry?.plan?.suggested_entry)} />
+          <div style={{ opacity: 0.8, marginTop: 8 }}>{s.entry?.plan?.note}</div>
+        </Card>
+
+        <Card title="Risk">
+          <KV k="SL" v={fmt(s.risk?.sl)} />
+          <KV k="TP1 / TP2 / TP3" v={`${fmt(tp[0])} / ${fmt(tp[1])} / ${fmt(tp[2])}`} />
+          <KV k="RR (vs TP2)" v={fmt(s.risk?.rr)} />
+          <KV k="Confidence" v={s.confidence?.score ?? "—"} />
+        </Card>
+      </div>
+
+      <details style={{ marginTop: 10 }}>
+        <summary style={{ cursor: "pointer" }}>Why / Facts</summary>
+        <div style={{ marginTop: 8 }}>
+          <div style={{ marginBottom: 6 }}>
+            {(s.why?.bullets || []).map((b, i) => (
+              <div key={i} style={{ opacity: 0.9 }}>- {b}</div>
+            ))}
+          </div>
+          <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, background: "#fafafa", padding: 10, borderRadius: 8 }}>
+            {JSON.stringify(s.why?.facts || {}, null, 2)}
+          </div>
+          {(s.why?.missing_fields || []).length ? (
+            <div style={{ marginTop: 8, color: "crimson" }}>
+              Missing/Guards: {(s.why.missing_fields || []).join(", ")}
+            </div>
+          ) : null}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+export default function TradeZonesVpnMultiTFv2() {
+  const [symbol, setSymbol] = useState("ETHUSDT");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [resp, setResp] = useState(null);
+
+  const meta = resp?.meta || {};
+  const uiBlocks = resp?.uiBlocks || [];
+  const setups = resp?.setups || [];
+  const dashboard = resp?.dashboard || {};
+  const markdown = resp?.rendered_markdown_vi || "";
+
+  async function load() {
+    setLoading(true);
+    setErr("");
+    try {
+      const s = symbol.trim().toUpperCase();
+
+      // Fetch raw klines
+      const [m5, m15, h1, h4, d1] = await Promise.all([
+        fetchBybitKlines({ symbol: s, interval: "5", limit: 350 }),
+        fetchBybitKlines({ symbol: s, interval: "15", limit: 350 }),
+        fetchBybitKlines({ symbol: s, interval: "60", limit: 350 }),
+        fetchBybitKlines({ symbol: s, interval: "240", limit: 350 }),
+        fetchBybitKlines({ symbol: s, interval: "D", limit: 260 }),
+      ]);
+
+      // Market context (ticker/funding/OI/orderbook...)
+      const raw = await fetchMarketContext({ symbol: s });
+
+      const body = {
+        symbol: s,
+        receivedAt: Date.now(),
+        raw,
+        klinesByTF: { "5": m5, "15": m15, "60": h1, "240": h4, "D": d1 },
+      };
+
+      const res = await fetch(`${BACKEND_URL}/api/trade-zones-client-multitf-v2`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(`Backend HTTP ${res.status}: ${t || "request failed"}`);
+      }
+
+      const json = await res.json();
+      setResp(json);
+    } catch (e) {
+      setErr(e?.message || String(e));
+      setResp(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const dq = dashboard?.data_quality || resp?.snapshot?.data_quality;
+
+  return (
+    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto", background: "#f7f7f7", minHeight: "100vh" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+        <h1 style={{ margin: 0 }}>SPEC Pipeline — Multi-TF</h1>
+        <div style={{ opacity: 0.8 }}>
+          Backend: {BACKEND_URL} | Generated: {meta.generatedAt ? new Date(meta.generatedAt).toLocaleString() : "—"}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14, marginBottom: 14 }}>
+        <input value={symbol} onChange={(e) => setSymbol(e.target.value)} style={{ padding: 10, width: 220, borderRadius: 10, border: "1px solid #ddd" }} />
+        <button onClick={load} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #ddd", background: "white" }} disabled={loading}>
+          {loading ? "Loading..." : "Refresh"}
+        </button>
+        {err ? <span style={{ color: "crimson" }}>{err}</span> : null}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <Card title="Data Quality">
+          <KV k="Grade" v={dq?.grade || "—"} />
+          <KV k="Snapshot" v={meta.snapshotVersion || resp?.snapshot?.snapshot_version || "—"} />
+          <KV k="AsOf" v={resp?.snapshot?.asof_ts ? new Date(resp.snapshot.asof_ts).toLocaleString() : "—"} />
+          {(dq?.issues || []).slice(0, 6).map((it, i) => (
+            <div key={i} style={{ marginTop: 6, color: "#7a3" }}>
+              - {it.code} ({it.tf}): {it.details}
+            </div>
+          ))}
+        </Card>
+
+        <Card title="Market">
+          <KV k="Last" v={fmt(resp?.snapshot?.market?.price?.last)} />
+          <KV k="Mark" v={fmt(resp?.snapshot?.market?.price?.mark)} />
+          <KV k="Index" v={fmt(resp?.snapshot?.market?.price?.index)} />
+          <KV k="Spread (bps)" v={fmt(resp?.snapshot?.market?.price?.spread_bps)} />
+          <KV k="Funding" v={fmt(resp?.snapshot?.market?.derivatives?.funding?.rate)} />
+          <KV k="OI" v={fmt(resp?.snapshot?.market?.derivatives?.open_interest?.value)} />
+        </Card>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <Card title="Setups">
+          {setups.length ? setups.map((s) => <SetupCard key={s.id} s={s} />) : <div>Chưa có dữ liệu.</div>}
+        </Card>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <Card title="Rendered Markdown (optional audit)">
+          <textarea value={markdown} readOnly style={{ width: "100%", minHeight: 260, padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
+        </Card>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <Card title="Snapshot (evidence)">
+          <details>
+            <summary style={{ cursor: "pointer" }}>View full snapshot JSON</summary>
+            <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, background: "#fafafa", padding: 12, borderRadius: 10 }}>
+              {resp?.snapshot ? JSON.stringify(resp.snapshot, null, 2) : "—"}
+            </pre>
+          </details>
+        </Card>
+      </div>
+    </div>
+  );
 }
