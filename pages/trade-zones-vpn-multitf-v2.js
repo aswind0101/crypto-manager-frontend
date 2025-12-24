@@ -109,12 +109,13 @@ export default function TradeZonesVpnMultiTFv2() {
 
             // Fetch raw klines
             const [m5, m15, h1, h4, d1] = await Promise.all([
-                fetchBybitKlines({ symbol: s, interval: "5", limit: 350 }),
-                fetchBybitKlines({ symbol: s, interval: "15", limit: 350 }),
-                fetchBybitKlines({ symbol: s, interval: "60", limit: 350 }),
-                fetchBybitKlines({ symbol: s, interval: "240", limit: 350 }),
-                fetchBybitKlines({ symbol: s, interval: "D", limit: 260 }),
+                fetchBybitKlines({ symbol: s, interval: "5", limit: 60 }),     // M5: 40–60 bars
+                fetchBybitKlines({ symbol: s, interval: "15", limit: 260 }),   // FULL
+                fetchBybitKlines({ symbol: s, interval: "60", limit: 260 }),   // FULL
+                fetchBybitKlines({ symbol: s, interval: "240", limit: 260 }),  // FULL
+                fetchBybitKlines({ symbol: s, interval: "D", limit: 220 }),    // FULL
             ]);
+
 
             // Market context (ticker/funding/OI/orderbook...)
             const raw = await fetchMarketContext({ symbol: s });
