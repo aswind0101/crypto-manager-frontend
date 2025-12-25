@@ -581,10 +581,10 @@ export default function BybitSnapshotV3New() {
           <div className="flex items-start justify-between gap-3 px-4 py-4">
             <div>
               <div className="text-lg font-semibold tracking-tight">
-                📡 Snapshot Console (FULL) — Bybit v3
+                📡 Snapshot Console — Bybit v3
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Một file snapshot FULL · Copy commands theo SPEC (DASH/CHECK/PART/SETUPS)
+                Phase 1: FULL snapshot (HTF+LTF) · Phase 2: LTF-only delta check (ENTRY_VALIDITY)
               </div>
             </div>
 
@@ -780,6 +780,18 @@ export default function BybitSnapshotV3New() {
             >
               {copiedKey === "copy_check_ltf" ? "Copied ✓" : "Copy [CHECK_LTF]"}
             </Button>
+            <Button
+              variant="secondary"
+              disabled={!anchor?.obj?.analysis_anchor}
+              onClick={() =>
+                copyText(
+                  `${anchor?.obj?.analysis_anchor?.commands?.check_ltf || ""}\n\n${anchor?.text || ""}`,
+                  "copy_check_ltf_bundle"
+                )
+              }
+            >
+              {copiedKey === "copy_check_ltf_bundle" ? "Copied ✓" : "Copy CHECK_LTF Bundle"}
+            </Button>
           </div>
           {/* Progress hint line */}
           <div className="px-4 pb-4 text-xs text-slate-500">
@@ -807,7 +819,7 @@ export default function BybitSnapshotV3New() {
                 <span className="text-xs text-slate-400">{openCommands ? "Ẩn ▲" : "Mở ▼"}</span>
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Chỉ có trigger hợp lệ: <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS]</span>. Bấm 1 lần để copy.
+                Chỉ có trigger hợp lệ:{" "} <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS] [CHECK_LTF]</span>. Bấm 1 lần để copy.
               </div>
             </button>
 
