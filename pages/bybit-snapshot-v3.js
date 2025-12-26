@@ -45,7 +45,7 @@ export default function BybitSnapshotV3New() {
   const haptic = () => {
     try {
       if (navigator?.vibrate) navigator.vibrate(10);
-    } catch { }
+    } catch {}
   };
 
   const copyText = async (text, key) => {
@@ -85,12 +85,12 @@ export default function BybitSnapshotV3New() {
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
   const ready = Boolean(full.fileName);
+
   // =======================
   // LTF STATUS (M5/M15) — user-facing
   // =======================
   const fmtLocal = (ms) => {
     if (!Number.isFinite(ms)) return "—";
-    // dùng timezone local của máy user (Mỹ thì sẽ ra PST/PDT/EST/…)
     return new Date(ms).toLocaleString(undefined, {
       year: "numeric",
       month: "2-digit",
@@ -120,14 +120,11 @@ export default function BybitSnapshotV3New() {
         return { label, ok: false, headline: "MISSING", sub: "candle_status missing" };
       }
 
-      // is_last_closed=false => candle hiện tại đang chạy (chưa đóng)
       const closedNow = Boolean(s.is_last_closed);
-
       const headline = closedNow ? "CLOSED" : "OPEN (forming)";
-      const sub = [
-        `last_open: ${fmtLocal(s.last_open_ts)}`,
-        `last_closed: ${fmtLocal(s.last_closed_ts)}`,
-      ].join(" | ");
+      const sub = [`last_open: ${fmtLocal(s.last_open_ts)}`, `last_closed: ${fmtLocal(s.last_closed_ts)}`].join(
+        " | "
+      );
 
       return { label, ok: closedNow, headline, sub };
     };
@@ -144,11 +141,17 @@ export default function BybitSnapshotV3New() {
         ok,
         headline: ok ? "READY" : "BLOCKED",
         sub: `tf=${trig.tf || "—"} | reason=${trig.reason || "—"} | evaluated_at=${fmtLocal(trig.evaluated_at)}`,
+        tf: trig.tf || "",
+        reason: trig.reason || "",
       };
     })();
 
     return { sym, m5Line, m15Line, hardBlock };
   }, [full.snapshot, primarySymbol]);
+
+  // ✅ Gate xuất file theo M5 readiness (machine-readable)
+  const ltfReadyM5 = Boolean(ltfUi?.hardBlock?.tf === "5" && ltfUi?.hardBlock?.ok === true);
+  const ltfBlockedReason = ltfUi?.hardBlock?.reason || "—";
 
   // Commands (SPEC modes) — chỉ dùng trigger hợp lệ
   const snapshotFileName = full.fileName || "";
@@ -292,7 +295,6 @@ export default function BybitSnapshotV3New() {
 
   /* =======================
      POSITION TEMPLATE (optional helper)
-     - không phải mode riêng trong SPEC, nhưng hữu ích khi user đã có lệnh
   ======================= */
   const macroPositionShort = useMemo(() => {
     if (!full.fileName) return "";
@@ -386,9 +388,7 @@ export default function BybitSnapshotV3New() {
       onClick={() => setCmdTab(id)}
       className={[
         "rounded-xl px-3 py-2 text-sm transition",
-        cmdTab === id
-          ? "bg-slate-200 text-slate-950"
-          : "bg-black/20 text-slate-200 hover:bg-black/30",
+        cmdTab === id ? "bg-slate-200 text-slate-950" : "bg-black/20 text-slate-200 hover:bg-black/30",
       ].join(" ")}
     >
       {label}
@@ -413,9 +413,7 @@ export default function BybitSnapshotV3New() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-sm font-semibold text-slate-100">{title}</div>
-            {subtitle ? (
-              <div className="mt-1 text-xs text-slate-400">{subtitle}</div>
-            ) : null}
+            {subtitle ? <div className="mt-1 text-xs text-slate-400">{subtitle}</div> : null}
             {text ? (
               <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-slate-800 bg-slate-950/40 p-3 text-[12px] text-slate-200">
                 {text}
@@ -449,24 +447,37 @@ export default function BybitSnapshotV3New() {
           {/* Header */}
           <div className="flex items-start justify-between gap-3 px-4 py-4">
             <div>
-              <div className="text-lg font-semibold tracking-tight">
-                📡 Snapshot Console (FULL) — Bybit v3
-              </div>
+              <div className="text-lg font-semibold tracking-tight">📡 Snapshot Console (FULL) — Bybit v3</div>
               <div className="mt-1 text-xs text-slate-400">
                 Một file snapshot FULL · Copy commands theo SPEC (DASH/CHECK/PART/SETUPS)
               </div>
             </div>
 
-            <span
-              className={[
-                "shrink-0 rounded-full px-3 py-1 text-xs",
-                ready
-                  ? "border border-emerald-800/60 bg-emerald-950/30 text-emerald-200"
-                  : "border border-slate-700 bg-slate-900 text-slate-300",
-              ].join(" ")}
-            >
-              {ready ? "Ready" : "No snapshot"}
-            </span>
+            <div className="flex flex-col items-end gap-2">
+              <span
+                className={[
+                  "shrink-0 rounded-full px-3 py-1 text-xs border",
+                  ready ? "border-emerald-800/60 bg-emerald-950/30 text-emerald-200" : "border-slate-700 bg-slate-900 text-slate-300",
+                ].join(" ")}
+              >
+                {ready ? "Snapshot generated" : "No snapshot"}
+              </span>
+
+              {/* ✅ M5 readiness badge */}
+              {full.snapshot ? (
+                <span
+                  className={[
+                    "shrink-0 rounded-full px-3 py-1 text-xs border",
+                    ltfReadyM5
+                      ? "border-emerald-800/60 bg-emerald-950/30 text-emerald-200"
+                      : "border-red-900/60 bg-red-950/30 text-red-200",
+                  ].join(" ")}
+                  title={ltfReadyM5 ? "M5 ready: OK to export for entry workflows" : `Blocked: ${ltfBlockedReason}`}
+                >
+                  M5 Gate: {ltfReadyM5 ? "READY" : "BLOCKED"}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           <div className="border-t border-slate-800" />
@@ -506,15 +517,11 @@ export default function BybitSnapshotV3New() {
                   className="absolute z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-lg"
                 >
                   {coinsLoading ? (
-                    <div className="px-3 py-3 text-sm text-slate-300">
-                      Loading Top 100 coins…
-                    </div>
+                    <div className="px-3 py-3 text-sm text-slate-300">Loading Top 100 coins…</div>
                   ) : coinsErr ? (
                     <div className="px-3 py-3 text-sm text-red-200">{coinsErr}</div>
                   ) : suggestions.length === 0 ? (
-                    <div className="px-3 py-3 text-sm text-slate-400">
-                      Không có gợi ý cho “{currentToken}”.
-                    </div>
+                    <div className="px-3 py-3 text-sm text-slate-400">Không có gợi ý cho “{currentToken}”.</div>
                   ) : (
                     <div className="max-h-72 overflow-auto">
                       {suggestions.map((c, idx) => {
@@ -533,8 +540,7 @@ export default function BybitSnapshotV3New() {
                           >
                             <div className="min-w-0">
                               <div className="text-sm text-slate-100">
-                                {c.name}{" "}
-                                <span className="text-xs text-slate-400">({c.symbol})</span>
+                                {c.name} <span className="text-xs text-slate-400">({c.symbol})</span>
                               </div>
                               <div className="text-xs text-slate-400">
                                 Auto-fill: <span className="text-slate-200">{pair}</span>
@@ -564,6 +570,7 @@ export default function BybitSnapshotV3New() {
               <div className="mt-1 break-all text-sm">{full.fileName || "—"}</div>
             </div>
           </div>
+
           {/* LTF Candle Status (user-facing) */}
           {full.snapshot && (
             <div className="px-4 pb-4">
@@ -615,17 +622,23 @@ export default function BybitSnapshotV3New() {
           {/* Quick actions */}
           <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
-              {loading
-                ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
-                : "Generate (FULL snapshot)"}
+              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate (FULL snapshot)"}
             </Button>
 
+            {/* ✅ Chặn export khi M5 chưa READY */}
             <Button
               variant="secondary"
               onClick={downloadFULL}
-              disabled={!full.snapshot || !full.fileName}
+              disabled={!full.snapshot || !full.fileName || !ltfReadyM5}
+              title={
+                !full.snapshot || !full.fileName
+                  ? "Generate snapshot trước"
+                  : ltfReadyM5
+                  ? "OK to export"
+                  : `Blocked: ${ltfBlockedReason}`
+              }
             >
-              Download JSON
+              Download JSON{full.snapshot && !ltfReadyM5 ? " (BLOCKED)" : ""}
             </Button>
 
             <Button
@@ -641,12 +654,12 @@ export default function BybitSnapshotV3New() {
           <div className="px-4 pb-4 text-xs text-slate-500">
             {loading ? (
               <span>
-                Đang generate snapshot{dots}{" "}
-                {progressPct ? `(ước lượng ${progressPct}%)` : ""}
+                Đang generate snapshot{dots} {progressPct ? `(ước lượng ${progressPct}%)` : ""}
               </span>
             ) : (
               <span>
-                Tip: Generate → Download JSON → Upload vào ChatGPT → dùng các lệnh copy đúng mode (DASH/CHECK/PART/SETUPS).
+                Tip: Generate → (M5 Gate READY) → Download JSON → Upload vào ChatGPT → dùng các lệnh copy đúng mode
+                (DASH/CHECK/PART/SETUPS).
               </span>
             )}
           </div>
@@ -663,7 +676,8 @@ export default function BybitSnapshotV3New() {
                 <span className="text-xs text-slate-400">{openCommands ? "Ẩn ▲" : "Mở ▼"}</span>
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Chỉ có trigger hợp lệ: <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS]</span>. Bấm 1 lần để copy.
+                Chỉ có trigger hợp lệ: <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS]</span>. Bấm 1 lần để
+                copy.
               </div>
             </button>
 
@@ -745,8 +759,7 @@ export default function BybitSnapshotV3New() {
                 )}
 
                 <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-500">
-                  Chuẩn mode theo SPEC:&nbsp;
-                  <span className="text-slate-300">[DASH]</span>,{" "}
+                  Chuẩn mode theo SPEC:&nbsp;<span className="text-slate-300">[DASH]</span>,{" "}
                   <span className="text-slate-300">[CHECK]</span>,{" "}
                   <span className="text-slate-300">[PART]</span>,{" "}
                   <span className="text-slate-300">[SETUPS]</span>
@@ -768,9 +781,7 @@ export default function BybitSnapshotV3New() {
         <div className="mx-auto max-w-3xl px-3 py-3">
           <div className="grid grid-cols-2 gap-2">
             <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
-              {loading
-                ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
-                : "Generate"}
+              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate"}
             </Button>
 
             <Button
@@ -783,13 +794,14 @@ export default function BybitSnapshotV3New() {
           </div>
 
           <div className="mt-2">
+            {/* ✅ Mobile: chặn export khi M5 chưa READY */}
             <Button
               variant="secondary"
               onClick={downloadFULL}
-              disabled={!full.snapshot || !full.fileName}
+              disabled={!full.snapshot || !full.fileName || !ltfReadyM5}
               className="w-full"
             >
-              Download JSON
+              Download JSON{full.snapshot && !ltfReadyM5 ? " (BLOCKED)" : ""}
             </Button>
           </div>
 
@@ -798,14 +810,12 @@ export default function BybitSnapshotV3New() {
               {loading
                 ? `Đang generate${dots}${progressPct ? ` (${progressPct}%)` : ""}`
                 : ready
-                  ? "Ready: FULL snapshot"
-                  : "Chưa có snapshot"}
+                ? ltfReadyM5
+                  ? "Ready: FULL snapshot (M5 READY)"
+                  : `Blocked: M5 not closed (${ltfBlockedReason})`
+                : "Chưa có snapshot"}
             </span>
-            <button
-              type="button"
-              className="underline underline-offset-2"
-              onClick={() => setOpenCommands(true)}
-            >
+            <button type="button" className="underline underline-offset-2" onClick={() => setOpenCommands(true)}>
               Commands
             </button>
           </div>
