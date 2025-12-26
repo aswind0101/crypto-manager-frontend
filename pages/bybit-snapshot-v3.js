@@ -45,7 +45,7 @@ export default function BybitSnapshotV3New() {
   const haptic = () => {
     try {
       if (navigator?.vibrate) navigator.vibrate(10);
-    } catch {}
+    } catch { }
   };
 
   const copyText = async (text, key) => {
@@ -85,6 +85,70 @@ export default function BybitSnapshotV3New() {
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
   const ready = Boolean(full.fileName);
+  // =======================
+  // LTF STATUS (M5/M15) — user-facing
+  // =======================
+  const fmtLocal = (ms) => {
+    if (!Number.isFinite(ms)) return "—";
+    // dùng timezone local của máy user (Mỹ thì sẽ ra PST/PDT/EST/…)
+    return new Date(ms).toLocaleString(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short",
+    });
+  };
+
+  const ltfUi = useMemo(() => {
+    const snap = full.snapshot;
+    const sym = primarySymbol;
+
+    const bybit = snap?.per_exchange_ltf?.bybit;
+    const block = bybit?.symbols?.[sym];
+
+    const cs = block?.meta?.candle_status || null;
+    const m5 = cs?.["5"] || null;
+    const m15 = cs?.["15"] || null;
+
+    const trig = block?.ltf_trigger_state || null;
+
+    const tfLine = (label, s) => {
+      if (!s) {
+        return { label, ok: false, headline: "MISSING", sub: "candle_status missing" };
+      }
+
+      // is_last_closed=false => candle hiện tại đang chạy (chưa đóng)
+      const closedNow = Boolean(s.is_last_closed);
+
+      const headline = closedNow ? "CLOSED" : "OPEN (forming)";
+      const sub = [
+        `last_open: ${fmtLocal(s.last_open_ts)}`,
+        `last_closed: ${fmtLocal(s.last_closed_ts)}`,
+      ].join(" | ");
+
+      return { label, ok: closedNow, headline, sub };
+    };
+
+    const m5Line = tfLine("M5", m5);
+    const m15Line = tfLine("M15", m15);
+
+    const hardBlock = (() => {
+      if (!trig) {
+        return { ok: false, headline: "UNKNOWN", sub: "ltf_trigger_state missing" };
+      }
+      const ok = Boolean(trig.ready);
+      return {
+        ok,
+        headline: ok ? "READY" : "BLOCKED",
+        sub: `tf=${trig.tf || "—"} | reason=${trig.reason || "—"} | evaluated_at=${fmtLocal(trig.evaluated_at)}`,
+      };
+    })();
+
+    return { sym, m5Line, m15Line, hardBlock };
+  }, [full.snapshot, primarySymbol]);
 
   // Commands (SPEC modes) — chỉ dùng trigger hợp lệ
   const snapshotFileName = full.fileName || "";
@@ -500,6 +564,53 @@ export default function BybitSnapshotV3New() {
               <div className="mt-1 break-all text-sm">{full.fileName || "—"}</div>
             </div>
           </div>
+          {/* LTF Candle Status (user-facing) */}
+          {full.snapshot && (
+            <div className="px-4 pb-4">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-3">
+                <div className="text-xs text-slate-400">LTF Closed-Candle Status (at export time)</div>
+
+                {/* Hard blocker */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    className={[
+                      "rounded-full px-3 py-1 text-xs border",
+                      ltfUi?.hardBlock?.ok
+                        ? "border-emerald-800/60 bg-emerald-950/30 text-emerald-200"
+                        : "border-red-900/60 bg-red-950/30 text-red-200",
+                    ].join(" ")}
+                  >
+                    Hard Blocker: {ltfUi?.hardBlock?.headline || "—"}
+                  </span>
+
+                  <span className="text-[11px] text-slate-400">{ltfUi?.hardBlock?.sub || ""}</span>
+                </div>
+
+                {/* M5 / M15 */}
+                <div className="mt-3 space-y-2">
+                  {[ltfUi?.m5Line, ltfUi?.m15Line].map((x) => (
+                    <div key={x?.label} className="flex items-start justify-between gap-3">
+                      <span
+                        className={[
+                          "shrink-0 rounded-full px-3 py-1 text-xs border",
+                          x?.ok
+                            ? "border-emerald-800/60 bg-emerald-950/30 text-emerald-200"
+                            : "border-amber-900/60 bg-amber-950/30 text-amber-200",
+                        ].join(" ")}
+                      >
+                        {x?.label}: {x?.headline}
+                      </span>
+                      <span className="min-w-0 text-[11px] text-slate-400">{x?.sub || ""}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 text-[11px] text-slate-500">
+                  Rule: chỉ khi candle đã đóng mới được dùng để trigger/entry; nếu OPEN (forming) thì phải generate lại sau.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Quick actions */}
           <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -687,8 +798,8 @@ export default function BybitSnapshotV3New() {
               {loading
                 ? `Đang generate${dots}${progressPct ? ` (${progressPct}%)` : ""}`
                 : ready
-                ? "Ready: FULL snapshot"
-                : "Chưa có snapshot"}
+                  ? "Ready: FULL snapshot"
+                  : "Chưa có snapshot"}
             </span>
             <button
               type="button"
