@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildFullSnapshotV3, buildEntryLtfSnapshotV3 } from "../lib/snapshot-v3";
+import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
 import { buildCopyCommands } from "../components/ui/helpers/bybit-snapshot-v3-ui-macros";
 
@@ -12,8 +12,6 @@ export default function BybitSnapshotV3New() {
   const [error, setError] = useState("");
 
   const [full, setFull] = useState({ snapshot: null, fileName: "" });
-  const [ltf, setLtf] = useState({ snapshot: null, fileName: "" });
-  const [anchor, setAnchor] = useState({ obj: null, text: "" });
 
   // per-button copied state
   const [copiedKey, setCopiedKey] = useState("");
@@ -44,69 +42,10 @@ export default function BybitSnapshotV3New() {
   /* =======================
      HELPERS
   ======================= */
-  /* =======================
-   PERSISTENCE (IndexedDB)
-   - Lưu FULL + LTF + STATE ANCHOR để không mất khi refresh
-======================= */
-  const DB_NAME = "price_analyzer_console_v3";
-  const DB_STORE = "kv";
-  const DB_VERSION = 1;
-
-  const idbOpen = () =>
-    new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(DB_STORE)) {
-          db.createObjectStore(DB_STORE);
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-
-  const idbSet = async (key, value) => {
-    const db = await idbOpen();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(DB_STORE, "readwrite");
-      tx.objectStore(DB_STORE).put(value, key);
-      tx.oncomplete = () => {
-        db.close();
-        resolve(true);
-      };
-      tx.onerror = () => {
-        db.close();
-        reject(tx.error);
-      };
-    });
-  };
-
-  const idbGet = async (key) => {
-    const db = await idbOpen();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(DB_STORE, "readonly");
-      const req = tx.objectStore(DB_STORE).get(key);
-      req.onsuccess = () => {
-        db.close();
-        resolve(req.result ?? null);
-      };
-      req.onerror = () => {
-        db.close();
-        reject(req.error);
-      };
-    });
-  };
-
-  const KV = {
-    FULL: "last_full",
-    LTF: "last_ltf",
-    ANCHOR: "last_anchor",
-  };
-
   const haptic = () => {
     try {
       if (navigator?.vibrate) navigator.vibrate(10);
-    } catch { }
+    } catch {}
   };
 
   const copyText = async (text, key) => {
@@ -142,38 +81,6 @@ export default function BybitSnapshotV3New() {
       .split(/[,\s]+/)
       .map((s) => s.trim().toUpperCase())
       .filter(Boolean);
-  const buildStateAnchor = ({ fullFileName, ltfFileName, symbol, fullSnapshot }) => {
-    const ts = fullSnapshot?.generated_at ?? Date.now();
-    const anchorId = `${symbol}_${ts}`;
-
-    // FULL: trigger hợp lệ theo SPEC hiện tại
-    const cmdFullDash = fullFileName ? `[DASH] FILE=${fullFileName}` : "";
-
-    // LTF-only: trigger đề xuất (cần patch SPEC sau để hợp thức hóa)
-    const cmdCheckLtf = ltfFileName
-      ? `[CHECK_LTF] FILE=${ltfFileName}\nANCHOR_REF=${anchorId}`
-      : "";
-
-    const anchorObj = {
-      analysis_anchor: {
-        anchor_id: anchorId,
-        symbol,
-        snapshot_file: fullFileName || null,
-        snapshot_generated_at: ts,
-        ltf_file: ltfFileName || null,
-        commands: {
-          full_dash: cmdFullDash || null,
-          check_ltf: cmdCheckLtf || null,
-        },
-        note: "LTF-only check requires SPEC to allow [CHECK_LTF].",
-      },
-    };
-
-    return {
-      obj: anchorObj,
-      text: JSON.stringify(anchorObj, null, 2),
-    };
-  };
 
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
@@ -343,33 +250,6 @@ export default function BybitSnapshotV3New() {
     }, 350);
     return () => clearInterval(t);
   }, [loading]);
-  /* =======================
-     RESTORE PERSISTED STATE (on refresh)
-  ======================= */
-  useEffect(() => {
-    let alive = true;
-
-    const restore = async () => {
-      try {
-        const lastFull = await idbGet(KV.FULL);
-        const lastLtf = await idbGet(KV.LTF);
-        const lastAnchor = await idbGet(KV.ANCHOR);
-
-        if (!alive) return;
-
-        if (lastFull?.snapshot && lastFull?.fileName) setFull(lastFull);
-        if (lastLtf?.snapshot && lastLtf?.fileName) setLtf(lastLtf);
-        if (lastAnchor?.obj && lastAnchor?.text) setAnchor(lastAnchor);
-      } catch (e) {
-        console.error("[restore] failed:", e);
-      }
-    };
-
-    restore();
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   /* =======================
      SNAPSHOT GENERATION
@@ -393,23 +273,8 @@ export default function BybitSnapshotV3New() {
       });
 
       const ts = fullSnap?.generated_at || Date.now();
-      const fullName = `bybit_full_snapshot_${ts}_${primarySymbol}.json`;
-
-      // Persist FULL
-      const fullPayload = { snapshot: fullSnap, fileName: fullName };
-      setFull(fullPayload);
-      await idbSet(KV.FULL, fullPayload);
-
-      // Build/persist anchor (nếu đã có LTF file thì nhúng luôn)
-      const ltfName = ltf?.fileName || "";
-      const a = buildStateAnchor({
-        fullFileName: fullName,
-        ltfFileName: ltfName,
-        symbol: primarySymbol,
-        fullSnapshot: fullSnap,
-      });
-      setAnchor(a);
-      await idbSet(KV.ANCHOR, a);
+      const name = `bybit_full_snapshot_${ts}_${primarySymbol}.json`;
+      setFull({ snapshot: fullSnap, fileName: name });
 
       setProgressPct(100);
     } catch (e) {
@@ -420,63 +285,7 @@ export default function BybitSnapshotV3New() {
       setLoading(false);
       setTimeout(() => setProgressPct(0), 800);
     }
-  }, [symbols, primarySymbol, ltf?.fileName]);
-  const handleGenerateLtfOnly = useCallback(async () => {
-    if (!symbols.length) {
-      setError("Vui lòng nhập ít nhất 1 symbol.");
-      return;
-    }
-
-    setError("");
-    setLoading(true);
-    setProgressPct(0);
-
-    try {
-      setProgressPct(15);
-
-      const anchorRef =
-        anchor?.obj?.analysis_anchor
-          ? {
-            snapshot_file: full?.fileName || null,
-            snapshot_generated_at: full?.snapshot?.generated_at || null,
-            anchor_id: anchor?.obj?.analysis_anchor?.anchor_id || null,
-          }
-          : null;
-
-      const ltfSnap = await buildEntryLtfSnapshotV3(symbols, anchorRef).then((r) => {
-        setProgressPct(90);
-        return r;
-      });
-
-      const ts = ltfSnap?.generated_at || Date.now();
-      const ltfName = `bybit_entry_ltf_${ts}_${primarySymbol}.json`;
-
-      const ltfPayload = { snapshot: ltfSnap, fileName: ltfName };
-      setLtf(ltfPayload);
-      await idbSet(KV.LTF, ltfPayload);
-
-      // Refresh anchor to include ltf file + command
-      if (full?.fileName && full?.snapshot) {
-        const a = buildStateAnchor({
-          fullFileName: full.fileName,
-          ltfFileName: ltfName,
-          symbol: primarySymbol,
-          fullSnapshot: full.snapshot,
-        });
-        setAnchor(a);
-        await idbSet(KV.ANCHOR, a);
-      }
-
-      setProgressPct(100);
-    } catch (e) {
-      console.error(e);
-      setError("Có lỗi khi tạo LTF-only snapshot.");
-      setProgressPct(0);
-    } finally {
-      setLoading(false);
-      setTimeout(() => setProgressPct(0), 800);
-    }
-  }, [symbols, primarySymbol, full?.fileName, full?.snapshot, anchor?.obj]);
+  }, [symbols, primarySymbol]);
 
   /* =======================
      DOWNLOAD
@@ -502,10 +311,6 @@ export default function BybitSnapshotV3New() {
   const downloadFULL = () => {
     if (!full.snapshot || !full.fileName) return;
     downloadJson(full.snapshot, full.fileName);
-  };
-  const downloadLTF = () => {
-    if (!ltf.snapshot || !ltf.fileName) return;
-    downloadJson(ltf.snapshot, ltf.fileName);
   };
 
   /* =======================
@@ -581,10 +386,10 @@ export default function BybitSnapshotV3New() {
           <div className="flex items-start justify-between gap-3 px-4 py-4">
             <div>
               <div className="text-lg font-semibold tracking-tight">
-                📡 Snapshot Console — Bybit v3
+                📡 Snapshot Console (FULL) — Bybit v3
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Phase 1: FULL snapshot (HTF+LTF) · Phase 2: LTF-only delta check (ENTRY_VALIDITY)
+                Một file snapshot FULL · Copy commands theo SPEC (DASH/CHECK/PART/SETUPS)
               </div>
             </div>
 
@@ -695,50 +500,7 @@ export default function BybitSnapshotV3New() {
               <div className="mt-1 break-all text-sm">{full.fileName || "—"}</div>
             </div>
           </div>
-          {/* File name (LTF-only) */}
-          <div className="px-4 pb-4">
-            <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
-              <div className="text-xs text-slate-400">Snapshot file (LTF-only)</div>
-              <div className="mt-1 break-all text-sm">{ltf.fileName || "—"}</div>
-            </div>
-          </div>
-          {/* STATE ANCHOR */}
-          <div className="px-4 pb-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold">🧷 STATE ANCHOR</div>
-                  <div className="mt-1 text-xs text-slate-400">
-                    Anchor + đường dẫn FULL/LTF được persist (không mất khi refresh). Dùng cho delta-check LTF.
-                  </div>
-                </div>
 
-                <button
-                  type="button"
-                  disabled={!anchor.text}
-                  onClick={() => copyText(anchor.text, "copy_anchor")}
-                  className={[
-                    "shrink-0 rounded-xl border px-3 py-2 text-xs",
-                    anchor.text
-                      ? "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                      : "border-slate-800 bg-black/20 text-slate-500 cursor-not-allowed",
-                  ].join(" ")}
-                >
-                  {copiedKey === "copy_anchor" ? "Copied ✓" : "Copy Anchor"}
-                </button>
-              </div>
-
-              {anchor.text ? (
-                <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-slate-800 bg-slate-950/40 p-3 text-[12px] text-slate-200">
-                  {anchor.text}
-                </pre>
-              ) : (
-                <div className="mt-3 text-xs text-slate-500">
-                  Chưa có anchor. Hãy Generate (FULL) trước; sau đó Generate (LTF-only) để có lệnh [CHECK_LTF].
-                </div>
-              )}
-            </div>
-          </div>
           {/* Quick actions */}
           <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
@@ -763,36 +525,7 @@ export default function BybitSnapshotV3New() {
               {copiedKey === "quick_dash" ? "Copied ✓" : "Copy [DASH]"}
             </Button>
           </div>
-          {/* LTF actions */}
-          <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <Button variant="secondary" onClick={handleGenerateLtfOnly} disabled={loading}>
-              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate (LTF-only)"}
-            </Button>
 
-            <Button variant="secondary" onClick={downloadLTF} disabled={!ltf.snapshot || !ltf.fileName}>
-              Download LTF JSON
-            </Button>
-
-            <Button
-              variant="secondary"
-              disabled={!anchor?.obj?.analysis_anchor?.commands?.check_ltf}
-              onClick={() => copyText(anchor?.obj?.analysis_anchor?.commands?.check_ltf || "", "copy_check_ltf")}
-            >
-              {copiedKey === "copy_check_ltf" ? "Copied ✓" : "Copy [CHECK_LTF]"}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={!anchor?.obj?.analysis_anchor}
-              onClick={() =>
-                copyText(
-                  `${anchor?.obj?.analysis_anchor?.commands?.check_ltf || ""}\n\n${anchor?.text || ""}`,
-                  "copy_check_ltf_bundle"
-                )
-              }
-            >
-              {copiedKey === "copy_check_ltf_bundle" ? "Copied ✓" : "Copy CHECK_LTF Bundle"}
-            </Button>
-          </div>
           {/* Progress hint line */}
           <div className="px-4 pb-4 text-xs text-slate-500">
             {loading ? (
@@ -819,7 +552,7 @@ export default function BybitSnapshotV3New() {
                 <span className="text-xs text-slate-400">{openCommands ? "Ẩn ▲" : "Mở ▼"}</span>
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Chỉ có trigger hợp lệ:{" "} <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS] [CHECK_LTF]</span>. Bấm 1 lần để copy.
+                Chỉ có trigger hợp lệ: <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS]</span>. Bấm 1 lần để copy.
               </div>
             </button>
 
@@ -954,8 +687,8 @@ export default function BybitSnapshotV3New() {
               {loading
                 ? `Đang generate${dots}${progressPct ? ` (${progressPct}%)` : ""}`
                 : ready
-                  ? "Ready: FULL snapshot"
-                  : "Chưa có snapshot"}
+                ? "Ready: FULL snapshot"
+                : "Chưa có snapshot"}
             </span>
             <button
               type="button"
