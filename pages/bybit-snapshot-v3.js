@@ -513,20 +513,19 @@ export default function BybitSnapshotV3New() {
   };
 
   // =======================
-  // LAST CLOSED CANDLES DATA (M5/M15/H1/H4/D1)
+  // LAST CLOSED CANDLES DATA (authoritative)
   // =======================
 
   // LTF block (M5/M15)
   const ltfSymbols = full.snapshot?.per_exchange_ltf?.bybit?.symbols;
   const ltfBlock = getSymbolBlock(ltfSymbols, primarySymbol);
-  // =======================
-  // LAST CLOSED CANDLES DATA (authoritative)
-  // =======================
 
-  // LTF indicators
+  // HTF block (H1/H4/D1)
+  const htfSymbols = full.snapshot?.per_exchange?.bybit?.symbols;
+  const htfBlock = getSymbolBlock(htfSymbols, primarySymbol);
+
+  // Indicators (authoritative last closed candle)
   const ltfIndicators = ltfBlock?.indicators_ltf || {};
-
-  // HTF indicators
   const htfIndicators = htfBlock?.indicators || {};
 
   const rowM5 = getLastClosedFromIndicator(ltfIndicators?.["5"]?.last, "5");
@@ -537,8 +536,6 @@ export default function BybitSnapshotV3New() {
   const rowD1 = getLastClosedFromIndicator(htfIndicators?.["D"]?.last, "D");
 
   const lastClosedRows = [rowM5, rowM15, rowH1, rowH4, rowD1].filter(Boolean);
-
-
 
   /* =======================
      RENDER
