@@ -1,6 +1,9 @@
 // bybit-snapshot-v3-ui-macros.js
 // UI helper file — COPY COMMANDS chuẩn theo Price Analyzer v3.1 AI Core SPEC (stable)
 // Mục tiêu: user chỉ copy TRIGGER HỢP LỆ, không dùng câu tự nhiên
+const SPEC_FLAG = "SPEC=v3.3-full-ai-core";
+const withSpec = (cmd) => `${cmd} | ${SPEC_FLAG}`;
+
 
 export function buildCopyCommands(snapshotFileName) {
   return {
@@ -9,7 +12,7 @@ export function buildCopyCommands(snapshotFileName) {
     // =============================
     fullDashboard: {
       label: "📊 Full Dashboard (Toàn bộ phân tích)",
-      command: `[DASH] FILE=${snapshotFileName}`,
+      command: withSpec(`[DASH] FILE=${snapshotFileName}`),
       description: "Xuất đầy đủ 6 phần + ≥3 setup theo SPEC"
     },
 
@@ -19,7 +22,7 @@ export function buildCopyCommands(snapshotFileName) {
     quickCheck: [
       {
         label: "⚡ Check nhanh Setup #1",
-        command: `[CHECK] FILE=${snapshotFileName} SETUP=#1`,
+        command: withSpec(`[CHECK] FILE=${snapshotFileName} SETUP=#1`),
         description: "Kiểm tra nhanh Setup #1: READY chưa, ENTRY OK không, GO/NO-GO"
       },
       {
@@ -40,7 +43,7 @@ export function buildCopyCommands(snapshotFileName) {
     partialDashboard: [
       {
         label: "🧭 Market Mode",
-        command: `[PART] FILE=${snapshotFileName} SECTION=I`,
+        command: withSpec(`[PART] FILE=${snapshotFileName} SECTION=I`),
         description: "Xem nhanh trạng thái thị trường (trend / range / bias)"
       },
       {
@@ -65,7 +68,7 @@ export function buildCopyCommands(snapshotFileName) {
     // =============================
     setupSummary: {
       label: "📋 Setup Summary (Tóm tắt nhanh)",
-      command: `[SETUPS] FILE=${snapshotFileName}`,
+      command: withSpec(`[SETUPS] FILE=${snapshotFileName}`),
       description: "Tóm tắt ≥3 setup: STATE, ENTRY, SL, TP, RR, CONFIDENCE, GO/NO-GO"
     }
   };
