@@ -43,11 +43,22 @@ export default function BybitSnapshotV3New() {
      HELPERS
   ======================= */
   // =======================
-  // CLOSED CANDLES VIEW (local time)
+  // LAST CLOSED CANDLE VIEW (America/Los_Angeles)
   // =======================
-  const fmtLocalShort = (ms) => {
+  const LA_TZ = "America/Los_Angeles";
+
+  const fmtLA = (ms) => {
     if (!Number.isFinite(ms)) return "—";
-    return new Date(ms).toLocaleString(); // local machine time
+    return new Date(ms).toLocaleString("en-US", {
+      timeZone: LA_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
   };
 
   const tfToMs = (tf) => {
@@ -57,67 +68,81 @@ export default function BybitSnapshotV3New() {
     return Number.isFinite(n) && n > 0 ? n * 60 * 1000 : null;
   };
 
-  // Lấy candles đã đóng (loại forming candle ở cuối nếu cần), trả về rows hiển thị
-  const getClosedCandleRows = (compact, candleStatusTf, tf) => {
-    const arr = Array.isArray(compact) ? compact : [];
-    if (!arr.length) return [];
+  // Lấy block symbol từ object-map hoặc array
+  const getSymbolBlock = (maybeSymbols, symbol) => {
+    if (!maybeSymbols) return null;
 
-    const tfMs = Number(candleStatusTf?.tf_ms) || tfToMs(tf) || 0;
-    if (!tfMs) return [];
+    // object-map: symbols[SYMBOL]
+    if (!Array.isArray(maybeSymbols)) return maybeSymbols?.[symbol] || null;
 
-    const isLastClosed = candleStatusTf?.is_last_closed === true;
-    const closedArr = isLastClosed ? arr : arr.slice(0, -1);
-
-    return closedArr
-      .map((k) => {
-        const openTs = Number(k.ts);
-        const closeTs = Number.isFinite(openTs) ? openTs + tfMs : null;
-        return {
-          close_ts: closeTs,
-          close_time: fmtLocalShort(closeTs),
-          o: k.o,
-          h: k.h,
-          l: k.l,
-          c: k.c,
-        };
-      })
-      .filter((x) => Number.isFinite(x.close_ts));
+    // array: [{ symbol: "ETHUSDT", ... }, ...]
+    return maybeSymbols.find((x) => (x?.symbol || x?.name) === symbol) || null;
   };
 
-  const ClosedCandlesTable = ({ title, rows }) => {
-    if (!rows || rows.length === 0) {
-      return <div className="mt-3 text-sm text-slate-400">{title}: No closed candles.</div>;
+  // Trả về 1 row: cây nến gần nhất đã đóng
+  // compact: [{ ts, o,h,l,c,... }]
+  // candleStatusTf: { is_last_closed, tf_ms, ... } (nếu có)
+  const getLastClosedCandleRow = (compact, candleStatusTf, tf) => {
+    const arr = Array.isArray(compact) ? compact : [];
+    if (!arr.length) return null;
+
+    const tfMs = Number(candleStatusTf?.tf_ms) || tfToMs(tf) || 0;
+    if (!tfMs) return null;
+
+    // Nếu snapshot đang có forming candle ở cuối: bỏ cây cuối
+    const isLastClosed = candleStatusTf?.is_last_closed === true;
+    const closedArr = isLastClosed ? arr : arr.slice(0, -1);
+    if (!closedArr.length) return null;
+
+    const last = closedArr[closedArr.length - 1];
+    const openTs = Number(last.ts);
+    const closeTs = Number.isFinite(openTs) ? openTs + tfMs : null;
+
+    if (!Number.isFinite(closeTs)) return null;
+
+    return {
+      tf: String(tf),
+      close_ts: closeTs,
+      close_time: fmtLA(closeTs),
+      o: last.o,
+      h: last.h,
+      l: last.l,
+      c: last.c,
+    };
+  };
+
+  const LastClosedTable = ({ rows }) => {
+    const safe = Array.isArray(rows) ? rows.filter(Boolean) : [];
+    if (!safe.length) {
+      return <div className="mt-3 text-sm text-slate-400">No closed candles.</div>;
     }
 
-    const sorted = [...rows].sort((a, b) => b.close_ts - a.close_ts); // newest first
-
     return (
-      <div className="mt-4">
-        <div className="text-sm font-semibold text-slate-200">{title}</div>
-        <div className="mt-2 overflow-x-auto rounded border border-slate-800">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-900 text-slate-200">
-              <tr>
-                <th className="px-2 py-2 text-left">Close time (local)</th>
-                <th className="px-2 py-2 text-right">Open</th>
-                <th className="px-2 py-2 text-right">High</th>
-                <th className="px-2 py-2 text-right">Low</th>
-                <th className="px-2 py-2 text-right">Close</th>
+      <div className="mt-3 overflow-x-auto rounded border border-slate-800">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-900 text-slate-200">
+            <tr>
+              <th className="px-2 py-2 text-left">TF</th>
+              <th className="px-2 py-2 text-left">Close time (LA)</th>
+              <th className="px-2 py-2 text-right">Open</th>
+              <th className="px-2 py-2 text-right">High</th>
+              <th className="px-2 py-2 text-right">Low</th>
+              <th className="px-2 py-2 text-right">Close</th>
+            </tr>
+          </thead>
+          <tbody className="bg-slate-950 text-slate-100">
+            {safe.map((r) => (
+              <tr key={r.tf} className="border-t border-slate-800">
+                <td className="px-2 py-2 text-left">{r.tf}</td>
+                <td className="px-2 py-2 text-left">{r.close_time}</td>
+                <td className="px-2 py-2 text-right">{r.o}</td>
+                <td className="px-2 py-2 text-right">{r.h}</td>
+                <td className="px-2 py-2 text-right">{r.l}</td>
+                <td className="px-2 py-2 text-right">{r.c}</td>
               </tr>
-            </thead>
-            <tbody className="bg-slate-950 text-slate-100">
-              {sorted.map((r, idx) => (
-                <tr key={idx} className="border-t border-slate-800">
-                  <td className="px-2 py-2 text-left">{r.close_time}</td>
-                  <td className="px-2 py-2 text-right">{r.o}</td>
-                  <td className="px-2 py-2 text-right">{r.h}</td>
-                  <td className="px-2 py-2 text-right">{r.l}</td>
-                  <td className="px-2 py-2 text-right">{r.c}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   };
@@ -450,15 +475,35 @@ export default function BybitSnapshotV3New() {
       </button>
     );
   };
-  // =======================
-  // CLOSED CANDLES DATA (from snapshot)
-  // =======================
-  const ltfBlock = full.snapshot?.per_exchange_ltf?.bybit?.symbols?.[primarySymbol] || null;
-  const cs = ltfBlock?.meta?.candle_status || {};
-  const kl = ltfBlock?.klines_ltf_compact || {};
 
-  const rowsM5 = getClosedCandleRows(kl?.["5"], cs?.["5"], "5");
-  const rowsM15 = getClosedCandleRows(kl?.["15"], cs?.["15"], "15");
+  // =======================
+  // LAST CLOSED CANDLES DATA (M5/M15/H1/H4/D1)
+  // =======================
+
+  // LTF block (M5/M15)
+  const ltfSymbols = full.snapshot?.per_exchange_ltf?.bybit?.symbols;
+  const ltfBlock = getSymbolBlock(ltfSymbols, primarySymbol);
+  const ltfCs = ltfBlock?.meta?.candle_status || {};
+  const ltfK = ltfBlock?.klines_ltf_compact || {};
+
+  // HTF block (H1/H4/D1) - thường nằm ở per_exchange.bybit.symbols
+  const htfSymbols = full.snapshot?.per_exchange?.bybit?.symbols;
+  const htfBlock = getSymbolBlock(htfSymbols, primarySymbol);
+  const htfCs = htfBlock?.meta?.candle_status || {};
+  const htfK = htfBlock?.klines_compact || {};
+
+  // Lấy 1 candle gần nhất đã đóng mỗi TF
+  const rowM5 = getLastClosedCandleRow(ltfK?.["5"], ltfCs?.["5"], "5");
+  const rowM15 = getLastClosedCandleRow(ltfK?.["15"], ltfCs?.["15"], "15");
+
+  // Các key timeframe HTF tùy builder: thường là "60" (H1), "240" (H4), "D" (D1)
+  const rowH1 = getLastClosedCandleRow(htfK?.["60"], htfCs?.["60"], "60");
+  const rowH4 = getLastClosedCandleRow(htfK?.["240"], htfCs?.["240"], "240");
+  const rowD1 = getLastClosedCandleRow(htfK?.["D"], htfCs?.["D"], "D");
+
+  // Gom để render
+  const lastClosedRows = [rowM5, rowM15, rowH1, rowH4, rowD1].filter(Boolean);
+
 
   /* =======================
      RENDER
@@ -578,13 +623,14 @@ export default function BybitSnapshotV3New() {
               <div className="mt-1 break-all text-sm">{full.fileName || "—"}</div>
             </div>
           </div>
-          {/* Closed Candles (local time) */}
+          {/* Last closed candles (LA time) */}
           {full.snapshot && (
             <div className="px-4 pb-4">
               <div className="rounded-2xl border border-slate-800 bg-black/20 px-3 py-3">
-                <div className="text-xs text-slate-400">Closed candles (local time)</div>
-                <ClosedCandlesTable title="M5" rows={rowsM5} />
-                <ClosedCandlesTable title="M15" rows={rowsM15} />
+                <div className="text-xs text-slate-400">
+                  Last closed candles (America/Los_Angeles)
+                </div>
+                <LastClosedTable rows={lastClosedRows} />
               </div>
             </div>
           )}
@@ -620,8 +666,7 @@ export default function BybitSnapshotV3New() {
               </span>
             ) : (
               <span>
-                Tip: Generate → (M5 Gate READY) → Download JSON → Upload vào ChatGPT → dùng các lệnh copy đúng mode
-                (DASH/CHECK/PART/SETUPS).
+                Tip: Generate → Download JSON → Upload vào ChatGPT → dùng các lệnh copy đúng mode (DASH/CHECK/PART/SETUPS).
               </span>
             )}
           </div>
