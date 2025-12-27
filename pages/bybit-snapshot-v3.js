@@ -52,16 +52,23 @@ export default function BybitSnapshotV3New() {
     const openTs = Number(last.ts);
     const closeTs = openTs + tfMs;
 
-    // OHLC: ưu tiên lấy trực tiếp từ last nếu có, nếu không thì lấy từ compact bằng ts
-    let o = last.o, h = last.h, l = last.l, c = last.c;
+    // ✅ Normalize: indicators.last có thể là open/high/low/close hoặc o/h/l/c
+    let o = last.open ?? last.o;
+    let h = last.high ?? last.h;
+    let l = last.low ?? last.l;
+    let c = last.close ?? last.c;
 
     const hasOHLC =
       [o, h, l, c].every((v) => v !== undefined && v !== null && v !== "");
 
+    // 🔁 Chỉ fallback sang compact nếu thật sự không có OHLC trong indicator.last
     if (!hasOHLC) {
       const k = pickOHLCByTs(compact, openTs);
       if (k) {
-        o = k.o; h = k.h; l = k.l; c = k.c;
+        o = k.o ?? k.open;
+        h = k.h ?? k.high;
+        l = k.l ?? k.low;
+        c = k.c ?? k.close;
       }
     }
 
