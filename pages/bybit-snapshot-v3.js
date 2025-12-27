@@ -43,7 +43,7 @@ export default function BybitSnapshotV3New() {
      HELPERS
   ======================= */
   // Lấy last closed candle trực tiếp từ indicators.last (nguồn chuẩn)
-  const getLastClosedFromIndicator = (last, tf) => {
+  const getLastClosedFromIndicator = (last, tf, compact) => {
     if (!last || !Number.isFinite(last.ts)) return null;
 
     const tfMs = tfToMs(tf);
@@ -52,14 +52,24 @@ export default function BybitSnapshotV3New() {
     const openTs = Number(last.ts);
     const closeTs = openTs + tfMs;
 
+    // OHLC: ưu tiên lấy trực tiếp từ last nếu có, nếu không thì lấy từ compact bằng ts
+    let o = last.o, h = last.h, l = last.l, c = last.c;
+
+    const hasOHLC =
+      [o, h, l, c].every((v) => v !== undefined && v !== null && v !== "");
+
+    if (!hasOHLC) {
+      const k = pickOHLCByTs(compact, openTs);
+      if (k) {
+        o = k.o; h = k.h; l = k.l; c = k.c;
+      }
+    }
+
     return {
       tf: String(tf),
       close_ts: closeTs,
       close_time: fmtLA(closeTs),
-      o: last.o,
-      h: last.h,
-      l: last.l,
-      c: last.c,
+      o, h, l, c,
     };
   };
 
@@ -98,6 +108,26 @@ export default function BybitSnapshotV3New() {
 
     // array: [{ symbol: "ETHUSDT", ... }, ...]
     return maybeSymbols.find((x) => (x?.symbol || x?.name) === symbol) || null;
+  };
+  const pickOHLCByTs = (compact, targetOpenTs) => {
+    const arr = Array.isArray(compact) ? compact : [];
+    if (!arr.length) return null;
+
+    const t0 = Number(targetOpenTs);
+
+    // ưu tiên match đúng ts
+    if (Number.isFinite(t0)) {
+      const exact = arr.find((k) => Number(k?.ts) === t0);
+      if (exact) return exact;
+    }
+
+    // fallback: lấy candle có ts lớn nhất
+    return arr.reduce((best, k) => {
+      const t = Number(k?.ts);
+      if (!Number.isFinite(t)) return best;
+      if (!best) return k;
+      return t > Number(best.ts) ? k : best;
+    }, null);
   };
 
   // Trả về 1 row: cây nến gần nhất đã đóng
@@ -527,13 +557,17 @@ export default function BybitSnapshotV3New() {
   // Indicators (authoritative last closed candle)
   const ltfIndicators = ltfBlock?.indicators_ltf || {};
   const htfIndicators = htfBlock?.indicators || {};
+  const ltfK = ltfBlock?.klines_ltf_compact || {};
+  const htfK = htfBlock?.klines_compact || {};
 
-  const rowM5 = getLastClosedFromIndicator(ltfIndicators?.["5"]?.last, "5");
-  const rowM15 = getLastClosedFromIndicator(ltfIndicators?.["15"]?.last, "15");
 
-  const rowH1 = getLastClosedFromIndicator(htfIndicators?.["60"]?.last, "60");
-  const rowH4 = getLastClosedFromIndicator(htfIndicators?.["240"]?.last, "240");
-  const rowD1 = getLastClosedFromIndicator(htfIndicators?.["D"]?.last, "D");
+  const rowM5 = getLastClosedFromIndicator(ltfIndicators?.["5"]?.last, "5", ltfK?.["5"]);
+  const rowM15 = getLastClosedFromIndicator(ltfIndicators?.["15"]?.last, "15", ltfK?.["15"]);
+
+  const rowH1 = getLastClosedFromIndicator(htfIndicators?.["60"]?.last, "60", htfK?.["60"]);
+  const rowH4 = getLastClosedFromIndicator(htfIndicators?.["240"]?.last, "240", htfK?.["240"]);
+  const rowD1 = getLastClosedFromIndicator(htfIndicators?.["D"]?.last, "D", htfK?.["D"]);
+
 
   const lastClosedRows = [rowM5, rowM15, rowH1, rowH4, rowD1].filter(Boolean);
 
