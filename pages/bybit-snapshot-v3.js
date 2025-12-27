@@ -42,6 +42,27 @@ export default function BybitSnapshotV3New() {
   /* =======================
      HELPERS
   ======================= */
+  // Lấy last closed candle trực tiếp từ indicators.last (nguồn chuẩn)
+  const getLastClosedFromIndicator = (last, tf) => {
+    if (!last || !Number.isFinite(last.ts)) return null;
+
+    const tfMs = tfToMs(tf);
+    if (!tfMs) return null;
+
+    const openTs = Number(last.ts);
+    const closeTs = openTs + tfMs;
+
+    return {
+      tf: String(tf),
+      close_ts: closeTs,
+      close_time: fmtLA(closeTs),
+      o: last.o,
+      h: last.h,
+      l: last.l,
+      c: last.c,
+    };
+  };
+
   // =======================
   // LAST CLOSED CANDLE VIEW (America/Los_Angeles)
   // =======================
@@ -498,26 +519,25 @@ export default function BybitSnapshotV3New() {
   // LTF block (M5/M15)
   const ltfSymbols = full.snapshot?.per_exchange_ltf?.bybit?.symbols;
   const ltfBlock = getSymbolBlock(ltfSymbols, primarySymbol);
-  const ltfCs = ltfBlock?.meta?.candle_status || {};
-  const ltfK = ltfBlock?.klines_ltf_compact || {};
+  // =======================
+  // LAST CLOSED CANDLES DATA (authoritative)
+  // =======================
 
-  // HTF block (H1/H4/D1) - thường nằm ở per_exchange.bybit.symbols
-  const htfSymbols = full.snapshot?.per_exchange?.bybit?.symbols;
-  const htfBlock = getSymbolBlock(htfSymbols, primarySymbol);
-  const htfCs = htfBlock?.meta?.candle_status || {};
-  const htfK = htfBlock?.klines_compact || {};
+  // LTF indicators
+  const ltfIndicators = ltfBlock?.indicators_ltf || {};
 
-  // Lấy 1 candle gần nhất đã đóng mỗi TF
-  const rowM5 = getLastClosedCandleRow(ltfK?.["5"], ltfCs?.["5"], "5");
-  const rowM15 = getLastClosedCandleRow(ltfK?.["15"], ltfCs?.["15"], "15");
+  // HTF indicators
+  const htfIndicators = htfBlock?.indicators || {};
 
-  // Các key timeframe HTF tùy builder: thường là "60" (H1), "240" (H4), "D" (D1)
-  const rowH1 = getLastClosedCandleRow(htfK?.["60"], htfCs?.["60"], "60");
-  const rowH4 = getLastClosedCandleRow(htfK?.["240"], htfCs?.["240"], "240");
-  const rowD1 = getLastClosedCandleRow(htfK?.["D"], htfCs?.["D"], "D");
+  const rowM5 = getLastClosedFromIndicator(ltfIndicators?.["5"]?.last, "5");
+  const rowM15 = getLastClosedFromIndicator(ltfIndicators?.["15"]?.last, "15");
 
-  // Gom để render
+  const rowH1 = getLastClosedFromIndicator(htfIndicators?.["60"]?.last, "60");
+  const rowH4 = getLastClosedFromIndicator(htfIndicators?.["240"]?.last, "240");
+  const rowD1 = getLastClosedFromIndicator(htfIndicators?.["D"]?.last, "D");
+
   const lastClosedRows = [rowM5, rowM15, rowH1, rowH4, rowD1].filter(Boolean);
+
 
 
   /* =======================
