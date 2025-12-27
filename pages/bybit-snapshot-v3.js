@@ -89,25 +89,40 @@ export default function BybitSnapshotV3New() {
     const tfMs = Number(candleStatusTf?.tf_ms) || tfToMs(tf) || 0;
     if (!tfMs) return null;
 
-    // Nếu snapshot đang có forming candle ở cuối: bỏ cây cuối
-    const isLastClosed = candleStatusTf?.is_last_closed === true;
-    const closedArr = isLastClosed ? arr : arr.slice(0, -1);
-    if (!closedArr.length) return null;
+    // 1) Ưu tiên dùng last_closed_ts từ candle_status (open ts của cây đã đóng gần nhất)
+    const targetOpenTs = Number(candleStatusTf?.last_closed_ts);
 
-    const last = closedArr[closedArr.length - 1];
-    const openTs = Number(last.ts);
+    // 2) Chọn candle "đúng cây đã đóng gần nhất" theo targetOpenTs; nếu không có thì fallback bằng max ts
+    let chosen = null;
+
+    if (Number.isFinite(targetOpenTs)) {
+      chosen = arr.find((k) => Number(k?.ts) === targetOpenTs) || null;
+    }
+
+    if (!chosen) {
+      // fallback: lấy candle có open ts lớn nhất (không phụ thuộc thứ tự mảng)
+      chosen = arr.reduce((best, k) => {
+        const t = Number(k?.ts);
+        if (!Number.isFinite(t)) return best;
+        if (!best) return k;
+        return t > Number(best.ts) ? k : best;
+      }, null);
+    }
+
+    if (!chosen) return null;
+
+    const openTs = Number(chosen.ts);
     const closeTs = Number.isFinite(openTs) ? openTs + tfMs : null;
-
     if (!Number.isFinite(closeTs)) return null;
 
     return {
       tf: String(tf),
       close_ts: closeTs,
-      close_time: fmtLA(closeTs),
-      o: last.o,
-      h: last.h,
-      l: last.l,
-      c: last.c,
+      close_time: fmtLA(closeTs), // LA timezone
+      o: chosen.o,
+      h: chosen.h,
+      l: chosen.l,
+      c: chosen.c,
     };
   };
 
