@@ -263,7 +263,9 @@ export default function BybitSnapshotV3New() {
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
   const ready = Boolean(full.fileName);
-
+  const isCompact = useMemo(() => {
+    return (full.fileName || "").includes("_compact_") || (full.fileName || "").includes("compact");
+  }, [full.fileName]);
 
   // Commands (SPEC modes) — chỉ dùng trigger hợp lệ
   const snapshotFileName = full.fileName || "";
@@ -620,7 +622,7 @@ export default function BybitSnapshotV3New() {
           {/* Header */}
           <div className="flex items-start justify-between gap-3 px-4 py-4">
             <div>
-              <div className="text-lg font-semibold tracking-tight">📡 Snapshot Console (FULL) — Bybit v3</div>
+              <div className="text-lg font-semibold tracking-tight">📡 Snapshot Console ({isCompact ? "COMPACT" : "FULL"}) — Bybit v3</div>
               <div className="mt-1 text-xs text-slate-400">
                 Một file snapshot FULL · Copy commands theo SPEC (DASH/CHECK/PART/SETUPS)
               </div>
@@ -724,7 +726,7 @@ export default function BybitSnapshotV3New() {
           {/* File name */}
           <div className="px-4 pb-4">
             <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
-              <div className="text-xs text-slate-400">Snapshot file (FULL)</div>
+              <div className="text-xs text-slate-400"> Snapshot file ({isCompact ? "COMPACT" : "FULL"})</div>
               <div className="mt-1 break-all text-sm">{full.fileName || "—"}</div>
             </div>
           </div>
@@ -740,12 +742,19 @@ export default function BybitSnapshotV3New() {
             </div>
           )}
           {/* Quick actions */}
-          <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-4">
             <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
-              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate (FULL snapshot)"}
+              {loading
+                ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
+                : "Generate (FULL snapshot)"}
             </Button>
 
-            {/* ✅ Chặn export khi M5 chưa READY */}
+            <Button variant="secondary" onClick={handleGenerateCompact} disabled={loading}>
+              {loading
+                ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
+                : "Generate (COMPACT snapshot)"}
+            </Button>
+
             <Button
               variant="secondary"
               onClick={downloadFULL}
@@ -754,6 +763,7 @@ export default function BybitSnapshotV3New() {
             >
               Download JSON
             </Button>
+
             <Button
               variant="secondary"
               disabled={!copyCommands?.fullDashboard?.command}
