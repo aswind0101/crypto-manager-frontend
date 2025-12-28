@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
+import { buildFullSnapshotV3, buildFullSnapshotV3Compact } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
 import { buildCopyCommands } from "../components/ui/helpers/bybit-snapshot-v3-ui-macros";
 
@@ -464,6 +464,38 @@ export default function BybitSnapshotV3New() {
       setTimeout(() => setProgressPct(0), 800);
     }
   }, [symbols, primarySymbol]);
+  const handleGenerateCompact = useCallback(async () => {
+    if (!symbols.length) {
+      setError("Vui lòng nhập ít nhất 1 symbol.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    setProgressPct(0);
+
+    try {
+      setProgressPct(15);
+
+      const fullSnap = await buildFullSnapshotV3Compact(symbols).then((r) => {
+        setProgressPct(90);
+        return r;
+      });
+
+      const ts = fullSnap?.generated_at || Date.now();
+      const name = `bybit_full_snapshot_compact_${ts}_${primarySymbol}.json`;
+      setFull({ snapshot: fullSnap, fileName: name });
+
+      setProgressPct(100);
+    } catch (e) {
+      console.error(e);
+      setError("Có lỗi khi tạo snapshot (compact).");
+      setProgressPct(0);
+    } finally {
+      setLoading(false);
+      setTimeout(() => setProgressPct(0), 800);
+    }
+  }, [symbols, primarySymbol]);
 
   /* =======================
      DOWNLOAD
@@ -859,15 +891,29 @@ export default function BybitSnapshotV3New() {
       {/* Sticky bottom actions (mobile) */}
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/90 backdrop-blur sm:hidden">
         <div className="mx-auto max-w-3xl px-3 py-3">
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
-              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate"}
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              onClick={handleGenerateFull}
+              disabled={loading}
+              className="w-full"
+            >
+              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate (FULL)"}
+            </Button>
+
+            <Button
+              onClick={handleGenerateCompact}
+              disabled={loading}
+              className="w-full"
+              variant="secondary"
+            >
+              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate (COMPACT)"}
             </Button>
 
             <Button
               variant="secondary"
               disabled={!copyCommands?.fullDashboard?.command}
               onClick={() => copyText(copyCommands?.fullDashboard?.command || "", "sticky_dash")}
+              className="w-full"
             >
               {copiedKey === "sticky_dash" ? "Copied ✓" : "Copy [DASH]"}
             </Button>
