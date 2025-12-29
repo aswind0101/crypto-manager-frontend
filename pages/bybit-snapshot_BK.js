@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildFullSnapshotV3 } from "../lib/snapshot-v3";
+import { buildFullSnapshotV3, buildFullSnapshotV3Compact } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
 import { buildCopyCommands } from "../components/ui/helpers/bybit-snapshot-v3-ui-macros";
 
@@ -42,10 +42,188 @@ export default function BybitSnapshotV3New() {
   /* =======================
      HELPERS
   ======================= */
+  // Lấy last closed candle trực tiếp từ indicators.last (nguồn chuẩn)
+  const getLastClosedFromIndicator = (last, tf, compact) => {
+    if (!last || !Number.isFinite(last.ts)) return null;
+
+    const tfMs = tfToMs(tf);
+    if (!tfMs) return null;
+
+    const openTs = Number(last.ts);
+    const closeTs = openTs + tfMs;
+
+    // ✅ Normalize: indicators.last có thể là open/high/low/close hoặc o/h/l/c
+    let o = last.open ?? last.o;
+    let h = last.high ?? last.h;
+    let l = last.low ?? last.l;
+    let c = last.close ?? last.c;
+
+    const hasOHLC =
+      [o, h, l, c].every((v) => v !== undefined && v !== null && v !== "");
+
+    // 🔁 Chỉ fallback sang compact nếu thật sự không có OHLC trong indicator.last
+    if (!hasOHLC) {
+      const k = pickOHLCByTs(compact, openTs);
+      if (k) {
+        o = k.o ?? k.open;
+        h = k.h ?? k.high;
+        l = k.l ?? k.low;
+        c = k.c ?? k.close;
+      }
+    }
+
+    return {
+      tf: String(tf),
+      close_ts: closeTs,
+      close_time: fmtLA(closeTs),
+      o, h, l, c,
+    };
+  };
+
+  // =======================
+  // LAST CLOSED CANDLE VIEW (America/Los_Angeles)
+  // =======================
+  const LA_TZ = "America/Los_Angeles";
+
+  const fmtLA = (ms) => {
+    if (!Number.isFinite(ms)) return "—";
+    return new Date(ms).toLocaleString("en-US", {
+      timeZone: LA_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  };
+
+  const tfToMs = (tf) => {
+    const s = String(tf);
+    if (s === "D") return 24 * 60 * 60 * 1000;
+    const n = Number(s);
+    return Number.isFinite(n) && n > 0 ? n * 60 * 1000 : null;
+  };
+
+  // Lấy block symbol từ object-map hoặc array
+  const getSymbolBlock = (maybeSymbols, symbol) => {
+    if (!maybeSymbols) return null;
+
+    // object-map: symbols[SYMBOL]
+    if (!Array.isArray(maybeSymbols)) return maybeSymbols?.[symbol] || null;
+
+    // array: [{ symbol: "ETHUSDT", ... }, ...]
+    return maybeSymbols.find((x) => (x?.symbol || x?.name) === symbol) || null;
+  };
+  const pickOHLCByTs = (compact, targetOpenTs) => {
+    const arr = Array.isArray(compact) ? compact : [];
+    if (!arr.length) return null;
+
+    const t0 = Number(targetOpenTs);
+
+    // ưu tiên match đúng ts
+    if (Number.isFinite(t0)) {
+      const exact = arr.find((k) => Number(k?.ts) === t0);
+      if (exact) return exact;
+    }
+
+    // fallback: lấy candle có ts lớn nhất
+    return arr.reduce((best, k) => {
+      const t = Number(k?.ts);
+      if (!Number.isFinite(t)) return best;
+      if (!best) return k;
+      return t > Number(best.ts) ? k : best;
+    }, null);
+  };
+
+  // Trả về 1 row: cây nến gần nhất đã đóng
+  // compact: [{ ts, o,h,l,c,... }]
+  // candleStatusTf: { is_last_closed, tf_ms, ... } (nếu có)
+  const getLastClosedCandleRow = (compact, candleStatusTf, tf) => {
+    const arr = Array.isArray(compact) ? compact : [];
+    if (!arr.length) return null;
+
+    const tfMs = Number(candleStatusTf?.tf_ms) || tfToMs(tf) || 0;
+    if (!tfMs) return null;
+
+    // 1) Ưu tiên dùng last_closed_ts từ candle_status (open ts của cây đã đóng gần nhất)
+    const targetOpenTs = Number(candleStatusTf?.last_closed_ts);
+
+    // 2) Chọn candle "đúng cây đã đóng gần nhất" theo targetOpenTs; nếu không có thì fallback bằng max ts
+    let chosen = null;
+
+    if (Number.isFinite(targetOpenTs)) {
+      chosen = arr.find((k) => Number(k?.ts) === targetOpenTs) || null;
+    }
+
+    if (!chosen) {
+      // fallback: lấy candle có open ts lớn nhất (không phụ thuộc thứ tự mảng)
+      chosen = arr.reduce((best, k) => {
+        const t = Number(k?.ts);
+        if (!Number.isFinite(t)) return best;
+        if (!best) return k;
+        return t > Number(best.ts) ? k : best;
+      }, null);
+    }
+
+    if (!chosen) return null;
+
+    const openTs = Number(chosen.ts);
+    const closeTs = Number.isFinite(openTs) ? openTs + tfMs : null;
+    if (!Number.isFinite(closeTs)) return null;
+
+    return {
+      tf: String(tf),
+      close_ts: closeTs,
+      close_time: fmtLA(closeTs), // LA timezone
+      o: chosen.o,
+      h: chosen.h,
+      l: chosen.l,
+      c: chosen.c,
+    };
+  };
+
+  const LastClosedTable = ({ rows }) => {
+    const safe = Array.isArray(rows) ? rows.filter(Boolean) : [];
+    if (!safe.length) {
+      return <div className="mt-3 text-sm text-slate-400">No closed candles.</div>;
+    }
+
+    return (
+      <div className="mt-3 overflow-x-auto rounded border border-slate-800">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-900 text-slate-200">
+            <tr>
+              <th className="px-2 py-2 text-left">TF</th>
+              <th className="px-2 py-2 text-left">Close time (LA)</th>
+              <th className="px-2 py-2 text-right">Open</th>
+              <th className="px-2 py-2 text-right">High</th>
+              <th className="px-2 py-2 text-right">Low</th>
+              <th className="px-2 py-2 text-right">Close</th>
+            </tr>
+          </thead>
+          <tbody className="bg-slate-950 text-slate-100">
+            {safe.map((r) => (
+              <tr key={r.tf} className="border-t border-slate-800">
+                <td className="px-2 py-2 text-left">{r.tf}</td>
+                <td className="px-2 py-2 text-left">{r.close_time}</td>
+                <td className="px-2 py-2 text-right">{r.o}</td>
+                <td className="px-2 py-2 text-right">{r.h}</td>
+                <td className="px-2 py-2 text-right">{r.l}</td>
+                <td className="px-2 py-2 text-right">{r.c}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   const haptic = () => {
     try {
       if (navigator?.vibrate) navigator.vibrate(10);
-    } catch {}
+    } catch { }
   };
 
   const copyText = async (text, key) => {
@@ -85,6 +263,9 @@ export default function BybitSnapshotV3New() {
   const symbols = useMemo(() => normalizeSymbols(symbolsText), [symbolsText]);
   const primarySymbol = symbols[0] || "SYMBOL";
   const ready = Boolean(full.fileName);
+  const isCompact = useMemo(() => {
+    return (full.fileName || "").includes("_compact_") || (full.fileName || "").includes("compact");
+  }, [full.fileName]);
 
   // Commands (SPEC modes) — chỉ dùng trigger hợp lệ
   const snapshotFileName = full.fileName || "";
@@ -228,7 +409,6 @@ export default function BybitSnapshotV3New() {
 
   /* =======================
      POSITION TEMPLATE (optional helper)
-     - không phải mode riêng trong SPEC, nhưng hữu ích khi user đã có lệnh
   ======================= */
   const macroPositionShort = useMemo(() => {
     if (!full.fileName) return "";
@@ -286,6 +466,38 @@ export default function BybitSnapshotV3New() {
       setTimeout(() => setProgressPct(0), 800);
     }
   }, [symbols, primarySymbol]);
+  const handleGenerateCompact = useCallback(async () => {
+    if (!symbols.length) {
+      setError("Vui lòng nhập ít nhất 1 symbol.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    setProgressPct(0);
+
+    try {
+      setProgressPct(15);
+
+      const fullSnap = await buildFullSnapshotV3Compact(symbols).then((r) => {
+        setProgressPct(90);
+        return r;
+      });
+
+      const ts = fullSnap?.generated_at || Date.now();
+      const name = `bybit_full_snapshot_compact_${ts}_${primarySymbol}.json`;
+      setFull({ snapshot: fullSnap, fileName: name });
+
+      setProgressPct(100);
+    } catch (e) {
+      console.error(e);
+      setError("Có lỗi khi tạo snapshot (compact).");
+      setProgressPct(0);
+    } finally {
+      setLoading(false);
+      setTimeout(() => setProgressPct(0), 800);
+    }
+  }, [symbols, primarySymbol]);
 
   /* =======================
      DOWNLOAD
@@ -322,9 +534,7 @@ export default function BybitSnapshotV3New() {
       onClick={() => setCmdTab(id)}
       className={[
         "rounded-xl px-3 py-2 text-sm transition",
-        cmdTab === id
-          ? "bg-slate-200 text-slate-950"
-          : "bg-black/20 text-slate-200 hover:bg-black/30",
+        cmdTab === id ? "bg-slate-200 text-slate-950" : "bg-black/20 text-slate-200 hover:bg-black/30",
       ].join(" ")}
     >
       {label}
@@ -349,9 +559,7 @@ export default function BybitSnapshotV3New() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-sm font-semibold text-slate-100">{title}</div>
-            {subtitle ? (
-              <div className="mt-1 text-xs text-slate-400">{subtitle}</div>
-            ) : null}
+            {subtitle ? <div className="mt-1 text-xs text-slate-400">{subtitle}</div> : null}
             {text ? (
               <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-slate-800 bg-slate-950/40 p-3 text-[12px] text-slate-200">
                 {text}
@@ -375,6 +583,35 @@ export default function BybitSnapshotV3New() {
     );
   };
 
+  // =======================
+  // LAST CLOSED CANDLES DATA (authoritative)
+  // =======================
+
+  // LTF block (M5/M15)
+  const ltfSymbols = full.snapshot?.per_exchange_ltf?.bybit?.symbols;
+  const ltfBlock = getSymbolBlock(ltfSymbols, primarySymbol);
+
+  // HTF block (H1/H4/D1)
+  const htfSymbols = full.snapshot?.per_exchange?.bybit?.symbols;
+  const htfBlock = getSymbolBlock(htfSymbols, primarySymbol);
+
+  // Indicators (authoritative last closed candle)
+  const ltfIndicators = ltfBlock?.indicators_ltf || {};
+  const htfIndicators = htfBlock?.indicators || {};
+  const ltfK = ltfBlock?.klines_ltf_compact || {};
+  const htfK = htfBlock?.klines_compact || {};
+
+
+  const rowM5 = getLastClosedFromIndicator(ltfIndicators?.["5"]?.last, "5", ltfK?.["5"]);
+  const rowM15 = getLastClosedFromIndicator(ltfIndicators?.["15"]?.last, "15", ltfK?.["15"]);
+
+  const rowH1 = getLastClosedFromIndicator(htfIndicators?.["60"]?.last, "60", htfK?.["60"]);
+  const rowH4 = getLastClosedFromIndicator(htfIndicators?.["240"]?.last, "240", htfK?.["240"]);
+  const rowD1 = getLastClosedFromIndicator(htfIndicators?.["D"]?.last, "D", htfK?.["D"]);
+
+
+  const lastClosedRows = [rowM5, rowM15, rowH1, rowH4, rowD1].filter(Boolean);
+
   /* =======================
      RENDER
   ======================= */
@@ -385,24 +622,22 @@ export default function BybitSnapshotV3New() {
           {/* Header */}
           <div className="flex items-start justify-between gap-3 px-4 py-4">
             <div>
-              <div className="text-lg font-semibold tracking-tight">
-                📡 Snapshot Console (FULL) — Bybit v3
-              </div>
+              <div className="text-lg font-semibold tracking-tight">📡 Snapshot Console ({isCompact ? "COMPACT" : "FULL"}) — Bybit v3</div>
               <div className="mt-1 text-xs text-slate-400">
                 Một file snapshot FULL · Copy commands theo SPEC (DASH/CHECK/PART/SETUPS)
               </div>
             </div>
 
-            <span
-              className={[
-                "shrink-0 rounded-full px-3 py-1 text-xs",
-                ready
-                  ? "border border-emerald-800/60 bg-emerald-950/30 text-emerald-200"
-                  : "border border-slate-700 bg-slate-900 text-slate-300",
-              ].join(" ")}
-            >
-              {ready ? "Ready" : "No snapshot"}
-            </span>
+            <div className="flex flex-col items-end gap-2">
+              <span
+                className={[
+                  "shrink-0 rounded-full px-3 py-1 text-xs border",
+                  ready ? "border-emerald-800/60 bg-emerald-950/30 text-emerald-200" : "border-slate-700 bg-slate-900 text-slate-300",
+                ].join(" ")}
+              >
+                {ready ? "Snapshot generated" : "No snapshot"}
+              </span>
+            </div>
           </div>
 
           <div className="border-t border-slate-800" />
@@ -442,15 +677,11 @@ export default function BybitSnapshotV3New() {
                   className="absolute z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-lg"
                 >
                   {coinsLoading ? (
-                    <div className="px-3 py-3 text-sm text-slate-300">
-                      Loading Top 100 coins…
-                    </div>
+                    <div className="px-3 py-3 text-sm text-slate-300">Loading Top 100 coins…</div>
                   ) : coinsErr ? (
                     <div className="px-3 py-3 text-sm text-red-200">{coinsErr}</div>
                   ) : suggestions.length === 0 ? (
-                    <div className="px-3 py-3 text-sm text-slate-400">
-                      Không có gợi ý cho “{currentToken}”.
-                    </div>
+                    <div className="px-3 py-3 text-sm text-slate-400">Không có gợi ý cho “{currentToken}”.</div>
                   ) : (
                     <div className="max-h-72 overflow-auto">
                       {suggestions.map((c, idx) => {
@@ -469,8 +700,7 @@ export default function BybitSnapshotV3New() {
                           >
                             <div className="min-w-0">
                               <div className="text-sm text-slate-100">
-                                {c.name}{" "}
-                                <span className="text-xs text-slate-400">({c.symbol})</span>
+                                {c.name} <span className="text-xs text-slate-400">({c.symbol})</span>
                               </div>
                               <div className="text-xs text-slate-400">
                                 Auto-fill: <span className="text-slate-200">{pair}</span>
@@ -496,23 +726,40 @@ export default function BybitSnapshotV3New() {
           {/* File name */}
           <div className="px-4 pb-4">
             <div className="rounded-xl border border-slate-800 bg-black/20 px-3 py-2">
-              <div className="text-xs text-slate-400">Snapshot file (FULL)</div>
+              <div className="text-xs text-slate-400"> Snapshot file ({isCompact ? "COMPACT" : "FULL"})</div>
               <div className="mt-1 break-all text-sm">{full.fileName || "—"}</div>
             </div>
           </div>
-
+          {/* Last closed candles (LA time) */}
+          {full.snapshot && (
+            <div className="px-4 pb-4">
+              <div className="rounded-2xl border border-slate-800 bg-black/20 px-3 py-3">
+                <div className="text-xs text-slate-400">
+                  Last closed candles (America/Los_Angeles)
+                </div>
+                <LastClosedTable rows={lastClosedRows} />
+              </div>
+            </div>
+          )}
           {/* Quick actions */}
-          <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-4">
             <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
               {loading
                 ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
                 : "Generate (FULL snapshot)"}
             </Button>
 
+            <Button variant="secondary" onClick={handleGenerateCompact} disabled={loading}>
+              {loading
+                ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
+                : "Generate (COMPACT snapshot)"}
+            </Button>
+
             <Button
               variant="secondary"
               onClick={downloadFULL}
               disabled={!full.snapshot || !full.fileName}
+              title={!full.snapshot || !full.fileName ? "Generate snapshot trước" : "Download snapshot JSON"}
             >
               Download JSON
             </Button>
@@ -530,8 +777,7 @@ export default function BybitSnapshotV3New() {
           <div className="px-4 pb-4 text-xs text-slate-500">
             {loading ? (
               <span>
-                Đang generate snapshot{dots}{" "}
-                {progressPct ? `(ước lượng ${progressPct}%)` : ""}
+                Đang generate snapshot{dots} {progressPct ? `(ước lượng ${progressPct}%)` : ""}
               </span>
             ) : (
               <span>
@@ -552,7 +798,8 @@ export default function BybitSnapshotV3New() {
                 <span className="text-xs text-slate-400">{openCommands ? "Ẩn ▲" : "Mở ▼"}</span>
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Chỉ có trigger hợp lệ: <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS]</span>. Bấm 1 lần để copy.
+                Chỉ có trigger hợp lệ: <span className="text-slate-200">[DASH] [CHECK] [PART] [SETUPS]</span>. Bấm 1 lần để
+                copy.
               </div>
             </button>
 
@@ -634,8 +881,7 @@ export default function BybitSnapshotV3New() {
                 )}
 
                 <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-500">
-                  Chuẩn mode theo SPEC:&nbsp;
-                  <span className="text-slate-300">[DASH]</span>,{" "}
+                  Chuẩn mode theo SPEC:&nbsp;<span className="text-slate-300">[DASH]</span>,{" "}
                   <span className="text-slate-300">[CHECK]</span>,{" "}
                   <span className="text-slate-300">[PART]</span>,{" "}
                   <span className="text-slate-300">[SETUPS]</span>
@@ -655,23 +901,36 @@ export default function BybitSnapshotV3New() {
       {/* Sticky bottom actions (mobile) */}
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/90 backdrop-blur sm:hidden">
         <div className="mx-auto max-w-3xl px-3 py-3">
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
-              {loading
-                ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}`
-                : "Generate"}
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              onClick={handleGenerateFull}
+              disabled={loading}
+              className="w-full"
+            >
+              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate (FULL)"}
+            </Button>
+
+            <Button
+              onClick={handleGenerateCompact}
+              disabled={loading}
+              className="w-full"
+              variant="secondary"
+            >
+              {loading ? `Generating${dots}${progressPct ? ` · ${progressPct}%` : ""}` : "Generate (COMPACT)"}
             </Button>
 
             <Button
               variant="secondary"
               disabled={!copyCommands?.fullDashboard?.command}
               onClick={() => copyText(copyCommands?.fullDashboard?.command || "", "sticky_dash")}
+              className="w-full"
             >
               {copiedKey === "sticky_dash" ? "Copied ✓" : "Copy [DASH]"}
             </Button>
           </div>
 
           <div className="mt-2">
+            {/* ✅ Mobile: chặn export khi M5 chưa READY */}
             <Button
               variant="secondary"
               onClick={downloadFULL}
@@ -687,14 +946,11 @@ export default function BybitSnapshotV3New() {
               {loading
                 ? `Đang generate${dots}${progressPct ? ` (${progressPct}%)` : ""}`
                 : ready
-                ? "Ready: FULL snapshot"
-                : "Chưa có snapshot"}
+                  ? "Ready: FULL snapshot"
+                  : "Chưa có snapshot"
+              }
             </span>
-            <button
-              type="button"
-              className="underline underline-offset-2"
-              onClick={() => setOpenCommands(true)}
-            >
+            <button type="button" className="underline underline-offset-2" onClick={() => setOpenCommands(true)}>
               Commands
             </button>
           </div>
