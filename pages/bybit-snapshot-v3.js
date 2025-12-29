@@ -2,9 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { buildFullSnapshotV3, buildFullSnapshotV3Compact } from "../lib/snapshot-v3";
 import Button from "../components/snapshot/Button";
 import { buildCopyCommands } from "../components/ui/helpers/bybit-snapshot-v3-ui-macros";
-import { analyzeSnapshot } from "../lib/price-analyzer-v3";
-
-
 
 export default function BybitSnapshotV3New() {
   /* =======================
@@ -744,11 +741,6 @@ export default function BybitSnapshotV3New() {
               </div>
             </div>
           )}
-          {full.snapshot ? (
-            <pre className="mt-4 whitespace-pre-wrap break-words text-xs">
-              {JSON.stringify(analyzeSnapshot(full.snapshot, primarySymbol, { timezone: "America/Los_Angeles" }), null, 2)}
-            </pre>
-          ) : null}
           {/* Quick actions */}
           <div className="px-4 pb-2 grid grid-cols-1 gap-2 sm:grid-cols-4">
             <Button variant="primary" onClick={handleGenerateFull} disabled={loading}>
