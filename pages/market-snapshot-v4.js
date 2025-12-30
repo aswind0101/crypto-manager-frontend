@@ -20,7 +20,8 @@ export default function MarketSnapshotV4Page() {
     const [err, setErr] = useState("");
     const [lastMeta, setLastMeta] = useState(null);
     const [liqStatus, setLiqStatus] = useState(null);
-
+    const safeSymbol = useMemo(() => String(symbol || "").toUpperCase().trim(), [symbol]);
+    
     function useDebouncedEffect(effect, deps, delay) {
         React.useEffect(() => {
             const h = setTimeout(() => effect(), delay);
@@ -36,7 +37,7 @@ export default function MarketSnapshotV4Page() {
         });
     }, [safeSymbol], 600);
 
-    const safeSymbol = useMemo(() => String(symbol || "").toUpperCase().trim(), [symbol]);
+
 
     const onGenerate = async () => {
         setErr("");
