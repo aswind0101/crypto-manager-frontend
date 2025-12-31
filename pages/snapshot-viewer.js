@@ -2,16 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarketSnapshotV4 } from "../lib/snapshot/market-snapshot-v4"; // adjust path if needed
 
 /**
- * Snapshot Viewer (Retail) - Inline CSS + Integrated Generator
- * - Generate snapshot JSON (client-only) via buildMarketSnapshotV4()
- * - Paste / Upload JSON snapshot
- * - Render:
- *   1) Header (symbol/time/quality)
- *   2) Market Context (market_outlook_v1: headline object, horizons, action, flag_texts objects)
- *   3) Primary Setup (from unified.setups_v2.primary)
- *   4) Top Candidates
- *   5) All Candidates + filters
- * - Click setup => Drawer detail
+ * Snapshot Viewer (Retail) - Inline CSS (Pro layout + Mobile-first) + Integrated Generator
+ * - Generator is a "Controls" panel (desktop sidebar, mobile collapsible)
+ * - Sticky top bar with Symbol/Quality/Ref + Tabs
+ * - Market Context prioritized (headline/flags/action/horizons)
+ * - No trading logic; only display fields present in snapshot JSON
  */
 
 function safeJsonParse(text) {
@@ -39,14 +34,8 @@ function clamp(x, a, b) {
 }
 
 function fmtNum(x, opts = {}) {
-  const { digits = 2, compact = false } = opts;
+  const { digits = 2 } = opts;
   if (!Number.isFinite(x)) return "—";
-  if (compact) {
-    const abs = Math.abs(x);
-    if (abs >= 1e9) return (x / 1e9).toFixed(2) + "B";
-    if (abs >= 1e6) return (x / 1e6).toFixed(2) + "M";
-    if (abs >= 1e3) return (x / 1e3).toFixed(2) + "K";
-  }
   const d = Math.abs(x) >= 1000 ? Math.min(digits, 1) : digits;
   return x.toLocaleString(undefined, { maximumFractionDigits: d });
 }
@@ -169,12 +158,7 @@ function chipStyle(base, tone) {
     t === "warn" ? "rgb(120,53,15)" :
     t === "neg" ? "rgb(127,29,29)" :
     "rgb(51,65,85)";
-  return {
-    ...base,
-    background: bg,
-    border: `1px solid ${br}`,
-    color: fg,
-  };
+  return { ...base, background: bg, border: `1px solid ${br}`, color: fg };
 }
 
 function toneForBias(bias) {
@@ -186,7 +170,7 @@ function toneForBias(bias) {
 
 function scoreToTone(x) {
   if (!Number.isFinite(x)) return "muted";
-  if (x >= 0.80) return "pos";
+  if (x >= 0.8) return "pos";
   if (x >= 0.65) return "warn";
   return "muted";
 }
@@ -207,131 +191,24 @@ function pickSetupKey(s, idx) {
   return `${sym}_${type}_${bias}_${tf}_${ep ?? "na"}_${st ?? "na"}_${idx}`;
 }
 
-function SetupCard({ setup, onOpen, compact = false }) {
-  const status = detectStatus(setup);
-  const sm = statusMeta(status);
-
-  const bias = setup?.bias || "—";
-  const biasTone = toneForBias(bias);
-
-  const tf = setup?.timeframe ?? setup?.tf ?? null;
-  const type = setup?.type || null;
-
-  const ez = Array.isArray(setup?.entry_zone) ? setup.entry_zone : null;
-  const ep = Number.isFinite(setup?.entry_preferred) ? setup.entry_preferred : Number.isFinite(setup?.entry) ? setup.entry : null;
-  const stop = Number.isFinite(setup?.stop) ? setup.stop : Number.isFinite(setup?.invalidation) ? setup.invalidation : null;
-
-  const finalScore =
-    Number.isFinite(setup?.final_score) ? setup.final_score :
-    Number.isFinite(setup?.scores?.final_score) ? setup.scores.final_score :
-    Number.isFinite(setup?.confidence) ? setup.confidence :
-    null;
-
-  const rr =
-    Number.isFinite(setup?.execution_metrics?.rr_tp1) ? setup.execution_metrics.rr_tp1 :
-    Number.isFinite(setup?.scores?.rr_tp1) ? setup.scores.rr_tp1 :
-    Number.isFinite(setup?.rr_estimate_tp1) ? setup.rr_estimate_tp1 :
-    null;
-
-  const qualityTier =
-    setup?.quality_tier ||
-    setup?.scores?.quality_tier ||
-    null;
-
-  const action = setup?.execution_state?.phase || null;
-  const readiness = setup?.execution_state?.readiness || null;
-  const orderType = setup?.execution_state?.order?.type || null;
-
-  const base = {
-    cursor: "pointer",
-    borderRadius: 14,
-    border: "1px solid rgba(148,163,184,0.35)",
-    background: "rgba(255,255,255,0.92)",
-    boxShadow: "0 10px 30px rgba(2,6,23,0.06)",
-    padding: compact ? 12 : 14,
-    transition: "transform 120ms ease, box-shadow 120ms ease",
-  };
-
-  const chipBase = {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "5px 10px",
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: 700,
-    letterSpacing: 0.1,
-    userSelect: "none",
-    whiteSpace: "nowrap",
-  };
-
+function Section({ title, right, children, noTop = false }) {
   return (
-    <div
-      style={base}
-      onClick={() => onOpen?.(setup)}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 14px 40px rgba(2,6,23,0.09)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0px)"; e.currentTarget.style.boxShadow = "0 10px 30px rgba(2,6,23,0.06)"; }}
-      role="button"
-      tabIndex={0}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14, fontWeight: 900, color: "rgb(15,23,42)" }}>
-              {typeLabelVN(type)}
-            </span>
-            <span style={chipStyle(chipBase, biasTone)}>{String(bias || "—")}</span>
-            {tf ? <span style={chipStyle(chipBase, "muted")}>{tfLabelVN(tf)}</span> : null}
-            <span style={chipStyle(chipBase, sm.tone)}>{sm.label}</span>
-            {qualityTier ? <span style={chipStyle(chipBase, scoreToTone(finalScore))}>Tier {qualityTier}</span> : null}
-          </div>
+    <div style={{ marginTop: noTop ? 0 : 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>{title}</div>
+        {right ? <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 850 }}>{right}</div> : null}
+      </div>
+      <div style={{ marginTop: 10 }}>{children}</div>
+    </div>
+  );
+}
 
-          <div style={{ marginTop: 8, color: "rgb(51,65,85)", fontSize: 13, lineHeight: 1.35 }}>
-            <span style={{ fontWeight: 800 }}>Trigger:</span>{" "}
-            <span style={{ color: "rgb(71,85,105)" }}>{setup?.trigger || "—"}</span>
-          </div>
-
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: compact ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-            <div style={{ padding: 10, borderRadius: 12, background: "rgba(241,245,249,0.8)", border: "1px solid rgba(148,163,184,0.28)" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "rgb(71,85,105)" }}>Entry zone</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: "rgb(15,23,42)" }}>
-                {ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)" }}>
-                Preferred: <b style={{ color: "rgb(15,23,42)" }}>{fmtNum(ep)}</b>
-              </div>
-            </div>
-
-            <div style={{ padding: 10, borderRadius: 12, background: "rgba(241,245,249,0.8)", border: "1px solid rgba(148,163,184,0.28)" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "rgb(71,85,105)" }}>Stop / Invalidation</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: "rgb(15,23,42)" }}>
-                {fmtNum(stop)}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)" }}>
-                RR TP1: <b style={{ color: "rgb(15,23,42)" }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
-              </div>
-            </div>
-
-            <div style={{ padding: 10, borderRadius: 12, background: "rgba(241,245,249,0.8)", border: "1px solid rgba(148,163,184,0.28)" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "rgb(71,85,105)" }}>Score / Execution</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 900, color: "rgb(15,23,42)" }}>
-                Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)" }}>
-                {action ? <>State: <b style={{ color: "rgb(15,23,42)" }}>{action}</b></> : "State: —"}
-                {orderType ? <> · Order: <b style={{ color: "rgb(15,23,42)" }}>{orderType}</b></> : null}
-                {readiness ? <> · <b style={{ color: "rgb(15,23,42)" }}>{readiness}</b></> : null}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ flexShrink: 0, textAlign: "right" }}>
-          <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 800 }}>Tap to view</div>
-          <div style={{ marginTop: 6, fontSize: 12, color: "rgb(100,116,139)" }}>
-            {setup?.symbol || ""}
-          </div>
-        </div>
+function KV({ k, v, mono = false }) {
+  return (
+    <div style={{ display: "flex", gap: 10, justifyContent: "space-between", padding: "8px 0", borderBottom: "1px dashed rgba(148,163,184,0.30)" }}>
+      <div style={{ fontSize: 12, fontWeight: 900, color: "rgb(71,85,105)" }}>{k}</div>
+      <div style={{ fontSize: 12, fontWeight: 850, color: "rgb(15,23,42)", textAlign: "right", fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit" }}>
+        {v}
       </div>
     </div>
   );
@@ -360,14 +237,14 @@ function Drawer({ open, onClose, title, children }) {
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-end",
-        padding: 16,
-        zIndex: 1000,
+        padding: 12,
+        zIndex: 2000,
       }}
     >
       <div
         style={{
           width: "min(980px, 100%)",
-          maxHeight: "86vh",
+          maxHeight: "88vh",
           background: "rgba(255,255,255,0.98)",
           border: "1px solid rgba(148,163,184,0.35)",
           borderRadius: 18,
@@ -375,8 +252,8 @@ function Drawer({ open, onClose, title, children }) {
           overflow: "hidden",
         }}
       >
-        <div style={{ padding: 14, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.25)" }}>
-          <div style={{ fontSize: 14, fontWeight: 900, color: "rgb(15,23,42)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ padding: 14, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.25)" }}>
+          <div style={{ fontSize: 14, fontWeight: 950, color: "rgb(15,23,42)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {title || "Details"}
           </div>
           <button
@@ -387,41 +264,14 @@ function Drawer({ open, onClose, title, children }) {
               padding: "8px 10px",
               borderRadius: 12,
               cursor: "pointer",
-              fontWeight: 900,
+              fontWeight: 950,
               color: "rgb(15,23,42)",
             }}
           >
             Close
           </button>
         </div>
-        <div style={{ padding: 14, overflow: "auto" }}>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KV({ k, v, mono = false }) {
-  return (
-    <div style={{ display: "flex", gap: 10, justifyContent: "space-between", padding: "8px 0", borderBottom: "1px dashed rgba(148,163,184,0.30)" }}>
-      <div style={{ fontSize: 12, fontWeight: 900, color: "rgb(71,85,105)" }}>{k}</div>
-      <div style={{ fontSize: 12, fontWeight: 800, color: "rgb(15,23,42)", textAlign: "right", fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit" }}>
-        {v}
-      </div>
-    </div>
-  );
-}
-
-function Section({ title, right, children }) {
-  return (
-    <div style={{ marginTop: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>{title}</div>
-        {right ? <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 800 }}>{right}</div> : null}
-      </div>
-      <div style={{ marginTop: 10 }}>
-        {children}
+        <div style={{ padding: 14, overflow: "auto" }}>{children}</div>
       </div>
     </div>
   );
@@ -446,7 +296,7 @@ function HorizonCard({ h, idx }) {
     padding: "5px 10px",
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: 900,
+    fontWeight: 950,
     whiteSpace: "nowrap",
   };
 
@@ -459,7 +309,7 @@ function HorizonCard({ h, idx }) {
           {items.slice(0, 5).map((b, i) => (
             <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(15,23,42,0.55)", marginTop: 7 }} />
-              <div style={{ fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.4, fontWeight: 800 }}>
+              <div style={{ fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.4, fontWeight: 850 }}>
                 {String(b)}
               </div>
             </div>
@@ -471,27 +321,23 @@ function HorizonCard({ h, idx }) {
 
   return (
     <div style={{
-      borderRadius: 14,
+      borderRadius: 16,
       border: "1px solid rgba(148,163,184,0.30)",
       background: "rgba(255,255,255,0.92)",
       boxShadow: "0 10px 30px rgba(2,6,23,0.05)",
       padding: 14,
-      minHeight: 140,
+      minHeight: 150,
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>{title}</div>
+      <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>{title}</div>
 
-          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {bias ? <span style={chipStyle(chipBase, tone)}>{String(bias)}</span> : null}
-            {clarity ? <span style={chipStyle(chipBase, "muted")}>Rõ xu hướng: {String(clarity)}</span> : null}
-            {Number.isFinite(confidence) ? (
-              <span style={chipStyle(chipBase, scoreToTone(confidence))}>
-                Tin cậy: {fmtPct01(confidence)}
-              </span>
-            ) : null}
-          </div>
-        </div>
+      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {bias ? <span style={chipStyle(chipBase, tone)}>{String(bias)}</span> : null}
+        {clarity ? <span style={chipStyle(chipBase, "muted")}>Rõ xu hướng: {String(clarity)}</span> : null}
+        {Number.isFinite(confidence) ? (
+          <span style={chipStyle(chipBase, scoreToTone(confidence))}>
+            Tin cậy: {fmtPct01(confidence)}
+          </span>
+        ) : null}
       </div>
 
       {block("Động lực chính", drivers)}
@@ -501,7 +347,168 @@ function HorizonCard({ h, idx }) {
   );
 }
 
+function SetupCard({ setup, onOpen, dense = false, isWide }) {
+  const status = detectStatus(setup);
+  const sm = statusMeta(status);
+
+  const bias = setup?.bias || "—";
+  const biasTone = toneForBias(bias);
+
+  const tf = setup?.timeframe ?? setup?.tf ?? null;
+  const type = setup?.type || null;
+
+  const ez = Array.isArray(setup?.entry_zone) ? setup.entry_zone : null;
+  const ep = Number.isFinite(setup?.entry_preferred) ? setup.entry_preferred : Number.isFinite(setup?.entry) ? setup.entry : null;
+  const stop = Number.isFinite(setup?.stop) ? setup.stop : Number.isFinite(setup?.invalidation) ? setup.invalidation : null;
+
+  const finalScore =
+    Number.isFinite(setup?.final_score) ? setup.final_score :
+    Number.isFinite(setup?.scores?.final_score) ? setup.scores.final_score :
+    Number.isFinite(setup?.confidence) ? setup.confidence :
+    null;
+
+  const rr =
+    Number.isFinite(setup?.execution_metrics?.rr_tp1) ? setup.execution_metrics.rr_tp1 :
+    Number.isFinite(setup?.scores?.rr_tp1) ? setup.scores.rr_tp1 :
+    Number.isFinite(setup?.rr_estimate_tp1) ? setup.rr_estimate_tp1 :
+    null;
+
+  const qualityTier = setup?.quality_tier || setup?.scores?.quality_tier || null;
+  const phase = setup?.execution_state?.phase || null;
+  const readiness = setup?.execution_state?.readiness || null;
+  const orderType = setup?.execution_state?.order?.type || null;
+
+  const chipBase = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 950,
+    whiteSpace: "nowrap",
+    userSelect: "none",
+  };
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen?.(setup)}
+      style={{
+        cursor: "pointer",
+        borderRadius: 18,
+        border: "1px solid rgba(148,163,184,0.30)",
+        background: "rgba(255,255,255,0.92)",
+        boxShadow: "0 10px 30px rgba(2,6,23,0.06)",
+        padding: dense ? 12 : 14,
+        transition: "transform 120ms ease, box-shadow 120ms ease",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 14px 40px rgba(2,6,23,0.09)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0px)"; e.currentTarget.style.boxShadow = "0 10px 30px rgba(2,6,23,0.06)"; }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 14, fontWeight: 950, color: "rgb(15,23,42)" }}>{typeLabelVN(type)}</span>
+            <span style={chipStyle(chipBase, biasTone)}>{String(bias)}</span>
+            {tf ? <span style={chipStyle(chipBase, "muted")}>{tfLabelVN(tf)}</span> : null}
+            <span style={chipStyle(chipBase, sm.tone)}>{sm.label}</span>
+            {qualityTier ? <span style={chipStyle(chipBase, scoreToTone(finalScore))}>Tier {qualityTier}</span> : null}
+          </div>
+
+          <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.45, fontWeight: 850 }}>
+            <span style={{ color: "rgb(51,65,85)", fontWeight: 950 }}>Trigger:</span>{" "}
+            {setup?.trigger || "—"}
+          </div>
+
+          <div
+            style={{
+              marginTop: 12,
+              display: "grid",
+              gridTemplateColumns: isWide ? "repeat(3, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
+              gap: 10,
+            }}
+          >
+            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)" }}>
+              <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>Entry zone</div>
+              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>
+                {ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 850 }}>
+                Preferred: <b style={{ color: "rgb(15,23,42)" }}>{fmtNum(ep)}</b>
+              </div>
+            </div>
+
+            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)" }}>
+              <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>Stop / Invalidation</div>
+              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>
+                {fmtNum(stop)}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 850 }}>
+                RR TP1: <b style={{ color: "rgb(15,23,42)" }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
+              </div>
+            </div>
+
+            {isWide ? (
+              <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)" }}>
+                <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>Score / Execution</div>
+                <div style={{ marginTop: 4, fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>
+                  Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
+                </div>
+                <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 850 }}>
+                  {phase ? <>State: <b style={{ color: "rgb(15,23,42)" }}>{phase}</b></> : "State: —"}
+                  {orderType ? <> · Order: <b style={{ color: "rgb(15,23,42)" }}>{orderType}</b></> : null}
+                  {readiness ? <> · <b style={{ color: "rgb(15,23,42)" }}>{readiness}</b></> : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {!isWide ? (
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)" }}>
+              <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>Score / Execution</div>
+              <div style={{ marginTop: 4, display: "flex", gap: 10, justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap" }}>
+                <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>
+                  Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
+                </div>
+                <div style={{ fontSize: 12, color: "rgb(71,85,105)", fontWeight: 850 }}>
+                  {phase ? <>State: <b style={{ color: "rgb(15,23,42)" }}>{phase}</b></> : "State: —"}
+                  {orderType ? <> · <b style={{ color: "rgb(15,23,42)" }}>{orderType}</b></> : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div style={{ flexShrink: 0, textAlign: "right", paddingTop: 2 }}>
+          <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 900 }}>View</div>
+          <div style={{ marginTop: 6, fontSize: 12, color: "rgb(100,116,139)", fontWeight: 850 }}>
+            {setup?.symbol || ""}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SnapshotViewerPage() {
+  // Layout breakpoints
+  const [isWide, setIsWide] = useState(false);
+  const [isMid, setIsMid] = useState(false);
+  useEffect(() => {
+    const onResize = () => {
+      setIsWide(window.innerWidth >= 1024);
+      setIsMid(window.innerWidth >= 760);
+    };
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Controls panel (mobile)
+  const [controlsOpen, setControlsOpen] = useState(false);
+
   // Generator state
   const [symbolInput, setSymbolInput] = useState("BTCUSDT");
   const [genLoading, setGenLoading] = useState(false);
@@ -528,15 +535,9 @@ export default function SnapshotViewerPage() {
 
   const safeSymbol = useMemo(() => String(symbolInput || "").toUpperCase().trim(), [symbolInput]);
 
-  const tz = snap?.runtime?.tz || "America/Los_Angeles";
-  const symbol = snap?.symbol || snap?.request?.symbol || "—";
-  const generatedAt = Number(snap?.generated_at);
-  const quality = snap?.unified?.data_quality || "—";
-  const diagErrors = snap?.diagnostics?.errors?.length || 0;
-
   const setupsV2 = snap?.unified?.setups_v2 || null;
-
   const outlook = snap?.unified?.market_outlook_v1 || null;
+
   const headlineObj = outlook?.headline || null;
   const horizons = safeArr(outlook?.horizons);
   const action = outlook?.action || null;
@@ -546,10 +547,15 @@ export default function SnapshotViewerPage() {
   const top = safeArr(setupsV2?.top_candidates);
   const all = getCandidatesAll(setupsV2);
 
+  const tz = snap?.runtime?.tz || "America/Los_Angeles";
+  const symbol = snap?.symbol || snap?.request?.symbol || "—";
+  const generatedAt = Number(snap?.generated_at);
+  const quality = snap?.unified?.data_quality || "—";
+  const diagErrors = snap?.diagnostics?.errors?.length || 0;
+
   const { px: refPx, src: pxSrc } = useMemo(() => getPrimaryPrice(snap), [snap]);
 
   const allTypes = useMemo(() => uniq(all.map((s) => s?.type)).sort(), [all]);
-
   const allTfs = useMemo(() => {
     return uniq(all.map((s) => String(s?.timeframe ?? s?.tf ?? "").trim()).filter(Boolean)).sort((a, b) => {
       const order = { "15": 1, "60": 2, "240": 3, "D": 4 };
@@ -612,15 +618,8 @@ export default function SnapshotViewerPage() {
     return xs;
   }, [all, fText, fStatus, fType, fTf, fTradableOnly, sortBy]);
 
-  const onOpenSetup = (s) => {
-    setSelectedSetup(s);
-    setDrawerOpen(true);
-  };
-
-  const onCloseDrawer = () => {
-    setDrawerOpen(false);
-    setSelectedSetup(null);
-  };
+  const onOpenSetup = (s) => { setSelectedSetup(s); setDrawerOpen(true); };
+  const onCloseDrawer = () => { setDrawerOpen(false); setSelectedSetup(null); };
 
   const applySnapshotObj = (obj, alsoSetRaw = true) => {
     setParseErr("");
@@ -628,6 +627,7 @@ export default function SnapshotViewerPage() {
     setSnap(obj);
     setTab("overview");
     if (alsoSetRaw) setRaw(JSON.stringify(obj, null, 2));
+    if (!isWide) setControlsOpen(false);
   };
 
   const onPasteApply = () => {
@@ -684,57 +684,56 @@ export default function SnapshotViewerPage() {
     page: {
       minHeight: "100vh",
       background: "linear-gradient(180deg, rgba(248,250,252,1) 0%, rgba(241,245,249,1) 70%, rgba(248,250,252,1) 100%)",
-      padding: 18,
       color: "rgb(15,23,42)",
     },
-    container: {
-      maxWidth: 1100,
+    shell: {
+      maxWidth: 1180,
       margin: "0 auto",
+      padding: isWide ? "18px 18px 28px" : "12px 12px 22px",
       display: "grid",
-      gap: 14,
-    },
-    header: {
-      borderRadius: 16,
-      border: "1px solid rgba(148,163,184,0.35)",
-      background: "rgba(255,255,255,0.92)",
-      boxShadow: "0 12px 40px rgba(2,6,23,0.06)",
-      padding: 16,
-    },
-    titleRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
       gap: 12,
-      flexWrap: "wrap",
     },
-    h1: { fontSize: 18, fontWeight: 950, margin: 0 },
-    sub: { marginTop: 8, fontSize: 13, color: "rgb(71,85,105)", lineHeight: 1.35 },
-    grid2: { display: "grid", gridTemplateColumns: "1fr", gap: 14 },
-    grid3: { display: "grid", gridTemplateColumns: "1fr", gap: 12 },
-    card: {
+
+    // Sticky top bar
+    topbar: {
+      position: "sticky",
+      top: 0,
+      zIndex: 1000,
       borderRadius: 16,
-      border: "1px solid rgba(148,163,184,0.35)",
+      border: "1px solid rgba(148,163,184,0.32)",
+      background: "rgba(255,255,255,0.88)",
+      backdropFilter: "blur(10px)",
+      boxShadow: "0 12px 40px rgba(2,6,23,0.06)",
+      padding: isWide ? 14 : 12,
+    },
+
+    // Main grid
+    grid: {
+      display: "grid",
+      gridTemplateColumns: isWide ? "380px 1fr" : "1fr",
+      gap: 12,
+      alignItems: "start",
+    },
+
+    card: {
+      borderRadius: 18,
+      border: "1px solid rgba(148,163,184,0.32)",
       background: "rgba(255,255,255,0.92)",
       boxShadow: "0 12px 40px rgba(2,6,23,0.06)",
-      padding: 16,
+      padding: 14,
     },
-    textarea: {
-      width: "100%",
-      minHeight: 180,
-      resize: "vertical",
-      borderRadius: 14,
-      border: "1px solid rgba(148,163,184,0.40)",
-      padding: 12,
-      outline: "none",
-      fontSize: 12.5,
-      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-      background: "rgba(248,250,252,0.9)",
-      color: "rgb(15,23,42)",
+
+    subtle: {
+      borderRadius: 16,
+      border: "1px solid rgba(148,163,184,0.26)",
+      background: "rgba(241,245,249,0.70)",
+      padding: 14,
     },
+
     btn: (variant) => ({
       padding: "10px 12px",
-      borderRadius: 12,
-      border: variant === "primary" ? "1px solid rgba(15,23,42,0.9)" : "1px solid rgba(148,163,184,0.35)",
+      borderRadius: 14,
+      border: variant === "primary" ? "1px solid rgba(15,23,42,0.95)" : "1px solid rgba(148,163,184,0.35)",
       background: variant === "primary" ? "rgba(15,23,42,0.95)" : "rgba(241,245,249,0.9)",
       color: variant === "primary" ? "white" : "rgb(15,23,42)",
       fontWeight: 950,
@@ -743,58 +742,69 @@ export default function SnapshotViewerPage() {
       userSelect: "none",
       whiteSpace: "nowrap",
     }),
+
     input: {
       padding: "10px 12px",
-      borderRadius: 12,
+      borderRadius: 14,
       border: "1px solid rgba(148,163,184,0.40)",
-      background: "rgba(248,250,252,0.9)",
-      fontSize: 12,
-      fontWeight: 800,
-      color: "rgb(15,23,42)",
-      outline: "none",
-    },
-    select: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: "1px solid rgba(148,163,184,0.40)",
-      background: "rgba(248,250,252,0.9)",
+      background: "rgba(248,250,252,0.95)",
       fontSize: 12,
       fontWeight: 900,
       color: "rgb(15,23,42)",
       outline: "none",
+    },
+
+    select: {
+      padding: "10px 12px",
+      borderRadius: 14,
+      border: "1px solid rgba(148,163,184,0.40)",
+      background: "rgba(248,250,252,0.95)",
+      fontSize: 12,
+      fontWeight: 950,
+      color: "rgb(15,23,42)",
+      outline: "none",
       cursor: "pointer",
     },
-    divider: { height: 1, background: "rgba(148,163,184,0.28)", marginTop: 12, marginBottom: 12 },
-    tiny: { fontSize: 12, color: "rgb(100,116,139)", fontWeight: 800 },
+
+    textarea: {
+      width: "100%",
+      minHeight: 190,
+      resize: "vertical",
+      borderRadius: 16,
+      border: "1px solid rgba(148,163,184,0.40)",
+      padding: 12,
+      outline: "none",
+      fontSize: 12,
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      background: "rgba(248,250,252,0.95)",
+      color: "rgb(15,23,42)",
+    },
+
+    divider: { height: 1, background: "rgba(148,163,184,0.25)", marginTop: 12, marginBottom: 12 },
+
+    // Segmented tabs
+    segWrap: {
+      display: "inline-flex",
+      padding: 4,
+      borderRadius: 14,
+      border: "1px solid rgba(148,163,184,0.30)",
+      background: "rgba(241,245,249,0.75)",
+      gap: 4,
+    },
+    segBtn: (active) => ({
+      padding: "8px 10px",
+      borderRadius: 12,
+      border: "1px solid rgba(148,163,184,0.0)",
+      background: active ? "rgba(15,23,42,0.95)" : "transparent",
+      color: active ? "white" : "rgb(15,23,42)",
+      fontWeight: 950,
+      fontSize: 12,
+      cursor: "pointer",
+      userSelect: "none",
+      minWidth: 72,
+      textAlign: "center",
+    }),
   };
-
-  // responsive columns
-  const [isWide, setIsWide] = useState(false);
-  useEffect(() => {
-    const onResize = () => setIsWide(window.innerWidth >= 980);
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  const [isMid, setIsMid] = useState(false);
-  useEffect(() => {
-    const onResize = () => setIsMid(window.innerWidth >= 720);
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  const horizonsGridStyle = useMemo(() => {
-    if (isWide) return { ...styles.grid3, gridTemplateColumns: "repeat(3, minmax(0, 1fr))" };
-    if (isMid) return { ...styles.grid3, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" };
-    return { ...styles.grid3, gridTemplateColumns: "1fr" };
-  }, [isWide, isMid]);
-
-  const mainGridStyle = useMemo(() => {
-    if (isWide) return { ...styles.grid2, gridTemplateColumns: "460px 1fr", alignItems: "start" };
-    return { ...styles.grid2, gridTemplateColumns: "1fr" };
-  }, [isWide]);
 
   const chipsBase = {
     display: "inline-flex",
@@ -808,309 +818,343 @@ export default function SnapshotViewerPage() {
     whiteSpace: "nowrap",
   };
 
+  const horizonsGridStyle = useMemo(() => {
+    if (isWide) return { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 };
+    if (isMid) return { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 };
+    return { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
+  }, [isWide, isMid]);
+
+  // Mobile controls overlay
+  const ControlsOverlay = ({ open, onClose, children }) => {
+    if (isWide) return null;
+    if (!open) return null;
+    return (
+      <div
+        onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(2,6,23,0.55)",
+          zIndex: 1500,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-end",
+          padding: 12,
+        }}
+      >
+        <div style={{
+          width: "100%",
+          maxWidth: 720,
+          maxHeight: "86vh",
+          borderRadius: 18,
+          border: "1px solid rgba(148,163,184,0.35)",
+          background: "rgba(255,255,255,0.98)",
+          boxShadow: "0 30px 80px rgba(2,6,23,0.25)",
+          overflow: "hidden",
+        }}>
+          <div style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.25)" }}>
+            <div style={{ fontWeight: 950, fontSize: 13 }}>Controls</div>
+            <button style={styles.btn("secondary")} onClick={onClose}>Close</button>
+          </div>
+          <div style={{ padding: 12, overflow: "auto" }}>
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const ControlsPanel = (
+    <div style={{ display: "grid", gap: 12 }}>
+      <div style={styles.card}>
+        <div style={{ fontSize: 13, fontWeight: 950 }}>Generate Snapshot (v4)</div>
+
+        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
+          <input
+            value={symbolInput}
+            onChange={(e) => setSymbolInput(e.target.value)}
+            placeholder="BTCUSDT"
+            style={styles.input}
+          />
+          <button
+            style={styles.btn("primary")}
+            onClick={onGenerate}
+            disabled={genLoading || !safeSymbol}
+          >
+            {genLoading ? "Generating..." : "Generate"}
+          </button>
+        </div>
+
+        <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.30)", background: "rgba(248,250,252,0.95)", fontSize: 12, fontWeight: 950 }}>
+            <input type="checkbox" checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)} />
+            Auto download JSON
+          </label>
+
+          <button
+            style={styles.btn("secondary")}
+            onClick={() => {
+              if (!snap) return;
+              const ts = new Date().toISOString().replace(/[:.]/g, "-");
+              const name = `market-snapshot-v4_${(snap?.symbol || safeSymbol || "SNAP")}_${ts}.json`;
+              downloadJson(snap, name);
+            }}
+            disabled={!snap}
+          >
+            Download
+          </button>
+        </div>
+
+        {genErr ? (
+          <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 950, whiteSpace: "pre-wrap", fontSize: 12 }}>
+            {genErr}
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 10, fontSize: 12, color: "rgb(100,116,139)", fontWeight: 850, lineHeight: 1.4 }}>
+          Gợi ý: Nếu 1 exchange bị CORS/geo, snapshot vẫn có thể tạo nhưng quality sẽ “partial” và errors tăng.
+        </div>
+      </div>
+
+      <div style={styles.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 950 }}>Load JSON</div>
+          <label style={{ ...styles.btn("secondary"), display: "inline-flex", alignItems: "center", gap: 8 }}>
+            Upload
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={(e) => onFilePick(e.target.files?.[0])}
+              style={{ display: "none" }}
+            />
+          </label>
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <textarea
+            value={raw}
+            onChange={(e) => setRaw(e.target.value)}
+            placeholder='Paste snapshot JSON (market_snapshot v4)...'
+            style={styles.textarea}
+          />
+        </div>
+
+        {parseErr ? (
+          <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 950, whiteSpace: "pre-wrap", fontSize: 12 }}>
+            {parseErr}
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button style={styles.btn("primary")} onClick={onPasteApply}>Apply</button>
+          <button
+            style={styles.btn("secondary")}
+            onClick={() => { if (snap) copyText(JSON.stringify(snap, null, 2)); }}
+            disabled={!snap}
+          >
+            Copy snapshot
+          </button>
+          <button
+            style={styles.btn("secondary")}
+            onClick={() => {
+              setRaw("");
+              setSnap(null);
+              setParseErr("");
+              setGenErr("");
+              setSelectedSetup(null);
+              setDrawerOpen(false);
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={styles.page}>
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <div style={styles.titleRow}>
+      <div style={styles.shell}>
+        {/* Sticky Top Bar */}
+        <div style={styles.topbar}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ minWidth: 0 }}>
-              <h1 style={styles.h1}>Snapshot Viewer (Retail)</h1>
-              <div style={styles.sub}>
-                Generate / Upload / Paste JSON snapshot → xem context thị trường + setups. UI chỉ hiển thị dữ liệu có sẵn trong snapshot.
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ fontSize: 16, fontWeight: 950 }}>{symbol}</div>
+                <span style={chipStyle(chipsBase, "muted")}>Quality: {String(quality)}</span>
+                <span style={chipStyle(chipsBase, diagErrors ? "warn" : "pos")}>Errors: {diagErrors}</span>
+                <span style={chipStyle(chipsBase, "muted")}>Ref: {Number.isFinite(refPx) ? fmtNum(refPx) : "—"} ({pxSrc})</span>
+              </div>
+
+              <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(71,85,105)", fontWeight: 850, lineHeight: 1.35 }}>
+                Generated: <b style={{ color: "rgb(15,23,42)" }}>{fmtTs(generatedAt, tz)}</b> · TZ: <b style={{ color: "rgb(15,23,42)" }}>{tz}</b>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <label style={{ ...styles.btn("secondary"), display: "inline-flex", alignItems: "center", gap: 8 }}>
-                Upload JSON
-                <input
-                  type="file"
-                  accept="application/json,.json"
-                  onChange={(e) => onFilePick(e.target.files?.[0])}
-                  style={{ display: "none" }}
-                />
-              </label>
-              <button style={styles.btn("primary")} onClick={onPasteApply}>
-                Apply JSON
-              </button>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {!isWide ? (
+                <button style={styles.btn("secondary")} onClick={() => setControlsOpen(true)}>
+                  Controls
+                </button>
+              ) : null}
+
+              <div style={styles.segWrap}>
+                <button style={styles.segBtn(tab === "overview")} onClick={() => setTab("overview")}>Overview</button>
+                <button style={styles.segBtn(tab === "top")} onClick={() => setTab("top")}>Top</button>
+                <button style={styles.segBtn(tab === "all")} onClick={() => setTab("all")}>All</button>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div style={styles.divider} />
+        {/* Mobile Controls Overlay */}
+        <ControlsOverlay open={controlsOpen} onClose={() => setControlsOpen(false)}>
+          {ControlsPanel}
+        </ControlsOverlay>
 
-          <div style={mainGridStyle}>
-            {/* Left: Generator + JSON input */}
-            <div style={styles.card}>
-              <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>Generate Snapshot (v4)</div>
-              <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: isWide ? "1fr auto" : "1fr", gap: 10, alignItems: "center" }}>
-                <input
-                  value={symbolInput}
-                  onChange={(e) => setSymbolInput(e.target.value)}
-                  placeholder="BTCUSDT"
-                  style={styles.input}
-                />
-                <button
-                  style={styles.btn("primary")}
-                  onClick={onGenerate}
-                  disabled={genLoading || !safeSymbol}
-                >
-                  {genLoading ? "Generating..." : "Generate & Load"}
-                </button>
-              </div>
-
-              <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(148,163,184,0.35)", background: "rgba(248,250,252,0.9)", fontSize: 12, fontWeight: 950 }}>
-                  <input
-                    type="checkbox"
-                    checked={autoDownload}
-                    onChange={(e) => setAutoDownload(e.target.checked)}
-                  />
-                  Auto download JSON
-                </label>
-
-                <button
-                  style={styles.btn("secondary")}
-                  onClick={() => {
-                    if (!snap) return;
-                    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-                    const name = `market-snapshot-v4_${(snap?.symbol || safeSymbol || "SNAP")}_${ts}.json`;
-                    downloadJson(snap, name);
-                  }}
-                  disabled={!snap}
-                >
-                  Download current snapshot
-                </button>
-              </div>
-
-              {genErr ? (
-                <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 900, whiteSpace: "pre-wrap", fontSize: 12 }}>
-                  {genErr}
-                </div>
-              ) : null}
-
-              <div style={{ marginTop: 12, ...styles.tiny }}>
-                Lưu ý: generator chạy client-only; nếu 1 exchange bị CORS/geo, snapshot vẫn tạo được nhưng quality có thể “partial” và diagnostics.errors tăng.
-              </div>
-
-              <div style={styles.divider} />
-
-              <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>Input JSON</div>
-              <div style={{ marginTop: 10 }}>
-                <textarea
-                  value={raw}
-                  onChange={(e) => setRaw(e.target.value)}
-                  placeholder='Paste full snapshot JSON here... (market_snapshot v4)'
-                  style={styles.textarea}
-                />
-              </div>
-
-              {parseErr ? (
-                <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 900, whiteSpace: "pre-wrap", fontSize: 12 }}>
-                  {parseErr}
-                </div>
-              ) : null}
-
-              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  style={styles.btn("secondary")}
-                  onClick={() => {
-                    if (!snap) return;
-                    copyText(JSON.stringify(snap, null, 2));
-                  }}
-                  disabled={!snap}
-                >
-                  Copy parsed snapshot
-                </button>
-                <button
-                  style={styles.btn("secondary")}
-                  onClick={() => {
-                    setRaw("");
-                    setSnap(null);
-                    setParseErr("");
-                    setGenErr("");
-                    setSelectedSetup(null);
-                    setDrawerOpen(false);
-                  }}
-                >
-                  Clear
-                </button>
-              </div>
+        {/* Main Grid */}
+        <div style={styles.grid}>
+          {/* Desktop Controls */}
+          {isWide ? (
+            <div style={{ position: "sticky", top: 92 }}>
+              {ControlsPanel}
             </div>
+          ) : null}
 
-            {/* Right: Snapshot meta + Tabs */}
-            <div style={styles.card}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 16, fontWeight: 950, color: "rgb(15,23,42)" }}>
-                      {symbol}
-                    </div>
-                    <span style={chipStyle(chipsBase, "muted")}>Quality: {String(quality)}</span>
-                    <span style={chipStyle(chipsBase, diagErrors ? "warn" : "pos")}>
-                      Errors: {diagErrors}
-                    </span>
-                    <span style={chipStyle(chipsBase, "muted")}>
-                      Ref: {Number.isFinite(refPx) ? fmtNum(refPx) : "—"} ({pxSrc})
-                    </span>
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(71,85,105)", fontWeight: 850 }}>
-                    Generated: <b style={{ color: "rgb(15,23,42)" }}>{fmtTs(generatedAt, tz)}</b> · TZ: <b style={{ color: "rgb(15,23,42)" }}>{tz}</b>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  <button style={styles.btn("secondary")} onClick={() => setTab("overview")}>Overview</button>
-                  <button style={styles.btn("secondary")} onClick={() => setTab("top")}>Top</button>
-                  <button style={styles.btn("secondary")} onClick={() => setTab("all")}>All</button>
-                </div>
-              </div>
-
-              {/* Body by tab */}
-              {tab === "overview" ? (
-                <>
-                  <Section title="Market Context" right={outlook ? "from unified.market_outlook_v1" : "market_outlook_v1 not found"}>
-                    {headlineObj ? (
-                      <div style={{
-                        padding: 14,
-                        borderRadius: 14,
-                        border: "1px solid rgba(148,163,184,0.30)",
-                        background: "rgba(241,245,249,0.65)",
-                        color: "rgb(15,23,42)",
-                        fontWeight: 900,
-                        lineHeight: 1.55,
-                        display: "grid",
-                        gap: 6
-                      }}>
+          {/* Viewer */}
+          <div style={{ display: "grid", gap: 12 }}>
+            {tab === "overview" ? (
+              <div style={styles.card}>
+                <Section title="Market Context" right={outlook ? "unified.market_outlook_v1" : "market_outlook_v1 not found"} noTop>
+                  {headlineObj ? (
+                    <div style={styles.subtle}>
+                      <div style={{ display: "grid", gap: 6, fontWeight: 950, color: "rgb(15,23,42)", lineHeight: 1.55 }}>
                         {headlineObj.market_position ? <div>{headlineObj.market_position}</div> : null}
                         {headlineObj.trend_clarity ? <div>{headlineObj.trend_clarity}</div> : null}
                         {headlineObj.data_quality ? <div>{headlineObj.data_quality}</div> : null}
                         {headlineObj.quick_risk ? <div>{headlineObj.quick_risk}</div> : null}
                       </div>
-                    ) : (
-                      <div style={{ color: "rgb(100,116,139)", fontWeight: 800, fontSize: 13 }}>
-                        (Không có headline trong snapshot)
-                      </div>
-                    )}
 
-                    {flagObjs.length ? (
-                      <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {flagObjs.slice(0, 12).map((f, i) => {
-                          const tone =
-                            toLower(f?.tone) === "good" ? "pos" :
-                            toLower(f?.tone) === "bad" ? "neg" :
-                            toLower(f?.tone) === "warn" ? "warn" :
-                            "muted";
-                          return (
-                            <span key={f?.key || i} style={chipStyle(chipsBase, tone)}>
-                              {String(f?.text || f?.key || "")}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ) : null}
+                      {flagObjs.length ? (
+                        <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {flagObjs.slice(0, 12).map((f, i) => {
+                            const tone =
+                              toLower(f?.tone) === "good" ? "pos" :
+                              toLower(f?.tone) === "bad" ? "neg" :
+                              toLower(f?.tone) === "warn" ? "warn" :
+                              "muted";
+                            return (
+                              <span key={f?.key || i} style={chipStyle(chipsBase, tone)}>
+                                {String(f?.text || f?.key || "")}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
+                      (Không có headline trong snapshot)
+                    </div>
+                  )}
 
-                    {action ? (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                          <span style={chipStyle(chipsBase, "muted")}>
-                            Hành động: {action.status || "—"}
-                          </span>
-                          {action.setup_type_label ? (
-                            <span style={chipStyle(chipsBase, "muted")}>
-                              Setup: {action.setup_type_label}
-                            </span>
-                          ) : null}
-                          {action.tf_label ? (
-                            <span style={chipStyle(chipsBase, "muted")}>
-                              TF: {action.tf_label}
-                            </span>
-                          ) : null}
+                  {action ? (
+                    <div style={{ marginTop: 12, borderRadius: 18, border: "1px solid rgba(148,163,184,0.30)", background: "rgba(15,23,42,0.03)", padding: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 13, fontWeight: 950 }}>Action</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={chipStyle(chipsBase, "muted")}>Hành động: {action.status || "—"}</span>
+                          {action.setup_type_label ? <span style={chipStyle(chipsBase, "muted")}>Setup: {action.setup_type_label}</span> : null}
+                          {action.tf_label ? <span style={chipStyle(chipsBase, "muted")}>TF: {action.tf_label}</span> : null}
                           {action.order_type ? (
                             <span style={chipStyle(chipsBase, "muted")}>
                               Order: {action.order_type}{action.order_price != null ? ` @ ${fmtNum(action.order_price)}` : ""}
                             </span>
                           ) : null}
                         </div>
+                      </div>
 
-                        {Array.isArray(action.summary) && action.summary.length ? (
-                          <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-                            {action.summary.slice(0, 6).map((b, i) => (
-                              <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                                <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(15,23,42,0.55)", marginTop: 7 }} />
-                                <div style={{ fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.4, fontWeight: 800 }}>
-                                  {String(b)}
-                                </div>
+                      {Array.isArray(action.summary) && action.summary.length ? (
+                        <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                          {action.summary.slice(0, 6).map((b, i) => (
+                            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(15,23,42,0.55)", marginTop: 7 }} />
+                              <div style={{ fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.4, fontWeight: 900 }}>
+                                {String(b)}
                               </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    <div style={{ marginTop: 12, ...horizonsGridStyle }}>
-                      {(horizons.length ? horizons : [{ title: "30m–4h" }, { title: "1–3d" }, { title: "1–2w" }]).map((h, i) => (
-                        <HorizonCard key={i} h={h} idx={i} />
-                      ))}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                  </Section>
+                  ) : null}
 
-                  <Section title="Primary Setup" right={primary ? "from unified.setups_v2.primary" : "no primary setup"}>
-                    {primary ? (
-                      <SetupCard setup={primary} onOpen={onOpenSetup} />
-                    ) : (
-                      <div style={{ color: "rgb(100,116,139)", fontWeight: 800, fontSize: 13 }}>
-                        (Snapshot không có primary tradable setup)
-                      </div>
-                    )}
-                  </Section>
+                  <div style={{ marginTop: 12, ...horizonsGridStyle }}>
+                    {(horizons.length ? horizons : [{ title: "30m–4h" }, { title: "1–3d" }, { title: "1–2w" }]).map((h, i) => (
+                      <HorizonCard key={i} h={h} idx={i} />
+                    ))}
+                  </div>
+                </Section>
 
-                  <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"}>
-                    {top.length ? (
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {top.map((s, idx) => (
-                          <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} compact />
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ color: "rgb(100,116,139)", fontWeight: 800, fontSize: 13 }}>
-                        (Không có top_candidates trong snapshot)
-                      </div>
-                    )}
-                  </Section>
-                </>
-              ) : null}
+                <div style={styles.divider} />
 
-              {tab === "top" ? (
+                <Section title="Primary Setup" right={primary ? "unified.setups_v2.primary" : "no primary setup"} noTop>
+                  {primary ? (
+                    <SetupCard setup={primary} onOpen={(s) => { setSelectedSetup(s); setDrawerOpen(true); }} isWide={isWide} />
+                  ) : (
+                    <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
+                      (Snapshot không có primary tradable setup)
+                    </div>
+                  )}
+                </Section>
+
                 <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"}>
                   {top.length ? (
-                    <div style={{ display: "grid", gap: 12 }}>
+                    <div style={{ display: "grid", gap: 10 }}>
                       {top.map((s, idx) => (
-                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} />
+                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} />
                       ))}
                     </div>
                   ) : (
-                    <div style={{ color: "rgb(100,116,139)", fontWeight: 800, fontSize: 13 }}>
+                    <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
                       (Không có top_candidates trong snapshot)
                     </div>
                   )}
                 </Section>
-              ) : null}
+              </div>
+            ) : null}
 
-              {tab === "all" ? (
-                <Section title="All Candidates" right={`Showing ${filteredAll.length} / ${all.length}`}>
+            {tab === "top" ? (
+              <div style={styles.card}>
+                <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"} noTop>
+                  {top.length ? (
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {top.map((s, idx) => (
+                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} isWide={isWide} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
+                      (Không có top_candidates trong snapshot)
+                    </div>
+                  )}
+                </Section>
+              </div>
+            ) : null}
+
+            {tab === "all" ? (
+              <div style={styles.card}>
+                <Section title="All Candidates" right={`Showing ${filteredAll.length} / ${all.length}`} noTop>
                   <div style={{ display: "grid", gap: 10 }}>
-                    <div style={{
-                      display: "grid",
-                      gridTemplateColumns: isWide ? "1.2fr 0.7fr 0.7fr 0.7fr 0.9fr 0.9fr" : "1fr 1fr",
-                      gap: 10,
-                      alignItems: "center",
-                    }}>
-                      <input
-                        value={fText}
-                        onChange={(e) => setFText(e.target.value)}
-                        placeholder="Search trigger / reasons / warnings..."
-                        style={styles.input}
-                      />
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isWide ? "1.1fr 0.65fr 0.7fr 0.6fr 0.7fr 0.8fr" : "1fr 1fr",
+                        gap: 10,
+                        alignItems: "center",
+                      }}
+                    >
+                      <input value={fText} onChange={(e) => setFText(e.target.value)} placeholder="Search trigger / reasons / warnings..." style={styles.input} />
 
                       <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} style={styles.select}>
                         <option value="all">Status: All</option>
@@ -1124,16 +1168,12 @@ export default function SnapshotViewerPage() {
 
                       <select value={fType} onChange={(e) => setFType(e.target.value)} style={styles.select}>
                         <option value="all">Type: All</option>
-                        {allTypes.map((t) => (
-                          <option key={t} value={t}>{typeLabelVN(t)}</option>
-                        ))}
+                        {allTypes.map((t) => <option key={t} value={t}>{typeLabelVN(t)}</option>)}
                       </select>
 
                       <select value={fTf} onChange={(e) => setFTf(e.target.value)} style={styles.select}>
                         <option value="all">TF: All</option>
-                        {allTfs.map((t) => (
-                          <option key={t} value={t}>{tfLabelVN(t)}</option>
-                        ))}
+                        {allTfs.map((t) => <option key={t} value={t}>{tfLabelVN(t)}</option>)}
                       </select>
 
                       <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={styles.select}>
@@ -1142,12 +1182,8 @@ export default function SnapshotViewerPage() {
                         <option value="tf_asc">Sort: TF asc</option>
                       </select>
 
-                      <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(148,163,184,0.35)", background: "rgba(248,250,252,0.9)", fontSize: 12, fontWeight: 950 }}>
-                        <input
-                          type="checkbox"
-                          checked={fTradableOnly}
-                          onChange={(e) => setFTradableOnly(e.target.checked)}
-                        />
+                      <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.30)", background: "rgba(248,250,252,0.95)", fontSize: 12, fontWeight: 950 }}>
+                        <input type="checkbox" checked={fTradableOnly} onChange={(e) => setFTradableOnly(e.target.checked)} />
                         Tradable only
                       </label>
                     </div>
@@ -1155,21 +1191,22 @@ export default function SnapshotViewerPage() {
                     <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
                       {filteredAll.length ? (
                         filteredAll.map((s, idx) => (
-                          <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} compact />
+                          <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} />
                         ))
                       ) : (
-                        <div style={{ color: "rgb(100,116,139)", fontWeight: 800, fontSize: 13 }}>
+                        <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
                           (Không có setup nào khớp filter)
                         </div>
                       )}
                     </div>
                   </div>
                 </Section>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
+        {/* Setup Detail Drawer */}
         <Drawer
           open={drawerOpen}
           onClose={onCloseDrawer}
@@ -1182,23 +1219,18 @@ export default function SnapshotViewerPage() {
           {selectedSetup ? (
             <div style={{ display: "grid", gap: 14 }}>
               <div style={{
-                borderRadius: 16,
-                border: "1px solid rgba(148,163,184,0.30)",
-                background: "rgba(241,245,249,0.65)",
+                borderRadius: 18,
+                border: "1px solid rgba(148,163,184,0.28)",
+                background: "rgba(241,245,249,0.70)",
                 padding: 14,
               }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: "rgb(71,85,105)" }}>Trigger</div>
-                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 900, color: "rgb(15,23,42)", lineHeight: 1.45 }}>
+                <div style={{ fontSize: 12, fontWeight: 950, color: "rgb(71,85,105)" }}>Trigger</div>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)", lineHeight: 1.45 }}>
                   {selectedSetup.trigger || "—"}
                 </div>
               </div>
 
-              <div style={{
-                borderRadius: 16,
-                border: "1px solid rgba(148,163,184,0.30)",
-                background: "rgba(255,255,255,0.92)",
-                padding: 14,
-              }}>
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6 }}>Trade Parameters</div>
                 <KV
                   k="Entry zone"
@@ -1208,10 +1240,7 @@ export default function SnapshotViewerPage() {
                       : "—"
                   }
                 />
-                <KV
-                  k="Entry preferred"
-                  v={fmtNum(Number.isFinite(selectedSetup.entry_preferred) ? selectedSetup.entry_preferred : selectedSetup.entry)}
-                />
+                <KV k="Entry preferred" v={fmtNum(Number.isFinite(selectedSetup.entry_preferred) ? selectedSetup.entry_preferred : selectedSetup.entry)} />
                 <KV k="Stop / Invalidation" v={fmtNum(Number.isFinite(selectedSetup.stop) ? selectedSetup.stop : selectedSetup.invalidation)} />
                 <KV k="TP1" v={fmtNum(selectedSetup?.targets?.tp1)} />
                 <KV k="TP2" v={fmtNum(selectedSetup?.targets?.tp2)} />
@@ -1229,13 +1258,8 @@ export default function SnapshotViewerPage() {
                 />
               </div>
 
-              <div style={{
-                borderRadius: 16,
-                border: "1px solid rgba(148,163,184,0.30)",
-                background: "rgba(255,255,255,0.92)",
-                padding: 14,
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6 }}>Eligibility & Execution State</div>
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6 }}>Eligibility & Execution</div>
                 <KV k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
                 <KV k="Tradable" v={(selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true) ? "Yes" : "No / Unknown"} />
                 <KV k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
@@ -1258,12 +1282,7 @@ export default function SnapshotViewerPage() {
                 />
               </div>
 
-              <div style={{
-                borderRadius: 16,
-                border: "1px solid rgba(148,163,184,0.30)",
-                background: "rgba(255,255,255,0.92)",
-                padding: 14,
-              }}>
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
                   <div style={{ fontSize: 13, fontWeight: 950 }}>Raw JSON</div>
                   <button
@@ -1281,12 +1300,13 @@ export default function SnapshotViewerPage() {
                     Copy
                   </button>
                 </div>
+
                 <pre style={{
                   marginTop: 10,
                   padding: 12,
-                  borderRadius: 14,
+                  borderRadius: 16,
                   border: "1px solid rgba(148,163,184,0.35)",
-                  background: "rgba(248,250,252,0.9)",
+                  background: "rgba(248,250,252,0.95)",
                   overflow: "auto",
                   fontSize: 11.5,
                   lineHeight: 1.45,
@@ -1298,7 +1318,7 @@ export default function SnapshotViewerPage() {
               </div>
             </div>
           ) : (
-            <div style={{ color: "rgb(100,116,139)", fontWeight: 800 }}>No setup selected.</div>
+            <div style={{ color: "rgb(100,116,139)", fontWeight: 850 }}>No setup selected.</div>
           )}
         </Drawer>
       </div>
