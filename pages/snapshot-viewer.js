@@ -3,10 +3,11 @@ import { buildMarketSnapshotV4 } from "../lib/snapshot/market-snapshot-v4"; // a
 
 /**
  * Snapshot Viewer (Retail) - Inline CSS (Pro layout + Mobile-first) + Integrated Generator
- * Fixes:
- * - Vietnamese typography: safer font stack + avoid ultra-heavy weights (950) + smoothing
- * - More professional background (subtle depth)
- * - Better centering + iPad stability: minWidth:0, overflowWrap, consistent grid alignment
+ * Fixes in this patch:
+ * - Centering metric tiles (Entry/Stop/TP/Score) + consistent heights
+ * - Add Take Profit tile on each setup card (TP1/TP2 + RR TP1)
+ * - Drawer detail KV rows no longer push values far right (mobile stacks; no horizontal scroll)
+ * - Mobile Controls Symbol input focus-stability (iOS keyboard / resize issues)
  */
 
 function safeJsonParse(text) {
@@ -205,20 +206,38 @@ function Section({ title, right, children, noTop = false }) {
   );
 }
 
-function KV({ k, v, mono = false }) {
+/**
+ * KV row: on mobile/small width, stack K on top of V to avoid "value pushed far right"
+ */
+function KV({ k, v, mono = false, stacked = false }) {
   return (
-    <div style={{ display: "flex", gap: 10, justifyContent: "space-between", padding: "8px 0", borderBottom: "1px dashed rgba(148,163,184,0.30)" }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "rgb(71,85,105)" }}>{k}</div>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: stacked ? "column" : "row",
+        gap: stacked ? 6 : 10,
+        justifyContent: stacked ? "flex-start" : "space-between",
+        alignItems: stacked ? "flex-start" : "baseline",
+        padding: "8px 0",
+        borderBottom: "1px dashed rgba(148,163,184,0.30)",
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color: "rgb(71,85,105)", minWidth: 0 }}>
+        {k}
+      </div>
+
       <div
         style={{
           fontSize: 12,
           fontWeight: 650,
           color: "rgb(15,23,42)",
-          textAlign: "right",
+          textAlign: stacked ? "left" : "right",
           fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit",
           overflowWrap: "anywhere",
           wordBreak: "break-word",
-          maxWidth: "68%",
+          maxWidth: stacked ? "100%" : "68%",
+          minWidth: 0,
         }}
       >
         {v}
@@ -284,7 +303,10 @@ function Drawer({ open, onClose, title, children }) {
             Close
           </button>
         </div>
-        <div style={{ padding: 14, overflow: "auto" }}>{children}</div>
+
+        <div style={{ padding: 14, overflow: "auto", minWidth: 0 }}>
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -341,6 +363,7 @@ function HorizonCard({ h, idx }) {
       boxShadow: "0 12px 36px rgba(2,6,23,0.06)",
       padding: 14,
       minHeight: 150,
+      minWidth: 0,
     }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)" }}>{title}</div>
 
@@ -375,6 +398,16 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   const ep = Number.isFinite(setup?.entry_preferred) ? setup.entry_preferred : Number.isFinite(setup?.entry) ? setup.entry : null;
   const stop = Number.isFinite(setup?.stop) ? setup.stop : Number.isFinite(setup?.invalidation) ? setup.invalidation : null;
 
+  const tp1 =
+    Number.isFinite(setup?.targets?.tp1) ? setup.targets.tp1 :
+    Number.isFinite(setup?.tp1) ? setup.tp1 :
+    null;
+
+  const tp2 =
+    Number.isFinite(setup?.targets?.tp2) ? setup.targets.tp2 :
+    Number.isFinite(setup?.tp2) ? setup.tp2 :
+    null;
+
   const finalScore =
     Number.isFinite(setup?.final_score) ? setup.final_score :
     Number.isFinite(setup?.scores?.final_score) ? setup.scores.final_score :
@@ -405,7 +438,27 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
     userSelect: "none",
   };
 
-  const metricsCols = isWide ? 3 : (isMid ? 3 : 2); // iPad gets 3 cols to avoid awkward wraps
+  // Now we show 4 tiles: Entry / Stop / Take Profit / Score
+  // Mobile: 2 cols (2 rows). iPad+Desktop: 4 cols in one row.
+  const metricsCols = (isWide || isMid) ? 4 : 2;
+
+  const tileStyle = {
+    padding: 10,
+    borderRadius: 14,
+    background: "rgba(241,245,249,0.75)",
+    border: "1px solid rgba(148,163,184,0.25)",
+    textAlign: "center",
+    minHeight: 92,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 0,
+  };
+
+  const tileLabel = { fontSize: 11, fontWeight: 750, color: "rgb(71,85,105)" };
+  const tileMain = { marginTop: 4, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", overflowWrap: "anywhere", minWidth: 0 };
+  const tileSub = { marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 650, overflowWrap: "anywhere", minWidth: 0 };
 
   return (
     <div
@@ -420,14 +473,14 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
         boxShadow: "0 12px 36px rgba(2,6,23,0.07)",
         padding: dense ? 12 : 14,
         transition: "transform 120ms ease, box-shadow 120ms ease",
+        minWidth: 0,
       }}
       onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 16px 46px rgba(2,6,23,0.10)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0px)"; e.currentTarget.style.boxShadow = "0 12px 36px rgba(2,6,23,0.07)"; }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", minWidth: 0 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          {/* Header chips: centered baseline */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start", minWidth: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 800, color: "rgb(15,23,42)" }}>{typeLabelVN(type)}</span>
             <span style={chipStyle(chipBase, biasTone)}>{String(bias)}</span>
             {tf ? <span style={chipStyle(chipBase, "muted")}>{tfLabelVN(tf)}</span> : null}
@@ -435,13 +488,11 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
             {qualityTier ? <span style={chipStyle(chipBase, scoreToTone(finalScore))}>Tier {qualityTier}</span> : null}
           </div>
 
-          {/* Trigger: keep left for readability but protect wraps */}
           <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.45, fontWeight: 650, overflowWrap: "anywhere" }}>
             <span style={{ color: "rgb(51,65,85)", fontWeight: 800 }}>Trigger:</span>{" "}
             {setup?.trigger || "—"}
           </div>
 
-          {/* Metrics: centered contents + iPad-safe columns */}
           <div
             style={{
               marginTop: 12,
@@ -449,34 +500,43 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
               gridTemplateColumns: `repeat(${metricsCols}, minmax(0, 1fr))`,
               gap: 10,
               alignItems: "stretch",
+              minWidth: 0,
             }}
           >
-            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)", textAlign: "center" }}>
-              <div style={{ fontSize: 11, fontWeight: 750, color: "rgb(71,85,105)" }}>Entry zone</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", overflowWrap: "anywhere" }}>
+            <div style={tileStyle}>
+              <div style={tileLabel}>Entry zone</div>
+              <div style={tileMain}>
                 {ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}
               </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 650 }}>
+              <div style={tileSub}>
                 Preferred: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{fmtNum(ep)}</b>
               </div>
             </div>
 
-            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)", textAlign: "center" }}>
-              <div style={{ fontSize: 11, fontWeight: 750, color: "rgb(71,85,105)" }}>Stop / Invalidation</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", overflowWrap: "anywhere" }}>
-                {fmtNum(stop)}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 650 }}>
+            <div style={tileStyle}>
+              <div style={tileLabel}>Stop / Invalidation</div>
+              <div style={tileMain}>{fmtNum(stop)}</div>
+              <div style={tileSub}>
                 RR TP1: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
               </div>
             </div>
 
-            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)", textAlign: "center" }}>
-              <div style={{ fontSize: 11, fontWeight: 750, color: "rgb(71,85,105)" }}>Score / Execution</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)" }}>
+            <div style={tileStyle}>
+              <div style={tileLabel}>Take Profit</div>
+              <div style={tileMain}>
+                {Number.isFinite(tp1) ? `TP1: ${fmtNum(tp1)}` : "TP1: —"}
+              </div>
+              <div style={tileSub}>
+                {Number.isFinite(tp2) ? <>TP2: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{fmtNum(tp2)}</b></> : "TP2: —"}
+              </div>
+            </div>
+
+            <div style={tileStyle}>
+              <div style={tileLabel}>Score / Execution</div>
+              <div style={tileMain}>
                 Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
               </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 650, overflowWrap: "anywhere" }}>
+              <div style={tileSub}>
                 {phase ? <>State: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{phase}</b></> : "State: —"}
                 {orderType ? <> · <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{orderType}</b></> : null}
                 {readiness ? <> · <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{readiness}</b></> : null}
@@ -485,7 +545,6 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
           </div>
         </div>
 
-        {/* Right meta: center aligned block */}
         <div style={{ flexShrink: 0, textAlign: "center", paddingTop: 2, minWidth: 62 }}>
           <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 700 }}>View</div>
           <div style={{ marginTop: 6, fontSize: 12, color: "rgb(100,116,139)", fontWeight: 650, overflowWrap: "anywhere" }}>
@@ -501,19 +560,36 @@ export default function SnapshotViewerPage() {
   const [isWide, setIsWide] = useState(false);
   const [isMid, setIsMid] = useState(false);
 
+  // Prevent noisy resize updates (iOS keyboard can fire frequent resize events)
+  const lastWRef = useRef(0);
+
   useEffect(() => {
     const onResize = () => {
-      setIsWide(window.innerWidth >= 1024);
-      setIsMid(window.innerWidth >= 760);
+      const w = window.innerWidth || 0;
+      if (Math.abs(w - lastWRef.current) < 2) return; // ignore micro changes
+      lastWRef.current = w;
+
+      setIsWide(w >= 1024);
+      setIsMid(w >= 760);
     };
     onResize();
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+
+    // iOS: visualViewport resize also happens; keep in sync but same filtering
+    const vv = window.visualViewport;
+    if (vv?.addEventListener) vv.addEventListener("resize", onResize);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (vv?.removeEventListener) vv.removeEventListener("resize", onResize);
+    };
   }, []);
 
   const [controlsOpen, setControlsOpen] = useState(false);
 
   const [symbolInput, setSymbolInput] = useState("BTCUSDT");
+  const symbolInputRef = useRef(null);
+
   const [genLoading, setGenLoading] = useState(false);
   const [genErr, setGenErr] = useState("");
   const [autoDownload, setAutoDownload] = useState(true);
@@ -886,10 +962,28 @@ export default function SnapshotViewerPage() {
 
         <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
           <input
+            ref={symbolInputRef}
             value={symbolInput}
-            onChange={(e) => setSymbolInput(e.target.value)}
+            onChange={(e) => {
+              setSymbolInput(e.target.value);
+
+              // iOS keyboard / viewport resize can cause focus loss; force it back next frame
+              requestAnimationFrame(() => {
+                if (symbolInputRef.current && document.activeElement !== symbolInputRef.current) {
+                  symbolInputRef.current.focus();
+                }
+              });
+            }}
+            onFocus={() => {
+              // ensure stable focus on open
+              requestAnimationFrame(() => symbolInputRef.current?.focus());
+            }}
             placeholder="BTCUSDT"
             style={styles.input}
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
           />
           <button
             style={styles.btn("primary")}
@@ -987,10 +1081,11 @@ export default function SnapshotViewerPage() {
     </div>
   );
 
+  const isKVStacked = !isMid; // stack KV rows on phone; keep row layout on iPad/desktop
+
   return (
     <div style={styles.page}>
       <div style={styles.shell}>
-        {/* Sticky Top Bar */}
         <div style={styles.topbar}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ minWidth: 0 }}>
@@ -1011,7 +1106,13 @@ export default function SnapshotViewerPage() {
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
               {!isWide ? (
-                <button style={styles.btn("secondary")} onClick={() => setControlsOpen(true)}>
+                <button
+                  style={styles.btn("secondary")}
+                  onClick={() => {
+                    setControlsOpen(true);
+                    requestAnimationFrame(() => symbolInputRef.current?.focus());
+                  }}
+                >
                   Controls
                 </button>
               ) : null}
@@ -1025,21 +1126,17 @@ export default function SnapshotViewerPage() {
           </div>
         </div>
 
-        {/* Mobile Controls Overlay */}
         <ControlsOverlay open={controlsOpen} onClose={() => setControlsOpen(false)}>
           {ControlsPanel}
         </ControlsOverlay>
 
-        {/* Main Grid */}
         <div style={styles.grid}>
-          {/* Desktop Controls */}
           {isWide ? (
             <div style={{ position: "sticky", top: 92 }}>
               {ControlsPanel}
             </div>
           ) : null}
 
-          {/* Viewer */}
           <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
             {tab === "overview" ? (
               <div style={styles.card}>
@@ -1225,7 +1322,6 @@ export default function SnapshotViewerPage() {
           </div>
         </div>
 
-        {/* Setup Detail Drawer */}
         <Drawer
           open={drawerOpen}
           onClose={onCloseDrawer}
@@ -1236,12 +1332,13 @@ export default function SnapshotViewerPage() {
           }
         >
           {selectedSetup ? (
-            <div style={{ display: "grid", gap: 14 }}>
+            <div style={{ display: "grid", gap: 14, minWidth: 0 }}>
               <div style={{
                 borderRadius: 18,
                 border: "1px solid rgba(148,163,184,0.28)",
                 background: "rgba(241,245,249,0.70)",
                 padding: 14,
+                minWidth: 0,
               }}>
                 <div style={{ fontSize: 12, fontWeight: 750, color: "rgb(71,85,105)" }}>Trigger</div>
                 <div style={{ marginTop: 6, fontSize: 13, fontWeight: 750, color: "rgb(15,23,42)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
@@ -1249,9 +1346,10 @@ export default function SnapshotViewerPage() {
                 </div>
               </div>
 
-              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Trade Parameters</div>
                 <KV
+                  stacked={isKVStacked}
                   k="Entry zone"
                   v={
                     Array.isArray(selectedSetup.entry_zone) && selectedSetup.entry_zone.length === 2
@@ -1259,11 +1357,12 @@ export default function SnapshotViewerPage() {
                       : "—"
                   }
                 />
-                <KV k="Entry preferred" v={fmtNum(Number.isFinite(selectedSetup.entry_preferred) ? selectedSetup.entry_preferred : selectedSetup.entry)} />
-                <KV k="Stop / Invalidation" v={fmtNum(Number.isFinite(selectedSetup.stop) ? selectedSetup.stop : selectedSetup.invalidation)} />
-                <KV k="TP1" v={fmtNum(selectedSetup?.targets?.tp1)} />
-                <KV k="TP2" v={fmtNum(selectedSetup?.targets?.tp2)} />
+                <KV stacked={isKVStacked} k="Entry preferred" v={fmtNum(Number.isFinite(selectedSetup.entry_preferred) ? selectedSetup.entry_preferred : selectedSetup.entry)} />
+                <KV stacked={isKVStacked} k="Stop / Invalidation" v={fmtNum(Number.isFinite(selectedSetup.stop) ? selectedSetup.stop : selectedSetup.invalidation)} />
+                <KV stacked={isKVStacked} k="TP1" v={fmtNum(selectedSetup?.targets?.tp1)} />
+                <KV stacked={isKVStacked} k="TP2" v={fmtNum(selectedSetup?.targets?.tp2)} />
                 <KV
+                  stacked={isKVStacked}
                   k="RR (TP1)"
                   v={
                     Number.isFinite(selectedSetup?.execution_metrics?.rr_tp1)
@@ -1277,13 +1376,14 @@ export default function SnapshotViewerPage() {
                 />
               </div>
 
-              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Eligibility & Execution</div>
-                <KV k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
-                <KV k="Tradable" v={(selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true) ? "Yes" : "No / Unknown"} />
-                <KV k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
-                <KV k="Readiness" v={selectedSetup?.execution_state?.readiness || "—"} />
+                <KV stacked={isKVStacked} k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
+                <KV stacked={isKVStacked} k="Tradable" v={(selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true) ? "Yes" : "No / Unknown"} />
+                <KV stacked={isKVStacked} k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
+                <KV stacked={isKVStacked} k="Readiness" v={selectedSetup?.execution_state?.readiness || "—"} />
                 <KV
+                  stacked={isKVStacked}
                   k="Order"
                   v={
                     selectedSetup?.execution_state?.order?.type
@@ -1292,6 +1392,7 @@ export default function SnapshotViewerPage() {
                   }
                 />
                 <KV
+                  stacked={isKVStacked}
                   k="Reasons"
                   v={
                     (safeArr(selectedSetup?.eligibility?.reasons).length || safeArr(selectedSetup?.execution_state?.reason).length)
@@ -1301,8 +1402,8 @@ export default function SnapshotViewerPage() {
                 />
               </div>
 
-              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800 }}>Raw JSON</div>
                   <button
                     style={{
@@ -1331,6 +1432,9 @@ export default function SnapshotViewerPage() {
                   lineHeight: 1.45,
                   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
                   color: "rgb(15,23,42)",
+                  minWidth: 0,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
                 }}>
 {JSON.stringify(selectedSetup, null, 2)}
                 </pre>
