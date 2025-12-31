@@ -501,21 +501,21 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
                     <div
                         style={{
                             marginTop: 12,
-                            display: "flex",
-                            flexWrap: "wrap",
-                            justifyContent: "center",   // center cả cụm thẻ
-                            alignItems: "stretch",
+                            display: "grid",
+                            gridTemplateColumns: (isWide || isMid)
+                                ? "repeat(4, minmax(0, 1fr))"
+                                : "repeat(2, minmax(0, 1fr))",
                             gap: isCompact ? 8 : 10,
+                            alignItems: "stretch",
+                            justifyItems: "stretch",     // each tile fills its cell
+                            justifyContent: "center",    // the whole grid block centers if constrained
+                            maxWidth: isCompact ? 560 : "100%", // “cụm” tile không bị trải quá rộng trên phone
+                            marginLeft: "auto",
+                            marginRight: "auto",
+                            minWidth: 0,
                         }}
                     >
-                        {/* Entry */}
-                        <div
-                            style={{
-                                ...tileStyle,
-                                flex: isWide || isMid ? "0 1 calc(25% - 8px)" : "0 1 calc(50% - 6px)", // 4 thẻ/1 hàng ở iPad+; 2 thẻ/1 hàng ở mobile
-                                maxWidth: isWide || isMid ? 240 : 320, // tránh tile quá to
-                            }}
-                        >
+                        <div style={tileStyle}>
                             <div style={tileLabel}>Entry zone</div>
                             <div style={tileMain}>
                                 {ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}
@@ -525,14 +525,7 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
                             </div>
                         </div>
 
-                        {/* Stop */}
-                        <div
-                            style={{
-                                ...tileStyle,
-                                flex: isWide || isMid ? "0 1 calc(25% - 8px)" : "0 1 calc(50% - 6px)",
-                                maxWidth: isWide || isMid ? 240 : 320,
-                            }}
-                        >
+                        <div style={tileStyle}>
                             <div style={tileLabel}>Stop / Invalidation</div>
                             <div style={tileMain}>{fmtNum(stop)}</div>
                             <div style={tileSub}>
@@ -540,37 +533,30 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
                             </div>
                         </div>
 
-                        {/* TP */}
-                        <div
-                            style={{
-                                ...tileStyle,
-                                flex: isWide || isMid ? "0 1 calc(25% - 8px)" : "0 1 calc(50% - 6px)",
-                                maxWidth: isWide || isMid ? 240 : 320,
-                            }}
-                        >
+                        <div style={tileStyle}>
                             <div style={tileLabel}>Take Profit</div>
-                            <div style={tileMain}>{Number.isFinite(tp1) ? `TP1: ${fmtNum(tp1)}` : "TP1: —"}</div>
-                            <div style={tileSub}>{Number.isFinite(tp2) ? `TP2: ${fmtNum(tp2)}` : "TP2: —"}</div>
+                            <div style={tileMain}>
+                                {Number.isFinite(tp1) ? `TP1: ${fmtNum(tp1)}` : "TP1: —"}
+                            </div>
+                            {Number.isFinite(tp2) ? (
+                                <div style={tileSub}>TP2: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{fmtNum(tp2)}</b></div>
+                            ) : (
+                                <div style={tileSub}>&nbsp;</div> // giữ chiều cao đồng đều
+                            )}
                         </div>
 
-                        {/* Score */}
-                        <div
-                            style={{
-                                ...tileStyle,
-                                flex: isWide || isMid ? "0 1 calc(25% - 8px)" : "0 1 calc(50% - 6px)",
-                                maxWidth: isWide || isMid ? 240 : 320,
-                            }}
-                        >
+                        <div style={tileStyle}>
                             <div style={tileLabel}>Score / Execution</div>
-                            <div style={tileMain}>Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}</div>
+                            <div style={tileMain}>
+                                Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
+                            </div>
                             <div style={tileSub}>
-                                {phase ? `State: ${phase}` : "State: —"}
-                                {orderType ? ` · ${orderType}` : ""}
-                                {readiness ? ` · ${readiness}` : ""}
+                                {phase ? <>State: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{phase}</b></> : "State: —"}
+                                {orderType ? <> · <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{orderType}</b></> : null}
+                                {readiness ? <> · <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{readiness}</b></> : null}
                             </div>
                         </div>
                     </div>
-
                 </div>
 
                 <div style={{ flexShrink: 0, textAlign: "center", paddingTop: 2, minWidth: 62 }}>
@@ -1204,10 +1190,10 @@ export default function SnapshotViewerPage() {
                                                 }}
                                             >
                                                 {[
-                                                    headlineObj.market_position ? `Thị trường: ${headlineObj.market_position}` : null,
-                                                    headlineObj.quick_risk ? `Rủi ro: ${headlineObj.quick_risk}` : null,
-                                                    headlineObj.trend_clarity ? `Xu hướng: ${headlineObj.trend_clarity}` : null,
-                                                    headlineObj.data_quality ? `Dữ liệu: ${headlineObj.data_quality}` : null,
+                                                    headlineObj.market_position ? `${headlineObj.market_position}` : null,
+                                                    headlineObj.quick_risk ? `${headlineObj.quick_risk}` : null,
+                                                    headlineObj.trend_clarity ? `${headlineObj.trend_clarity}` : null,
+                                                    headlineObj.data_quality ? `${headlineObj.data_quality}` : null,
                                                 ].filter(Boolean).map((txt, i) => {
                                                     const { icon, tone } = headlineBadge(txt);
                                                     return (
