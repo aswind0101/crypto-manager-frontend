@@ -3,10 +3,10 @@ import { buildMarketSnapshotV4 } from "../lib/snapshot/market-snapshot-v4"; // a
 
 /**
  * Snapshot Viewer (Retail) - Inline CSS (Pro layout + Mobile-first) + Integrated Generator
- * - Generator is a "Controls" panel (desktop sidebar, mobile collapsible)
- * - Sticky top bar with Symbol/Quality/Ref + Tabs
- * - Market Context prioritized (headline/flags/action/horizons)
- * - No trading logic; only display fields present in snapshot JSON
+ * Fixes:
+ * - Vietnamese typography: safer font stack + avoid ultra-heavy weights (950) + smoothing
+ * - More professional background (subtle depth)
+ * - Better centering + iPad stability: minWidth:0, overflowWrap, consistent grid alignment
  */
 
 function safeJsonParse(text) {
@@ -194,9 +194,11 @@ function pickSetupKey(s, idx) {
 function Section({ title, right, children, noTop = false }) {
   return (
     <div style={{ marginTop: noTop ? 0 : 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>{title}</div>
-        {right ? <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 850 }}>{right}</div> : null}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {title}
+        </div>
+        {right ? <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 700, whiteSpace: "nowrap" }}>{right}</div> : null}
       </div>
       <div style={{ marginTop: 10 }}>{children}</div>
     </div>
@@ -206,8 +208,19 @@ function Section({ title, right, children, noTop = false }) {
 function KV({ k, v, mono = false }) {
   return (
     <div style={{ display: "flex", gap: 10, justifyContent: "space-between", padding: "8px 0", borderBottom: "1px dashed rgba(148,163,184,0.30)" }}>
-      <div style={{ fontSize: 12, fontWeight: 900, color: "rgb(71,85,105)" }}>{k}</div>
-      <div style={{ fontSize: 12, fontWeight: 850, color: "rgb(15,23,42)", textAlign: "right", fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit" }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "rgb(71,85,105)" }}>{k}</div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 650,
+          color: "rgb(15,23,42)",
+          textAlign: "right",
+          fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit",
+          overflowWrap: "anywhere",
+          wordBreak: "break-word",
+          maxWidth: "68%",
+        }}
+      >
         {v}
       </div>
     </div>
@@ -233,7 +246,7 @@ function Drawer({ open, onClose, title, children }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(2,6,23,0.55)",
+        background: "rgba(2,6,23,0.58)",
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-end",
@@ -248,12 +261,12 @@ function Drawer({ open, onClose, title, children }) {
           background: "rgba(255,255,255,0.98)",
           border: "1px solid rgba(148,163,184,0.35)",
           borderRadius: 18,
-          boxShadow: "0 30px 80px rgba(2,6,23,0.25)",
+          boxShadow: "0 34px 90px rgba(2,6,23,0.35)",
           overflow: "hidden",
         }}
       >
         <div style={{ padding: 14, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.25)" }}>
-          <div style={{ fontSize: 14, fontWeight: 950, color: "rgb(15,23,42)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "rgb(15,23,42)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {title || "Details"}
           </div>
           <button
@@ -264,7 +277,7 @@ function Drawer({ open, onClose, title, children }) {
               padding: "8px 10px",
               borderRadius: 12,
               cursor: "pointer",
-              fontWeight: 950,
+              fontWeight: 750,
               color: "rgb(15,23,42)",
             }}
           >
@@ -292,11 +305,12 @@ function HorizonCard({ h, idx }) {
   const chipBase = {
     display: "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     padding: "5px 10px",
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: 950,
+    fontWeight: 750,
     whiteSpace: "nowrap",
   };
 
@@ -304,12 +318,12 @@ function HorizonCard({ h, idx }) {
     if (!items.length) return null;
     return (
       <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>{label}</div>
+        <div style={{ fontSize: 11, fontWeight: 750, color: "rgb(71,85,105)" }}>{label}</div>
         <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
           {items.slice(0, 5).map((b, i) => (
             <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(15,23,42,0.55)", marginTop: 7 }} />
-              <div style={{ fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.4, fontWeight: 850 }}>
+              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(15,23,42,0.55)", marginTop: 7, flexShrink: 0 }} />
+              <div style={{ fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>
                 {String(b)}
               </div>
             </div>
@@ -324,11 +338,11 @@ function HorizonCard({ h, idx }) {
       borderRadius: 16,
       border: "1px solid rgba(148,163,184,0.30)",
       background: "rgba(255,255,255,0.92)",
-      boxShadow: "0 10px 30px rgba(2,6,23,0.05)",
+      boxShadow: "0 12px 36px rgba(2,6,23,0.06)",
       padding: 14,
       minHeight: 150,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>{title}</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)" }}>{title}</div>
 
       <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         {bias ? <span style={chipStyle(chipBase, tone)}>{String(bias)}</span> : null}
@@ -347,7 +361,7 @@ function HorizonCard({ h, idx }) {
   );
 }
 
-function SetupCard({ setup, onOpen, dense = false, isWide }) {
+function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   const status = detectStatus(setup);
   const sm = statusMeta(status);
 
@@ -381,14 +395,17 @@ function SetupCard({ setup, onOpen, dense = false, isWide }) {
   const chipBase = {
     display: "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     padding: "6px 10px",
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: 950,
+    fontWeight: 750,
     whiteSpace: "nowrap",
     userSelect: "none",
   };
+
+  const metricsCols = isWide ? 3 : (isMid ? 3 : 2); // iPad gets 3 cols to avoid awkward wraps
 
   return (
     <div
@@ -400,90 +417,78 @@ function SetupCard({ setup, onOpen, dense = false, isWide }) {
         borderRadius: 18,
         border: "1px solid rgba(148,163,184,0.30)",
         background: "rgba(255,255,255,0.92)",
-        boxShadow: "0 10px 30px rgba(2,6,23,0.06)",
+        boxShadow: "0 12px 36px rgba(2,6,23,0.07)",
         padding: dense ? 12 : 14,
         transition: "transform 120ms ease, box-shadow 120ms ease",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 14px 40px rgba(2,6,23,0.09)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0px)"; e.currentTarget.style.boxShadow = "0 10px 30px rgba(2,6,23,0.06)"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 16px 46px rgba(2,6,23,0.10)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0px)"; e.currentTarget.style.boxShadow = "0 12px 36px rgba(2,6,23,0.07)"; }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 14, fontWeight: 950, color: "rgb(15,23,42)" }}>{typeLabelVN(type)}</span>
+          {/* Header chips: centered baseline */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start" }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: "rgb(15,23,42)" }}>{typeLabelVN(type)}</span>
             <span style={chipStyle(chipBase, biasTone)}>{String(bias)}</span>
             {tf ? <span style={chipStyle(chipBase, "muted")}>{tfLabelVN(tf)}</span> : null}
             <span style={chipStyle(chipBase, sm.tone)}>{sm.label}</span>
             {qualityTier ? <span style={chipStyle(chipBase, scoreToTone(finalScore))}>Tier {qualityTier}</span> : null}
           </div>
 
-          <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.45, fontWeight: 850 }}>
-            <span style={{ color: "rgb(51,65,85)", fontWeight: 950 }}>Trigger:</span>{" "}
+          {/* Trigger: keep left for readability but protect wraps */}
+          <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.45, fontWeight: 650, overflowWrap: "anywhere" }}>
+            <span style={{ color: "rgb(51,65,85)", fontWeight: 800 }}>Trigger:</span>{" "}
             {setup?.trigger || "—"}
           </div>
 
+          {/* Metrics: centered contents + iPad-safe columns */}
           <div
             style={{
               marginTop: 12,
               display: "grid",
-              gridTemplateColumns: isWide ? "repeat(3, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
+              gridTemplateColumns: `repeat(${metricsCols}, minmax(0, 1fr))`,
               gap: 10,
+              alignItems: "stretch",
             }}
           >
-            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)" }}>
-              <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>Entry zone</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>
+            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)", textAlign: "center" }}>
+              <div style={{ fontSize: 11, fontWeight: 750, color: "rgb(71,85,105)" }}>Entry zone</div>
+              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", overflowWrap: "anywhere" }}>
                 {ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}
               </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 850 }}>
-                Preferred: <b style={{ color: "rgb(15,23,42)" }}>{fmtNum(ep)}</b>
+              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 650 }}>
+                Preferred: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{fmtNum(ep)}</b>
               </div>
             </div>
 
-            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)" }}>
-              <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>Stop / Invalidation</div>
-              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>
+            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)", textAlign: "center" }}>
+              <div style={{ fontSize: 11, fontWeight: 750, color: "rgb(71,85,105)" }}>Stop / Invalidation</div>
+              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", overflowWrap: "anywhere" }}>
                 {fmtNum(stop)}
               </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 850 }}>
-                RR TP1: <b style={{ color: "rgb(15,23,42)" }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
+              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 650 }}>
+                RR TP1: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
               </div>
             </div>
 
-            {isWide ? (
-              <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)" }}>
-                <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>Score / Execution</div>
-                <div style={{ marginTop: 4, fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>
-                  Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
-                </div>
-                <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 850 }}>
-                  {phase ? <>State: <b style={{ color: "rgb(15,23,42)" }}>{phase}</b></> : "State: —"}
-                  {orderType ? <> · Order: <b style={{ color: "rgb(15,23,42)" }}>{orderType}</b></> : null}
-                  {readiness ? <> · <b style={{ color: "rgb(15,23,42)" }}>{readiness}</b></> : null}
-                </div>
+            <div style={{ padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)", textAlign: "center" }}>
+              <div style={{ fontSize: 11, fontWeight: 750, color: "rgb(71,85,105)" }}>Score / Execution</div>
+              <div style={{ marginTop: 4, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)" }}>
+                Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
               </div>
-            ) : null}
+              <div style={{ marginTop: 4, fontSize: 12, color: "rgb(71,85,105)", fontWeight: 650, overflowWrap: "anywhere" }}>
+                {phase ? <>State: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{phase}</b></> : "State: —"}
+                {orderType ? <> · <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{orderType}</b></> : null}
+                {readiness ? <> · <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{readiness}</b></> : null}
+              </div>
+            </div>
           </div>
-
-          {!isWide ? (
-            <div style={{ marginTop: 10, padding: 10, borderRadius: 14, background: "rgba(241,245,249,0.75)", border: "1px solid rgba(148,163,184,0.25)" }}>
-              <div style={{ fontSize: 11, fontWeight: 950, color: "rgb(71,85,105)" }}>Score / Execution</div>
-              <div style={{ marginTop: 4, display: "flex", gap: 10, justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap" }}>
-                <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>
-                  Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
-                </div>
-                <div style={{ fontSize: 12, color: "rgb(71,85,105)", fontWeight: 850 }}>
-                  {phase ? <>State: <b style={{ color: "rgb(15,23,42)" }}>{phase}</b></> : "State: —"}
-                  {orderType ? <> · <b style={{ color: "rgb(15,23,42)" }}>{orderType}</b></> : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
 
-        <div style={{ flexShrink: 0, textAlign: "right", paddingTop: 2 }}>
-          <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 900 }}>View</div>
-          <div style={{ marginTop: 6, fontSize: 12, color: "rgb(100,116,139)", fontWeight: 850 }}>
+        {/* Right meta: center aligned block */}
+        <div style={{ flexShrink: 0, textAlign: "center", paddingTop: 2, minWidth: 62 }}>
+          <div style={{ fontSize: 12, color: "rgb(100,116,139)", fontWeight: 700 }}>View</div>
+          <div style={{ marginTop: 6, fontSize: 12, color: "rgb(100,116,139)", fontWeight: 650, overflowWrap: "anywhere" }}>
             {setup?.symbol || ""}
           </div>
         </div>
@@ -493,9 +498,9 @@ function SetupCard({ setup, onOpen, dense = false, isWide }) {
 }
 
 export default function SnapshotViewerPage() {
-  // Layout breakpoints
   const [isWide, setIsWide] = useState(false);
   const [isMid, setIsMid] = useState(false);
+
   useEffect(() => {
     const onResize = () => {
       setIsWide(window.innerWidth >= 1024);
@@ -506,16 +511,13 @@ export default function SnapshotViewerPage() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Controls panel (mobile)
   const [controlsOpen, setControlsOpen] = useState(false);
 
-  // Generator state
   const [symbolInput, setSymbolInput] = useState("BTCUSDT");
   const [genLoading, setGenLoading] = useState(false);
   const [genErr, setGenErr] = useState("");
   const [autoDownload, setAutoDownload] = useState(true);
 
-  // Viewer state
   const [raw, setRaw] = useState("");
   const [snap, setSnap] = useState(null);
   const [parseErr, setParseErr] = useState("");
@@ -525,7 +527,6 @@ export default function SnapshotViewerPage() {
 
   const [tab, setTab] = useState("overview"); // overview | top | all
 
-  // Filters for "all"
   const [fText, setFText] = useState("");
   const [fStatus, setFStatus] = useState("all");
   const [fType, setFType] = useState("all");
@@ -680,12 +681,23 @@ export default function SnapshotViewerPage() {
     }
   };
 
+  const fontStack =
+    '"Be Vietnam Pro", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"';
+
   const styles = {
     page: {
       minHeight: "100vh",
-      background: "linear-gradient(180deg, rgba(248,250,252,1) 0%, rgba(241,245,249,1) 70%, rgba(248,250,252,1) 100%)",
       color: "rgb(15,23,42)",
+      fontFamily: fontStack,
+      WebkitFontSmoothing: "antialiased",
+      MozOsxFontSmoothing: "grayscale",
+      textRendering: "optimizeLegibility",
+      background:
+        "radial-gradient(1000px 600px at 10% 0%, rgba(99,102,241,0.10) 0%, rgba(99,102,241,0.00) 60%)," +
+        "radial-gradient(900px 520px at 90% 10%, rgba(14,165,233,0.10) 0%, rgba(14,165,233,0.00) 55%)," +
+        "linear-gradient(180deg, rgba(248,250,252,1) 0%, rgba(241,245,249,1) 55%, rgba(248,250,252,1) 100%)",
     },
+
     shell: {
       maxWidth: 1180,
       margin: "0 auto",
@@ -694,20 +706,18 @@ export default function SnapshotViewerPage() {
       gap: 12,
     },
 
-    // Sticky top bar
     topbar: {
       position: "sticky",
       top: 0,
       zIndex: 1000,
       borderRadius: 16,
       border: "1px solid rgba(148,163,184,0.32)",
-      background: "rgba(255,255,255,0.88)",
-      backdropFilter: "blur(10px)",
-      boxShadow: "0 12px 40px rgba(2,6,23,0.06)",
+      background: "rgba(255,255,255,0.86)",
+      backdropFilter: "blur(12px)",
+      boxShadow: "0 14px 44px rgba(2,6,23,0.07)",
       padding: isWide ? 14 : 12,
     },
 
-    // Main grid
     grid: {
       display: "grid",
       gridTemplateColumns: isWide ? "380px 1fr" : "1fr",
@@ -717,17 +727,19 @@ export default function SnapshotViewerPage() {
 
     card: {
       borderRadius: 18,
-      border: "1px solid rgba(148,163,184,0.32)",
+      border: "1px solid rgba(148,163,184,0.30)",
       background: "rgba(255,255,255,0.92)",
-      boxShadow: "0 12px 40px rgba(2,6,23,0.06)",
+      boxShadow: "0 14px 44px rgba(2,6,23,0.07)",
       padding: 14,
+      minWidth: 0,
     },
 
     subtle: {
       borderRadius: 16,
-      border: "1px solid rgba(148,163,184,0.26)",
+      border: "1px solid rgba(148,163,184,0.24)",
       background: "rgba(241,245,249,0.70)",
       padding: 14,
+      minWidth: 0,
     },
 
     btn: (variant) => ({
@@ -736,7 +748,7 @@ export default function SnapshotViewerPage() {
       border: variant === "primary" ? "1px solid rgba(15,23,42,0.95)" : "1px solid rgba(148,163,184,0.35)",
       background: variant === "primary" ? "rgba(15,23,42,0.95)" : "rgba(241,245,249,0.9)",
       color: variant === "primary" ? "white" : "rgb(15,23,42)",
-      fontWeight: 950,
+      fontWeight: 750,
       fontSize: 12,
       cursor: "pointer",
       userSelect: "none",
@@ -749,9 +761,10 @@ export default function SnapshotViewerPage() {
       border: "1px solid rgba(148,163,184,0.40)",
       background: "rgba(248,250,252,0.95)",
       fontSize: 12,
-      fontWeight: 900,
+      fontWeight: 650,
       color: "rgb(15,23,42)",
       outline: "none",
+      minWidth: 0,
     },
 
     select: {
@@ -760,10 +773,11 @@ export default function SnapshotViewerPage() {
       border: "1px solid rgba(148,163,184,0.40)",
       background: "rgba(248,250,252,0.95)",
       fontSize: 12,
-      fontWeight: 950,
+      fontWeight: 700,
       color: "rgb(15,23,42)",
       outline: "none",
       cursor: "pointer",
+      minWidth: 0,
     },
 
     textarea: {
@@ -778,11 +792,12 @@ export default function SnapshotViewerPage() {
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
       background: "rgba(248,250,252,0.95)",
       color: "rgb(15,23,42)",
+      overflowWrap: "anywhere",
+      wordBreak: "break-word",
     },
 
-    divider: { height: 1, background: "rgba(148,163,184,0.25)", marginTop: 12, marginBottom: 12 },
+    divider: { height: 1, background: "rgba(148,163,184,0.22)", marginTop: 12, marginBottom: 12 },
 
-    // Segmented tabs
     segWrap: {
       display: "inline-flex",
       padding: 4,
@@ -797,7 +812,7 @@ export default function SnapshotViewerPage() {
       border: "1px solid rgba(148,163,184,0.0)",
       background: active ? "rgba(15,23,42,0.95)" : "transparent",
       color: active ? "white" : "rgb(15,23,42)",
-      fontWeight: 950,
+      fontWeight: 750,
       fontSize: 12,
       cursor: "pointer",
       userSelect: "none",
@@ -809,11 +824,12 @@ export default function SnapshotViewerPage() {
   const chipsBase = {
     display: "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     padding: "6px 10px",
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: 950,
+    fontWeight: 750,
     userSelect: "none",
     whiteSpace: "nowrap",
   };
@@ -824,7 +840,6 @@ export default function SnapshotViewerPage() {
     return { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
   }, [isWide, isMid]);
 
-  // Mobile controls overlay
   const ControlsOverlay = ({ open, onClose, children }) => {
     if (isWide) return null;
     if (!open) return null;
@@ -834,7 +849,7 @@ export default function SnapshotViewerPage() {
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(2,6,23,0.55)",
+          background: "rgba(2,6,23,0.58)",
           zIndex: 1500,
           display: "flex",
           justifyContent: "center",
@@ -849,11 +864,11 @@ export default function SnapshotViewerPage() {
           borderRadius: 18,
           border: "1px solid rgba(148,163,184,0.35)",
           background: "rgba(255,255,255,0.98)",
-          boxShadow: "0 30px 80px rgba(2,6,23,0.25)",
+          boxShadow: "0 34px 90px rgba(2,6,23,0.35)",
           overflow: "hidden",
         }}>
           <div style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.25)" }}>
-            <div style={{ fontWeight: 950, fontSize: 13 }}>Controls</div>
+            <div style={{ fontWeight: 800, fontSize: 13 }}>Controls</div>
             <button style={styles.btn("secondary")} onClick={onClose}>Close</button>
           </div>
           <div style={{ padding: 12, overflow: "auto" }}>
@@ -867,7 +882,7 @@ export default function SnapshotViewerPage() {
   const ControlsPanel = (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={styles.card}>
-        <div style={{ fontSize: 13, fontWeight: 950 }}>Generate Snapshot (v4)</div>
+        <div style={{ fontSize: 13, fontWeight: 800 }}>Generate Snapshot (v4)</div>
 
         <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
           <input
@@ -886,7 +901,7 @@ export default function SnapshotViewerPage() {
         </div>
 
         <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.30)", background: "rgba(248,250,252,0.95)", fontSize: 12, fontWeight: 950 }}>
+          <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.30)", background: "rgba(248,250,252,0.95)", fontSize: 12, fontWeight: 700 }}>
             <input type="checkbox" checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)} />
             Auto download JSON
           </label>
@@ -906,19 +921,19 @@ export default function SnapshotViewerPage() {
         </div>
 
         {genErr ? (
-          <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 950, whiteSpace: "pre-wrap", fontSize: 12 }}>
+          <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 750, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>
             {genErr}
           </div>
         ) : null}
 
-        <div style={{ marginTop: 10, fontSize: 12, color: "rgb(100,116,139)", fontWeight: 850, lineHeight: 1.4 }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: "rgb(100,116,139)", fontWeight: 650, lineHeight: 1.4 }}>
           Gợi ý: Nếu 1 exchange bị CORS/geo, snapshot vẫn có thể tạo nhưng quality sẽ “partial” và errors tăng.
         </div>
       </div>
 
       <div style={styles.card}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 950 }}>Load JSON</div>
+          <div style={{ fontSize: 13, fontWeight: 800 }}>Load JSON</div>
           <label style={{ ...styles.btn("secondary"), display: "inline-flex", alignItems: "center", gap: 8 }}>
             Upload
             <input
@@ -940,7 +955,7 @@ export default function SnapshotViewerPage() {
         </div>
 
         {parseErr ? (
-          <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 950, whiteSpace: "pre-wrap", fontSize: 12 }}>
+          <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 750, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>
             {parseErr}
           </div>
         ) : null}
@@ -979,15 +994,18 @@ export default function SnapshotViewerPage() {
         <div style={styles.topbar}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <div style={{ fontSize: 16, fontWeight: 950 }}>{symbol}</div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{symbol}</div>
                 <span style={chipStyle(chipsBase, "muted")}>Quality: {String(quality)}</span>
                 <span style={chipStyle(chipsBase, diagErrors ? "warn" : "pos")}>Errors: {diagErrors}</span>
-                <span style={chipStyle(chipsBase, "muted")}>Ref: {Number.isFinite(refPx) ? fmtNum(refPx) : "—"} ({pxSrc})</span>
+                <span style={chipStyle(chipsBase, "muted")}>
+                  Ref: {Number.isFinite(refPx) ? fmtNum(refPx) : "—"} ({pxSrc})
+                </span>
               </div>
 
-              <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(71,85,105)", fontWeight: 850, lineHeight: 1.35 }}>
-                Generated: <b style={{ color: "rgb(15,23,42)" }}>{fmtTs(generatedAt, tz)}</b> · TZ: <b style={{ color: "rgb(15,23,42)" }}>{tz}</b>
+              <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(71,85,105)", fontWeight: 650, lineHeight: 1.35, overflowWrap: "anywhere" }}>
+                Generated: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{fmtTs(generatedAt, tz)}</b> · TZ:{" "}
+                <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{tz}</b>
               </div>
             </div>
 
@@ -1022,13 +1040,13 @@ export default function SnapshotViewerPage() {
           ) : null}
 
           {/* Viewer */}
-          <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
             {tab === "overview" ? (
               <div style={styles.card}>
                 <Section title="Market Context" right={outlook ? "unified.market_outlook_v1" : "market_outlook_v1 not found"} noTop>
                   {headlineObj ? (
                     <div style={styles.subtle}>
-                      <div style={{ display: "grid", gap: 6, fontWeight: 950, color: "rgb(15,23,42)", lineHeight: 1.55 }}>
+                      <div style={{ display: "grid", gap: 6, fontWeight: 800, color: "rgb(15,23,42)", lineHeight: 1.55, overflowWrap: "anywhere" }}>
                         {headlineObj.market_position ? <div>{headlineObj.market_position}</div> : null}
                         {headlineObj.trend_clarity ? <div>{headlineObj.trend_clarity}</div> : null}
                         {headlineObj.data_quality ? <div>{headlineObj.data_quality}</div> : null}
@@ -1053,7 +1071,7 @@ export default function SnapshotViewerPage() {
                       ) : null}
                     </div>
                   ) : (
-                    <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
+                    <div style={{ color: "rgb(100,116,139)", fontWeight: 650, fontSize: 13 }}>
                       (Không có headline trong snapshot)
                     </div>
                   )}
@@ -1061,7 +1079,7 @@ export default function SnapshotViewerPage() {
                   {action ? (
                     <div style={{ marginTop: 12, borderRadius: 18, border: "1px solid rgba(148,163,184,0.30)", background: "rgba(15,23,42,0.03)", padding: 14 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                        <div style={{ fontSize: 13, fontWeight: 950 }}>Action</div>
+                        <div style={{ fontSize: 13, fontWeight: 800 }}>Action</div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <span style={chipStyle(chipsBase, "muted")}>Hành động: {action.status || "—"}</span>
                           {action.setup_type_label ? <span style={chipStyle(chipsBase, "muted")}>Setup: {action.setup_type_label}</span> : null}
@@ -1078,8 +1096,8 @@ export default function SnapshotViewerPage() {
                         <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
                           {action.summary.slice(0, 6).map((b, i) => (
                             <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(15,23,42,0.55)", marginTop: 7 }} />
-                              <div style={{ fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.4, fontWeight: 900 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(15,23,42,0.55)", marginTop: 7, flexShrink: 0 }} />
+                              <div style={{ fontSize: 12.5, color: "rgb(71,85,105)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>
                                 {String(b)}
                               </div>
                             </div>
@@ -1100,9 +1118,9 @@ export default function SnapshotViewerPage() {
 
                 <Section title="Primary Setup" right={primary ? "unified.setups_v2.primary" : "no primary setup"} noTop>
                   {primary ? (
-                    <SetupCard setup={primary} onOpen={(s) => { setSelectedSetup(s); setDrawerOpen(true); }} isWide={isWide} />
+                    <SetupCard setup={primary} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} />
                   ) : (
-                    <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
+                    <div style={{ color: "rgb(100,116,139)", fontWeight: 650, fontSize: 13 }}>
                       (Snapshot không có primary tradable setup)
                     </div>
                   )}
@@ -1112,11 +1130,11 @@ export default function SnapshotViewerPage() {
                   {top.length ? (
                     <div style={{ display: "grid", gap: 10 }}>
                       {top.map((s, idx) => (
-                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} />
+                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />
                       ))}
                     </div>
                   ) : (
-                    <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
+                    <div style={{ color: "rgb(100,116,139)", fontWeight: 650, fontSize: 13 }}>
                       (Không có top_candidates trong snapshot)
                     </div>
                   )}
@@ -1130,11 +1148,11 @@ export default function SnapshotViewerPage() {
                   {top.length ? (
                     <div style={{ display: "grid", gap: 12 }}>
                       {top.map((s, idx) => (
-                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} isWide={isWide} />
+                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} />
                       ))}
                     </div>
                   ) : (
-                    <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
+                    <div style={{ color: "rgb(100,116,139)", fontWeight: 650, fontSize: 13 }}>
                       (Không có top_candidates trong snapshot)
                     </div>
                   )}
@@ -1152,6 +1170,7 @@ export default function SnapshotViewerPage() {
                         gridTemplateColumns: isWide ? "1.1fr 0.65fr 0.7fr 0.6fr 0.7fr 0.8fr" : "1fr 1fr",
                         gap: 10,
                         alignItems: "center",
+                        minWidth: 0,
                       }}
                     >
                       <input value={fText} onChange={(e) => setFText(e.target.value)} placeholder="Search trigger / reasons / warnings..." style={styles.input} />
@@ -1182,7 +1201,7 @@ export default function SnapshotViewerPage() {
                         <option value="tf_asc">Sort: TF asc</option>
                       </select>
 
-                      <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.30)", background: "rgba(248,250,252,0.95)", fontSize: 12, fontWeight: 950 }}>
+                      <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.30)", background: "rgba(248,250,252,0.95)", fontSize: 12, fontWeight: 700 }}>
                         <input type="checkbox" checked={fTradableOnly} onChange={(e) => setFTradableOnly(e.target.checked)} />
                         Tradable only
                       </label>
@@ -1191,10 +1210,10 @@ export default function SnapshotViewerPage() {
                     <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
                       {filteredAll.length ? (
                         filteredAll.map((s, idx) => (
-                          <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} />
+                          <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />
                         ))
                       ) : (
-                        <div style={{ color: "rgb(100,116,139)", fontWeight: 850, fontSize: 13 }}>
+                        <div style={{ color: "rgb(100,116,139)", fontWeight: 650, fontSize: 13 }}>
                           (Không có setup nào khớp filter)
                         </div>
                       )}
@@ -1224,14 +1243,14 @@ export default function SnapshotViewerPage() {
                 background: "rgba(241,245,249,0.70)",
                 padding: 14,
               }}>
-                <div style={{ fontSize: 12, fontWeight: 950, color: "rgb(71,85,105)" }}>Trigger</div>
-                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)", lineHeight: 1.45 }}>
+                <div style={{ fontSize: 12, fontWeight: 750, color: "rgb(71,85,105)" }}>Trigger</div>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 750, color: "rgb(15,23,42)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
                   {selectedSetup.trigger || "—"}
                 </div>
               </div>
 
               <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6 }}>Trade Parameters</div>
+                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Trade Parameters</div>
                 <KV
                   k="Entry zone"
                   v={
@@ -1259,7 +1278,7 @@ export default function SnapshotViewerPage() {
               </div>
 
               <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6 }}>Eligibility & Execution</div>
+                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Eligibility & Execution</div>
                 <KV k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
                 <KV k="Tradable" v={(selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true) ? "Yes" : "No / Unknown"} />
                 <KV k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
@@ -1284,7 +1303,7 @@ export default function SnapshotViewerPage() {
 
               <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.92)", padding: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                  <div style={{ fontSize: 13, fontWeight: 950 }}>Raw JSON</div>
+                  <div style={{ fontSize: 13, fontWeight: 800 }}>Raw JSON</div>
                   <button
                     style={{
                       border: "1px solid rgba(148,163,184,0.35)",
@@ -1292,7 +1311,7 @@ export default function SnapshotViewerPage() {
                       padding: "8px 10px",
                       borderRadius: 12,
                       cursor: "pointer",
-                      fontWeight: 950,
+                      fontWeight: 750,
                       color: "rgb(15,23,42)",
                     }}
                     onClick={() => copyText(JSON.stringify(selectedSetup, null, 2))}
@@ -1318,7 +1337,7 @@ export default function SnapshotViewerPage() {
               </div>
             </div>
           ) : (
-            <div style={{ color: "rgb(100,116,139)", fontWeight: 850 }}>No setup selected.</div>
+            <div style={{ color: "rgb(100,116,139)", fontWeight: 650 }}>No setup selected.</div>
           )}
         </Drawer>
       </div>
