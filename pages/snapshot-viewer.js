@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { buildMarketSnapshotV4 } from "../lib/snapshot/market-snapshot-v4"; // adjust path if needed
 
 /**
- * Snapshot Viewer (Retail) - Inline CSS
+ * Snapshot Viewer (Retail) - Inline CSS + Integrated Generator
+ * - Generate snapshot JSON (client-only) via buildMarketSnapshotV4()
  * - Paste / Upload JSON snapshot
  * - Render:
  *   1) Header (symbol/time/quality)
  *   2) Market Context (market_outlook_v1: headline object, horizons, action, flag_texts objects)
  *   3) Primary Setup (from unified.setups_v2.primary)
- *   4) Top Candidates (from unified.setups_v2.top_candidates)
- *   5) All Candidates (from unified.setups_v2.candidates_all) + filters
- * - Click any setup => Drawer / Bottom sheet detail (mobile-friendly)
- *
- * IMPORTANT: UI is read-only (no trading logic). It only displays fields present in JSON.
+ *   4) Top Candidates
+ *   5) All Candidates + filters
+ * - Click setup => Drawer detail
  */
 
 function safeJsonParse(text) {
@@ -21,6 +21,16 @@ function safeJsonParse(text) {
   } catch (e) {
     return { ok: false, err: String(e?.message || e) };
   }
+}
+
+function downloadJson(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function clamp(x, a, b) {
@@ -68,7 +78,6 @@ function safeArr(x) {
 }
 
 function detectStatus(setup) {
-  // priority: explicit eligibility/status, else execution_state, else fallback
   const elig = setup?.eligibility || null;
   if (elig?.status) return String(elig.status);
 
@@ -76,13 +85,11 @@ function detectStatus(setup) {
   const phase = ex?.phase ? String(ex.phase) : "";
   const tradable = ex?.tradable;
 
-  // Map into retail-friendly buckets
   if (phase === "invalidated") return "invalidated";
   if (phase === "missed") return "missed";
   if (tradable === true && phase === "ready") return "tradable";
   if (phase === "waiting") return "waiting";
 
-  // v2 fallback: if setup appears actionable by presence of entry/stop
   const hasCore =
     Array.isArray(setup?.entry_zone) &&
     setup.entry_zone.length === 2 &&
@@ -138,6 +145,7 @@ function getPrimaryPrice(snapshot) {
 
 function copyText(text) {
   try {
+    if (typeof navigator === "undefined") return;
     navigator.clipboard.writeText(String(text || ""));
   } catch {
     // ignore
@@ -169,7 +177,6 @@ function chipStyle(base, tone) {
   };
 }
 
-/** UPDATED: understands Long/Short + Tăng/Giảm */
 function toneForBias(bias) {
   const b = toLower(bias);
   if (b === "long" || b === "up" || b === "bull" || b === "tăng" || b === "tang") return "pos";
@@ -420,11 +427,10 @@ function Section({ title, right, children }) {
   );
 }
 
-/** UPDATED: matches market_outlook_v1.horizons[] schema */
 function HorizonCard({ h, idx }) {
   const title = h?.title || h?.label || `Horizon ${idx + 1}`;
-  const bias = h?.bias || null;          // "Tăng"/"Giảm"
-  const clarity = h?.clarity || null;    // "Yếu"/"Trung bình"/"Rõ"
+  const bias = h?.bias || null;
+  const clarity = h?.clarity || null;
   const confidence = Number(h?.confidence);
 
   const drivers = safeArr(h?.drivers);
@@ -496,6 +502,13 @@ function HorizonCard({ h, idx }) {
 }
 
 export default function SnapshotViewerPage() {
+  // Generator state
+  const [symbolInput, setSymbolInput] = useState("BTCUSDT");
+  const [genLoading, setGenLoading] = useState(false);
+  const [genErr, setGenErr] = useState("");
+  const [autoDownload, setAutoDownload] = useState(true);
+
+  // Viewer state
   const [raw, setRaw] = useState("");
   const [snap, setSnap] = useState(null);
   const [parseErr, setParseErr] = useState("");
@@ -507,11 +520,13 @@ export default function SnapshotViewerPage() {
 
   // Filters for "all"
   const [fText, setFText] = useState("");
-  const [fStatus, setFStatus] = useState("all"); // all|tradable|waiting|missed|invalidated|unavailable|unknown
+  const [fStatus, setFStatus] = useState("all");
   const [fType, setFType] = useState("all");
   const [fTf, setFTf] = useState("all");
   const [fTradableOnly, setFTradableOnly] = useState(false);
-  const [sortBy, setSortBy] = useState("score_desc"); // score_desc | rr_desc | tf_asc
+  const [sortBy, setSortBy] = useState("score_desc");
+
+  const safeSymbol = useMemo(() => String(symbolInput || "").toUpperCase().trim(), [symbolInput]);
 
   const tz = snap?.runtime?.tz || "America/Los_Angeles";
   const symbol = snap?.symbol || snap?.request?.symbol || "—";
@@ -521,12 +536,11 @@ export default function SnapshotViewerPage() {
 
   const setupsV2 = snap?.unified?.setups_v2 || null;
 
-  // market_outlook_v1 (UPDATED mapping)
   const outlook = snap?.unified?.market_outlook_v1 || null;
-  const headlineObj = outlook?.headline || null; // object: {market_position, trend_clarity, data_quality, quick_risk}
-  const horizons = safeArr(outlook?.horizons);   // [{title,bias,clarity,confidence,drivers[],risks[],playbook[]}]
-  const action = outlook?.action || null;        // {status, order_type, order_price, summary[], setup_type_label, tf_label}
-  const flagObjs = safeArr(outlook?.flag_texts); // [{key,text,tone}]
+  const headlineObj = outlook?.headline || null;
+  const horizons = safeArr(outlook?.horizons);
+  const action = outlook?.action || null;
+  const flagObjs = safeArr(outlook?.flag_texts);
 
   const primary = setupsV2?.primary || null;
   const top = safeArr(setupsV2?.top_candidates);
@@ -534,9 +548,7 @@ export default function SnapshotViewerPage() {
 
   const { px: refPx, src: pxSrc } = useMemo(() => getPrimaryPrice(snap), [snap]);
 
-  const allTypes = useMemo(() => {
-    return uniq(all.map((s) => s?.type)).sort();
-  }, [all]);
+  const allTypes = useMemo(() => uniq(all.map((s) => s?.type)).sort(), [all]);
 
   const allTfs = useMemo(() => {
     return uniq(all.map((s) => String(s?.timeframe ?? s?.tf ?? "").trim()).filter(Boolean)).sort((a, b) => {
@@ -561,17 +573,9 @@ export default function SnapshotViewerPage() {
       });
     }
 
-    if (fStatus !== "all") {
-      xs = xs.filter((s) => toLower(detectStatus(s)) === toLower(fStatus));
-    }
-
-    if (fType !== "all") {
-      xs = xs.filter((s) => String(s?.type || "") === fType);
-    }
-
-    if (fTf !== "all") {
-      xs = xs.filter((s) => String(s?.timeframe ?? s?.tf ?? "") === fTf);
-    }
+    if (fStatus !== "all") xs = xs.filter((s) => toLower(detectStatus(s)) === toLower(fStatus));
+    if (fType !== "all") xs = xs.filter((s) => String(s?.type || "") === fType);
+    if (fTf !== "all") xs = xs.filter((s) => String(s?.timeframe ?? s?.tf ?? "") === fTf);
 
     if (fTradableOnly) {
       xs = xs.filter((s) => {
@@ -618,6 +622,14 @@ export default function SnapshotViewerPage() {
     setSelectedSetup(null);
   };
 
+  const applySnapshotObj = (obj, alsoSetRaw = true) => {
+    setParseErr("");
+    setGenErr("");
+    setSnap(obj);
+    setTab("overview");
+    if (alsoSetRaw) setRaw(JSON.stringify(obj, null, 2));
+  };
+
   const onPasteApply = () => {
     setParseErr("");
     const res = safeJsonParse(raw);
@@ -626,8 +638,7 @@ export default function SnapshotViewerPage() {
       setParseErr(res.err || "Invalid JSON");
       return;
     }
-    setSnap(res.obj);
-    setTab("overview");
+    applySnapshotObj(res.obj, false);
   };
 
   const onFilePick = async (file) => {
@@ -642,11 +653,30 @@ export default function SnapshotViewerPage() {
         setParseErr(res.err || "Invalid JSON");
         return;
       }
-      setSnap(res.obj);
-      setTab("overview");
+      applySnapshotObj(res.obj, false);
     } catch (e) {
       setSnap(null);
       setParseErr(String(e?.message || e));
+    }
+  };
+
+  const onGenerate = async () => {
+    setGenErr("");
+    setParseErr("");
+    setGenLoading(true);
+    try {
+      const snapObj = await buildMarketSnapshotV4(safeSymbol, { tz: "America/Los_Angeles" });
+      applySnapshotObj(snapObj, true);
+
+      if (autoDownload) {
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        const name = `market-snapshot-v4_${safeSymbol}_${ts}.json`;
+        downloadJson(snapObj, name);
+      }
+    } catch (e) {
+      setGenErr(String(e?.message || e));
+    } finally {
+      setGenLoading(false);
     }
   };
 
@@ -679,16 +709,8 @@ export default function SnapshotViewerPage() {
     },
     h1: { fontSize: 18, fontWeight: 950, margin: 0 },
     sub: { marginTop: 8, fontSize: 13, color: "rgb(71,85,105)", lineHeight: 1.35 },
-    grid2: {
-      display: "grid",
-      gridTemplateColumns: "1fr",
-      gap: 14,
-    },
-    grid3: {
-      display: "grid",
-      gridTemplateColumns: "1fr",
-      gap: 12,
-    },
+    grid2: { display: "grid", gridTemplateColumns: "1fr", gap: 14 },
+    grid3: { display: "grid", gridTemplateColumns: "1fr", gap: 12 },
     card: {
       borderRadius: 16,
       border: "1px solid rgba(148,163,184,0.35)",
@@ -742,12 +764,7 @@ export default function SnapshotViewerPage() {
       outline: "none",
       cursor: "pointer",
     },
-    divider: {
-      height: 1,
-      background: "rgba(148,163,184,0.28)",
-      marginTop: 12,
-      marginBottom: 12,
-    },
+    divider: { height: 1, background: "rgba(148,163,184,0.28)", marginTop: 12, marginBottom: 12 },
     tiny: { fontSize: 12, color: "rgb(100,116,139)", fontWeight: 800 },
   };
 
@@ -775,7 +792,7 @@ export default function SnapshotViewerPage() {
   }, [isWide, isMid]);
 
   const mainGridStyle = useMemo(() => {
-    if (isWide) return { ...styles.grid2, gridTemplateColumns: "420px 1fr", alignItems: "start" };
+    if (isWide) return { ...styles.grid2, gridTemplateColumns: "460px 1fr", alignItems: "start" };
     return { ...styles.grid2, gridTemplateColumns: "1fr" };
   }, [isWide]);
 
@@ -794,13 +811,12 @@ export default function SnapshotViewerPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        {/* Header */}
         <div style={styles.header}>
           <div style={styles.titleRow}>
             <div style={{ minWidth: 0 }}>
               <h1 style={styles.h1}>Snapshot Viewer (Retail)</h1>
               <div style={styles.sub}>
-                Paste / upload JSON snapshot → xem context thị trường + setups. UI chỉ hiển thị dữ liệu có sẵn trong snapshot.
+                Generate / Upload / Paste JSON snapshot → xem context thị trường + setups. UI chỉ hiển thị dữ liệu có sẵn trong snapshot.
               </div>
             </div>
 
@@ -823,8 +839,61 @@ export default function SnapshotViewerPage() {
           <div style={styles.divider} />
 
           <div style={mainGridStyle}>
-            {/* Input panel */}
+            {/* Left: Generator + JSON input */}
             <div style={styles.card}>
+              <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>Generate Snapshot (v4)</div>
+              <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: isWide ? "1fr auto" : "1fr", gap: 10, alignItems: "center" }}>
+                <input
+                  value={symbolInput}
+                  onChange={(e) => setSymbolInput(e.target.value)}
+                  placeholder="BTCUSDT"
+                  style={styles.input}
+                />
+                <button
+                  style={styles.btn("primary")}
+                  onClick={onGenerate}
+                  disabled={genLoading || !safeSymbol}
+                >
+                  {genLoading ? "Generating..." : "Generate & Load"}
+                </button>
+              </div>
+
+              <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(148,163,184,0.35)", background: "rgba(248,250,252,0.9)", fontSize: 12, fontWeight: 950 }}>
+                  <input
+                    type="checkbox"
+                    checked={autoDownload}
+                    onChange={(e) => setAutoDownload(e.target.checked)}
+                  />
+                  Auto download JSON
+                </label>
+
+                <button
+                  style={styles.btn("secondary")}
+                  onClick={() => {
+                    if (!snap) return;
+                    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+                    const name = `market-snapshot-v4_${(snap?.symbol || safeSymbol || "SNAP")}_${ts}.json`;
+                    downloadJson(snap, name);
+                  }}
+                  disabled={!snap}
+                >
+                  Download current snapshot
+                </button>
+              </div>
+
+              {genErr ? (
+                <div style={{ marginTop: 10, color: "rgb(127,29,29)", fontWeight: 900, whiteSpace: "pre-wrap", fontSize: 12 }}>
+                  {genErr}
+                </div>
+              ) : null}
+
+              <div style={{ marginTop: 12, ...styles.tiny }}>
+                Lưu ý: generator chạy client-only; nếu 1 exchange bị CORS/geo, snapshot vẫn tạo được nhưng quality có thể “partial” và diagnostics.errors tăng.
+              </div>
+
+              <div style={styles.divider} />
+
               <div style={{ fontSize: 13, fontWeight: 950, color: "rgb(15,23,42)" }}>Input JSON</div>
               <div style={{ marginTop: 10 }}>
                 <textarea
@@ -858,6 +927,7 @@ export default function SnapshotViewerPage() {
                     setRaw("");
                     setSnap(null);
                     setParseErr("");
+                    setGenErr("");
                     setSelectedSetup(null);
                     setDrawerOpen(false);
                   }}
@@ -865,13 +935,9 @@ export default function SnapshotViewerPage() {
                   Clear
                 </button>
               </div>
-
-              <div style={{ marginTop: 12, ...styles.tiny }}>
-                Tip: dùng trang generate JSON hiện có để xuất file snapshot rồi upload vào đây.
-              </div>
             </div>
 
-            {/* Snapshot meta + Tabs */}
+            {/* Right: Snapshot meta + Tabs */}
             <div style={styles.card}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ minWidth: 0 }}>
@@ -903,7 +969,6 @@ export default function SnapshotViewerPage() {
               {tab === "overview" ? (
                 <>
                   <Section title="Market Context" right={outlook ? "from unified.market_outlook_v1" : "market_outlook_v1 not found"}>
-                    {/* Headline (object) */}
                     {headlineObj ? (
                       <div style={{
                         padding: 14,
@@ -927,7 +992,6 @@ export default function SnapshotViewerPage() {
                       </div>
                     )}
 
-                    {/* Flag chips (array of {key,text,tone}) */}
                     {flagObjs.length ? (
                       <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {flagObjs.slice(0, 12).map((f, i) => {
@@ -945,7 +1009,6 @@ export default function SnapshotViewerPage() {
                       </div>
                     ) : null}
 
-                    {/* Action (schema: status, summary[], setup_type_label, tf_label...) */}
                     {action ? (
                       <div style={{ marginTop: 12 }}>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -984,7 +1047,6 @@ export default function SnapshotViewerPage() {
                       </div>
                     ) : null}
 
-                    {/* Horizons */}
                     <div style={{ marginTop: 12, ...horizonsGridStyle }}>
                       {(horizons.length ? horizons : [{ title: "30m–4h" }, { title: "1–3d" }, { title: "1–2w" }]).map((h, i) => (
                         <HorizonCard key={i} h={h} idx={i} />
@@ -1108,7 +1170,6 @@ export default function SnapshotViewerPage() {
           </div>
         </div>
 
-        {/* Drawer */}
         <Drawer
           open={drawerOpen}
           onClose={onCloseDrawer}
@@ -1175,24 +1236,10 @@ export default function SnapshotViewerPage() {
                 padding: 14,
               }}>
                 <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6 }}>Eligibility & Execution State</div>
-                <KV
-                  k="Status"
-                  v={statusMeta(detectStatus(selectedSetup)).label}
-                />
-                <KV
-                  k="Tradable"
-                  v={
-                    (selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true) ? "Yes" : "No / Unknown"
-                  }
-                />
-                <KV
-                  k="Phase"
-                  v={selectedSetup?.execution_state?.phase || "—"}
-                />
-                <KV
-                  k="Readiness"
-                  v={selectedSetup?.execution_state?.readiness || "—"}
-                />
+                <KV k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
+                <KV k="Tradable" v={(selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true) ? "Yes" : "No / Unknown"} />
+                <KV k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
+                <KV k="Readiness" v={selectedSetup?.execution_state?.readiness || "—"} />
                 <KV
                   k="Order"
                   v={
@@ -1217,34 +1264,20 @@ export default function SnapshotViewerPage() {
                 background: "rgba(255,255,255,0.92)",
                 padding: 14,
               }}>
-                <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6 }}>Scores (if present)</div>
-                <KV k="Final score" v={Number.isFinite(selectedSetup?.final_score) ? fmtPct01(selectedSetup.final_score) : Number.isFinite(selectedSetup?.scores?.final_score) ? fmtPct01(selectedSetup.scores.final_score) : "—"} />
-                <KV k="Quality tier" v={selectedSetup?.quality_tier || selectedSetup?.scores?.quality_tier || "—"} />
-                <KV k="Idea confidence" v={Number.isFinite(selectedSetup?.idea_confidence) ? fmtPct01(selectedSetup.idea_confidence) : "—"} />
-                <KV k="Parameter reliability" v={Number.isFinite(selectedSetup?.parameter_reliability) ? fmtPct01(selectedSetup.parameter_reliability) : "—"} />
-                <KV
-                  k="Warnings"
-                  v={safeArr(selectedSetup?.warnings).length ? safeArr(selectedSetup.warnings).slice(0, 12).join(" · ") : safeArr(selectedSetup?.scores?.warnings).length ? safeArr(selectedSetup.scores.warnings).slice(0, 12).join(" · ") : "—"}
-                />
-              </div>
-
-              <div style={{
-                borderRadius: 16,
-                border: "1px solid rgba(148,163,184,0.30)",
-                background: "rgba(255,255,255,0.92)",
-                padding: 14,
-              }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
                   <div style={{ fontSize: 13, fontWeight: 950 }}>Raw JSON</div>
-                  <button style={{
-                    border: "1px solid rgba(148,163,184,0.35)",
-                    background: "rgba(241,245,249,0.9)",
-                    padding: "8px 10px",
-                    borderRadius: 12,
-                    cursor: "pointer",
-                    fontWeight: 950,
-                    color: "rgb(15,23,42)",
-                  }} onClick={() => copyText(JSON.stringify(selectedSetup, null, 2))}>
+                  <button
+                    style={{
+                      border: "1px solid rgba(148,163,184,0.35)",
+                      background: "rgba(241,245,249,0.9)",
+                      padding: "8px 10px",
+                      borderRadius: 12,
+                      cursor: "pointer",
+                      fontWeight: 950,
+                      color: "rgb(15,23,42)",
+                    }}
+                    onClick={() => copyText(JSON.stringify(selectedSetup, null, 2))}
+                  >
                     Copy
                   </button>
                 </div>
