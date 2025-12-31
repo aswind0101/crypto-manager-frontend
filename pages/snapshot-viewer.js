@@ -501,21 +501,21 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
                     <div
                         style={{
                             marginTop: 12,
-                            display: "grid",
-                            gridTemplateColumns: (isWide || isMid)
-                                ? "repeat(4, minmax(0, 1fr))"
-                                : "repeat(2, minmax(0, 1fr))",
-                            gap: isCompact ? 8 : 10,
+                            display: "flex",
+                            flexWrap: "wrap",
+                            justifyContent: "center",   // center cả cụm thẻ
                             alignItems: "stretch",
-                            justifyItems: "stretch",     // each tile fills its cell
-                            justifyContent: "center",    // the whole grid block centers if constrained
-                            maxWidth: isCompact ? 560 : "100%", // “cụm” tile không bị trải quá rộng trên phone
-                            marginLeft: "auto",
-                            marginRight: "auto",
-                            minWidth: 0,
+                            gap: isCompact ? 8 : 10,
                         }}
                     >
-                        <div style={tileStyle}>
+                        {/* Entry */}
+                        <div
+                            style={{
+                                ...tileStyle,
+                                flex: isWide || isMid ? "0 1 calc(25% - 8px)" : "0 1 calc(50% - 6px)", // 4 thẻ/1 hàng ở iPad+; 2 thẻ/1 hàng ở mobile
+                                maxWidth: isWide || isMid ? 240 : 320, // tránh tile quá to
+                            }}
+                        >
                             <div style={tileLabel}>Entry zone</div>
                             <div style={tileMain}>
                                 {ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}
@@ -525,7 +525,14 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
                             </div>
                         </div>
 
-                        <div style={tileStyle}>
+                        {/* Stop */}
+                        <div
+                            style={{
+                                ...tileStyle,
+                                flex: isWide || isMid ? "0 1 calc(25% - 8px)" : "0 1 calc(50% - 6px)",
+                                maxWidth: isWide || isMid ? 240 : 320,
+                            }}
+                        >
                             <div style={tileLabel}>Stop / Invalidation</div>
                             <div style={tileMain}>{fmtNum(stop)}</div>
                             <div style={tileSub}>
@@ -533,30 +540,37 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
                             </div>
                         </div>
 
-                        <div style={tileStyle}>
+                        {/* TP */}
+                        <div
+                            style={{
+                                ...tileStyle,
+                                flex: isWide || isMid ? "0 1 calc(25% - 8px)" : "0 1 calc(50% - 6px)",
+                                maxWidth: isWide || isMid ? 240 : 320,
+                            }}
+                        >
                             <div style={tileLabel}>Take Profit</div>
-                            <div style={tileMain}>
-                                {Number.isFinite(tp1) ? `TP1: ${fmtNum(tp1)}` : "TP1: —"}
-                            </div>
-                            {Number.isFinite(tp2) ? (
-                                <div style={tileSub}>TP2: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{fmtNum(tp2)}</b></div>
-                            ) : (
-                                <div style={tileSub}>&nbsp;</div> // giữ chiều cao đồng đều
-                            )}
+                            <div style={tileMain}>{Number.isFinite(tp1) ? `TP1: ${fmtNum(tp1)}` : "TP1: —"}</div>
+                            <div style={tileSub}>{Number.isFinite(tp2) ? `TP2: ${fmtNum(tp2)}` : "TP2: —"}</div>
                         </div>
 
-                        <div style={tileStyle}>
+                        {/* Score */}
+                        <div
+                            style={{
+                                ...tileStyle,
+                                flex: isWide || isMid ? "0 1 calc(25% - 8px)" : "0 1 calc(50% - 6px)",
+                                maxWidth: isWide || isMid ? 240 : 320,
+                            }}
+                        >
                             <div style={tileLabel}>Score / Execution</div>
-                            <div style={tileMain}>
-                                Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}
-                            </div>
+                            <div style={tileMain}>Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}</div>
                             <div style={tileSub}>
-                                {phase ? <>State: <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{phase}</b></> : "State: —"}
-                                {orderType ? <> · <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{orderType}</b></> : null}
-                                {readiness ? <> · <b style={{ color: "rgb(15,23,42)", fontWeight: 800 }}>{readiness}</b></> : null}
+                                {phase ? `State: ${phase}` : "State: —"}
+                                {orderType ? ` · ${orderType}` : ""}
+                                {readiness ? ` · ${readiness}` : ""}
                             </div>
                         </div>
                     </div>
+
                 </div>
 
                 <div style={{ flexShrink: 0, textAlign: "center", paddingTop: 2, minWidth: 62 }}>
@@ -568,6 +582,30 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
             </div>
         </div>
     );
+}
+function headlineBadge(text) {
+    const s = toLower(text);
+
+    // Icon + tone heuristic (đủ dùng cho retail UI)
+    let icon = "•";
+    let tone = "muted";
+
+    if (s.includes("tăng") || s.includes("bull") || s.includes("up")) { icon = "▲"; tone = "pos"; }
+    if (s.includes("giảm") || s.includes("bear") || s.includes("down")) { icon = "▼"; tone = "neg"; }
+
+    if (s.includes("rủi ro") || s.includes("risk")) {
+        if (s.includes("cao") || s.includes("high")) { icon = "⚠"; tone = "neg"; }
+        else if (s.includes("trung") || s.includes("medium")) { icon = "⚠"; tone = "warn"; }
+        else { icon = "●"; tone = "muted"; }
+    }
+
+    if (s.includes("yếu") || s.includes("weak")) { icon = "⟂"; tone = "muted"; }
+    if (s.includes("mạnh") || s.includes("strong")) { icon = "✦"; tone = "pos"; }
+
+    if (s.includes("tốt") || s.includes("good") || s.includes("ok")) { icon = "✓"; }
+    if (s.includes("kém") || s.includes("poor") || s.includes("partial")) { icon = "⚠"; tone = "warn"; }
+
+    return { icon, tone };
 }
 
 export default function SnapshotViewerPage() {
@@ -1157,7 +1195,6 @@ export default function SnapshotViewerPage() {
                                 <Section title="Market Context" right={outlook ? "unified.market_outlook_v1" : "market_outlook_v1 not found"} noTop>
                                     {headlineObj ? (
                                         <div style={{ ...styles.subtle, padding: 14 }}>
-                                            {/* Headline tiles */}
                                             <div
                                                 style={{
                                                     display: "grid",
@@ -1166,56 +1203,39 @@ export default function SnapshotViewerPage() {
                                                     minWidth: 0,
                                                 }}
                                             >
-                                                {headlineObj.market_position ? (
-                                                    <div style={{
-                                                        borderRadius: 16, border: "1px solid rgba(148,163,184,0.26)",
-                                                        background: "rgba(255,255,255,0.75)", padding: 12
-                                                    }}>
-                                                        <div style={{ fontSize: 11, fontWeight: 800, color: "rgb(71,85,105)" }}>Vị trí thị trường</div>
-                                                        <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
-                                                            {headlineObj.market_position}
+                                                {[
+                                                    headlineObj.market_position ? `Thị trường: ${headlineObj.market_position}` : null,
+                                                    headlineObj.quick_risk ? `Rủi ro: ${headlineObj.quick_risk}` : null,
+                                                    headlineObj.trend_clarity ? `Xu hướng: ${headlineObj.trend_clarity}` : null,
+                                                    headlineObj.data_quality ? `Dữ liệu: ${headlineObj.data_quality}` : null,
+                                                ].filter(Boolean).map((txt, i) => {
+                                                    const { icon, tone } = headlineBadge(txt);
+                                                    return (
+                                                        <div
+                                                            key={i}
+                                                            style={{
+                                                                borderRadius: 16,
+                                                                border: "1px solid rgba(148,163,184,0.26)",
+                                                                background: "rgba(255,255,255,0.75)",
+                                                                padding: 12,
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "space-between",
+                                                                gap: 10,
+                                                                minWidth: 0,
+                                                            }}
+                                                        >
+                                                            <div style={{ fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", overflowWrap: "anywhere" }}>
+                                                                {txt}
+                                                            </div>
+                                                            <span style={chipStyle({ ...chipsBase, padding: "6px 10px" }, tone)}>
+                                                                {icon}
+                                                            </span>
                                                         </div>
-                                                    </div>
-                                                ) : null}
-
-                                                {headlineObj.trend_clarity ? (
-                                                    <div style={{
-                                                        borderRadius: 16, border: "1px solid rgba(148,163,184,0.26)",
-                                                        background: "rgba(255,255,255,0.75)", padding: 12
-                                                    }}>
-                                                        <div style={{ fontSize: 11, fontWeight: 800, color: "rgb(71,85,105)" }}>Độ rõ xu hướng</div>
-                                                        <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
-                                                            {headlineObj.trend_clarity}
-                                                        </div>
-                                                    </div>
-                                                ) : null}
-
-                                                {headlineObj.quick_risk ? (
-                                                    <div style={{
-                                                        borderRadius: 16, border: "1px solid rgba(239,68,68,0.22)",
-                                                        background: "rgba(239,68,68,0.06)", padding: 12
-                                                    }}>
-                                                        <div style={{ fontSize: 11, fontWeight: 800, color: "rgb(127,29,29)" }}>Rủi ro nhanh</div>
-                                                        <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "rgb(127,29,29)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
-                                                            {headlineObj.quick_risk}
-                                                        </div>
-                                                    </div>
-                                                ) : null}
-
-                                                {headlineObj.data_quality ? (
-                                                    <div style={{
-                                                        borderRadius: 16, border: "1px solid rgba(148,163,184,0.26)",
-                                                        background: "rgba(255,255,255,0.75)", padding: 12
-                                                    }}>
-                                                        <div style={{ fontSize: 11, fontWeight: 800, color: "rgb(71,85,105)" }}>Chất lượng dữ liệu</div>
-                                                        <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "rgb(15,23,42)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
-                                                            {headlineObj.data_quality}
-                                                        </div>
-                                                    </div>
-                                                ) : null}
+                                                    );
+                                                })}
                                             </div>
 
-                                            {/* Flags chips */}
                                             {flagObjs.length ? (
                                                 <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
                                                     {flagObjs.slice(0, 12).map((f, i) => {
@@ -1233,6 +1253,7 @@ export default function SnapshotViewerPage() {
                                                 </div>
                                             ) : null}
                                         </div>
+
                                     ) : (
                                         <div style={{ color: "rgb(100,116,139)", fontWeight: 650, fontSize: 13 }}>
                                             (Không có headline trong snapshot)
