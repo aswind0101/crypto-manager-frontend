@@ -1121,10 +1121,10 @@ export default function SnapshotViewerPage() {
   const marketContextItems = useMemo(() => {
     if (!headlineObj) return [];
     const items = [];
-    if (headlineObj.market_position) items.push({ key: "market", icon: "up", tone: "muted", text: `Thị trường: ${headlineObj.market_position}` });
-    if (headlineObj.quick_risk) items.push({ key: "risk", icon: "risk", tone: "warn", text: `Rủi ro: ${headlineObj.quick_risk}` });
-    if (headlineObj.trend_clarity) items.push({ key: "clarity", icon: "clarity", tone: "muted", text: `Xu hướng: ${headlineObj.trend_clarity}` });
-    if (headlineObj.data_quality) items.push({ key: "data", icon: "data", tone: "muted", text: `Dữ liệu: ${headlineObj.data_quality}` });
+    if (headlineObj.market_position) items.push({ key: "market", icon: "up", tone: "muted", text: `${headlineObj.market_position}` });
+    if (headlineObj.quick_risk) items.push({ key: "risk", icon: "risk", tone: "warn", text: `${headlineObj.quick_risk}` });
+    if (headlineObj.trend_clarity) items.push({ key: "clarity", icon: "clarity", tone: "muted", text: `${headlineObj.trend_clarity}` });
+    if (headlineObj.data_quality) items.push({ key: "data", icon: "data", tone: "muted", text: `${headlineObj.data_quality}` });
 
     // refine icon for market direction
     if (items.length) {
