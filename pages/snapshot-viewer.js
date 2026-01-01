@@ -437,6 +437,129 @@ function HorizonCard({ h, idx }) {
   );
 }
 
+
+
+// ---------- NEW: Setup Outlook (from market_outlook_v1.setups_overview) ----------
+function BulletList({ items, max = 6 }) {
+  const xs = safeArr(items).slice(0, max);
+  if (!xs.length) return null;
+  return (
+    <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+      {xs.map((b, i) => (
+        <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(226,232,240,0.55)", marginTop: 7, flexShrink: 0 }} />
+          <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.86)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>{String(b)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GuidanceCard({ g, chipsBase }) {
+  if (!g) return null;
+  const intent = String(g.intent || "");
+  const tone = intent.includes("READY") ? "pos" : intent.includes("NO_TRADE") ? "neg" : "warn";
+  return (
+    <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(2,6,23,0.18)", padding: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>Guidance (Now)</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {g.status ? <span style={chipStyle(chipsBase, tone)}>{String(g.status)}</span> : null}
+          {g.intent ? <span style={chipStyle(chipsBase, "muted")}>{String(g.intent)}</span> : null}
+        </div>
+      </div>
+      {g.summary ? <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 750, color: "rgba(226,232,240,0.86)", lineHeight: 1.45 }}>{String(g.summary)}</div> : null}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 10 }}>
+        {safeArr(g.do).length ? (
+          <div style={{ borderRadius: 16, border: "1px solid rgba(148,163,184,0.16)", background: "rgba(30,41,59,0.32)", padding: 12 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 900, color: "rgba(148,163,184,0.95)" }}>Nên làm</div>
+            <BulletList items={g.do} max={5} />
+          </div>
+        ) : null}
+        {safeArr(g.avoid).length ? (
+          <div style={{ borderRadius: 16, border: "1px solid rgba(148,163,184,0.16)", background: "rgba(30,41,59,0.22)", padding: 12 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 900, color: "rgba(148,163,184,0.95)" }}>Tránh</div>
+            <BulletList items={g.avoid} max={5} />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function OutlookBucket({ title, ids, byId, onOpen, chipsBase, isWide, isMid }) {
+  const list = safeArr(ids).map((id) => byId?.get?.(id)).filter(Boolean);
+  return (
+    <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.45)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>{title}</div>
+        <span style={chipStyle(chipsBase, list.length ? "muted" : "warn")}>{list.length ? `${list.length} setups` : "None"}</span>
+      </div>
+      {list.length ? (
+        <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+          {list.map((s, idx) => (
+            <SetupCard key={s.id || pickSetupKey(s, idx)} setup={s} onOpen={onOpen} dense isWide={isWide} isMid={isMid} />
+          ))}
+        </div>
+      ) : (
+        <div style={{ marginTop: 10, color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có setup trong nhóm này)</div>
+      )}
+    </div>
+  );
+}
+
+function SetupOutlookPanel({ outlook, onOpen, chipsBase, isWide, isMid }) {
+  const so = outlook?.setups_overview || null;
+  const g = outlook?.guidance?.now || null;
+  const byH = so?.by_horizon || null;
+
+  const byId = useMemo(() => {
+    const m = new Map();
+    const items = safeArr(so?.items);
+    for (const it of items) if (it?.id) m.set(it.id, it);
+    return m;
+  }, [so]);
+
+  const h0 = byH?.h0_4h || null;
+  const h1 = byH?.h1_3d || null;
+  const h2 = byH?.h2_2w || null;
+
+  if (!so && !g) {
+    return <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Snapshot chưa có setups_overview / guidance)</div>;
+  }
+
+  const grid3 = isWide
+    ? { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }
+    : isMid
+    ? { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }
+    : { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
+
+  const horizonBlock = (h, label) => {
+    if (!h) return null;
+    return (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13, fontWeight: 950, color: "rgba(226,232,240,0.95)" }}>{label}</div>
+          {h.note ? <span style={chipStyle(chipsBase, "muted")}>{String(h.note)}</span> : null}
+        </div>
+        <div style={{ marginTop: 10, ...grid3 }}>
+          <OutlookBucket title="Focus (có thể vào)" ids={h.focus} byId={byId} onOpen={onOpen} chipsBase={chipsBase} isWide={isWide} isMid={isMid} />
+          <OutlookBucket title="Watchlist (chờ điểm đẹp)" ids={h.watchlist} byId={byId} onOpen={onOpen} chipsBase={chipsBase} isWide={isWide} isMid={isMid} />
+          <OutlookBucket title="Avoid (tránh)" ids={h.avoid} byId={byId} onOpen={onOpen} chipsBase={chipsBase} isWide={isWide} isMid={isMid} />
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      <GuidanceCard g={g} chipsBase={chipsBase} />
+      {horizonBlock(h0, "Setups · 30 phút – 4 giờ tới")}
+      {horizonBlock(h1, "Setups · 1 – 3 ngày tới")}
+      {horizonBlock(h2, "Setups · 1 – 2 tuần tới")}
+    </div>
+  );
+}
 function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   const status = detectStatus(setup);
   const sm = statusMeta(status);
@@ -582,6 +705,10 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
             <span style={chipStyle(chipBase, biasTone)}>{String(bias)}</span>
             {tf ? <span style={chipStyle(chipBase, "muted")}>{tfLabelVN(tf)}</span> : null}
             <span style={chipStyle(chipBase, sm.tone)}>{sm.label}</span>
+
+{Number.isFinite(setup?.context_fit) ? <span style={chipStyle(chipBase, scoreToTone(setup.context_fit))}>Fit {fmtPct01(setup.context_fit)}</span> : null}
+{Number.isFinite(setup?.distance_to_entry_pct) ? <span style={chipStyle(chipBase, "muted")}>ΔEntry {fmtPct01(setup.distance_to_entry_pct)}</span> : null}
+{Number.isFinite(setup?.stop_distance_pct) ? <span style={chipStyle(chipBase, "muted")}>ΔStop {fmtPct01(setup.stop_distance_pct)}</span> : null}
             {qualityTier ? <span style={chipStyle(chipBase, scoreToTone(finalScore))}>Tier {qualityTier}</span> : null}
           </div>
 
@@ -1356,7 +1483,11 @@ export default function SnapshotViewerPage() {
                     {(horizons.length ? horizons : [{ title: "30m–4h" }, { title: "1–3d" }, { title: "1–2w" }]).map((h, i) => (
                       <HorizonCard key={i} h={h} idx={i} />
                     ))}
-                  </div>
+                  
+
+<Section title="Setup Outlook (Setup-centric)" right={outlook?.setups_overview ? "market_outlook_v1.setups_overview" : "setups_overview not found"}>
+  <SetupOutlookPanel outlook={outlook} onOpen={onOpenSetup} chipsBase={chipsBase} isWide={isWide} isMid={isMid} />
+</Section></div>
                 </Section>
 
                 <div style={styles.divider} />
@@ -1546,6 +1677,42 @@ export default function SnapshotViewerPage() {
                   }
                 />
               </div>
+
+              
+
+{selectedSetup?.explain ? (
+  <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(2,6,23,0.18)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+    <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Setup Explainer</div>
+
+    {safeArr(selectedSetup?.explain?.why_this_setup).length ? (
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 900, color: "rgba(148,163,184,0.95)" }}>Vì sao kèo này đáng chú ý</div>
+        <BulletList items={selectedSetup.explain.why_this_setup} max={8} />
+      </div>
+    ) : null}
+
+    {safeArr(selectedSetup?.explain?.entry_tactics).length ? (
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 900, color: "rgba(148,163,184,0.95)" }}>Cách vào lệnh</div>
+        <BulletList items={selectedSetup.explain.entry_tactics} max={8} />
+      </div>
+    ) : null}
+
+    {safeArr(selectedSetup?.explain?.invalidation).length ? (
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 900, color: "rgba(148,163,184,0.95)" }}>Điều kiện hỏng kèo</div>
+        <BulletList items={selectedSetup.explain.invalidation} max={6} />
+      </div>
+    ) : null}
+
+    {safeArr(selectedSetup?.explain?.management).length ? (
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 900, color: "rgba(148,163,184,0.95)" }}>Quản trị lệnh</div>
+        <BulletList items={selectedSetup.explain.management} max={8} />
+      </div>
+    ) : null}
+  </div>
+) : null}
 
               <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", minWidth: 0 }}>
