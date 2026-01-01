@@ -301,19 +301,52 @@ const HELP_VN = {
 function HelpTip({ k }) {
   const data = HELP_VN[k];
   const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+
   if (!data) return null;
+
+  // Click outside to close (desktop + iPad)
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (e) => {
+      const el = rootRef.current;
+      if (!el) return;
+      if (!el.contains(e.target)) setOpen(false);
+    };
+
+    // Use capture to catch outside clicks early
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [open]);
+
+  const toggle = (e) => {
+    // Prevent Bar / Row click handlers from firing
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen((v) => !v);
+  };
+
+  const close = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setOpen(false);
+  };
 
   return (
     <span
+      ref={rootRef}
       style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
-      tabIndex={0}
-      aria-label={`Giải thích ${data.title}`}
+      onClick={(e) => e.stopPropagation()} // prevent parent row toggles
     >
-      <span
+      <button
+        type="button"
+        onPointerDown={toggle} // iPad-friendly
+        onClick={toggle}
+        aria-label={`Giải thích ${data.title}`}
+        aria-expanded={open ? "true" : "false"}
         style={{
           width: 16,
           height: 16,
@@ -323,27 +356,29 @@ function HelpTip({ k }) {
           alignItems: "center",
           justifyContent: "center",
           border: "1px solid rgba(148,163,184,0.35)",
-          background: "rgba(2,6,23,0.35)",
+          background: open ? "rgba(34,211,238,0.14)" : "rgba(2,6,23,0.35)",
           color: "rgba(226,232,240,0.95)",
           fontSize: 11,
           fontWeight: 950,
-          cursor: "help",
+          cursor: "pointer",
           userSelect: "none",
+          padding: 0,
+          lineHeight: "16px",
         }}
         title={`${data.title}: ${data.lines.join(" ")}`}
       >
         i
-      </span>
+      </button>
 
       {open ? (
         <div
           style={{
             position: "absolute",
             left: 0,
-            top: 20,
+            top: 22,
             zIndex: 5000,
-            width: 320,
-            maxWidth: "min(320px, 80vw)",
+            width: 340,
+            maxWidth: "min(340px, 86vw)",
             padding: 12,
             borderRadius: 14,
             border: "1px solid rgba(148,163,184,0.22)",
@@ -351,12 +386,56 @@ function HelpTip({ k }) {
             boxShadow: "0 24px 64px rgba(0,0,0,0.55)",
             backdropFilter: "blur(10px)",
           }}
+          role="dialog"
+          aria-label={`Tooltip ${data.title}`}
+          onPointerDown={(e) => e.stopPropagation()} // keep inside clicks from closing
+          onClick={(e) => e.stopPropagation()}
         >
-          <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)" }}>{data.title}</div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+            }}
+          >
+            <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)" }}>
+              {data.title}
+            </div>
+
+            <button
+              type="button"
+              onPointerDown={close}
+              onClick={close}
+              aria-label="Đóng"
+              style={{
+                border: "1px solid rgba(148,163,184,0.22)",
+                background: "rgba(15,23,42,0.55)",
+                color: "rgba(226,232,240,0.9)",
+                borderRadius: 10,
+                padding: "4px 8px",
+                fontSize: 12,
+                fontWeight: 850,
+                cursor: "pointer",
+              }}
+            >
+              Đóng
+            </button>
+          </div>
+
           <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
             {data.lines.map((t, idx) => (
               <div key={idx} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <div style={{ width: 6, height: 6, borderRadius: 99, marginTop: 6, background: "rgba(34,211,238,1)" }} />
+                <div
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 99,
+                    marginTop: 6,
+                    background: "rgba(34,211,238,1)",
+                    flex: "0 0 auto",
+                  }}
+                />
                 <div style={{ fontSize: 12, fontWeight: 750, color: "rgba(226,232,240,0.86)", lineHeight: 1.45 }}>
                   {t}
                 </div>
@@ -368,6 +447,7 @@ function HelpTip({ k }) {
     </span>
   );
 }
+
 
 /* =========================
    UI primitives
