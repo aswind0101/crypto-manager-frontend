@@ -300,12 +300,11 @@ const HELP_VN = {
 
 function HelpTip({ k }) {
   const data = HELP_VN[k];
+
+  // Hooks MUST be called unconditionally
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
-  if (!data) return null;
-
-  // Click outside to close (desktop + iPad)
   useEffect(() => {
     if (!open) return;
 
@@ -315,23 +314,24 @@ function HelpTip({ k }) {
       if (!el.contains(e.target)) setOpen(false);
     };
 
-    // Use capture to catch outside clicks early
     document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
   }, [open]);
 
+  // After hooks: safe early return
+  if (!data) return null;
+
   const toggle = (e) => {
-    // Prevent Bar / Row click handlers from firing
     e.preventDefault();
     e.stopPropagation();
     setOpen((v) => !v);
   };
 
   const close = (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    e.preventDefault();
+    e.stopPropagation();
     setOpen(false);
   };
 
@@ -339,11 +339,11 @@ function HelpTip({ k }) {
     <span
       ref={rootRef}
       style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
-      onClick={(e) => e.stopPropagation()} // prevent parent row toggles
+      onClick={(e) => e.stopPropagation()}
     >
       <button
         type="button"
-        onPointerDown={toggle} // iPad-friendly
+        onPointerDown={toggle}
         onClick={toggle}
         aria-label={`Giải thích ${data.title}`}
         aria-expanded={open ? "true" : "false"}
@@ -365,13 +365,16 @@ function HelpTip({ k }) {
           padding: 0,
           lineHeight: "16px",
         }}
-        title={`${data.title}: ${data.lines.join(" ")}`}
       >
         i
       </button>
 
-      {open ? (
+      {open && (
         <div
+          role="dialog"
+          aria-label={`Tooltip ${data.title}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
           style={{
             position: "absolute",
             left: 0,
@@ -386,10 +389,6 @@ function HelpTip({ k }) {
             boxShadow: "0 24px 64px rgba(0,0,0,0.55)",
             backdropFilter: "blur(10px)",
           }}
-          role="dialog"
-          aria-label={`Tooltip ${data.title}`}
-          onPointerDown={(e) => e.stopPropagation()} // keep inside clicks from closing
-          onClick={(e) => e.stopPropagation()}
         >
           <div
             style={{
@@ -436,18 +435,24 @@ function HelpTip({ k }) {
                     flex: "0 0 auto",
                   }}
                 />
-                <div style={{ fontSize: 12, fontWeight: 750, color: "rgba(226,232,240,0.86)", lineHeight: 1.45 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 750,
+                    color: "rgba(226,232,240,0.86)",
+                    lineHeight: 1.45,
+                  }}
+                >
                   {t}
                 </div>
               </div>
             ))}
           </div>
         </div>
-      ) : null}
+      )}
     </span>
   );
 }
-
 
 /* =========================
    UI primitives
