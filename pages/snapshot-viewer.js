@@ -265,50 +265,6 @@ function Icon({ name = "dot", size = 18, tone = "muted" }) {
     </svg>
   );
 }
-
-/* =========================
-   UI primitives
-========================= */
-function chipStyle(tone) {
-  const t = tone || "muted";
-  const bg =
-    t === "pos" ? "rgba(34,197,94,0.12)"
-    : t === "warn" ? "rgba(245,158,11,0.14)"
-    : t === "neg" ? "rgba(239,68,68,0.12)"
-    : t === "cyan" ? "rgba(34,211,238,0.12)"
-    : t === "violet" ? "rgba(167,139,250,0.14)"
-    : "rgba(148,163,184,0.12)";
-  const br =
-    t === "pos" ? "rgba(34,197,94,0.35)"
-    : t === "warn" ? "rgba(245,158,11,0.35)"
-    : t === "neg" ? "rgba(239,68,68,0.30)"
-    : t === "cyan" ? "rgba(34,211,238,0.30)"
-    : t === "violet" ? "rgba(167,139,250,0.30)"
-    : "rgba(148,163,184,0.24)";
-  const fg =
-    t === "pos" ? "rgba(134,239,172,1)"
-    : t === "warn" ? "rgba(253,230,138,1)"
-    : t === "neg" ? "rgba(254,202,202,1)"
-    : t === "cyan" ? "rgba(165,243,252,1)"
-    : t === "violet" ? "rgba(221,214,254,1)"
-    : "rgba(226,232,240,0.90)";
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "7px 10px",
-    borderRadius: 999,
-    border: `1px solid ${br}`,
-    background: bg,
-    color: fg,
-    fontSize: 12,
-    fontWeight: 850,
-    userSelect: "none",
-    whiteSpace: "nowrap",
-  };
-}
-
-
 /* =========================
    Help tooltips (VN)
 ========================= */
@@ -413,20 +369,65 @@ function HelpTip({ k }) {
   );
 }
 
-{ value01, tone = "cyan", labelLeft, labelRight }) {
+/* =========================
+   UI primitives
+========================= */
+function chipStyle(tone) {
+  const t = tone || "muted";
+  const bg =
+    t === "pos" ? "rgba(34,197,94,0.12)"
+      : t === "warn" ? "rgba(245,158,11,0.14)"
+        : t === "neg" ? "rgba(239,68,68,0.12)"
+          : t === "cyan" ? "rgba(34,211,238,0.12)"
+            : t === "violet" ? "rgba(167,139,250,0.14)"
+              : "rgba(148,163,184,0.12)";
+  const br =
+    t === "pos" ? "rgba(34,197,94,0.35)"
+      : t === "warn" ? "rgba(245,158,11,0.35)"
+        : t === "neg" ? "rgba(239,68,68,0.30)"
+          : t === "cyan" ? "rgba(34,211,238,0.30)"
+            : t === "violet" ? "rgba(167,139,250,0.30)"
+              : "rgba(148,163,184,0.24)";
+  const fg =
+    t === "pos" ? "rgba(134,239,172,1)"
+      : t === "warn" ? "rgba(253,230,138,1)"
+        : t === "neg" ? "rgba(254,202,202,1)"
+          : t === "cyan" ? "rgba(165,243,252,1)"
+            : t === "violet" ? "rgba(221,214,254,1)"
+              : "rgba(226,232,240,0.90)";
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "7px 10px",
+    borderRadius: 999,
+    border: `1px solid ${br}`,
+    background: bg,
+    color: fg,
+    fontSize: 12,
+    fontWeight: 850,
+    userSelect: "none",
+    whiteSpace: "nowrap",
+  };
+}
+
+function Bar({ value01, tone = "cyan", labelLeft, labelRight, helpKey }) {
   const v = clamp(Number(value01), 0, 1);
   const c =
     tone === "pos" ? "rgba(34,197,94,1)"
-    : tone === "warn" ? "rgba(245,158,11,1)"
-    : tone === "neg" ? "rgba(239,68,68,1)"
-    : tone === "violet" ? "rgba(167,139,250,1)"
-    : "rgba(34,211,238,1)";
+      : tone === "warn" ? "rgba(245,158,11,1)"
+        : tone === "neg" ? "rgba(239,68,68,1)"
+          : tone === "violet" ? "rgba(167,139,250,1)"
+            : "rgba(34,211,238,1)";
 
   return (
     <div style={{ width: "100%", minWidth: 0 }}>
       {(labelLeft || labelRight) ? (
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5, fontWeight: 800, color: "rgba(148,163,184,0.95)" }}>
-          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}><span>{labelLeft || ""}</span>{helpKey ? <HelpTip k={helpKey} /> : null}</div>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
+            <span>{labelLeft || ""}</span>
+            {helpKey ? <HelpTip k={helpKey} /> : null}
+          </div>
           <div style={{ whiteSpace: "nowrap" }}>{labelRight || ""}</div>
         </div>
       ) : null}
@@ -681,8 +682,8 @@ function FocusSetupCard({ item, outlook, onOpen }) {
 
   const glow =
     biasTone === "pos" ? "rgba(34,197,94,0.35)"
-    : biasTone === "neg" ? "rgba(239,68,68,0.28)"
-    : "rgba(34,211,238,0.25)";
+      : biasTone === "neg" ? "rgba(239,68,68,0.28)"
+        : "rgba(34,211,238,0.25)";
 
   return (
     <div
@@ -968,9 +969,9 @@ function MarketDNA({ outlook, refPx, pxSrc, isMobile }) {
 
   const regimeTone =
     regime === "bull" ? "pos"
-    : regime === "bear" ? "neg"
-    : regime.includes("range") ? "warn"
-    : "muted";
+      : regime === "bear" ? "neg"
+        : regime.includes("range") ? "warn"
+          : "muted";
 
   return (
     <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.16)", background: "rgba(15,23,42,0.60)", boxShadow: "0 18px 60px rgba(0,0,0,0.32)", padding: 14, backdropFilter: "blur(14px)" }}>
@@ -1136,7 +1137,7 @@ export default function SnapshotViewerPage() {
     load();
     return () => {
       alive = false;
-      try { ac.abort(); } catch {}
+      try { ac.abort(); } catch { }
     };
   }, []);
 
@@ -1478,32 +1479,32 @@ export default function SnapshotViewerPage() {
           </div>
         </div>
 
-      {/* Market headline banner (separate from command bar to reduce clutter) */}
-      {chips.length ? (
-        <div style={{ padding: isWide ? "10px 18px 0" : "10px 12px 0" }}>
-          <div
-            style={{
-              maxWidth: shellMax,
-              margin: "0 auto",
-              padding: "10px 12px",
-              borderRadius: 18,
-              border: "1px solid rgba(148,163,184,0.12)",
-              background: "rgba(15,23,42,0.40)",
-              boxShadow: "0 12px 48px rgba(0,0,0,0.28)",
-              backdropFilter: "blur(14px)",
-              overflowX: "auto",
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              WebkitOverflowScrolling: "touch",
-            }}
-          >
-            {chips.map((c, i) => (
-              <span key={i} style={chipStyle(c.tone)}>{c.text}</span>
-            ))}
+        {/* Market headline banner (separate from command bar to reduce clutter) */}
+        {chips.length ? (
+          <div style={{ padding: isWide ? "10px 18px 0" : "10px 12px 0" }}>
+            <div
+              style={{
+                maxWidth: shellMax,
+                margin: "0 auto",
+                padding: "10px 12px",
+                borderRadius: 18,
+                border: "1px solid rgba(148,163,184,0.12)",
+                background: "rgba(15,23,42,0.40)",
+                boxShadow: "0 12px 48px rgba(0,0,0,0.28)",
+                backdropFilter: "blur(14px)",
+                overflowX: "auto",
+                display: "flex",
+                gap: 10,
+                alignItems: "center",
+                WebkitOverflowScrolling: "touch",
+              }}
+            >
+              {chips.map((c, i) => (
+                <span key={i} style={chipStyle(c.tone)}>{c.text}</span>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
         {genLoading ? (
           <div style={{ maxWidth: shellMax, margin: "12px auto 0", padding: "0 0 4px" }}>
