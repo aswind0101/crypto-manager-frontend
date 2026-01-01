@@ -305,33 +305,58 @@ function HelpTip({ k }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
+  // iOS Safari often fires touch + click; we guard to avoid double-toggle.
+  const lastTouchTsRef = useRef(0);
+
   useEffect(() => {
     if (!open) return;
 
-    const onPointerDown = (e) => {
+    const onOutside = (e) => {
       const el = rootRef.current;
       if (!el) return;
       if (!el.contains(e.target)) setOpen(false);
     };
 
-    document.addEventListener("pointerdown", onPointerDown, true);
+    // Capture phase so we reliably detect outside interactions.
+    document.addEventListener("pointerdown", onOutside, true);
+    document.addEventListener("mousedown", onOutside, true);
+    document.addEventListener("touchstart", onOutside, true);
+
     return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("pointerdown", onOutside, true);
+      document.removeEventListener("mousedown", onOutside, true);
+      document.removeEventListener("touchstart", onOutside, true);
     };
   }, [open]);
 
-  // After hooks: safe early return
   if (!data) return null;
 
   const toggle = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (e?.preventDefault) e.preventDefault();
+    if (e?.stopPropagation) e.stopPropagation();
     setOpen((v) => !v);
   };
 
+  const onTouchStart = (e) => {
+    // Mark the touch time to ignore the follow-up click.
+    lastTouchTsRef.current = Date.now();
+    toggle(e);
+  };
+
+  const onClick = (e) => {
+    // If a touch happened recently, ignore this click (prevents open->close on iPad).
+    const dt = Date.now() - (lastTouchTsRef.current || 0);
+    if (dt >= 0 && dt < 450) {
+      if (e?.preventDefault) e.preventDefault();
+      if (e?.stopPropagation) e.stopPropagation();
+      return;
+    }
+    toggle(e);
+  };
+
   const close = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (e?.preventDefault) e.preventDefault();
+    if (e?.stopPropagation) e.stopPropagation();
     setOpen(false);
   };
 
@@ -339,11 +364,16 @@ function HelpTip({ k }) {
     <span
       ref={rootRef}
       style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      // prevent parent row click/tap from firing
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
       <button
         type="button"
-        onPointerDown={toggle}
+        onTouchStart={onTouchStart}
+        onClick={onClick}
         aria-label={`Giải thích ${data.title}`}
         aria-expanded={open ? "true" : "false"}
         style={{
@@ -363,6 +393,7 @@ function HelpTip({ k }) {
           userSelect: "none",
           padding: 0,
           lineHeight: "16px",
+          WebkitTapHighlightColor: "transparent",
         }}
       >
         i
@@ -372,7 +403,10 @@ function HelpTip({ k }) {
         <div
           role="dialog"
           aria-label={`Tooltip ${data.title}`}
+          // keep inside clicks from closing
           onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           style={{
             position: "absolute",
@@ -389,21 +423,19 @@ function HelpTip({ k }) {
             backdropFilter: "blur(10px)",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 10,
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
             <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)" }}>
               {data.title}
             </div>
 
             <button
               type="button"
-              onPointerDown={close}
+              onTouchStart={(e) => { lastTouchTsRef.current = Date.now(); close(e); }}
+              onClick={(e) => {
+                const dt = Date.now() - (lastTouchTsRef.current || 0);
+                if (dt >= 0 && dt < 450) { e.preventDefault(); e.stopPropagation(); return; }
+                close(e);
+              }}
               aria-label="Đóng"
               style={{
                 border: "1px solid rgba(148,163,184,0.22)",
@@ -414,6 +446,7 @@ function HelpTip({ k }) {
                 fontSize: 12,
                 fontWeight: 850,
                 cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
               }}
             >
               Đóng
@@ -433,14 +466,7 @@ function HelpTip({ k }) {
                     flex: "0 0 auto",
                   }}
                 />
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 750,
-                    color: "rgba(226,232,240,0.86)",
-                    lineHeight: 1.45,
-                  }}
-                >
+                <div style={{ fontSize: 12, fontWeight: 750, color: "rgba(226,232,240,0.86)", lineHeight: 1.45 }}>
                   {t}
                 </div>
               </div>
