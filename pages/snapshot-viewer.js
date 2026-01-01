@@ -28,7 +28,7 @@ function toLower(x) {
   return String(x || "").toLowerCase();
 }
 function uniq(arr) {
-  return Array.from(new Set(arr.filter(Boolean)));
+  return Array.from(new Set((arr || []).filter(Boolean)));
 }
 function safeArr(x) {
   return Array.isArray(x) ? x : [];
@@ -80,10 +80,15 @@ function typeLabelVN(type) {
 }
 function tfLabelVN(tf) {
   const x = String(tf || "");
+  if (x === "5") return "5m";
   if (x === "15") return "15m";
   if (x === "60") return "1H";
   if (x === "240") return "4H";
   if (x === "D") return "1D";
+  if (x === "15m") return "15m";
+  if (x === "1h") return "1H";
+  if (x === "4h") return "4H";
+  if (x === "1d") return "1D";
   return x || "—";
 }
 
@@ -107,8 +112,8 @@ function getPrimaryPrice(snapshot) {
 
 function toneForBias(bias) {
   const b = toLower(bias);
-  if (b === "long" || b === "up" || b === "bull" || b === "tăng" || b === "tang") return "pos";
-  if (b === "short" || b === "down" || b === "bear" || b === "giảm" || b === "giam") return "neg";
+  if (b === "long" || b === "up" || b === "bull" || b.includes("tăng") || b.includes("tang")) return "pos";
+  if (b === "short" || b === "down" || b === "bear" || b.includes("giảm") || b.includes("giam")) return "neg";
   return "muted";
 }
 
@@ -134,15 +139,9 @@ function pickSetupKey(s, idx) {
 }
 
 // --------------------- candle close extraction ---------------------
-// Goal: show last candle close for 5m, 15m, 1H, 4H, 1D.
-// Snapshot schema can vary; this tries common paths and “best effort”.
 function lastCloseFromSeries(series) {
   if (!series) return null;
 
-  // series could be:
-  // - array of arrays: [t,o,h,l,c,v] ...
-  // - array of objects: {t,o,h,l,c,v} ...
-  // - object with "candles"/"data"/"rows"
   const xs =
     Array.isArray(series) ? series :
     Array.isArray(series?.candles) ? series.candles :
@@ -154,7 +153,6 @@ function lastCloseFromSeries(series) {
 
   const last = xs[xs.length - 1];
   if (Array.isArray(last)) {
-    // [t,o,h,l,c,v] => c at index 4
     const c = Number(last[4]);
     return Number.isFinite(c) ? c : null;
   }
@@ -166,31 +164,28 @@ function lastCloseFromSeries(series) {
 }
 
 function findLastClose(snapshot, tfKey) {
-  // tfKey: "m5" | "m15" | "h1" | "h4" | "d1"
-  // try unified first, then per_exchange (bybit/binance), then generic.
-  const uni = snapshot?.unified || null;
-  const ex = snapshot?.per_exchange || null;
-
-  // candidate paths (order matters)
   const paths = [
-    // unified candles
     (s) => s?.unified?.candles?.[tfKey],
     (s) => s?.unified?.ohlcv?.[tfKey],
     (s) => s?.unified?.klines?.[tfKey],
 
-    // per exchange bybit
     (s) => s?.per_exchange?.bybit?.candles?.[tfKey],
     (s) => s?.per_exchange?.bybit?.ohlcv?.[tfKey],
     (s) => s?.per_exchange?.bybit?.klines?.[tfKey],
 
-    // per exchange binance
     (s) => s?.per_exchange?.binance?.candles?.[tfKey],
     (s) => s?.per_exchange?.binance?.ohlcv?.[tfKey],
     (s) => s?.per_exchange?.binance?.klines?.[tfKey],
 
-    // sometimes timeframe keys are numeric minutes/hours
-    (s) => s?.per_exchange?.bybit?.klines?.[tfKey === "m5" ? "5" : tfKey === "m15" ? "15" : tfKey === "h1" ? "60" : tfKey === "h4" ? "240" : tfKey === "d1" ? "D" : tfKey],
-    (s) => s?.unified?.klines?.[tfKey === "m5" ? "5" : tfKey === "m15" ? "15" : tfKey === "h1" ? "60" : tfKey === "h4" ? "240" : tfKey === "d1" ? "D" : tfKey],
+    // numeric tf fallback
+    (s) =>
+      s?.per_exchange?.bybit?.klines?.[
+        tfKey === "m5" ? "5" : tfKey === "m15" ? "15" : tfKey === "h1" ? "60" : tfKey === "h4" ? "240" : tfKey === "d1" ? "D" : tfKey
+      ],
+    (s) =>
+      s?.unified?.klines?.[
+        tfKey === "m5" ? "5" : tfKey === "m15" ? "15" : tfKey === "h1" ? "60" : tfKey === "h4" ? "240" : tfKey === "d1" ? "D" : tfKey
+      ],
   ];
 
   for (const getter of paths) {
@@ -199,13 +194,12 @@ function findLastClose(snapshot, tfKey) {
     if (Number.isFinite(c)) return c;
   }
 
-  // final fallback: if no candle series, try ticker last/mark
-  const t = ex?.bybit?.ticker || ex?.binance?.ticker || uni?.ticker || null;
+  const t = snapshot?.per_exchange?.bybit?.ticker || snapshot?.per_exchange?.binance?.ticker || snapshot?.unified?.ticker || null;
   const closeGuess = Number(t?.last ?? t?.mark);
   return Number.isFinite(closeGuess) ? closeGuess : null;
 }
 
-// --------------------- UI: Icon + chip ---------------------
+// --------------------- UI: icons + chips ---------------------
 function Icon({ name = "dot", size = 16 }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" };
   const stroke = { stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
@@ -290,7 +284,7 @@ function chipStyle(base, tone) {
   return { ...base, background: bg, border: `1px solid ${br}`, color: fg };
 }
 
-// --------------------- components ---------------------
+// --------------------- small components ---------------------
 function Section({ title, right, children, noTop = false }) {
   return (
     <div style={{ marginTop: noTop ? 0 : 14 }}>
@@ -301,6 +295,40 @@ function Section({ title, right, children, noTop = false }) {
         {right ? <div style={{ fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 700, whiteSpace: "nowrap" }}>{right}</div> : null}
       </div>
       <div style={{ marginTop: 10 }}>{children}</div>
+    </div>
+  );
+}
+
+function KV({ k, v, stacked = false, mono = false }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: stacked ? "column" : "row",
+        gap: stacked ? 6 : 10,
+        justifyContent: stacked ? "flex-start" : "space-between",
+        alignItems: stacked ? "flex-start" : "baseline",
+        padding: "8px 0",
+        borderBottom: "1px dashed rgba(148,163,184,0.28)",
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 750, color: "rgba(148,163,184,0.95)" }}>{k}</div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: "rgba(226,232,240,0.92)",
+          textAlign: stacked ? "left" : "right",
+          fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit",
+          overflowWrap: "anywhere",
+          wordBreak: "break-word",
+          maxWidth: stacked ? "100%" : "70%",
+          minWidth: 0,
+        }}
+      >
+        {v}
+      </div>
     </div>
   );
 }
@@ -349,7 +377,9 @@ function Drawer({ open, onClose, title, children }) {
         }}
       >
         <div style={{ padding: 14, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.18)" }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "rgba(226,232,240,0.95)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title || "Details"}</div>
+          <div style={{ fontSize: 14, fontWeight: 900, color: "rgba(226,232,240,0.95)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {title || "Details"}
+          </div>
           <button
             onClick={onClose}
             style={{
@@ -358,7 +388,7 @@ function Drawer({ open, onClose, title, children }) {
               padding: "8px 10px",
               borderRadius: 12,
               cursor: "pointer",
-              fontWeight: 750,
+              fontWeight: 850,
               color: "rgba(226,232,240,0.95)",
             }}
           >
@@ -371,6 +401,7 @@ function Drawer({ open, onClose, title, children }) {
   );
 }
 
+// --------------------- SetupCard ---------------------
 function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   const status = detectStatus(setup);
   const sm = statusMeta(status);
@@ -407,7 +438,7 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
     padding: "6px 10px",
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: 750,
+    fontWeight: 800,
     whiteSpace: "nowrap",
     userSelect: "none",
   };
@@ -432,20 +463,12 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   };
 
   const tileLabel = { fontSize: isCompact ? 10.5 : 11, fontWeight: 750, color: "rgba(148,163,184,0.95)", textAlign: "center", width: "100%" };
-  const tileMain = { marginTop: 2, fontSize: isCompact ? 12.5 : 13, fontWeight: 850, color: "rgba(226,232,240,0.95)", overflowWrap: "anywhere", textAlign: "center", width: "100%" };
-  const tileSub = { marginTop: 2, fontSize: isCompact ? 11.5 : 12, color: "rgba(226,232,240,0.80)", fontWeight: 650, overflowWrap: "anywhere", textAlign: "center", width: "100%" };
+  const tileMain = { marginTop: 2, fontSize: isCompact ? 12.5 : 13, fontWeight: 900, color: "rgba(226,232,240,0.95)", overflowWrap: "anywhere", textAlign: "center", width: "100%" };
+  const tileSub = { marginTop: 2, fontSize: isCompact ? 11.5 : 12, color: "rgba(226,232,240,0.80)", fontWeight: 700, overflowWrap: "anywhere", textAlign: "center", width: "100%" };
 
-  // Center THE GROUP (not just text): flex-center wrapper + fit-content grid.
+  // Center THE GROUP (not just content): wrapper flex-center + fit-content grid
   const tileGroup = (
-    <div
-      style={{
-        marginTop: 12,
-        width: "100%",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "stretch",
-      }}
-    >
+    <div style={{ marginTop: 12, width: "100%", display: "flex", justifyContent: "center", alignItems: "stretch" }}>
       <div
         style={{
           width: "fit-content",
@@ -462,7 +485,7 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
           <div style={tileLabel}>Entry zone</div>
           <div style={tileMain}>{ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}</div>
           <div style={tileSub}>
-            Preferred: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{fmtNum(ep)}</b>
+            Preferred: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 950 }}>{fmtNum(ep)}</b>
           </div>
         </div>
 
@@ -470,7 +493,7 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
           <div style={tileLabel}>Stop / Invalidation</div>
           <div style={tileMain}>{fmtNum(stop)}</div>
           <div style={tileSub}>
-            RR TP1: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
+            RR TP1: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 950 }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
           </div>
         </div>
 
@@ -521,7 +544,7 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", minWidth: 0 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start", minWidth: 0 }}>
-            <span style={{ fontSize: 14, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>{typeLabelVN(type)}</span>
+            <span style={{ fontSize: 14, fontWeight: 950, color: "rgba(226,232,240,0.95)" }}>{typeLabelVN(type)}</span>
             <span style={chipStyle(chipBase, biasTone)}>{String(bias)}</span>
             {tf ? <span style={chipStyle(chipBase, "muted")}>{tfLabelVN(tf)}</span> : null}
             <span style={chipStyle(chipBase, sm.tone)}>{sm.label}</span>
@@ -536,8 +559,8 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
         </div>
 
         <div style={{ flexShrink: 0, textAlign: "center", paddingTop: 2, minWidth: 62 }}>
-          <div style={{ fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 750 }}>View</div>
-          <div style={{ marginTop: 6, fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 700, overflowWrap: "anywhere" }}>{setup?.symbol || ""}</div>
+          <div style={{ fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 800 }}>View</div>
+          <div style={{ marginTop: 6, fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 750, overflowWrap: "anywhere" }}>{setup?.symbol || ""}</div>
         </div>
       </div>
     </div>
@@ -569,7 +592,7 @@ export default function SnapshotViewerPage() {
   }, []);
 
   // Top 100 coins autocomplete (CoinGecko)
-  const [coins, setCoins] = useState([]); // {id, symbol, name, market_cap_rank}
+  const [coins, setCoins] = useState([]); // {id, symbol, name, rank}
   const [coinsErr, setCoinsErr] = useState("");
   useEffect(() => {
     let alive = true;
@@ -605,8 +628,6 @@ export default function SnapshotViewerPage() {
   }, []);
 
   const [symbolInput, setSymbolInput] = useState("BTCUSDT");
-  const symbolInputRef = useRef(null);
-
   const [genLoading, setGenLoading] = useState(false);
   const [genErr, setGenErr] = useState("");
   const [snap, setSnap] = useState(null);
@@ -617,14 +638,11 @@ export default function SnapshotViewerPage() {
   const [tab, setTab] = useState("overview"); // overview | top | all
   const [fText, setFText] = useState("");
 
-  // normalize: allow user type "BTC", "BTCUSDT", "ETH/USDT" etc.
   const safeSymbol = useMemo(() => {
     const raw = String(symbolInput || "").trim().toUpperCase();
     if (!raw) return "";
     const cleaned = raw.replace(/\s+/g, "").replace("/", "");
     if (cleaned.endsWith("USDT")) return cleaned;
-    // if user typed known symbol, map to SYMBOLUSDT
-    // if typed coin name (rare), we don’t map here—only from selection.
     return `${cleaned}USDT`;
   }, [symbolInput]);
 
@@ -648,7 +666,6 @@ export default function SnapshotViewerPage() {
 
   const { px: refPx, src: pxSrc } = useMemo(() => getPrimaryPrice(snap), [snap]);
 
-  // Candle closes
   const close5m = useMemo(() => (snap ? findLastClose(snap, "m5") : null), [snap]);
   const close15m = useMemo(() => (snap ? findLastClose(snap, "m15") : null), [snap]);
   const close1h = useMemo(() => (snap ? findLastClose(snap, "h1") : null), [snap]);
@@ -690,7 +707,7 @@ export default function SnapshotViewerPage() {
     }
   };
 
-  // Market context (content + icon only)
+  // Market context: content + icon only
   const marketContextItems = useMemo(() => {
     if (!headlineObj) return [];
     const items = [];
@@ -736,6 +753,20 @@ export default function SnapshotViewerPage() {
     return items;
   }, [headlineObj]);
 
+  const coinOptions = useMemo(() => {
+    return coins.slice(0, 100).map((c) => {
+      const label = `${c.name} (${c.symbol})`;
+      const pair = `${c.symbol}USDT`;
+      return { label, pair };
+    });
+  }, [coins]);
+
+  const labelToPair = useMemo(() => {
+    const m = new Map();
+    for (const o of coinOptions) m.set(o.label, o.pair);
+    return m;
+  }, [coinOptions]);
+
   const fontStack =
     '"Be Vietnam Pro","Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji"';
 
@@ -753,7 +784,6 @@ export default function SnapshotViewerPage() {
         "radial-gradient(900px 520px at 50% 110%, rgba(34,197,94,0.14) 0%, rgba(34,197,94,0) 55%)," +
         "linear-gradient(180deg, rgba(2,6,23,1) 0%, rgba(15,23,42,1) 50%, rgba(2,6,23,1) 100%)",
     },
-
     shell: {
       maxWidth: 1180,
       margin: "0 auto",
@@ -761,7 +791,6 @@ export default function SnapshotViewerPage() {
       display: "grid",
       gap: 12,
     },
-
     topbar: {
       position: "sticky",
       top: 0,
@@ -773,7 +802,6 @@ export default function SnapshotViewerPage() {
       boxShadow: "0 18px 60px rgba(0,0,0,0.35)",
       padding: isWide ? 14 : 12,
     },
-
     card: {
       borderRadius: 18,
       border: "1px solid rgba(148,163,184,0.18)",
@@ -783,7 +811,6 @@ export default function SnapshotViewerPage() {
       minWidth: 0,
       backdropFilter: "blur(14px)",
     },
-
     subtle: {
       borderRadius: 16,
       border: "1px solid rgba(148,163,184,0.16)",
@@ -792,34 +819,31 @@ export default function SnapshotViewerPage() {
       minWidth: 0,
       backdropFilter: "blur(12px)",
     },
-
     btn: (variant) => ({
       padding: "10px 12px",
       borderRadius: 14,
       border: variant === "primary" ? "1px solid rgba(226,232,240,0.35)" : "1px solid rgba(148,163,184,0.22)",
       background: variant === "primary" ? "rgba(226,232,240,0.10)" : "rgba(30,41,59,0.55)",
       color: "rgba(226,232,240,0.95)",
-      fontWeight: 800,
+      fontWeight: 900,
       fontSize: 12,
       cursor: "pointer",
       userSelect: "none",
       whiteSpace: "nowrap",
       backdropFilter: "blur(12px)",
     }),
-
     input: {
       padding: "10px 12px",
       borderRadius: 14,
       border: "1px solid rgba(148,163,184,0.24)",
       background: "rgba(2,6,23,0.35)",
       fontSize: 12,
-      fontWeight: 800,
+      fontWeight: 900,
       color: "rgba(226,232,240,0.95)",
       outline: "none",
       minWidth: 0,
       width: "100%",
     },
-
     segWrap: {
       display: "inline-flex",
       padding: 4,
@@ -829,14 +853,13 @@ export default function SnapshotViewerPage() {
       gap: 4,
       backdropFilter: "blur(12px)",
     },
-
     segBtn: (active) => ({
       padding: "8px 10px",
       borderRadius: 12,
       border: "1px solid rgba(148,163,184,0.0)",
       background: active ? "rgba(226,232,240,0.12)" : "transparent",
       color: "rgba(226,232,240,0.95)",
-      fontWeight: 900,
+      fontWeight: 950,
       fontSize: 12,
       cursor: "pointer",
       userSelect: "none",
@@ -853,7 +876,7 @@ export default function SnapshotViewerPage() {
     padding: "6px 10px",
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: 850,
+    fontWeight: 900,
     userSelect: "none",
     whiteSpace: "nowrap",
   };
@@ -864,33 +887,18 @@ export default function SnapshotViewerPage() {
     return { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
   }, [isWide, isMid]);
 
-  // Autocomplete datalist options
-  const coinOptions = useMemo(() => {
-    // keep it tight: top 100 only
-    return coins.slice(0, 100).map((c) => {
-      const label = `${c.name} (${c.symbol})`;
-      const pair = `${c.symbol}USDT`;
-      return { label, pair };
-    });
-  }, [coins]);
+  const isKVStacked = !isMid;
 
-  // If user selects a datalist option, browser gives the value (label),
-  // but we want to convert to pair. We'll map by label.
-  const labelToPair = useMemo(() => {
-    const m = new Map();
-    for (const o of coinOptions) m.set(o.label, o.pair);
-    return m;
-  }, [coinOptions]);
-
+  // --------- Render ----------
   return (
     <div style={styles.page}>
       <div style={styles.shell}>
-        {/* TOPBAR: Generate + Summary + Candle closes */}
+        {/* Top bar: Generate + summary + closes */}
         <div style={styles.topbar}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 950, letterSpacing: 0.2 }}>{symbol || "—"}</div>
+                <div style={{ fontSize: 16, fontWeight: 980, letterSpacing: 0.2 }}>{symbol || "—"}</div>
 
                 {snap ? (
                   <>
@@ -903,7 +911,6 @@ export default function SnapshotViewerPage() {
                 )}
               </div>
 
-              {/* candle closes row */}
               <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <span style={chipStyle(chipsBase, "muted")}>Close 5m: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(close5m)}</b></span>
                 <span style={chipStyle(chipsBase, "muted")}>Close 15m: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(close15m)}</b></span>
@@ -912,11 +919,11 @@ export default function SnapshotViewerPage() {
                 <span style={chipStyle(chipsBase, "muted")}>Close 1D: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(close1d)}</b></span>
               </div>
 
-              <div style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.72)", fontWeight: 650, lineHeight: 1.35, overflowWrap: "anywhere" }}>
+              <div style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.72)", fontWeight: 700, lineHeight: 1.35, overflowWrap: "anywhere" }}>
                 {snap ? (
                   <>
-                    Generated: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{fmtTs(generatedAt, tz)}</b> · TZ:{" "}
-                    <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{tz}</b>
+                    Generated: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 950 }}>{fmtTs(generatedAt, tz)}</b> · TZ:{" "}
+                    <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 950 }}>{tz}</b>
                   </>
                 ) : (
                   "Nhập Symbol rồi bấm Generate để chạy snapshot và phân tích."
@@ -924,24 +931,15 @@ export default function SnapshotViewerPage() {
               </div>
             </div>
 
-            {/* Right controls: input + generate + tabs */}
             <div style={{ display: "grid", gap: 10, minWidth: isWide ? 420 : "100%" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
                 <div style={{ minWidth: 0 }}>
                   <input
-                    ref={symbolInputRef}
                     value={symbolInput}
                     onChange={(e) => {
                       const v = e.target.value;
-                      // if user picked from datalist (label), map to pair
                       const mapped = labelToPair.get(v);
                       setSymbolInput(mapped || v);
-                    }}
-                    onBlur={() => {
-                      // normalize on blur
-                      const v = String(symbolInput || "").trim();
-                      if (labelToPair.has(v)) return;
-                      // keep user string; safeSymbol will normalize.
                     }}
                     placeholder="BTC / BTCUSDT / ETH..."
                     style={styles.input}
@@ -957,7 +955,7 @@ export default function SnapshotViewerPage() {
                     ))}
                   </datalist>
                   {coinsErr ? (
-                    <div style={{ marginTop: 6, fontSize: 12, color: "rgba(245,158,11,0.95)", fontWeight: 750 }}>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "rgba(245,158,11,0.95)", fontWeight: 800 }}>
                       Không load được Top 100 (CoinGecko). Bạn vẫn có thể nhập symbol thủ công.
                     </div>
                   ) : null}
@@ -969,7 +967,7 @@ export default function SnapshotViewerPage() {
               </div>
 
               {genErr ? (
-                <div style={{ color: "rgb(239,68,68)", fontWeight: 850, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>{genErr}</div>
+                <div style={{ color: "rgb(239,68,68)", fontWeight: 900, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>{genErr}</div>
               ) : null}
 
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -990,21 +988,14 @@ export default function SnapshotViewerPage() {
           </div>
         </div>
 
-        {/* MAIN CONTENT */}
+        {/* Content */}
         <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
           {tab === "overview" ? (
             <div style={styles.card}>
               <Section title="Market Context" right={outlook ? "unified.market_outlook_v1" : "market_outlook_v1 not found"} noTop>
                 {marketContextItems.length ? (
                   <div style={styles.subtle}>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: isMid ? "repeat(2, minmax(0, 1fr))" : "1fr",
-                        gap: 10,
-                        minWidth: 0,
-                      }}
-                    >
+                    <div style={{ display: "grid", gridTemplateColumns: isMid ? "repeat(2, minmax(0, 1fr))" : "1fr", gap: 10, minWidth: 0 }}>
                       {marketContextItems.map((it) => (
                         <div
                           key={it.key}
@@ -1020,7 +1011,7 @@ export default function SnapshotViewerPage() {
                             minWidth: 0,
                           }}
                         >
-                          <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.92)", overflowWrap: "anywhere", lineHeight: 1.35 }}>
+                          <div style={{ fontSize: 13, fontWeight: 950, color: "rgba(226,232,240,0.92)", overflowWrap: "anywhere", lineHeight: 1.35 }}>
                             {it.text}
                           </div>
                           <span style={chipStyle({ padding: "6px 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" }, it.tone)}>
@@ -1044,7 +1035,7 @@ export default function SnapshotViewerPage() {
                     ) : null}
                   </div>
                 ) : (
-                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có headline trong snapshot)</div>
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 700, fontSize: 13 }}>(Không có headline trong snapshot)</div>
                 )}
               </Section>
 
@@ -1068,7 +1059,7 @@ export default function SnapshotViewerPage() {
                         {action.summary.slice(0, 6).map((b, i) => (
                           <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                             <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(226,232,240,0.55)", marginTop: 7, flexShrink: 0 }} />
-                            <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.80)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>{String(b)}</div>
+                            <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.80)", lineHeight: 1.4, fontWeight: 700, overflowWrap: "anywhere" }}>{String(b)}</div>
                           </div>
                         ))}
                       </div>
@@ -1093,7 +1084,7 @@ export default function SnapshotViewerPage() {
                         backdropFilter: "blur(10px)",
                       }}
                     >
-                      <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.95)" }}>{h?.title || h?.label || `Horizon ${i + 1}`}</div>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>{h?.title || h?.label || `Horizon ${i + 1}`}</div>
                       <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {h?.bias ? <span style={chipStyle(chipsBase, toneForBias(h.bias))}>{String(h.bias)}</span> : null}
                         {h?.clarity ? <span style={chipStyle(chipsBase, "muted")}>Rõ xu hướng: {String(h.clarity)}</span> : null}
@@ -1101,7 +1092,7 @@ export default function SnapshotViewerPage() {
                       </div>
 
                       {safeArr(h?.drivers).slice(0, 4).map((d, k) => (
-                        <div key={k} style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.82)", fontWeight: 650, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+                        <div key={k} style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.82)", fontWeight: 700, lineHeight: 1.4, overflowWrap: "anywhere" }}>
                           • {String(d)}
                         </div>
                       ))}
@@ -1114,7 +1105,7 @@ export default function SnapshotViewerPage() {
                 {primary ? (
                   <SetupCard setup={primary} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} />
                 ) : (
-                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Snapshot không có primary tradable setup)</div>
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 700, fontSize: 13 }}>(Snapshot không có primary tradable setup)</div>
                 )}
               </Section>
 
@@ -1126,7 +1117,7 @@ export default function SnapshotViewerPage() {
                     ))}
                   </div>
                 ) : (
-                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates khớp filter)</div>
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 700, fontSize: 13 }}>(Không có top_candidates khớp filter)</div>
                 )}
               </Section>
             </div>
@@ -1142,7 +1133,7 @@ export default function SnapshotViewerPage() {
                     ))}
                   </div>
                 ) : (
-                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates khớp filter)</div>
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 700, fontSize: 13 }}>(Không có top_candidates khớp filter)</div>
                 )}
               </Section>
             </div>
@@ -1158,14 +1149,14 @@ export default function SnapshotViewerPage() {
                     ))}
                   </div>
                 ) : (
-                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có setup nào khớp filter)</div>
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 700, fontSize: 13 }}>(Không có setup nào khớp filter)</div>
                 )}
               </Section>
             </div>
           ) : null}
         </div>
 
-        {/* Setup details drawer (NO raw JSON block) */}
+        {/* Drawer: FULL DETAILS restored */}
         <Drawer
           open={drawerOpen}
           onClose={onCloseDrawer}
@@ -1177,41 +1168,107 @@ export default function SnapshotViewerPage() {
         >
           {selectedSetup ? (
             <div style={{ display: "grid", gap: 14, minWidth: 0 }}>
-              <div
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid rgba(148,163,184,0.18)",
-                  background: "rgba(30,41,59,0.45)",
-                  padding: 14,
-                  minWidth: 0,
-                  backdropFilter: "blur(12px)",
-                }}
-              >
+              {/* Trigger + quick copy */}
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(30,41,59,0.45)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
                 <div style={{ fontSize: 12, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>Trigger</div>
-                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.95)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 850, color: "rgba(226,232,240,0.95)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
                   {selectedSetup.trigger || "—"}
                 </div>
-
                 <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button
-                    style={{
-                      border: "1px solid rgba(148,163,184,0.22)",
-                      background: "rgba(2,6,23,0.25)",
-                      padding: "10px 12px",
-                      borderRadius: 12,
-                      cursor: "pointer",
-                      fontWeight: 850,
-                      color: "rgba(226,232,240,0.95)",
-                    }}
+                    style={{ border: "1px solid rgba(148,163,184,0.22)", background: "rgba(2,6,23,0.25)", padding: "10px 12px", borderRadius: 12, cursor: "pointer", fontWeight: 900, color: "rgba(226,232,240,0.95)" }}
                     onClick={() => copyText(selectedSetup.trigger || "")}
                   >
                     Copy Trigger
                   </button>
                 </div>
               </div>
+
+              {/* Trade Parameters */}
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Trade Parameters</div>
+
+                <KV
+                  stacked={isKVStacked}
+                  k="Entry zone"
+                  v={
+                    Array.isArray(selectedSetup.entry_zone) && selectedSetup.entry_zone.length === 2
+                      ? `${fmtNum(Math.min(selectedSetup.entry_zone[0], selectedSetup.entry_zone[1]))} → ${fmtNum(Math.max(selectedSetup.entry_zone[0], selectedSetup.entry_zone[1]))}`
+                      : "—"
+                  }
+                />
+                <KV stacked={isKVStacked} k="Entry preferred" v={fmtNum(Number.isFinite(selectedSetup.entry_preferred) ? selectedSetup.entry_preferred : selectedSetup.entry)} />
+                <KV stacked={isKVStacked} k="Stop / Invalidation" v={fmtNum(Number.isFinite(selectedSetup.stop) ? selectedSetup.stop : selectedSetup.invalidation)} />
+                <KV stacked={isKVStacked} k="TP1" v={fmtNum(selectedSetup?.targets?.tp1 ?? selectedSetup?.tp1)} />
+                <KV stacked={isKVStacked} k="TP2" v={fmtNum(selectedSetup?.targets?.tp2 ?? selectedSetup?.tp2)} />
+                <KV
+                  stacked={isKVStacked}
+                  k="RR (TP1)"
+                  v={
+                    Number.isFinite(selectedSetup?.execution_metrics?.rr_tp1)
+                      ? selectedSetup.execution_metrics.rr_tp1.toFixed(2)
+                      : Number.isFinite(selectedSetup?.scores?.rr_tp1)
+                      ? selectedSetup.scores.rr_tp1.toFixed(2)
+                      : Number.isFinite(selectedSetup?.rr_estimate_tp1)
+                      ? selectedSetup.rr_estimate_tp1.toFixed(2)
+                      : "—"
+                  }
+                  mono
+                />
+              </div>
+
+              {/* Scoring & State */}
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Scoring & Execution</div>
+
+                <KV stacked={isKVStacked} k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
+                <KV stacked={isKVStacked} k="Tradable" v={selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true ? "Yes" : "No / Unknown"} />
+                <KV stacked={isKVStacked} k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
+                <KV stacked={isKVStacked} k="Readiness" v={selectedSetup?.execution_state?.readiness || "—"} />
+                <KV
+                  stacked={isKVStacked}
+                  k="Order"
+                  v={
+                    selectedSetup?.execution_state?.order?.type
+                      ? `${selectedSetup.execution_state.order.type}${selectedSetup.execution_state.order.price != null ? ` @ ${fmtNum(selectedSetup.execution_state.order.price)}` : ""}`
+                      : "—"
+                  }
+                />
+
+                <KV
+                  stacked={isKVStacked}
+                  k="Final score"
+                  v={
+                    Number.isFinite(selectedSetup?.final_score)
+                      ? fmtPct01(selectedSetup.final_score)
+                      : Number.isFinite(selectedSetup?.scores?.final_score)
+                      ? fmtPct01(selectedSetup.scores.final_score)
+                      : Number.isFinite(selectedSetup?.confidence)
+                      ? fmtPct01(selectedSetup.confidence)
+                      : "—"
+                  }
+                />
+                <KV stacked={isKVStacked} k="Quality tier" v={selectedSetup?.quality_tier || selectedSetup?.scores?.quality_tier || "—"} />
+              </div>
+
+              {/* Reasons / Warnings */}
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ fontSize: 13, fontWeight: 950, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Reasons & Notes</div>
+
+                <KV
+                  stacked={isKVStacked}
+                  k="Reasons"
+                  v={
+                    safeArr(selectedSetup?.eligibility?.reasons).length || safeArr(selectedSetup?.execution_state?.reason).length
+                      ? uniq([...safeArr(selectedSetup?.eligibility?.reasons), ...safeArr(selectedSetup?.execution_state?.reason)]).slice(0, 12).join(" · ")
+                      : "—"
+                  }
+                />
+                <KV stacked={isKVStacked} k="Warnings" v={safeArr(selectedSetup?.warnings).length ? safeArr(selectedSetup.warnings).slice(0, 12).join(" · ") : "—"} />
+              </div>
             </div>
           ) : (
-            <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650 }}>No setup selected.</div>
+            <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 700 }}>No setup selected.</div>
           )}
         </Drawer>
       </div>
