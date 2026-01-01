@@ -308,7 +308,112 @@ function chipStyle(tone) {
   };
 }
 
-function Bar({ value01, tone = "cyan", labelLeft, labelRight }) {
+
+/* =========================
+   Help tooltips (VN)
+========================= */
+const HELP_VN = {
+  readiness: {
+    title: "Execution Readiness",
+    lines: [
+      "Là mức độ SẴN SÀNG để THỰC THI lệnh ngay lúc này (timing).",
+      "Không phải xác suất thắng; không thay thế RR hay Score.",
+      "Cách đọc nhanh: ≥70% có thể vào theo plan; 40–70% chờ thêm điều kiện; <40% đứng ngoài.",
+      "Readiness thấp thường do: giá chưa về entry, trigger chưa xác nhận, hoặc đang tránh FOMO."
+    ],
+  },
+  setup_score: {
+    title: "Setup Score",
+    lines: [
+      "Là điểm chất lượng của setup (độ 'đáng trade' về mặt kỹ thuật + cấu trúc).",
+      "Không phản ánh timing vào lệnh; timing xem ở Readiness.",
+      "Cách đọc nhanh: ≥80% rất đẹp; 65–80% ổn; <65% chỉ theo dõi/đợi kèo tốt hơn.",
+      "Score cao nhưng Readiness thấp: kèo đẹp nhưng CHƯA ĐẾN LÚC vào."
+    ],
+  },
+  context_fit: {
+    title: "Context Fit (FIT)",
+    lines: [
+      "Là mức độ phù hợp của setup với BỐI CẢNH thị trường hiện tại (thuận gió hay ngược gió).",
+      "Ví dụ: Long hợp nếu HTF ủng hộ và dòng tiền nghiêng mua; ngược lại FIT giảm.",
+      "Cách đọc nhanh: ≥70% ưu tiên; 50–70% theo dõi; <50% tránh (ngược bối cảnh).",
+      "FIT khác Score: Score = kèo đẹp; FIT = kèo hợp bối cảnh."
+    ],
+  },
+};
+
+function HelpTip({ k }) {
+  const data = HELP_VN[k];
+  const [open, setOpen] = useState(false);
+  if (!data) return null;
+
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      tabIndex={0}
+      aria-label={`Giải thích ${data.title}`}
+    >
+      <span
+        style={{
+          width: 16,
+          height: 16,
+          marginLeft: 6,
+          borderRadius: 99,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          border: "1px solid rgba(148,163,184,0.35)",
+          background: "rgba(2,6,23,0.35)",
+          color: "rgba(226,232,240,0.95)",
+          fontSize: 11,
+          fontWeight: 950,
+          cursor: "help",
+          userSelect: "none",
+        }}
+        title={`${data.title}: ${data.lines.join(" ")}`}
+      >
+        i
+      </span>
+
+      {open ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 20,
+            zIndex: 5000,
+            width: 320,
+            maxWidth: "min(320px, 80vw)",
+            padding: 12,
+            borderRadius: 14,
+            border: "1px solid rgba(148,163,184,0.22)",
+            background: "rgba(2,6,23,0.92)",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.55)",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)" }}>{data.title}</div>
+          <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+            {data.lines.map((t, idx) => (
+              <div key={idx} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div style={{ width: 6, height: 6, borderRadius: 99, marginTop: 6, background: "rgba(34,211,238,1)" }} />
+                <div style={{ fontSize: 12, fontWeight: 750, color: "rgba(226,232,240,0.86)", lineHeight: 1.45 }}>
+                  {t}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </span>
+  );
+}
+
+{ value01, tone = "cyan", labelLeft, labelRight }) {
   const v = clamp(Number(value01), 0, 1);
   const c =
     tone === "pos" ? "rgba(34,197,94,1)"
@@ -321,7 +426,7 @@ function Bar({ value01, tone = "cyan", labelLeft, labelRight }) {
     <div style={{ width: "100%", minWidth: 0 }}>
       {(labelLeft || labelRight) ? (
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5, fontWeight: 800, color: "rgba(148,163,184,0.95)" }}>
-          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{labelLeft || ""}</div>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}><span>{labelLeft || ""}</span>{helpKey ? <HelpTip k={helpKey} /> : null}</div>
           <div style={{ whiteSpace: "nowrap" }}>{labelRight || ""}</div>
         </div>
       ) : null}
@@ -653,13 +758,13 @@ function FocusSetupCard({ item, outlook, onOpen }) {
           <Bar
             value01={Number.isFinite(item?.final_score) ? item.final_score : 0}
             tone={scoreTone === "pos" ? "pos" : scoreTone === "warn" ? "warn" : "cyan"}
-            labelLeft="Setup Score"
+            labelLeft="Setup Score" helpKey="setup_score"
             labelRight={Number.isFinite(item?.final_score) ? pct(item.final_score, 0) : "—"}
           />
           <Bar
             value01={Number.isFinite(item?.context_fit) ? item.context_fit : 0}
             tone={fitTone}
-            labelLeft="Context Fit"
+            labelLeft="Context Fit" helpKey="context_fit"
             labelRight={Number.isFinite(item?.context_fit) ? pct(item.context_fit, 0) : "—"}
           />
           <Bar
@@ -1481,7 +1586,7 @@ export default function SnapshotViewerPage() {
                   </div>
 
                   <div style={{ minWidth: 240, flex: "0 0 280px" }}>
-                    <Bar value01={readiness01} tone={st.tone === "pos" ? "pos" : st.tone === "warn" ? "warn" : st.tone === "neg" ? "neg" : "cyan"} labelLeft="Execution readiness" labelRight={pct(readiness01, 0)} />
+                    <Bar value01={readiness01} tone={st.tone === "pos" ? "pos" : st.tone === "warn" ? "warn" : st.tone === "neg" ? "neg" : "cyan"} labelLeft="Execution readiness" helpKey="readiness" labelRight={pct(readiness01, 0)} />
                   </div>
                 </div>
 
