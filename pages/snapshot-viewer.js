@@ -47,6 +47,21 @@ function fmtTs(ts, tz = "America/Los_Angeles") {
   }
 }
 
+function fmtTsShort(ts, tz = "America/Los_Angeles") {
+  if (!Number.isFinite(ts)) return "—";
+  try {
+    return new Date(ts).toLocaleString("en-US", {
+      timeZone: tz,
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return new Date(ts).toISOString().slice(0, 16);
+  }
+}
+
 function toLower(x) {
   return String(x || "").toLowerCase();
 }
@@ -79,10 +94,10 @@ function typeLabelVN(type) {
 
 function statusMetaVN(status) {
   const s = toLower(status);
-  if (s.includes("vào") || s === "ready") return { label: "READY", tone: "pos" };
-  if (s.includes("chờ") || s === "waiting") return { label: "WAIT", tone: "warn" };
-  if (s.includes("bỏ") || s === "missed") return { label: "NO TRADE", tone: "muted" };
-  if (s.includes("hỏng") || s === "invalidated") return { label: "INVALID", tone: "neg" };
+  if (s.includes("vào") || s === "ready") return { label: "SẴN SÀNG", tone: "pos" };
+  if (s.includes("chờ") || s === "waiting") return { label: "CHỜ", tone: "warn" };
+  if (s.includes("bỏ") || s.includes("no trade") || s === "missed") return { label: "ĐỨNG NGOÀI", tone: "muted" };
+  if (s.includes("hỏng") || s === "invalidated") return { label: "HỎNG", tone: "neg" };
   return { label: String(status || "UNKNOWN"), tone: "muted" };
 }
 
@@ -503,9 +518,6 @@ function SetupMiniRow({ item, onOpen }) {
           <span style={chipStyle(phaseMeta.tone)}>{phaseMeta.label}</span>
           <span style={chipStyle(biasTone)}>{String(item?.bias || "—")}</span>
           <span style={chipStyle("muted")}>{triggerState}</span>
-        </div>
-        <div style={{ marginTop: 6, fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {item?.symbol || ""}
         </div>
         <div style={{ marginTop: 6, fontSize: 12.0, fontWeight: 850, color: "rgba(226,232,240,0.78)", overflowWrap: "anywhere" }}>
           <span style={{ color: "rgba(148,163,184,0.95)", fontWeight: 950 }}>Cần đợi:</span> {needText}
@@ -928,12 +940,12 @@ function useLoadingPipeline(isLoading) {
   );
 
   const [idx, setIdx] = useState(0);
-  const [t, setT] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
     if (!isLoading) {
       setIdx(0);
-      setT(0);
+      setElapsedMs(0);
       return;
     }
     let raf = null;
@@ -942,7 +954,7 @@ function useLoadingPipeline(isLoading) {
     const tick = () => {
       const now = performance.now();
       const elapsed = now - start;
-      setT(elapsed);
+      setElapsedMs(elapsed);
       const step = Math.floor(elapsed / 850);
       setIdx(Math.min(step, steps.length - 1));
       raf = requestAnimationFrame(tick);
@@ -951,7 +963,10 @@ function useLoadingPipeline(isLoading) {
     return () => raf && cancelAnimationFrame(raf);
   }, [isLoading, steps.length]);
 
-  const progress01 = isLoading ? clamp((idx + clamp((t % 850) / 850, 0, 1)) / steps.length, 0, 1) : 0;
+  // Monotonic progress: reach 100% and stay there until the real generation finishes.
+  // Avoid looping 80% -> 100% caused by fractional progress on the last step.
+  const total = steps.length * 850;
+  const progress01 = isLoading ? clamp(elapsedMs / total, 0, 1) : 0;
 
   return { steps, idx, progress01 };
 }
@@ -1235,6 +1250,15 @@ export default function SnapshotViewerPage() {
 
   // Market headline chips
   const chips = [];
+  // Compact meta (Ref + Updated + State) to reduce clutter in the top bar
+  if (Number.isFinite(refPx) || Number.isFinite(generatedAt)) {
+    const parts = [];
+    if (Number.isFinite(refPx)) parts.push(`Ref ${fmtNum(refPx)} (${pxSrc})`);
+    if (Number.isFinite(generatedAt)) parts.push(`Upd ${fmtTsShort(generatedAt, tz)}`);
+    if (parts.length) chips.push({ tone: "muted", text: parts.join(" • ") });
+  }
+  // State (READY/CHỜ/ĐỨNG NGOÀI...) sits with the other market chips, not the command controls
+  if (st?.label) chips.push({ tone: st.tone, text: `Trạng thái: ${st.label}` });
   if (headline?.market_position) chips.push({ tone: "violet", text: headline.market_position });
   if (headline?.trend_clarity) chips.push({ tone: "muted", text: headline.trend_clarity });
   if (headline?.quick_risk) chips.push({ tone: "warn", text: headline.quick_risk });
@@ -1253,9 +1277,6 @@ export default function SnapshotViewerPage() {
                 <Icon name="spark" tone="cyan" size={18} />
                 <div style={{ fontSize: 15, fontWeight: 980, letterSpacing: 0.2 }}>{symbol}</div>
               </div>
-              {Number.isFinite(refPx) ? <span style={chipStyle("muted")}>Ref {fmtNum(refPx)} <span style={{ color: "rgba(148,163,184,0.95)", fontWeight: 850 }}>({pxSrc})</span></span> : null}
-              {Number.isFinite(generatedAt) ? <span style={chipStyle("muted")}>Updated {fmtTs(generatedAt, tz)}</span> : null}
-              <span style={chipStyle(st.tone)}>{st.label}</span>
             </div>
           </div>
 
