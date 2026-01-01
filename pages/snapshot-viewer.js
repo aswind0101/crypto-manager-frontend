@@ -344,7 +344,6 @@ function HelpTip({ k }) {
       <button
         type="button"
         onPointerDown={toggle}
-        onClick={toggle}
         aria-label={`Giải thích ${data.title}`}
         aria-expanded={open ? "true" : "false"}
         style={{
@@ -405,7 +404,6 @@ function HelpTip({ k }) {
             <button
               type="button"
               onPointerDown={close}
-              onClick={close}
               aria-label="Đóng"
               style={{
                 border: "1px solid rgba(148,163,184,0.22)",
