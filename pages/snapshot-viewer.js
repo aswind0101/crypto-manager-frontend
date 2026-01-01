@@ -500,12 +500,14 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   const tileMain = { marginTop: 2, fontSize: isCompact ? 12.5 : 13, fontWeight: 850, color: "rgba(226,232,240,0.95)", overflowWrap: "anywhere", textAlign: "center", width: "100%" };
   const tileSub = { marginTop: 2, fontSize: isCompact ? 11.5 : 12, color: "rgba(226,232,240,0.80)", fontWeight: 650, overflowWrap: "anywhere", textAlign: "center", width: "100%" };
 
+  // IMPORTANT: Center the whole tile group (NOT just content inside tiles)
+  // Use inline-grid so the block can shrink-to-fit and be centered by outer wrapper.
   const tileGroup = (
     <div style={{ textAlign: "center" }}>
       <div
         style={{
           marginTop: 12,
-          display: "inline-grid",
+          display: "inline-grid", // key: shrink-to-fit then center as inline element
           gridTemplateColumns: isWide || isMid ? "repeat(4, minmax(0, 220px))" : "repeat(2, minmax(0, 220px))",
           gap: isCompact ? 8 : 10,
           justifyContent: "center",
@@ -677,9 +679,7 @@ export default function SnapshotViewerPage() {
 
     return () => {
       alive = false;
-      try {
-        ac.abort();
-      } catch {}
+      try { ac.abort(); } catch {}
     };
   }, []);
 
@@ -1045,7 +1045,9 @@ export default function SnapshotViewerPage() {
     return { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
   }, [isWide, isMid]);
 
+
   // Controls panel removed (Generate is now in topbar)
+
 
   const isKVStacked = !isMid;
 
@@ -1057,6 +1059,7 @@ export default function SnapshotViewerPage() {
     if (headlineObj.trend_clarity) items.push({ key: "clarity", icon: "clarity", tone: "muted", text: `${headlineObj.trend_clarity}` });
     if (headlineObj.data_quality) items.push({ key: "data", icon: "data", tone: "muted", text: `${headlineObj.data_quality}` });
 
+    // refine icon for market direction
     if (items.length) {
       const m = items.find((x) => x.key === "market");
       if (m) {
@@ -1191,6 +1194,7 @@ export default function SnapshotViewerPage() {
                                 key={c.id || c.pair || i}
                                 onMouseEnter={() => setSuggActive(i)}
                                 onMouseDown={(e) => {
+                                  // prevent input blur
                                   e.preventDefault();
                                   pickSuggestion(c);
                                 }}
@@ -1252,18 +1256,341 @@ export default function SnapshotViewerPage() {
               </div>
             </div>
           </div>
-
-          {genErr ? (
-            <div style={{ marginTop: 10, color: "rgb(239,68,68)", fontWeight: 850, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>{genErr}</div>
-          ) : null}
         </div>
 
         <div style={styles.grid}>
           <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
-            {/* ... phần render còn lại của viewer giữ nguyên như file gốc ... */}
-            {/* Lưu ý: phần code phía dưới (overview/top/all, drawer, filters...) vẫn giữ nguyên của bạn. */}
+            {tab === "overview" ? (
+              <div style={styles.card}>
+                <Section title="Market Context" right={outlook ? "unified.market_outlook_v1" : "market_outlook_v1 not found"} noTop>
+                  {marketContextItems.length ? (
+                    <div style={styles.subtle}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: isMid ? "repeat(2, minmax(0, 1fr))" : "1fr",
+                          gap: 10,
+                          minWidth: 0,
+                        }}
+                      >
+                        {marketContextItems.map((it) => (
+                          <div
+                            key={it.key}
+                            style={{
+                              borderRadius: 16,
+                              border: "1px solid rgba(148,163,184,0.18)",
+                              background: "rgba(2,6,23,0.22)",
+                              padding: 12,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 10,
+                              minWidth: 0,
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.92)", overflowWrap: "anywhere", lineHeight: 1.35 }}>
+                              {it.text}
+                            </div>
+                            <span
+                              style={chipStyle(
+                                { ...chipsBase, padding: "6px 10px", gap: 8, color: "currentColor" },
+                                it.tone
+                              )}
+                            >
+                              <span style={{ display: "inline-flex", alignItems: "center" }}>
+                                <Icon name={it.icon} size={16} />
+                              </span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {flagObjs.length ? (
+                        <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {flagObjs.slice(0, 12).map((f, i) => {
+                            const tone = toLower(f?.tone) === "good" ? "pos" : toLower(f?.tone) === "bad" ? "neg" : toLower(f?.tone) === "warn" ? "warn" : "muted";
+                            return (
+                              <span key={f?.key || i} style={chipStyle(chipsBase, tone)}>
+                                {String(f?.text || f?.key || "")}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có headline trong snapshot)</div>
+                  )}
+
+                  {action ? (
+                    <div style={{ marginTop: 12, borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(2,6,23,0.18)", padding: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>Action</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={chipStyle(chipsBase, "muted")}>Hành động: {action.status || "—"}</span>
+                          {action.setup_type_label ? <span style={chipStyle(chipsBase, "muted")}>Setup: {action.setup_type_label}</span> : null}
+                          {action.tf_label ? <span style={chipStyle(chipsBase, "muted")}>TF: {action.tf_label}</span> : null}
+                          {action.order_type ? (
+                            <span style={chipStyle(chipsBase, "muted")}>
+                              Order: {action.order_type}
+                              {action.order_price != null ? ` @ ${fmtNum(action.order_price)}` : ""}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {Array.isArray(action.summary) && action.summary.length ? (
+                        <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                          {action.summary.slice(0, 6).map((b, i) => (
+                            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(226,232,240,0.55)", marginTop: 7, flexShrink: 0 }} />
+                              <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.80)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>{String(b)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div style={{ marginTop: 12, ...horizonsGridStyle }}>
+                    {(horizons.length ? horizons : [{ title: "30m–4h" }, { title: "1–3d" }, { title: "1–2w" }]).map((h, i) => (
+                      <HorizonCard key={i} h={h} idx={i} />
+                    ))}
+                  </div>
+                </Section>
+
+                <div style={styles.divider} />
+
+                <Section title="Primary Setup" right={primary ? "unified.setups_v2.primary" : "no primary setup"} noTop>
+                  {primary ? <SetupCard setup={primary} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} /> : <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Snapshot không có primary tradable setup)</div>}
+                </Section>
+
+                <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"}>
+                  {top.length ? (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {top.map((s, idx) => (
+                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates trong snapshot)</div>
+                  )}
+                </Section>
+              </div>
+            ) : null}
+
+            {tab === "top" ? (
+              <div style={styles.card}>
+                <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"} noTop>
+                  {top.length ? (
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {top.map((s, idx) => (
+                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates trong snapshot)</div>
+                  )}
+                </Section>
+              </div>
+            ) : null}
+
+            {tab === "all" ? (
+              <div style={styles.card}>
+                <Section title="All Candidates" right={`Showing ${filteredAll.length} / ${all.length}`} noTop>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isWide ? "1.1fr 0.65fr 0.7fr 0.6fr 0.7fr 0.8fr" : "1fr 1fr",
+                        gap: 10,
+                        alignItems: "center",
+                        minWidth: 0,
+                      }}
+                    >
+                      <input value={fText} onChange={(e) => setFText(e.target.value)} placeholder="Search trigger / reasons / warnings..." style={styles.input} />
+
+                      <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} style={styles.select}>
+                        <option value="all">Status: All</option>
+                        <option value="tradable">Tradable</option>
+                        <option value="waiting">Waiting</option>
+                        <option value="missed">Missed</option>
+                        <option value="invalidated">Invalidated</option>
+                        <option value="unavailable">Unavailable</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+
+                      <select value={fType} onChange={(e) => setFType(e.target.value)} style={styles.select}>
+                        <option value="all">Type: All</option>
+                        {allTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {typeLabelVN(t)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select value={fTf} onChange={(e) => setFTf(e.target.value)} style={styles.select}>
+                        <option value="all">TF: All</option>
+                        {allTfs.map((t) => (
+                          <option key={t} value={t}>
+                            {tfLabelVN(t)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={styles.select}>
+                        <option value="score_desc">Sort: Score desc</option>
+                        <option value="rr_desc">Sort: RR desc</option>
+                        <option value="tf_asc">Sort: TF asc</option>
+                      </select>
+
+                      <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.20)", background: "rgba(2,6,23,0.25)", fontSize: 12, fontWeight: 800 }}>
+                        <input type="checkbox" checked={fTradableOnly} onChange={(e) => setFTradableOnly(e.target.checked)} />
+                        Tradable only
+                      </label>
+                    </div>
+
+                    <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
+                      {filteredAll.length ? (
+                        filteredAll.map((s, idx) => <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />)
+                      ) : (
+                        <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có setup nào khớp filter)</div>
+                      )}
+                    </div>
+                  </div>
+                </Section>
+              </div>
+            ) : null}
           </div>
         </div>
+
+        <Drawer
+          open={drawerOpen}
+          onClose={onCloseDrawer}
+          title={
+            selectedSetup
+              ? `${selectedSetup.symbol || ""} · ${typeLabelVN(selectedSetup.type)} · ${selectedSetup.bias || ""} · ${tfLabelVN(selectedSetup.timeframe ?? selectedSetup.tf)}`
+              : "Details"
+          }
+        >
+          {selectedSetup ? (
+            <div style={{ display: "grid", gap: 14, minWidth: 0 }}>
+              <div
+                style={{
+                  borderRadius: 18,
+                  border: "1px solid rgba(148,163,184,0.18)",
+                  background: "rgba(30,41,59,0.45)",
+                  padding: 14,
+                  minWidth: 0,
+                  backdropFilter: "blur(12px)",
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>Trigger</div>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.95)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
+                  {selectedSetup.trigger || "—"}
+                </div>
+              </div>
+
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Trade Parameters</div>
+                <KV
+                  stacked={!isMid}
+                  k="Entry zone"
+                  v={
+                    Array.isArray(selectedSetup.entry_zone) && selectedSetup.entry_zone.length === 2
+                      ? `${fmtNum(Math.min(selectedSetup.entry_zone[0], selectedSetup.entry_zone[1]))} → ${fmtNum(Math.max(selectedSetup.entry_zone[0], selectedSetup.entry_zone[1]))}`
+                      : "—"
+                  }
+                />
+                <KV stacked={!isMid} k="Entry preferred" v={fmtNum(Number.isFinite(selectedSetup.entry_preferred) ? selectedSetup.entry_preferred : selectedSetup.entry)} />
+                <KV stacked={!isMid} k="Stop / Invalidation" v={fmtNum(Number.isFinite(selectedSetup.stop) ? selectedSetup.stop : selectedSetup.invalidation)} />
+                <KV stacked={!isMid} k="TP1" v={fmtNum(selectedSetup?.targets?.tp1)} />
+                <KV stacked={!isMid} k="TP2" v={fmtNum(selectedSetup?.targets?.tp2)} />
+                <KV
+                  stacked={!isMid}
+                  k="RR (TP1)"
+                  v={
+                    Number.isFinite(selectedSetup?.execution_metrics?.rr_tp1)
+                      ? selectedSetup.execution_metrics.rr_tp1.toFixed(2)
+                      : Number.isFinite(selectedSetup?.scores?.rr_tp1)
+                      ? selectedSetup.scores.rr_tp1.toFixed(2)
+                      : Number.isFinite(selectedSetup?.rr_estimate_tp1)
+                      ? selectedSetup.rr_estimate_tp1.toFixed(2)
+                      : "—"
+                  }
+                />
+              </div>
+
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Eligibility & Execution</div>
+                <KV stacked={!isMid} k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
+                <KV stacked={!isMid} k="Tradable" v={selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true ? "Yes" : "No / Unknown"} />
+                <KV stacked={!isMid} k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
+                <KV stacked={!isMid} k="Readiness" v={selectedSetup?.execution_state?.readiness || "—"} />
+                <KV
+                  stacked={!isMid}
+                  k="Order"
+                  v={
+                    selectedSetup?.execution_state?.order?.type
+                      ? `${selectedSetup.execution_state.order.type}${selectedSetup.execution_state.order.price != null ? ` @ ${fmtNum(selectedSetup.execution_state.order.price)}` : ""}`
+                      : "—"
+                  }
+                />
+                <KV
+                  stacked={!isMid}
+                  k="Reasons"
+                  v={
+                    safeArr(selectedSetup?.eligibility?.reasons).length || safeArr(selectedSetup?.execution_state?.reason).length
+                      ? uniq([...safeArr(selectedSetup?.eligibility?.reasons), ...safeArr(selectedSetup?.execution_state?.reason)]).slice(0, 12).join(" · ")
+                      : "—"
+                  }
+                />
+              </div>
+
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>Raw JSON</div>
+                  <button
+                    style={{
+                      border: "1px solid rgba(148,163,184,0.22)",
+                      background: "rgba(2,6,23,0.25)",
+                      padding: "8px 10px",
+                      borderRadius: 12,
+                      cursor: "pointer",
+                      fontWeight: 850,
+                      color: "rgba(226,232,240,0.95)",
+                    }}
+                    onClick={() => copyText(JSON.stringify(selectedSetup, null, 2))}
+                  >
+                    Copy
+                  </button>
+                </div>
+
+                <pre
+                  style={{
+                    marginTop: 10,
+                    padding: 12,
+                    borderRadius: 16,
+                    border: "1px solid rgba(148,163,184,0.22)",
+                    background: "rgba(2,6,23,0.25)",
+                    overflow: "auto",
+                    fontSize: 11.5,
+                    lineHeight: 1.45,
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    color: "rgba(226,232,240,0.95)",
+                    minWidth: 0,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+{JSON.stringify(selectedSetup, null, 2)}
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650 }}>No setup selected.</div>
+          )}
+        </Drawer>
       </div>
     </div>
   );
