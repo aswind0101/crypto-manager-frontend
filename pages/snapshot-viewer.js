@@ -1,42 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarketSnapshotV4 } from "../lib/snapshot/market-snapshot-v4"; // adjust path if needed
 
-function safeJsonParse(text) {
-  try {
-    const obj = JSON.parse(text);
-    return { ok: true, obj };
-  } catch (e) {
-    return { ok: false, err: String(e?.message || e) };
-  }
-}
-
-function downloadJson(obj, filename) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
+// --------------------- utils ---------------------
 function clamp(x, a, b) {
   if (!Number.isFinite(x)) return a;
   return Math.max(a, Math.min(b, x));
 }
-
 function fmtNum(x, opts = {}) {
   const { digits = 2 } = opts;
   if (!Number.isFinite(x)) return "—";
   const d = Math.abs(x) >= 1000 ? Math.min(digits, 1) : digits;
   return x.toLocaleString(undefined, { maximumFractionDigits: d });
 }
-
 function fmtPct01(x) {
   if (!Number.isFinite(x)) return "—";
   return `${Math.round(clamp(x, 0, 1) * 100)}%`;
 }
-
 function fmtTs(ts, tz = "America/Los_Angeles") {
   if (!Number.isFinite(ts)) return "—";
   try {
@@ -45,19 +24,25 @@ function fmtTs(ts, tz = "America/Los_Angeles") {
     return new Date(ts).toISOString();
   }
 }
-
 function toLower(x) {
   return String(x || "").toLowerCase();
 }
-
 function uniq(arr) {
   return Array.from(new Set(arr.filter(Boolean)));
 }
-
 function safeArr(x) {
   return Array.isArray(x) ? x : [];
 }
+function copyText(text) {
+  try {
+    if (typeof navigator === "undefined") return;
+    navigator.clipboard.writeText(String(text || ""));
+  } catch {
+    // ignore
+  }
+}
 
+// --------------------- snapshot helpers ---------------------
 function detectStatus(setup) {
   const elig = setup?.eligibility || null;
   if (elig?.status) return String(elig.status);
@@ -93,7 +78,6 @@ function typeLabelVN(type) {
   if (t === "mean_reversion") return "Hồi về trung bình";
   return t || "—";
 }
-
 function tfLabelVN(tf) {
   const x = String(tf || "");
   if (x === "15") return "15m";
@@ -121,16 +105,107 @@ function getPrimaryPrice(snapshot) {
   return { px: null, src: "—" };
 }
 
-function copyText(text) {
-  try {
-    if (typeof navigator === "undefined") return;
-    navigator.clipboard.writeText(String(text || ""));
-  } catch {
-    // ignore
-  }
+function toneForBias(bias) {
+  const b = toLower(bias);
+  if (b === "long" || b === "up" || b === "bull" || b === "tăng" || b === "tang") return "pos";
+  if (b === "short" || b === "down" || b === "bear" || b === "giảm" || b === "giam") return "neg";
+  return "muted";
 }
 
-// ---------- Modern UI: Icon (inline SVG) ----------
+function scoreToTone(x) {
+  if (!Number.isFinite(x)) return "muted";
+  if (x >= 0.8) return "pos";
+  if (x >= 0.65) return "warn";
+  return "muted";
+}
+
+function getCandidatesAll(setupsV2) {
+  return safeArr(setupsV2?.candidates_all).length ? safeArr(setupsV2?.candidates_all) : safeArr(setupsV2?.top_candidates);
+}
+
+function pickSetupKey(s, idx) {
+  const sym = s?.symbol || "SYM";
+  const type = s?.type || "type";
+  const bias = s?.bias || "bias";
+  const tf = s?.timeframe || s?.tf || "";
+  const ep = Number.isFinite(s?.entry_preferred) ? s.entry_preferred : Number.isFinite(s?.entry) ? s.entry : null;
+  const st = Number.isFinite(s?.stop) ? s.stop : null;
+  return `${sym}_${type}_${bias}_${tf}_${ep ?? "na"}_${st ?? "na"}_${idx}`;
+}
+
+// --------------------- candle close extraction ---------------------
+// Goal: show last candle close for 5m, 15m, 1H, 4H, 1D.
+// Snapshot schema can vary; this tries common paths and “best effort”.
+function lastCloseFromSeries(series) {
+  if (!series) return null;
+
+  // series could be:
+  // - array of arrays: [t,o,h,l,c,v] ...
+  // - array of objects: {t,o,h,l,c,v} ...
+  // - object with "candles"/"data"/"rows"
+  const xs =
+    Array.isArray(series) ? series :
+    Array.isArray(series?.candles) ? series.candles :
+    Array.isArray(series?.data) ? series.data :
+    Array.isArray(series?.rows) ? series.rows :
+    null;
+
+  if (!xs || !xs.length) return null;
+
+  const last = xs[xs.length - 1];
+  if (Array.isArray(last)) {
+    // [t,o,h,l,c,v] => c at index 4
+    const c = Number(last[4]);
+    return Number.isFinite(c) ? c : null;
+  }
+  if (last && typeof last === "object") {
+    const c = Number(last.c ?? last.close);
+    return Number.isFinite(c) ? c : null;
+  }
+  return null;
+}
+
+function findLastClose(snapshot, tfKey) {
+  // tfKey: "m5" | "m15" | "h1" | "h4" | "d1"
+  // try unified first, then per_exchange (bybit/binance), then generic.
+  const uni = snapshot?.unified || null;
+  const ex = snapshot?.per_exchange || null;
+
+  // candidate paths (order matters)
+  const paths = [
+    // unified candles
+    (s) => s?.unified?.candles?.[tfKey],
+    (s) => s?.unified?.ohlcv?.[tfKey],
+    (s) => s?.unified?.klines?.[tfKey],
+
+    // per exchange bybit
+    (s) => s?.per_exchange?.bybit?.candles?.[tfKey],
+    (s) => s?.per_exchange?.bybit?.ohlcv?.[tfKey],
+    (s) => s?.per_exchange?.bybit?.klines?.[tfKey],
+
+    // per exchange binance
+    (s) => s?.per_exchange?.binance?.candles?.[tfKey],
+    (s) => s?.per_exchange?.binance?.ohlcv?.[tfKey],
+    (s) => s?.per_exchange?.binance?.klines?.[tfKey],
+
+    // sometimes timeframe keys are numeric minutes/hours
+    (s) => s?.per_exchange?.bybit?.klines?.[tfKey === "m5" ? "5" : tfKey === "m15" ? "15" : tfKey === "h1" ? "60" : tfKey === "h4" ? "240" : tfKey === "d1" ? "D" : tfKey],
+    (s) => s?.unified?.klines?.[tfKey === "m5" ? "5" : tfKey === "m15" ? "15" : tfKey === "h1" ? "60" : tfKey === "h4" ? "240" : tfKey === "d1" ? "D" : tfKey],
+  ];
+
+  for (const getter of paths) {
+    const series = getter(snapshot);
+    const c = lastCloseFromSeries(series);
+    if (Number.isFinite(c)) return c;
+  }
+
+  // final fallback: if no candle series, try ticker last/mark
+  const t = ex?.bybit?.ticker || ex?.binance?.ticker || uni?.ticker || null;
+  const closeGuess = Number(t?.last ?? t?.mark);
+  return Number.isFinite(closeGuess) ? closeGuess : null;
+}
+
+// --------------------- UI: Icon + chip ---------------------
 function Icon({ name = "dot", size = 16 }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" };
   const stroke = { stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
@@ -179,13 +254,6 @@ function Icon({ name = "dot", size = 16 }) {
       </svg>
     );
   }
-  if (name === "dot") {
-    return (
-      <svg {...common}>
-        <circle cx="12" cy="12" r="4" fill="currentColor" />
-      </svg>
-    );
-  }
   return (
     <svg {...common}>
       <circle cx="12" cy="12" r="4" fill="currentColor" />
@@ -193,7 +261,6 @@ function Icon({ name = "dot", size = 16 }) {
   );
 }
 
-// ---------- Chip style ----------
 function chipStyle(base, tone) {
   const t = tone || "muted";
   const bg =
@@ -223,34 +290,7 @@ function chipStyle(base, tone) {
   return { ...base, background: bg, border: `1px solid ${br}`, color: fg };
 }
 
-function toneForBias(bias) {
-  const b = toLower(bias);
-  if (b === "long" || b === "up" || b === "bull" || b === "tăng" || b === "tang") return "pos";
-  if (b === "short" || b === "down" || b === "bear" || b === "giảm" || b === "giam") return "neg";
-  return "muted";
-}
-
-function scoreToTone(x) {
-  if (!Number.isFinite(x)) return "muted";
-  if (x >= 0.8) return "pos";
-  if (x >= 0.65) return "warn";
-  return "muted";
-}
-
-function getCandidatesAll(setupsV2) {
-  return safeArr(setupsV2?.candidates_all).length ? safeArr(setupsV2?.candidates_all) : safeArr(setupsV2?.top_candidates);
-}
-
-function pickSetupKey(s, idx) {
-  const sym = s?.symbol || "SYM";
-  const type = s?.type || "type";
-  const bias = s?.bias || "bias";
-  const tf = s?.timeframe || s?.tf || "";
-  const ep = Number.isFinite(s?.entry_preferred) ? s.entry_preferred : Number.isFinite(s?.entry) ? s.entry : null;
-  const st = Number.isFinite(s?.stop) ? s.stop : null;
-  return `${sym}_${type}_${bias}_${tf}_${ep ?? "na"}_${st ?? "na"}_${idx}`;
-}
-
+// --------------------- components ---------------------
 function Section({ title, right, children, noTop = false }) {
   return (
     <div style={{ marginTop: noTop ? 0 : 14 }}>
@@ -261,43 +301,6 @@ function Section({ title, right, children, noTop = false }) {
         {right ? <div style={{ fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 700, whiteSpace: "nowrap" }}>{right}</div> : null}
       </div>
       <div style={{ marginTop: 10 }}>{children}</div>
-    </div>
-  );
-}
-
-/**
- * KV row: stack K on top of V for mobile to avoid horizontal scroll
- */
-function KV({ k, v, mono = false, stacked = false }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: stacked ? "column" : "row",
-        gap: stacked ? 6 : 10,
-        justifyContent: stacked ? "flex-start" : "space-between",
-        alignItems: stacked ? "flex-start" : "baseline",
-        padding: "8px 0",
-        borderBottom: "1px dashed rgba(148,163,184,0.28)",
-        minWidth: 0,
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(148,163,184,0.95)", minWidth: 0 }}>{k}</div>
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 650,
-          color: "rgba(226,232,240,0.95)",
-          textAlign: stacked ? "left" : "right",
-          fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit",
-          overflowWrap: "anywhere",
-          wordBreak: "break-word",
-          maxWidth: stacked ? "100%" : "68%",
-          minWidth: 0,
-        }}
-      >
-        {v}
-      </div>
     </div>
   );
 }
@@ -368,75 +371,6 @@ function Drawer({ open, onClose, title, children }) {
   );
 }
 
-function HorizonCard({ h, idx }) {
-  const title = h?.title || h?.label || `Horizon ${idx + 1}`;
-  const bias = h?.bias || null;
-  const clarity = h?.clarity || null;
-  const confidence = Number(h?.confidence);
-
-  const drivers = safeArr(h?.drivers);
-  const risks = safeArr(h?.risks);
-  const playbook = safeArr(h?.playbook);
-
-  const tone = bias ? toneForBias(bias) : "muted";
-
-  const chipBase = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    padding: "5px 10px",
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: 750,
-    whiteSpace: "nowrap",
-  };
-
-  const block = (label, items) => {
-    if (!items.length) return null;
-    return (
-      <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 750, color: "rgba(148,163,184,0.95)" }}>{label}</div>
-        <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-          {items.slice(0, 5).map((b, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(226,232,240,0.55)", marginTop: 7, flexShrink: 0 }} />
-              <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.86)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>{String(b)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div
-      style={{
-        borderRadius: 16,
-        border: "1px solid rgba(148,163,184,0.20)",
-        background: "rgba(15,23,42,0.55)",
-        boxShadow: "0 14px 46px rgba(0,0,0,0.22)",
-        padding: 14,
-        minHeight: 150,
-        minWidth: 0,
-        backdropFilter: "blur(10px)",
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.95)" }}>{title}</div>
-
-      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {bias ? <span style={chipStyle(chipBase, tone)}>{String(bias)}</span> : null}
-        {clarity ? <span style={chipStyle(chipBase, "muted")}>Rõ xu hướng: {String(clarity)}</span> : null}
-        {Number.isFinite(confidence) ? <span style={chipStyle(chipBase, scoreToTone(confidence))}>Tin cậy: {fmtPct01(confidence)}</span> : null}
-      </div>
-
-      {block("Động lực chính", drivers)}
-      {block("Rủi ro / cản trở", risks)}
-      {block("Cách hành động", playbook)}
-    </div>
-  );
-}
-
 function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   const status = detectStatus(setup);
   const sm = statusMeta(status);
@@ -493,6 +427,7 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
     gap: isCompact ? 2 : 4,
     minWidth: 0,
     width: "100%",
+    boxSizing: "border-box",
     backdropFilter: "blur(10px)",
   };
 
@@ -500,19 +435,27 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   const tileMain = { marginTop: 2, fontSize: isCompact ? 12.5 : 13, fontWeight: 850, color: "rgba(226,232,240,0.95)", overflowWrap: "anywhere", textAlign: "center", width: "100%" };
   const tileSub = { marginTop: 2, fontSize: isCompact ? 11.5 : 12, color: "rgba(226,232,240,0.80)", fontWeight: 650, overflowWrap: "anywhere", textAlign: "center", width: "100%" };
 
-  // IMPORTANT: Center the whole tile group (NOT just content inside tiles)
-  // Use inline-grid so the block can shrink-to-fit and be centered by outer wrapper.
+  // Center THE GROUP (not just text): flex-center wrapper + fit-content grid.
   const tileGroup = (
-    <div style={{ textAlign: "center" }}>
+    <div
+      style={{
+        marginTop: 12,
+        width: "100%",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "stretch",
+      }}
+    >
       <div
         style={{
-          marginTop: 12,
-          display: "inline-grid", // key: shrink-to-fit then center as inline element
-          gridTemplateColumns: isWide || isMid ? "repeat(4, minmax(0, 220px))" : "repeat(2, minmax(0, 220px))",
+          width: "fit-content",
+          maxWidth: "100%",
+          display: "grid",
+          gridTemplateColumns: isWide || isMid ? "repeat(4, minmax(180px, 220px))" : "repeat(2, minmax(160px, 220px))",
           gap: isCompact ? 8 : 10,
           justifyContent: "center",
+          justifyItems: "stretch",
           alignItems: "stretch",
-          maxWidth: "100%",
         }}
       >
         <div style={tileStyle}>
@@ -601,59 +544,89 @@ function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
   );
 }
 
+// --------------------- main page ---------------------
 export default function SnapshotViewerPage() {
   const [isWide, setIsWide] = useState(false);
   const [isMid, setIsMid] = useState(false);
 
   const lastWRef = useRef(0);
-
   useEffect(() => {
     const onResize = () => {
       const w = window.innerWidth || 0;
       if (Math.abs(w - lastWRef.current) < 2) return;
       lastWRef.current = w;
-
       setIsWide(w >= 1024);
       setIsMid(w >= 760);
     };
     onResize();
     window.addEventListener("resize", onResize);
-
     const vv = window.visualViewport;
     if (vv?.addEventListener) vv.addEventListener("resize", onResize);
-
     return () => {
       window.removeEventListener("resize", onResize);
       if (vv?.removeEventListener) vv.removeEventListener("resize", onResize);
     };
   }, []);
 
-  const [controlsOpen, setControlsOpen] = useState(false);
+  // Top 100 coins autocomplete (CoinGecko)
+  const [coins, setCoins] = useState([]); // {id, symbol, name, market_cap_rank}
+  const [coinsErr, setCoinsErr] = useState("");
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      setCoinsErr("");
+      try {
+        const url =
+          "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false";
+        const res = await fetch(url, { method: "GET" });
+        if (!res.ok) throw new Error(`Coin list HTTP ${res.status}`);
+        const data = await res.json();
+        if (!alive) return;
+        const xs = Array.isArray(data) ? data : [];
+        setCoins(
+          xs
+            .map((x) => ({
+              id: x?.id,
+              symbol: String(x?.symbol || "").toUpperCase(),
+              name: String(x?.name || ""),
+              rank: Number.isFinite(x?.market_cap_rank) ? x.market_cap_rank : null,
+            }))
+            .filter((x) => x.symbol && x.name)
+        );
+      } catch (e) {
+        if (!alive) return;
+        setCoinsErr(String(e?.message || e));
+      }
+    };
+    load();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const [symbolInput, setSymbolInput] = useState("BTCUSDT");
   const symbolInputRef = useRef(null);
 
   const [genLoading, setGenLoading] = useState(false);
   const [genErr, setGenErr] = useState("");
-  const [autoDownload, setAutoDownload] = useState(true);
-
-  const [raw, setRaw] = useState("");
   const [snap, setSnap] = useState(null);
-  const [parseErr, setParseErr] = useState("");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedSetup, setSelectedSetup] = useState(null);
 
   const [tab, setTab] = useState("overview"); // overview | top | all
-
   const [fText, setFText] = useState("");
-  const [fStatus, setFStatus] = useState("all");
-  const [fType, setFType] = useState("all");
-  const [fTf, setFTf] = useState("all");
-  const [fTradableOnly, setFTradableOnly] = useState(false);
-  const [sortBy, setSortBy] = useState("score_desc");
 
-  const safeSymbol = useMemo(() => String(symbolInput || "").toUpperCase().trim(), [symbolInput]);
+  // normalize: allow user type "BTC", "BTCUSDT", "ETH/USDT" etc.
+  const safeSymbol = useMemo(() => {
+    const raw = String(symbolInput || "").trim().toUpperCase();
+    if (!raw) return "";
+    const cleaned = raw.replace(/\s+/g, "").replace("/", "");
+    if (cleaned.endsWith("USDT")) return cleaned;
+    // if user typed known symbol, map to SYMBOLUSDT
+    // if typed coin name (rare), we don’t map here—only from selection.
+    return `${cleaned}USDT`;
+  }, [symbolInput]);
 
   const setupsV2 = snap?.unified?.setups_v2 || null;
   const outlook = snap?.unified?.market_outlook_v1 || null;
@@ -668,73 +641,31 @@ export default function SnapshotViewerPage() {
   const all = getCandidatesAll(setupsV2);
 
   const tz = snap?.runtime?.tz || "America/Los_Angeles";
-  const symbol = snap?.symbol || snap?.request?.symbol || "—";
+  const symbol = snap?.symbol || snap?.request?.symbol || safeSymbol || "—";
   const generatedAt = Number(snap?.generated_at);
   const quality = snap?.unified?.data_quality || "—";
   const diagErrors = snap?.diagnostics?.errors?.length || 0;
 
   const { px: refPx, src: pxSrc } = useMemo(() => getPrimaryPrice(snap), [snap]);
 
-  const allTypes = useMemo(() => uniq(all.map((s) => s?.type)).sort(), [all]);
-  const allTfs = useMemo(() => {
-    return uniq(all.map((s) => String(s?.timeframe ?? s?.tf ?? "").trim()).filter(Boolean)).sort((a, b) => {
-      const order = { "15": 1, "60": 2, "240": 3, "D": 4 };
-      return (order[a] || 99) - (order[b] || 99);
-    });
-  }, [all]);
+  // Candle closes
+  const close5m = useMemo(() => (snap ? findLastClose(snap, "m5") : null), [snap]);
+  const close15m = useMemo(() => (snap ? findLastClose(snap, "m15") : null), [snap]);
+  const close1h = useMemo(() => (snap ? findLastClose(snap, "h1") : null), [snap]);
+  const close4h = useMemo(() => (snap ? findLastClose(snap, "h4") : null), [snap]);
+  const close1d = useMemo(() => (snap ? findLastClose(snap, "d1") : null), [snap]);
+
+  const filteredTop = useMemo(() => {
+    const q = toLower(fText).trim();
+    if (!q) return top;
+    return top.filter((s) => toLower([s?.symbol, s?.type, s?.bias, s?.trigger].join(" ")).includes(q));
+  }, [top, fText]);
 
   const filteredAll = useMemo(() => {
-    let xs = all.slice();
-
     const q = toLower(fText).trim();
-    if (q) {
-      xs = xs.filter((s) => {
-        const blob = [
-          s?.symbol,
-          s?.type,
-          s?.bias,
-          s?.timeframe,
-          s?.trigger,
-          safeArr(s?.eligibility?.reasons).join(" "),
-          safeArr(s?.execution_state?.reason).join(" "),
-          safeArr(s?.warnings).join(" "),
-        ].join(" ");
-        return toLower(blob).includes(q);
-      });
-    }
-
-    if (fStatus !== "all") xs = xs.filter((s) => toLower(detectStatus(s)) === toLower(fStatus));
-    if (fType !== "all") xs = xs.filter((s) => String(s?.type || "") === fType);
-    if (fTf !== "all") xs = xs.filter((s) => String(s?.timeframe ?? s?.tf ?? "") === fTf);
-
-    if (fTradableOnly) {
-      xs = xs.filter((s) => {
-        const t = s?.eligibility?.tradable;
-        const ex = s?.execution_state?.tradable;
-        return t === true || ex === true || toLower(detectStatus(s)) === "tradable";
-      });
-    }
-
-    const getScore = (s) =>
-      Number.isFinite(s?.final_score) ? s.final_score : Number.isFinite(s?.scores?.final_score) ? s.scores.final_score : Number.isFinite(s?.confidence) ? s.confidence : -1;
-
-    const getRr = (s) =>
-      Number.isFinite(s?.execution_metrics?.rr_tp1) ? s.execution_metrics.rr_tp1 : Number.isFinite(s?.scores?.rr_tp1) ? s.scores.rr_tp1 : Number.isFinite(s?.rr_estimate_tp1) ? s.rr_estimate_tp1 : -1;
-
-    const getTfOrder = (s) => {
-      const tf = String(s?.timeframe ?? s?.tf ?? "");
-      const order = { "15": 1, "60": 2, "240": 3, "D": 4 };
-      return order[tf] || 99;
-    };
-
-    xs.sort((a, b) => {
-      if (sortBy === "rr_desc") return getRr(b) - getRr(a);
-      if (sortBy === "tf_asc") return getTfOrder(a) - getTfOrder(b);
-      return getScore(b) - getScore(a);
-    });
-
-    return xs;
-  }, [all, fText, fStatus, fType, fTf, fTradableOnly, sortBy]);
+    if (!q) return all;
+    return all.filter((s) => toLower([s?.symbol, s?.type, s?.bias, s?.trigger].join(" ")).includes(q));
+  }, [all, fText]);
 
   const onOpenSetup = (s) => {
     setSelectedSetup(s);
@@ -745,64 +676,65 @@ export default function SnapshotViewerPage() {
     setSelectedSetup(null);
   };
 
-  const applySnapshotObj = (obj, alsoSetRaw = true) => {
-    setParseErr("");
-    setGenErr("");
-    setSnap(obj);
-    setTab("overview");
-    if (alsoSetRaw) setRaw(JSON.stringify(obj, null, 2));
-    if (!isWide) setControlsOpen(false);
-  };
-
-  const onPasteApply = () => {
-    setParseErr("");
-    const res = safeJsonParse(raw);
-    if (!res.ok) {
-      setSnap(null);
-      setParseErr(res.err || "Invalid JSON");
-      return;
-    }
-    applySnapshotObj(res.obj, false);
-  };
-
-  const onFilePick = async (file) => {
-    setParseErr("");
-    if (!file) return;
-    try {
-      const text = await file.text();
-      setRaw(text);
-      const res = safeJsonParse(text);
-      if (!res.ok) {
-        setSnap(null);
-        setParseErr(res.err || "Invalid JSON");
-        return;
-      }
-      applySnapshotObj(res.obj, false);
-    } catch (e) {
-      setSnap(null);
-      setParseErr(String(e?.message || e));
-    }
-  };
-
   const onGenerate = async () => {
     setGenErr("");
-    setParseErr("");
     setGenLoading(true);
     try {
       const snapObj = await buildMarketSnapshotV4(safeSymbol, { tz: "America/Los_Angeles" });
-      applySnapshotObj(snapObj, true);
-
-      if (autoDownload) {
-        const ts = new Date().toISOString().replace(/[:.]/g, "-");
-        const name = `market-snapshot-v4_${safeSymbol}_${ts}.json`;
-        downloadJson(snapObj, name);
-      }
+      setSnap(snapObj);
+      setTab("overview");
     } catch (e) {
       setGenErr(String(e?.message || e));
     } finally {
       setGenLoading(false);
     }
   };
+
+  // Market context (content + icon only)
+  const marketContextItems = useMemo(() => {
+    if (!headlineObj) return [];
+    const items = [];
+    if (headlineObj.market_position) items.push({ key: "market", icon: "dot", tone: "muted", text: `${headlineObj.market_position}` });
+    if (headlineObj.quick_risk) items.push({ key: "risk", icon: "risk", tone: "warn", text: `${headlineObj.quick_risk}` });
+    if (headlineObj.trend_clarity) items.push({ key: "clarity", icon: "clarity", tone: "muted", text: `${headlineObj.trend_clarity}` });
+    if (headlineObj.data_quality) items.push({ key: "data", icon: "data", tone: "muted", text: `${headlineObj.data_quality}` });
+
+    const m = items.find((x) => x.key === "market");
+    if (m) {
+      const s = toLower(m.text);
+      if (s.includes("tăng") || s.includes("bull") || s.includes("up")) {
+        m.icon = "up";
+        m.tone = "pos";
+      } else if (s.includes("giảm") || s.includes("bear") || s.includes("down")) {
+        m.icon = "down";
+        m.tone = "neg";
+      } else {
+        m.icon = "dot";
+        m.tone = "muted";
+      }
+    }
+    const r = items.find((x) => x.key === "risk");
+    if (r) {
+      const s = toLower(r.text);
+      if (s.includes("cao") || s.includes("high")) r.tone = "neg";
+      else if (s.includes("trung") || s.includes("medium")) r.tone = "warn";
+      else r.tone = "muted";
+    }
+    const c = items.find((x) => x.key === "clarity");
+    if (c) {
+      const s = toLower(c.text);
+      if (s.includes("mạnh") || s.includes("strong")) c.tone = "pos";
+      else c.tone = "muted";
+    }
+    const d = items.find((x) => x.key === "data");
+    if (d) {
+      const s = toLower(d.text);
+      if (s.includes("tốt") || s.includes("good") || s.includes("ok")) d.tone = "pos";
+      else if (s.includes("kém") || s.includes("poor") || s.includes("partial")) d.tone = "warn";
+      else d.tone = "muted";
+    }
+    return items;
+  }, [headlineObj]);
 
   const fontStack =
     '"Be Vietnam Pro","Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji"';
@@ -840,13 +772,6 @@ export default function SnapshotViewerPage() {
       backdropFilter: "blur(14px)",
       boxShadow: "0 18px 60px rgba(0,0,0,0.35)",
       padding: isWide ? 14 : 12,
-    },
-
-    grid: {
-      display: "grid",
-      gridTemplateColumns: isWide ? "380px 1fr" : "1fr",
-      gap: 12,
-      alignItems: "start",
     },
 
     card: {
@@ -888,42 +813,12 @@ export default function SnapshotViewerPage() {
       border: "1px solid rgba(148,163,184,0.24)",
       background: "rgba(2,6,23,0.35)",
       fontSize: 12,
-      fontWeight: 700,
-      color: "rgba(226,232,240,0.95)",
-      outline: "none",
-      minWidth: 0,
-    },
-
-    select: {
-      padding: "10px 12px",
-      borderRadius: 14,
-      border: "1px solid rgba(148,163,184,0.24)",
-      background: "rgba(2,6,23,0.35)",
-      fontSize: 12,
       fontWeight: 800,
       color: "rgba(226,232,240,0.95)",
       outline: "none",
-      cursor: "pointer",
       minWidth: 0,
-    },
-
-    textarea: {
       width: "100%",
-      minHeight: 190,
-      resize: "vertical",
-      borderRadius: 16,
-      border: "1px solid rgba(148,163,184,0.24)",
-      padding: 12,
-      outline: "none",
-      fontSize: 12,
-      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-      background: "rgba(2,6,23,0.35)",
-      color: "rgba(226,232,240,0.95)",
-      overflowWrap: "anywhere",
-      wordBreak: "break-word",
     },
-
-    divider: { height: 1, background: "rgba(148,163,184,0.16)", marginTop: 12, marginBottom: 12 },
 
     segWrap: {
       display: "inline-flex",
@@ -969,457 +864,308 @@ export default function SnapshotViewerPage() {
     return { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
   }, [isWide, isMid]);
 
-  const ControlsOverlay = ({ open, onClose, children }) => {
-    if (isWide) return null;
-    if (!open) return null;
-    return (
-      <div
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onClose?.();
-        }}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(2,6,23,0.78)",
-          zIndex: 1500,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "flex-end",
-          padding: 12,
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 720,
-            maxHeight: "86vh",
-            borderRadius: 18,
-            border: "1px solid rgba(148,163,184,0.20)",
-            background: "rgba(15,23,42,0.86)",
-            boxShadow: "0 34px 90px rgba(0,0,0,0.50)",
-            overflow: "hidden",
-            backdropFilter: "blur(14px)",
-          }}
-        >
-          <div style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.16)" }}>
-            <div style={{ fontWeight: 900, fontSize: 13, color: "rgba(226,232,240,0.95)" }}>Controls</div>
-            <button style={styles.btn("secondary")} onClick={onClose}>
-              Close
-            </button>
-          </div>
-          <div style={{ padding: 12, overflow: "auto" }}>{children}</div>
-        </div>
-      </div>
-    );
-  };
+  // Autocomplete datalist options
+  const coinOptions = useMemo(() => {
+    // keep it tight: top 100 only
+    return coins.slice(0, 100).map((c) => {
+      const label = `${c.name} (${c.symbol})`;
+      const pair = `${c.symbol}USDT`;
+      return { label, pair };
+    });
+  }, [coins]);
 
-  const ControlsPanel = (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={styles.card}>
-        <div style={{ fontSize: 13, fontWeight: 900 }}>Generate Snapshot (v4)</div>
-
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
-          <input
-            ref={symbolInputRef}
-            value={symbolInput}
-            onChange={(e) => {
-              setSymbolInput(e.target.value);
-              requestAnimationFrame(() => {
-                if (symbolInputRef.current && document.activeElement !== symbolInputRef.current) {
-                  symbolInputRef.current.focus();
-                }
-              });
-            }}
-            onFocus={() => {
-              requestAnimationFrame(() => symbolInputRef.current?.focus());
-            }}
-            placeholder="BTCUSDT"
-            style={styles.input}
-            inputMode="text"
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-          <button style={styles.btn("primary")} onClick={onGenerate} disabled={genLoading || !safeSymbol}>
-            {genLoading ? "Generating..." : "Generate"}
-          </button>
-        </div>
-
-        <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.20)", background: "rgba(2,6,23,0.25)", fontSize: 12, fontWeight: 800 }}>
-            <input type="checkbox" checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)} />
-            Auto download JSON
-          </label>
-
-          <button
-            style={styles.btn("secondary")}
-            onClick={() => {
-              if (!snap) return;
-              const ts = new Date().toISOString().replace(/[:.]/g, "-");
-              const name = `market-snapshot-v4_${(snap?.symbol || safeSymbol || "SNAP")}_${ts}.json`;
-              downloadJson(snap, name);
-            }}
-            disabled={!snap}
-          >
-            Download
-          </button>
-        </div>
-
-        {genErr ? (
-          <div style={{ marginTop: 10, color: "rgb(239,68,68)", fontWeight: 850, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>{genErr}</div>
-        ) : null}
-
-        <div style={{ marginTop: 10, fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 650, lineHeight: 1.4 }}>
-          Gợi ý: Nếu 1 exchange bị CORS/geo, snapshot vẫn có thể tạo nhưng quality sẽ “partial” và errors tăng.
-        </div>
-      </div>
-
-      <div style={styles.card}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 900 }}>Load JSON</div>
-          <label style={{ ...styles.btn("secondary"), display: "inline-flex", alignItems: "center", gap: 8 }}>
-            Upload
-            <input type="file" accept="application/json,.json" onChange={(e) => onFilePick(e.target.files?.[0])} style={{ display: "none" }} />
-          </label>
-        </div>
-
-        <div style={{ marginTop: 10 }}>
-          <textarea value={raw} onChange={(e) => setRaw(e.target.value)} placeholder='Paste snapshot JSON (market_snapshot v4)...' style={styles.textarea} />
-        </div>
-
-        {parseErr ? (
-          <div style={{ marginTop: 10, color: "rgb(239,68,68)", fontWeight: 850, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>{parseErr}</div>
-        ) : null}
-
-        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button style={styles.btn("primary")} onClick={onPasteApply}>
-            Apply
-          </button>
-          <button style={styles.btn("secondary")} onClick={() => (snap ? copyText(JSON.stringify(snap, null, 2)) : null)} disabled={!snap}>
-            Copy snapshot
-          </button>
-          <button
-            style={styles.btn("secondary")}
-            onClick={() => {
-              setRaw("");
-              setSnap(null);
-              setParseErr("");
-              setGenErr("");
-              setSelectedSetup(null);
-              setDrawerOpen(false);
-            }}
-          >
-            Clear
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const isKVStacked = !isMid;
-
-  const marketContextItems = useMemo(() => {
-    if (!headlineObj) return [];
-    const items = [];
-    if (headlineObj.market_position) items.push({ key: "market", icon: "up", tone: "muted", text: `${headlineObj.market_position}` });
-    if (headlineObj.quick_risk) items.push({ key: "risk", icon: "risk", tone: "warn", text: `${headlineObj.quick_risk}` });
-    if (headlineObj.trend_clarity) items.push({ key: "clarity", icon: "clarity", tone: "muted", text: `${headlineObj.trend_clarity}` });
-    if (headlineObj.data_quality) items.push({ key: "data", icon: "data", tone: "muted", text: `${headlineObj.data_quality}` });
-
-    // refine icon for market direction
-    if (items.length) {
-      const m = items.find((x) => x.key === "market");
-      if (m) {
-        const s = toLower(m.text);
-        if (s.includes("tăng") || s.includes("bull") || s.includes("up")) {
-          m.icon = "up";
-          m.tone = "pos";
-        } else if (s.includes("giảm") || s.includes("bear") || s.includes("down")) {
-          m.icon = "down";
-          m.tone = "neg";
-        } else {
-          m.icon = "dot";
-          m.tone = "muted";
-        }
-      }
-      const r = items.find((x) => x.key === "risk");
-      if (r) {
-        const s = toLower(r.text);
-        if (s.includes("cao") || s.includes("high")) r.tone = "neg";
-        else if (s.includes("trung") || s.includes("medium")) r.tone = "warn";
-        else r.tone = "muted";
-      }
-      const c = items.find((x) => x.key === "clarity");
-      if (c) {
-        const s = toLower(c.text);
-        if (s.includes("mạnh") || s.includes("strong")) c.tone = "pos";
-        else if (s.includes("yếu") || s.includes("weak")) c.tone = "muted";
-        else c.tone = "muted";
-      }
-      const d = items.find((x) => x.key === "data");
-      if (d) {
-        const s = toLower(d.text);
-        if (s.includes("tốt") || s.includes("good") || s.includes("ok")) d.tone = "pos";
-        else if (s.includes("kém") || s.includes("poor") || s.includes("partial")) d.tone = "warn";
-        else d.tone = "muted";
-      }
-    }
-    return items;
-  }, [headlineObj]);
+  // If user selects a datalist option, browser gives the value (label),
+  // but we want to convert to pair. We'll map by label.
+  const labelToPair = useMemo(() => {
+    const m = new Map();
+    for (const o of coinOptions) m.set(o.label, o.pair);
+    return m;
+  }, [coinOptions]);
 
   return (
     <div style={styles.page}>
       <div style={styles.shell}>
+        {/* TOPBAR: Generate + Summary + Candle closes */}
         <div style={styles.topbar}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 950, letterSpacing: 0.2 }}>{symbol}</div>
-                <span style={chipStyle(chipsBase, "muted")}>Quality: {String(quality)}</span>
-                <span style={chipStyle(chipsBase, diagErrors ? "warn" : "pos")}>Errors: {diagErrors}</span>
-                <span style={chipStyle(chipsBase, "muted")}>Ref: {Number.isFinite(refPx) ? fmtNum(refPx) : "—"} ({pxSrc})</span>
+                <div style={{ fontSize: 16, fontWeight: 950, letterSpacing: 0.2 }}>{symbol || "—"}</div>
+
+                {snap ? (
+                  <>
+                    <span style={chipStyle(chipsBase, "muted")}>Quality: {String(quality)}</span>
+                    <span style={chipStyle(chipsBase, diagErrors ? "warn" : "pos")}>Errors: {diagErrors}</span>
+                    <span style={chipStyle(chipsBase, "muted")}>Ref: {Number.isFinite(refPx) ? fmtNum(refPx) : "—"} ({pxSrc})</span>
+                  </>
+                ) : (
+                  <span style={chipStyle(chipsBase, "muted")}>Chưa có snapshot</span>
+                )}
+              </div>
+
+              {/* candle closes row */}
+              <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <span style={chipStyle(chipsBase, "muted")}>Close 5m: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(close5m)}</b></span>
+                <span style={chipStyle(chipsBase, "muted")}>Close 15m: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(close15m)}</b></span>
+                <span style={chipStyle(chipsBase, "muted")}>Close 1H: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(close1h)}</b></span>
+                <span style={chipStyle(chipsBase, "muted")}>Close 4H: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(close4h)}</b></span>
+                <span style={chipStyle(chipsBase, "muted")}>Close 1D: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(close1d)}</b></span>
               </div>
 
               <div style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.72)", fontWeight: 650, lineHeight: 1.35, overflowWrap: "anywhere" }}>
-                Generated: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{fmtTs(generatedAt, tz)}</b> · TZ:{" "}
-                <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{tz}</b>
+                {snap ? (
+                  <>
+                    Generated: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{fmtTs(generatedAt, tz)}</b> · TZ:{" "}
+                    <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{tz}</b>
+                  </>
+                ) : (
+                  "Nhập Symbol rồi bấm Generate để chạy snapshot và phân tích."
+                )}
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-              {!isWide ? (
-                <button
-                  style={styles.btn("secondary")}
-                  onClick={() => {
-                    setControlsOpen(true);
-                    requestAnimationFrame(() => symbolInputRef.current?.focus());
-                  }}
-                >
-                  Controls
+            {/* Right controls: input + generate + tabs */}
+            <div style={{ display: "grid", gap: 10, minWidth: isWide ? 420 : "100%" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
+                <div style={{ minWidth: 0 }}>
+                  <input
+                    ref={symbolInputRef}
+                    value={symbolInput}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      // if user picked from datalist (label), map to pair
+                      const mapped = labelToPair.get(v);
+                      setSymbolInput(mapped || v);
+                    }}
+                    onBlur={() => {
+                      // normalize on blur
+                      const v = String(symbolInput || "").trim();
+                      if (labelToPair.has(v)) return;
+                      // keep user string; safeSymbol will normalize.
+                    }}
+                    placeholder="BTC / BTCUSDT / ETH..."
+                    style={styles.input}
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    list="top100-coins"
+                  />
+                  <datalist id="top100-coins">
+                    {coinOptions.map((o) => (
+                      <option key={o.label} value={o.label} />
+                    ))}
+                  </datalist>
+                  {coinsErr ? (
+                    <div style={{ marginTop: 6, fontSize: 12, color: "rgba(245,158,11,0.95)", fontWeight: 750 }}>
+                      Không load được Top 100 (CoinGecko). Bạn vẫn có thể nhập symbol thủ công.
+                    </div>
+                  ) : null}
+                </div>
+
+                <button style={styles.btn("primary")} onClick={onGenerate} disabled={genLoading || !safeSymbol}>
+                  {genLoading ? "Generating..." : "Generate"}
                 </button>
+              </div>
+
+              {genErr ? (
+                <div style={{ color: "rgb(239,68,68)", fontWeight: 850, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>{genErr}</div>
               ) : null}
 
-              <div style={styles.segWrap}>
-                <button style={styles.segBtn(tab === "overview")} onClick={() => setTab("overview")}>Overview</button>
-                <button style={styles.segBtn(tab === "top")} onClick={() => setTab("top")}>Top</button>
-                <button style={styles.segBtn(tab === "all")} onClick={() => setTab("all")}>All</button>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <div style={styles.segWrap}>
+                  <button style={styles.segBtn(tab === "overview")} onClick={() => setTab("overview")}>Overview</button>
+                  <button style={styles.segBtn(tab === "top")} onClick={() => setTab("top")}>Top</button>
+                  <button style={styles.segBtn(tab === "all")} onClick={() => setTab("all")}>All</button>
+                </div>
+
+                <input
+                  value={fText}
+                  onChange={(e) => setFText(e.target.value)}
+                  placeholder="Search trigger / bias / type..."
+                  style={{ ...styles.input, width: isWide ? 260 : "100%" }}
+                />
               </div>
             </div>
           </div>
         </div>
 
-        <ControlsOverlay open={controlsOpen} onClose={() => setControlsOpen(false)}>
-          {ControlsPanel}
-        </ControlsOverlay>
-
-        <div style={styles.grid}>
-          {isWide ? <div style={{ position: "sticky", top: 92 }}>{ControlsPanel}</div> : null}
-
-          <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
-            {tab === "overview" ? (
-              <div style={styles.card}>
-                <Section title="Market Context" right={outlook ? "unified.market_outlook_v1" : "market_outlook_v1 not found"} noTop>
-                  {marketContextItems.length ? (
-                    <div style={styles.subtle}>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: isMid ? "repeat(2, minmax(0, 1fr))" : "1fr",
-                          gap: 10,
-                          minWidth: 0,
-                        }}
-                      >
-                        {marketContextItems.map((it) => (
-                          <div
-                            key={it.key}
-                            style={{
-                              borderRadius: 16,
-                              border: "1px solid rgba(148,163,184,0.18)",
-                              background: "rgba(2,6,23,0.22)",
-                              padding: 12,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 10,
-                              minWidth: 0,
-                            }}
-                          >
-                            <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.92)", overflowWrap: "anywhere", lineHeight: 1.35 }}>
-                              {it.text}
-                            </div>
-                            <span
-                              style={chipStyle(
-                                { ...chipsBase, padding: "6px 10px", gap: 8, color: "currentColor" },
-                                it.tone
-                              )}
-                            >
-                              <span style={{ display: "inline-flex", alignItems: "center" }}>
-                                <Icon name={it.icon} size={16} />
-                              </span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {flagObjs.length ? (
-                        <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                          {flagObjs.slice(0, 12).map((f, i) => {
-                            const tone = toLower(f?.tone) === "good" ? "pos" : toLower(f?.tone) === "bad" ? "neg" : toLower(f?.tone) === "warn" ? "warn" : "muted";
-                            return (
-                              <span key={f?.key || i} style={chipStyle(chipsBase, tone)}>
-                                {String(f?.text || f?.key || "")}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có headline trong snapshot)</div>
-                  )}
-
-                  {action ? (
-                    <div style={{ marginTop: 12, borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(2,6,23,0.18)", padding: 14 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                        <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>Action</div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <span style={chipStyle(chipsBase, "muted")}>Hành động: {action.status || "—"}</span>
-                          {action.setup_type_label ? <span style={chipStyle(chipsBase, "muted")}>Setup: {action.setup_type_label}</span> : null}
-                          {action.tf_label ? <span style={chipStyle(chipsBase, "muted")}>TF: {action.tf_label}</span> : null}
-                          {action.order_type ? (
-                            <span style={chipStyle(chipsBase, "muted")}>
-                              Order: {action.order_type}
-                              {action.order_price != null ? ` @ ${fmtNum(action.order_price)}` : ""}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {Array.isArray(action.summary) && action.summary.length ? (
-                        <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-                          {action.summary.slice(0, 6).map((b, i) => (
-                            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(226,232,240,0.55)", marginTop: 7, flexShrink: 0 }} />
-                              <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.80)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>{String(b)}</div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  <div style={{ marginTop: 12, ...horizonsGridStyle }}>
-                    {(horizons.length ? horizons : [{ title: "30m–4h" }, { title: "1–3d" }, { title: "1–2w" }]).map((h, i) => (
-                      <HorizonCard key={i} h={h} idx={i} />
-                    ))}
-                  </div>
-                </Section>
-
-                <div style={styles.divider} />
-
-                <Section title="Primary Setup" right={primary ? "unified.setups_v2.primary" : "no primary setup"} noTop>
-                  {primary ? <SetupCard setup={primary} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} /> : <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Snapshot không có primary tradable setup)</div>}
-                </Section>
-
-                <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"}>
-                  {top.length ? (
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {top.map((s, idx) => (
-                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates trong snapshot)</div>
-                  )}
-                </Section>
-              </div>
-            ) : null}
-
-            {tab === "top" ? (
-              <div style={styles.card}>
-                <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"} noTop>
-                  {top.length ? (
-                    <div style={{ display: "grid", gap: 12 }}>
-                      {top.map((s, idx) => (
-                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates trong snapshot)</div>
-                  )}
-                </Section>
-              </div>
-            ) : null}
-
-            {tab === "all" ? (
-              <div style={styles.card}>
-                <Section title="All Candidates" right={`Showing ${filteredAll.length} / ${all.length}`} noTop>
-                  <div style={{ display: "grid", gap: 10 }}>
+        {/* MAIN CONTENT */}
+        <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
+          {tab === "overview" ? (
+            <div style={styles.card}>
+              <Section title="Market Context" right={outlook ? "unified.market_outlook_v1" : "market_outlook_v1 not found"} noTop>
+                {marketContextItems.length ? (
+                  <div style={styles.subtle}>
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: isWide ? "1.1fr 0.65fr 0.7fr 0.6fr 0.7fr 0.8fr" : "1fr 1fr",
+                        gridTemplateColumns: isMid ? "repeat(2, minmax(0, 1fr))" : "1fr",
                         gap: 10,
-                        alignItems: "center",
                         minWidth: 0,
                       }}
                     >
-                      <input value={fText} onChange={(e) => setFText(e.target.value)} placeholder="Search trigger / reasons / warnings..." style={styles.input} />
-
-                      <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} style={styles.select}>
-                        <option value="all">Status: All</option>
-                        <option value="tradable">Tradable</option>
-                        <option value="waiting">Waiting</option>
-                        <option value="missed">Missed</option>
-                        <option value="invalidated">Invalidated</option>
-                        <option value="unavailable">Unavailable</option>
-                        <option value="unknown">Unknown</option>
-                      </select>
-
-                      <select value={fType} onChange={(e) => setFType(e.target.value)} style={styles.select}>
-                        <option value="all">Type: All</option>
-                        {allTypes.map((t) => (
-                          <option key={t} value={t}>
-                            {typeLabelVN(t)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select value={fTf} onChange={(e) => setFTf(e.target.value)} style={styles.select}>
-                        <option value="all">TF: All</option>
-                        {allTfs.map((t) => (
-                          <option key={t} value={t}>
-                            {tfLabelVN(t)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={styles.select}>
-                        <option value="score_desc">Sort: Score desc</option>
-                        <option value="rr_desc">Sort: RR desc</option>
-                        <option value="tf_asc">Sort: TF asc</option>
-                      </select>
-
-                      <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.20)", background: "rgba(2,6,23,0.25)", fontSize: 12, fontWeight: 800 }}>
-                        <input type="checkbox" checked={fTradableOnly} onChange={(e) => setFTradableOnly(e.target.checked)} />
-                        Tradable only
-                      </label>
+                      {marketContextItems.map((it) => (
+                        <div
+                          key={it.key}
+                          style={{
+                            borderRadius: 16,
+                            border: "1px solid rgba(148,163,184,0.18)",
+                            background: "rgba(2,6,23,0.22)",
+                            padding: 12,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 10,
+                            minWidth: 0,
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.92)", overflowWrap: "anywhere", lineHeight: 1.35 }}>
+                            {it.text}
+                          </div>
+                          <span style={chipStyle({ padding: "6px 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" }, it.tone)}>
+                            <Icon name={it.icon} size={16} />
+                          </span>
+                        </div>
+                      ))}
                     </div>
 
-                    <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
-                      {filteredAll.length ? (
-                        filteredAll.map((s, idx) => <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />)
-                      ) : (
-                        <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có setup nào khớp filter)</div>
-                      )}
+                    {flagObjs.length ? (
+                      <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {flagObjs.slice(0, 12).map((f, i) => {
+                          const tone = toLower(f?.tone) === "good" ? "pos" : toLower(f?.tone) === "bad" ? "neg" : toLower(f?.tone) === "warn" ? "warn" : "muted";
+                          return (
+                            <span key={f?.key || i} style={chipStyle(chipsBase, tone)}>
+                              {String(f?.text || f?.key || "")}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có headline trong snapshot)</div>
+                )}
+              </Section>
+
+              {action ? (
+                <Section title="Action" right={action?.status || ""}>
+                  <div style={styles.subtle}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <span style={chipStyle(chipsBase, "muted")}>Hành động: {action.status || "—"}</span>
+                      {action.setup_type_label ? <span style={chipStyle(chipsBase, "muted")}>Setup: {action.setup_type_label}</span> : null}
+                      {action.tf_label ? <span style={chipStyle(chipsBase, "muted")}>TF: {action.tf_label}</span> : null}
+                      {action.order_type ? (
+                        <span style={chipStyle(chipsBase, "muted")}>
+                          Order: {action.order_type}
+                          {action.order_price != null ? ` @ ${fmtNum(action.order_price)}` : ""}
+                        </span>
+                      ) : null}
                     </div>
+
+                    {Array.isArray(action.summary) && action.summary.length ? (
+                      <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                        {action.summary.slice(0, 6).map((b, i) => (
+                          <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                            <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(226,232,240,0.55)", marginTop: 7, flexShrink: 0 }} />
+                            <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.80)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>{String(b)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </Section>
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+
+              <Section title="Horizon Outlook" right={horizons.length ? `${horizons.length} horizons` : ""}>
+                <div style={{ marginTop: 12, ...horizonsGridStyle }}>
+                  {(horizons.length ? horizons : [{ title: "30m–4h" }, { title: "1–3d" }, { title: "1–2w" }]).map((h, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        borderRadius: 16,
+                        border: "1px solid rgba(148,163,184,0.20)",
+                        background: "rgba(15,23,42,0.55)",
+                        boxShadow: "0 14px 46px rgba(0,0,0,0.22)",
+                        padding: 14,
+                        minHeight: 150,
+                        minWidth: 0,
+                        backdropFilter: "blur(10px)",
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.95)" }}>{h?.title || h?.label || `Horizon ${i + 1}`}</div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {h?.bias ? <span style={chipStyle(chipsBase, toneForBias(h.bias))}>{String(h.bias)}</span> : null}
+                        {h?.clarity ? <span style={chipStyle(chipsBase, "muted")}>Rõ xu hướng: {String(h.clarity)}</span> : null}
+                        {Number.isFinite(Number(h?.confidence)) ? <span style={chipStyle(chipsBase, scoreToTone(Number(h.confidence)))}>Tin cậy: {fmtPct01(Number(h.confidence))}</span> : null}
+                      </div>
+
+                      {safeArr(h?.drivers).slice(0, 4).map((d, k) => (
+                        <div key={k} style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.82)", fontWeight: 650, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+                          • {String(d)}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              <Section title="Primary Setup" right={primary ? "unified.setups_v2.primary" : "no primary setup"}>
+                {primary ? (
+                  <SetupCard setup={primary} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} />
+                ) : (
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Snapshot không có primary tradable setup)</div>
+                )}
+              </Section>
+
+              <Section title="Top Candidates" right={filteredTop.length ? `${filteredTop.length} setups` : "none"}>
+                {filteredTop.length ? (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {filteredTop.map((s, idx) => (
+                      <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates khớp filter)</div>
+                )}
+              </Section>
+            </div>
+          ) : null}
+
+          {tab === "top" ? (
+            <div style={styles.card}>
+              <Section title="Top Candidates" right={filteredTop.length ? `${filteredTop.length} setups` : "none"} noTop>
+                {filteredTop.length ? (
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {filteredTop.map((s, idx) => (
+                      <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} />
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates khớp filter)</div>
+                )}
+              </Section>
+            </div>
+          ) : null}
+
+          {tab === "all" ? (
+            <div style={styles.card}>
+              <Section title="All Candidates" right={`Showing ${filteredAll.length} / ${all.length}`} noTop>
+                {filteredAll.length ? (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {filteredAll.map((s, idx) => (
+                      <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có setup nào khớp filter)</div>
+                )}
+              </Section>
+            </div>
+          ) : null}
         </div>
 
+        {/* Setup details drawer (NO raw JSON block) */}
         <Drawer
           open={drawerOpen}
           onClose={onCloseDrawer}
@@ -1445,102 +1191,23 @@ export default function SnapshotViewerPage() {
                 <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.95)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
                   {selectedSetup.trigger || "—"}
                 </div>
-              </div>
 
-              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
-                <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Trade Parameters</div>
-                <KV
-                  stacked={!isMid}
-                  k="Entry zone"
-                  v={
-                    Array.isArray(selectedSetup.entry_zone) && selectedSetup.entry_zone.length === 2
-                      ? `${fmtNum(Math.min(selectedSetup.entry_zone[0], selectedSetup.entry_zone[1]))} → ${fmtNum(Math.max(selectedSetup.entry_zone[0], selectedSetup.entry_zone[1]))}`
-                      : "—"
-                  }
-                />
-                <KV stacked={!isMid} k="Entry preferred" v={fmtNum(Number.isFinite(selectedSetup.entry_preferred) ? selectedSetup.entry_preferred : selectedSetup.entry)} />
-                <KV stacked={!isMid} k="Stop / Invalidation" v={fmtNum(Number.isFinite(selectedSetup.stop) ? selectedSetup.stop : selectedSetup.invalidation)} />
-                <KV stacked={!isMid} k="TP1" v={fmtNum(selectedSetup?.targets?.tp1)} />
-                <KV stacked={!isMid} k="TP2" v={fmtNum(selectedSetup?.targets?.tp2)} />
-                <KV
-                  stacked={!isMid}
-                  k="RR (TP1)"
-                  v={
-                    Number.isFinite(selectedSetup?.execution_metrics?.rr_tp1)
-                      ? selectedSetup.execution_metrics.rr_tp1.toFixed(2)
-                      : Number.isFinite(selectedSetup?.scores?.rr_tp1)
-                      ? selectedSetup.scores.rr_tp1.toFixed(2)
-                      : Number.isFinite(selectedSetup?.rr_estimate_tp1)
-                      ? selectedSetup.rr_estimate_tp1.toFixed(2)
-                      : "—"
-                  }
-                />
-              </div>
-
-              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
-                <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Eligibility & Execution</div>
-                <KV stacked={!isMid} k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
-                <KV stacked={!isMid} k="Tradable" v={selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true ? "Yes" : "No / Unknown"} />
-                <KV stacked={!isMid} k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
-                <KV stacked={!isMid} k="Readiness" v={selectedSetup?.execution_state?.readiness || "—"} />
-                <KV
-                  stacked={!isMid}
-                  k="Order"
-                  v={
-                    selectedSetup?.execution_state?.order?.type
-                      ? `${selectedSetup.execution_state.order.type}${selectedSetup.execution_state.order.price != null ? ` @ ${fmtNum(selectedSetup.execution_state.order.price)}` : ""}`
-                      : "—"
-                  }
-                />
-                <KV
-                  stacked={!isMid}
-                  k="Reasons"
-                  v={
-                    safeArr(selectedSetup?.eligibility?.reasons).length || safeArr(selectedSetup?.execution_state?.reason).length
-                      ? uniq([...safeArr(selectedSetup?.eligibility?.reasons), ...safeArr(selectedSetup?.execution_state?.reason)]).slice(0, 12).join(" · ")
-                      : "—"
-                  }
-                />
-              </div>
-
-              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>Raw JSON</div>
+                <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button
                     style={{
                       border: "1px solid rgba(148,163,184,0.22)",
                       background: "rgba(2,6,23,0.25)",
-                      padding: "8px 10px",
+                      padding: "10px 12px",
                       borderRadius: 12,
                       cursor: "pointer",
                       fontWeight: 850,
                       color: "rgba(226,232,240,0.95)",
                     }}
-                    onClick={() => copyText(JSON.stringify(selectedSetup, null, 2))}
+                    onClick={() => copyText(selectedSetup.trigger || "")}
                   >
-                    Copy
+                    Copy Trigger
                   </button>
                 </div>
-
-                <pre
-                  style={{
-                    marginTop: 10,
-                    padding: 12,
-                    borderRadius: 16,
-                    border: "1px solid rgba(148,163,184,0.22)",
-                    background: "rgba(2,6,23,0.25)",
-                    overflow: "auto",
-                    fontSize: 11.5,
-                    lineHeight: 1.45,
-                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                    color: "rgba(226,232,240,0.95)",
-                    minWidth: 0,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-{JSON.stringify(selectedSetup, null, 2)}
-                </pre>
               </div>
             </div>
           ) : (
