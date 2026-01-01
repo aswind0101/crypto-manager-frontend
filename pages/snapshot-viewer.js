@@ -434,6 +434,49 @@ function SetupMiniRow({ item, onOpen }) {
   const rr = Number.isFinite(item?.rr_tp1) ? item.rr_tp1 : null;
   const dEntry = Number.isFinite(item?.distance_to_entry_pct) ? item.distance_to_entry_pct : null;
 
+  // Execution / trigger state
+  const phase = String(item?.phase || item?.execution_state?.phase || "");
+  const reasonCodes = safeArr(item?.execution_state?.reason);
+  const insideEZ = !!item?.execution_state?.proximity?.inside_entry_zone;
+  const needTextRaw = safeArr(item?.reasons_vn)?.[0] || "";
+
+  const phaseMeta = (() => {
+    const p = phase.toLowerCase();
+    if (p === "ready") return { label: "READY", tone: "pos" };
+    if (p === "waiting") return { label: "WAIT", tone: "warn" };
+    if (p === "missed") return { label: "NO TRADE", tone: "muted" };
+    if (p === "invalidated") return { label: "INVALID", tone: "neg" };
+    // fallback by reasons
+    if (reasonCodes.includes("inside_entry_zone")) return { label: "READY", tone: "pos" };
+    if (reasonCodes.some((r) => String(r).startsWith("waiting_"))) return { label: "WAIT", tone: "warn" };
+    return { label: phase ? phase.toUpperCase() : "—", tone: "muted" };
+  })();
+
+  const triggerState = (() => {
+    if (phaseMeta.label === "READY") {
+      return insideEZ ? "Trong entry zone" : "Sẵn sàng (gần entry)";
+    }
+    if (reasonCodes.includes("waiting_trigger") || reasonCodes.includes("waiting_reversal_confirmation")) {
+      return "Chờ xác nhận trigger";
+    }
+    if (reasonCodes.includes("waiting_pullback_to_zone")) {
+      return "Chờ hồi về entry";
+    }
+    if (reasonCodes.includes("price_too_far_from_entry_zone") || reasonCodes.includes("avoid_chasing")) {
+      return "Xa entry, không đuổi";
+    }
+    if (phaseMeta.label === "INVALID") return "Kèo hỏng";
+    return "Theo dõi";
+  })();
+
+  const needText = (() => {
+    // show a very concrete next step if possible
+    if (phaseMeta.label === "READY") return "Có thể đặt lệnh theo plan";
+    if (needTextRaw) return needTextRaw;
+    if (triggerState) return triggerState;
+    return "Chờ điều kiện phù hợp";
+  })();
+
   return (
     <div
       role="button"
@@ -441,47 +484,61 @@ function SetupMiniRow({ item, onOpen }) {
       onClick={() => onOpen?.(item)}
       style={{
         display: "grid",
-        gridTemplateColumns: "1.2fr 0.8fr 0.9fr 0.8fr",
-        gap: 10,
+        gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1.0fr)",
+        gap: 12,
         alignItems: "center",
-        padding: "10px 12px",
+        padding: "12px 12px",
         borderRadius: 14,
         border: "1px solid rgba(148,163,184,0.16)",
         background: "rgba(2,6,23,0.25)",
         cursor: "pointer",
       }}
     >
+      {/* Left: identity + status + what to wait for */}
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 950, color: "rgba(226,232,240,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {typeLabelVN(item?.type)} • {String(item?.bias || "")} • {tfLabelVN(item?.timeframe)}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+            {typeLabelVN(item?.type)} • {String(item?.bias || "")} • {tfLabelVN(item?.timeframe)}
+          </div>
+          <span style={chipStyle(phaseMeta.tone)}>{phaseMeta.label}</span>
+          <span style={chipStyle(biasTone)}>{String(item?.bias || "—")}</span>
+          <span style={chipStyle("muted")}>{triggerState}</span>
         </div>
-        <div style={{ marginTop: 2, fontSize: 11.5, fontWeight: 750, color: "rgba(148,163,184,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ marginTop: 6, fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {item?.symbol || ""}
         </div>
+        <div style={{ marginTop: 6, fontSize: 12.0, fontWeight: 850, color: "rgba(226,232,240,0.78)", overflowWrap: "anywhere" }}>
+          <span style={{ color: "rgba(148,163,184,0.95)", fontWeight: 950 }}>Cần đợi:</span> {needText}
+        </div>
+
+        {item?.trigger ? (
+          <div style={{ marginTop: 6, fontSize: 11.5, fontWeight: 800, color: "rgba(148,163,184,0.95)", overflowWrap: "anywhere" }}>
+            <span style={{ color: "rgba(148,163,184,0.95)", fontWeight: 950 }}>Trigger:</span> {item.trigger}
+          </div>
+        ) : null}
       </div>
 
-      <div style={{ display: "grid", gap: 6 }}>
-        <div style={{ ...chipStyle(biasTone), justifyContent: "center" }}>{String(item?.bias || "—")}</div>
-      </div>
-
-      <div style={{ display: "grid", gap: 8 }}>
+      {/* Right: metrics */}
+      <div style={{ minWidth: 0, display: "grid", gap: 10 }}>
         <Bar
           value01={Number.isFinite(item?.final_score) ? item.final_score : 0}
           tone={scoreTone === "pos" ? "pos" : scoreTone === "warn" ? "warn" : "cyan"}
           labelLeft="Score"
           labelRight={Number.isFinite(item?.final_score) ? pct(item.final_score, 0) : "—"}
         />
-      </div>
-
-      <div style={{ textAlign: "right" }}>
-        <div style={{ fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
-          Fit: <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(fit) ? pct(fit, 0) : "—"}</b>
-        </div>
-        <div style={{ marginTop: 2, fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
-          RR: <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
-        </div>
-        <div style={{ marginTop: 2, fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
-          ΔEntry: <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(dEntry) ? pct(dEntry, 2) : "—"}</b>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
+            Fit<br />
+            <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(fit) ? pct(fit, 0) : "—"}</b>
+          </div>
+          <div style={{ fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
+            RR<br />
+            <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
+          </div>
+          <div style={{ fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)", textAlign: "right" }}>
+            ΔEntry<br />
+            <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(dEntry) ? pct(dEntry, 2) : "—"}</b>
+          </div>
         </div>
       </div>
     </div>
@@ -1200,12 +1257,6 @@ export default function SnapshotViewerPage() {
               {Number.isFinite(generatedAt) ? <span style={chipStyle("muted")}>Updated {fmtTs(generatedAt, tz)}</span> : null}
               <span style={chipStyle(st.tone)}>{st.label}</span>
             </div>
-
-            <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {chips.slice(0, 3).map((c, i) => (
-                <span key={i} style={chipStyle(c.tone)}>{c.text}</span>
-              ))}
-            </div>
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -1300,6 +1351,33 @@ export default function SnapshotViewerPage() {
             </div>
           </div>
         </div>
+
+      {/* Market headline banner (separate from command bar to reduce clutter) */}
+      {chips.length ? (
+        <div style={{ padding: isWide ? "10px 18px 0" : "10px 12px 0" }}>
+          <div
+            style={{
+              maxWidth: shellMax,
+              margin: "0 auto",
+              padding: "10px 12px",
+              borderRadius: 18,
+              border: "1px solid rgba(148,163,184,0.12)",
+              background: "rgba(15,23,42,0.40)",
+              boxShadow: "0 12px 48px rgba(0,0,0,0.28)",
+              backdropFilter: "blur(14px)",
+              overflowX: "auto",
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            {chips.map((c, i) => (
+              <span key={i} style={chipStyle(c.tone)}>{c.text}</span>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
         {genLoading ? (
           <div style={{ maxWidth: shellMax, margin: "12px auto 0", padding: "0 0 4px" }}>
