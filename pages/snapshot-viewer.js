@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarketSnapshotV4 } from "../lib/snapshot/market-snapshot-v4"; // adjust path if needed
 
-/* =========================
-   Utilities
-========================= */
 function safeJsonParse(text) {
   try {
-    return { ok: true, obj: JSON.parse(text) };
+    const obj = JSON.parse(text);
+    return { ok: true, obj };
   } catch (e) {
     return { ok: false, err: String(e?.message || e) };
   }
@@ -27,15 +25,16 @@ function clamp(x, a, b) {
   return Math.max(a, Math.min(b, x));
 }
 
-function pct(x, digits = 0) {
-  if (!Number.isFinite(x)) return "—";
-  return `${(x * 100).toFixed(digits)}%`;
-}
-
-function fmtNum(x, digits = 2) {
+function fmtNum(x, opts = {}) {
+  const { digits = 2 } = opts;
   if (!Number.isFinite(x)) return "—";
   const d = Math.abs(x) >= 1000 ? Math.min(digits, 1) : digits;
   return x.toLocaleString(undefined, { maximumFractionDigits: d });
+}
+
+function fmtPct01(x) {
+  if (!Number.isFinite(x)) return "—";
+  return `${Math.round(clamp(x, 0, 1) * 100)}%`;
 }
 
 function fmtTs(ts, tz = "America/Los_Angeles") {
@@ -47,40 +46,43 @@ function fmtTs(ts, tz = "America/Los_Angeles") {
   }
 }
 
-function fmtTsShort(ts, tz = "America/Los_Angeles") {
-  if (!Number.isFinite(ts)) return "—";
-  try {
-    return new Date(ts).toLocaleString("en-US", {
-      timeZone: tz,
-      month: "numeric",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return new Date(ts).toISOString().slice(0, 16);
-  }
-}
-
 function toLower(x) {
   return String(x || "").toLowerCase();
+}
+
+function uniq(arr) {
+  return Array.from(new Set(arr.filter(Boolean)));
 }
 
 function safeArr(x) {
   return Array.isArray(x) ? x : [];
 }
 
-/* =========================
-   Domain mapping
-========================= */
-function tfLabelVN(tf) {
-  const x = String(tf || "");
-  if (x === "5") return "5m";
-  if (x === "15") return "15m";
-  if (x === "60") return "1H";
-  if (x === "240") return "4H";
-  if (x === "D") return "1D";
-  return x || "—";
+function detectStatus(setup) {
+  const elig = setup?.eligibility || null;
+  if (elig?.status) return String(elig.status);
+
+  const ex = setup?.execution_state || null;
+  const phase = ex?.phase ? String(ex.phase) : "";
+  const tradable = ex?.tradable;
+
+  if (phase === "invalidated") return "invalidated";
+  if (phase === "missed") return "missed";
+  if (tradable === true && phase === "ready") return "tradable";
+  if (phase === "waiting") return "waiting";
+
+  const hasCore = Array.isArray(setup?.entry_zone) && setup.entry_zone.length === 2 && Number.isFinite(setup?.stop);
+  return hasCore ? "unknown" : "unavailable";
+}
+
+function statusMeta(status) {
+  const s = toLower(status);
+  if (s === "tradable" || s === "ready") return { label: "Tradable", tone: "pos" };
+  if (s === "waiting") return { label: "Waiting", tone: "warn" };
+  if (s === "rejected" || s === "unavailable") return { label: "Unavailable", tone: "muted" };
+  if (s === "missed") return { label: "Missed", tone: "neg" };
+  if (s === "invalidated") return { label: "Invalidated", tone: "neg" };
+  return { label: status ? String(status) : "Unknown", tone: "muted" };
 }
 
 function typeLabelVN(type) {
@@ -92,27 +94,13 @@ function typeLabelVN(type) {
   return t || "—";
 }
 
-function statusMetaVN(status) {
-  const s = toLower(status);
-  if (s.includes("vào") || s === "ready") return { label: "SẴN SÀNG", tone: "pos" };
-  if (s.includes("chờ") || s === "waiting") return { label: "CHỜ", tone: "warn" };
-  if (s.includes("bỏ") || s.includes("no trade") || s === "missed") return { label: "ĐỨNG NGOÀI", tone: "muted" };
-  if (s.includes("hỏng") || s === "invalidated") return { label: "HỎNG", tone: "neg" };
-  return { label: String(status || "UNKNOWN"), tone: "muted" };
-}
-
-function toneForBias(bias) {
-  const b = toLower(bias);
-  if (b === "long" || b.includes("tăng")) return "pos";
-  if (b === "short" || b.includes("giảm")) return "neg";
-  return "muted";
-}
-
-function scoreToTone(x) {
-  if (!Number.isFinite(x)) return "muted";
-  if (x >= 0.8) return "pos";
-  if (x >= 0.65) return "warn";
-  return "muted";
+function tfLabelVN(tf) {
+  const x = String(tf || "");
+  if (x === "15") return "15m";
+  if (x === "60") return "1H";
+  if (x === "240") return "4H";
+  if (x === "D") return "1D";
+  return x || "—";
 }
 
 function getPrimaryPrice(snapshot) {
@@ -133,62 +121,21 @@ function getPrimaryPrice(snapshot) {
   return { px: null, src: "—" };
 }
 
-function computeReadiness(outlook) {
-  // Deterministic readiness score 0..1 using: guidance intent + primary context_fit + H0 confidence
-  const g = outlook?.guidance?.now || null;
-  const so = outlook?.setups_overview || null;
-  const primaryId = safeArr(so?.by_horizon?.h0_4h?.focus)?.[0] || null;
-
-  let fit = null;
-  if (primaryId) {
-    const it = safeArr(so?.items).find((x) => x?.id === primaryId);
-    if (it && Number.isFinite(it?.context_fit)) fit = it.context_fit;
-  } else {
-    // fallback: try primary in setups_overview.primary (no id), use max context_fit
-    const maxFit = Math.max(...safeArr(so?.items).map((x) => (Number.isFinite(x?.context_fit) ? x.context_fit : -1)));
-    if (Number.isFinite(maxFit) && maxFit >= 0) fit = maxFit;
+function copyText(text) {
+  try {
+    if (typeof navigator === "undefined") return;
+    navigator.clipboard.writeText(String(text || ""));
+  } catch {
+    // ignore
   }
-
-  const h0 = safeArr(outlook?.horizons).find((h) => h?.key === "h0_4h");
-  const conf = Number.isFinite(h0?.confidence) ? h0.confidence : null;
-
-  const intent = String(g?.intent || "").toUpperCase();
-  let base = 0.35;
-  if (intent.includes("READY")) base = 0.70;
-  else if (intent.includes("WAIT")) base = 0.45;
-  else if (intent.includes("NO_TRADE")) base = 0.25;
-
-  const fitAdj = Number.isFinite(fit) ? (fit - 0.5) * 0.35 : 0;
-  const confAdj = Number.isFinite(conf) ? (conf - 0.5) * 0.25 : 0;
-
-  return clamp(base + fitAdj + confAdj, 0, 1);
 }
 
-/* =========================
-   Icons (inline SVG)
-========================= */
-function Icon({ name = "dot", size = 18, tone = "muted" }) {
-  const colors = {
-    pos: "rgba(34,197,94,1)",
-    warn: "rgba(245,158,11,1)",
-    neg: "rgba(239,68,68,1)",
-    muted: "rgba(148,163,184,1)",
-    cyan: "rgba(34,211,238,1)",
-    violet: "rgba(167,139,250,1)",
-  };
-  const color = colors[tone] || colors.muted;
+// ---------- Modern UI: Icon (inline SVG) ----------
+function Icon({ name = "dot", size = 16 }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" };
-  const stroke = { stroke: color, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
+  const stroke = { stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
 
-  if (name === "spark") {
-    return (
-      <svg {...common}>
-        <path {...stroke} d="M12 2l1.2 5.2L18 9l-4.8 1.8L12 16l-1.2-5.2L6 9l4.8-1.8L12 2z" />
-        <path {...stroke} d="M4 14l.8 3.2L8 18l-3.2.8L4 22l-.8-3.2L0 18l3.2-.8L4 14z" />
-      </svg>
-    );
-  }
-  if (name === "arrowUp") {
+  if (name === "up") {
     return (
       <svg {...common}>
         <path {...stroke} d="M12 19V5" />
@@ -196,7 +143,7 @@ function Icon({ name = "dot", size = 18, tone = "muted" }) {
       </svg>
     );
   }
-  if (name === "arrowDown") {
+  if (name === "down") {
     return (
       <svg {...common}>
         <path {...stroke} d="M12 5v14" />
@@ -204,366 +151,158 @@ function Icon({ name = "dot", size = 18, tone = "muted" }) {
       </svg>
     );
   }
-  if (name === "dash") {
+  if (name === "risk") {
     return (
       <svg {...common}>
-        <path {...stroke} d="M5 12h14" />
+        <path {...stroke} d="M12 9v4" />
+        <path {...stroke} d="M12 17h.01" />
+        <path {...stroke} d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
       </svg>
     );
   }
-  if (name === "shield") {
+  if (name === "clarity") {
     return (
       <svg {...common}>
-        <path {...stroke} d="M12 2l8 4v6c0 5-3 9-8 10C7 21 4 17 4 12V6l8-4z" />
+        <path {...stroke} d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+        <path {...stroke} d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
       </svg>
     );
   }
-  if (name === "bolt") {
+  if (name === "data") {
     return (
       <svg {...common}>
-        <path {...stroke} d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
+        <path {...stroke} d="M4 6h16" />
+        <path {...stroke} d="M4 12h16" />
+        <path {...stroke} d="M4 18h16" />
+        <path {...stroke} d="M7 6v12" />
+        <path {...stroke} d="M17 6v12" />
       </svg>
     );
   }
-  if (name === "clock") {
+  if (name === "dot") {
     return (
       <svg {...common}>
-        <circle {...stroke} cx="12" cy="12" r="9" />
-        <path {...stroke} d="M12 7v6l4 2" />
-      </svg>
-    );
-  }
-  if (name === "x") {
-    return (
-      <svg {...common}>
-        <path {...stroke} d="M6 6l12 12" />
-        <path {...stroke} d="M18 6L6 18" />
-      </svg>
-    );
-  }
-  if (name === "download") {
-    return (
-      <svg {...common}>
-        <path {...stroke} d="M12 3v10" />
-        <path {...stroke} d="M7 10l5 5 5-5" />
-        <path {...stroke} d="M5 21h14" />
-      </svg>
-    );
-  }
-  if (name === "layers") {
-    return (
-      <svg {...common}>
-        <path {...stroke} d="M12 2l9 5-9 5-9-5 9-5z" />
-        <path {...stroke} d="M3 12l9 5 9-5" />
-        <path {...stroke} d="M3 17l9 5 9-5" />
+        <circle cx="12" cy="12" r="4" fill="currentColor" />
       </svg>
     );
   }
   return (
     <svg {...common}>
-      <circle cx="12" cy="12" r="4" fill={color} />
+      <circle cx="12" cy="12" r="4" fill="currentColor" />
     </svg>
   );
 }
-/* =========================
-   Help tooltips (VN)
-========================= */
-const HELP_VN = {
-  readiness: {
-    title: "Execution Readiness",
-    lines: [
-      "Là mức độ SẴN SÀNG để THỰC THI lệnh ngay lúc này (timing).",
-      "Không phải xác suất thắng; không thay thế RR hay Score.",
-      "Cách đọc nhanh: ≥70% có thể vào theo plan; 40–70% chờ thêm điều kiện; <40% đứng ngoài.",
-      "Readiness thấp thường do: giá chưa về entry, trigger chưa xác nhận, hoặc đang tránh FOMO."
-    ],
-  },
-  setup_score: {
-    title: "Setup Score",
-    lines: [
-      "Là điểm chất lượng của setup (độ 'đáng trade' về mặt kỹ thuật + cấu trúc).",
-      "Không phản ánh timing vào lệnh; timing xem ở Readiness.",
-      "Cách đọc nhanh: ≥80% rất đẹp; 65–80% ổn; <65% chỉ theo dõi/đợi kèo tốt hơn.",
-      "Score cao nhưng Readiness thấp: kèo đẹp nhưng CHƯA ĐẾN LÚC vào."
-    ],
-  },
-  context_fit: {
-    title: "Context Fit (FIT)",
-    lines: [
-      "Là mức độ phù hợp của setup với BỐI CẢNH thị trường hiện tại (thuận gió hay ngược gió).",
-      "Ví dụ: Long hợp nếu HTF ủng hộ và dòng tiền nghiêng mua; ngược lại FIT giảm.",
-      "Cách đọc nhanh: ≥70% ưu tiên; 50–70% theo dõi; <50% tránh (ngược bối cảnh).",
-      "FIT khác Score: Score = kèo đẹp; FIT = kèo hợp bối cảnh."
-    ],
-  },
-};
 
-function HelpTip({ k }) {
-  const data = HELP_VN[k];
-
-  // Hooks MUST be called unconditionally
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-
-  // iOS Safari often fires touch + click; we guard to avoid double-toggle.
-  const lastTouchTsRef = useRef(0);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onOutside = (e) => {
-      const el = rootRef.current;
-      if (!el) return;
-      if (!el.contains(e.target)) setOpen(false);
-    };
-
-    // Capture phase so we reliably detect outside interactions.
-    document.addEventListener("pointerdown", onOutside, true);
-    document.addEventListener("mousedown", onOutside, true);
-    document.addEventListener("touchstart", onOutside, true);
-
-    return () => {
-      document.removeEventListener("pointerdown", onOutside, true);
-      document.removeEventListener("mousedown", onOutside, true);
-      document.removeEventListener("touchstart", onOutside, true);
-    };
-  }, [open]);
-
-  if (!data) return null;
-
-  const toggle = (e) => {
-    if (e?.preventDefault) e.preventDefault();
-    if (e?.stopPropagation) e.stopPropagation();
-    setOpen((v) => !v);
-  };
-
-  const onTouchStart = (e) => {
-    // Mark the touch time to ignore the follow-up click.
-    lastTouchTsRef.current = Date.now();
-    toggle(e);
-  };
-
-  const onClick = (e) => {
-    // If a touch happened recently, ignore this click (prevents open->close on iPad).
-    const dt = Date.now() - (lastTouchTsRef.current || 0);
-    if (dt >= 0 && dt < 450) {
-      if (e?.preventDefault) e.preventDefault();
-      if (e?.stopPropagation) e.stopPropagation();
-      return;
-    }
-    toggle(e);
-  };
-
-  const close = (e) => {
-    if (e?.preventDefault) e.preventDefault();
-    if (e?.stopPropagation) e.stopPropagation();
-    setOpen(false);
-  };
-
-  return (
-    <span
-      ref={rootRef}
-      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
-      // prevent parent row click/tap from firing
-      onPointerDown={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-      onTouchStart={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <button
-        type="button"
-        onTouchStart={onTouchStart}
-        onClick={onClick}
-        aria-label={`Giải thích ${data.title}`}
-        aria-expanded={open ? "true" : "false"}
-        style={{
-          width: 16,
-          height: 16,
-          marginLeft: 6,
-          borderRadius: 99,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          border: "1px solid rgba(148,163,184,0.35)",
-          background: open ? "rgba(34,211,238,0.14)" : "rgba(2,6,23,0.35)",
-          color: "rgba(226,232,240,0.95)",
-          fontSize: 11,
-          fontWeight: 950,
-          cursor: "pointer",
-          userSelect: "none",
-          padding: 0,
-          lineHeight: "16px",
-          WebkitTapHighlightColor: "transparent",
-        }}
-      >
-        i
-      </button>
-
-      {open && (
-        <div
-          role="dialog"
-          aria-label={`Tooltip ${data.title}`}
-          // keep inside clicks from closing
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 22,
-            zIndex: 5000,
-            width: 340,
-            maxWidth: "min(340px, 86vw)",
-            padding: 12,
-            borderRadius: 14,
-            border: "1px solid rgba(148,163,184,0.22)",
-            background: "rgba(2,6,23,0.92)",
-            boxShadow: "0 24px 64px rgba(0,0,0,0.55)",
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)" }}>
-              {data.title}
-            </div>
-
-            <button
-              type="button"
-              onTouchStart={(e) => { lastTouchTsRef.current = Date.now(); close(e); }}
-              onClick={(e) => {
-                const dt = Date.now() - (lastTouchTsRef.current || 0);
-                if (dt >= 0 && dt < 450) { e.preventDefault(); e.stopPropagation(); return; }
-                close(e);
-              }}
-              aria-label="Đóng"
-              style={{
-                border: "1px solid rgba(148,163,184,0.22)",
-                background: "rgba(15,23,42,0.55)",
-                color: "rgba(226,232,240,0.9)",
-                borderRadius: 10,
-                padding: "4px 8px",
-                fontSize: 12,
-                fontWeight: 850,
-                cursor: "pointer",
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              Đóng
-            </button>
-          </div>
-
-          <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-            {data.lines.map((t, idx) => (
-              <div key={idx} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <div
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 99,
-                    marginTop: 6,
-                    background: "rgba(34,211,238,1)",
-                    flex: "0 0 auto",
-                  }}
-                />
-                <div style={{ fontSize: 12, fontWeight: 750, color: "rgba(226,232,240,0.86)", lineHeight: 1.45 }}>
-                  {t}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </span>
-  );
-}
-
-/* =========================
-   UI primitives
-========================= */
-function chipStyle(tone) {
+// ---------- Chip style ----------
+function chipStyle(base, tone) {
   const t = tone || "muted";
   const bg =
-    t === "pos" ? "rgba(34,197,94,0.12)"
-      : t === "warn" ? "rgba(245,158,11,0.14)"
-        : t === "neg" ? "rgba(239,68,68,0.12)"
-          : t === "cyan" ? "rgba(34,211,238,0.12)"
-            : t === "violet" ? "rgba(167,139,250,0.14)"
-              : "rgba(148,163,184,0.12)";
+    t === "pos"
+      ? "rgba(34,197,94,0.12)"
+      : t === "warn"
+      ? "rgba(245,158,11,0.14)"
+      : t === "neg"
+      ? "rgba(239,68,68,0.12)"
+      : "rgba(148,163,184,0.16)";
   const br =
-    t === "pos" ? "rgba(34,197,94,0.35)"
-      : t === "warn" ? "rgba(245,158,11,0.35)"
-        : t === "neg" ? "rgba(239,68,68,0.30)"
-          : t === "cyan" ? "rgba(34,211,238,0.30)"
-            : t === "violet" ? "rgba(167,139,250,0.30)"
-              : "rgba(148,163,184,0.24)";
+    t === "pos"
+      ? "rgba(34,197,94,0.35)"
+      : t === "warn"
+      ? "rgba(245,158,11,0.35)"
+      : t === "neg"
+      ? "rgba(239,68,68,0.30)"
+      : "rgba(148,163,184,0.26)";
   const fg =
-    t === "pos" ? "rgba(134,239,172,1)"
-      : t === "warn" ? "rgba(253,230,138,1)"
-        : t === "neg" ? "rgba(254,202,202,1)"
-          : t === "cyan" ? "rgba(165,243,252,1)"
-            : t === "violet" ? "rgba(221,214,254,1)"
-              : "rgba(226,232,240,0.90)";
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "7px 10px",
-    borderRadius: 999,
-    border: `1px solid ${br}`,
-    background: bg,
-    color: fg,
-    fontSize: 12,
-    fontWeight: 850,
-    userSelect: "none",
-    whiteSpace: "nowrap",
-  };
+    t === "pos"
+      ? "rgb(16,120,68)"
+      : t === "warn"
+      ? "rgb(146,64,14)"
+      : t === "neg"
+      ? "rgb(153,27,27)"
+      : "rgb(148,163,184)";
+  return { ...base, background: bg, border: `1px solid ${br}`, color: fg };
 }
 
-function Bar({ value01, tone = "cyan", labelLeft, labelRight, helpKey }) {
-  const v = clamp(Number(value01), 0, 1);
-  const c =
-    tone === "pos" ? "rgba(34,197,94,1)"
-      : tone === "warn" ? "rgba(245,158,11,1)"
-        : tone === "neg" ? "rgba(239,68,68,1)"
-          : tone === "violet" ? "rgba(167,139,250,1)"
-            : "rgba(34,211,238,1)";
-
-  return (
-    <div style={{ width: "100%", minWidth: 0 }}>
-      {(labelLeft || labelRight) ? (
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5, fontWeight: 800, color: "rgba(148,163,184,0.95)" }}>
-          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
-            <span>{labelLeft || ""}</span>
-            {helpKey ? <HelpTip k={helpKey} /> : null}
-          </div>
-          <div style={{ whiteSpace: "nowrap" }}>{labelRight || ""}</div>
-        </div>
-      ) : null}
-      <div style={{ height: 10, borderRadius: 999, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(2,6,23,0.35)", overflow: "hidden", marginTop: (labelLeft || labelRight) ? 8 : 0 }}>
-        <div style={{ height: "100%", width: `${(v * 100).toFixed(1)}%`, background: c, boxShadow: `0 0 18px ${c}` }} />
-      </div>
-    </div>
-  );
+function toneForBias(bias) {
+  const b = toLower(bias);
+  if (b === "long" || b === "up" || b === "bull" || b === "tăng" || b === "tang") return "pos";
+  if (b === "short" || b === "down" || b === "bear" || b === "giảm" || b === "giam") return "neg";
+  return "muted";
 }
 
-function SectionTitle({ icon, tone, title, right }) {
+function scoreToTone(x) {
+  if (!Number.isFinite(x)) return "muted";
+  if (x >= 0.8) return "pos";
+  if (x >= 0.65) return "warn";
+  return "muted";
+}
+
+function getCandidatesAll(setupsV2) {
+  return safeArr(setupsV2?.candidates_all).length ? safeArr(setupsV2?.candidates_all) : safeArr(setupsV2?.top_candidates);
+}
+
+function pickSetupKey(s, idx) {
+  const sym = s?.symbol || "SYM";
+  const type = s?.type || "type";
+  const bias = s?.bias || "bias";
+  const tf = s?.timeframe || s?.tf || "";
+  const ep = Number.isFinite(s?.entry_preferred) ? s.entry_preferred : Number.isFinite(s?.entry) ? s.entry : null;
+  const st = Number.isFinite(s?.stop) ? s.stop : null;
+  return `${sym}_${type}_${bias}_${tf}_${ep ?? "na"}_${st ?? "na"}_${idx}`;
+}
+
+function Section({ title, right, children, noTop = false }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-        {icon ? <Icon name={icon} tone={tone || "muted"} size={18} /> : null}
-        <div style={{ fontSize: 13, fontWeight: 950, color: "rgba(226,232,240,0.95)", letterSpacing: 0.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    <div style={{ marginTop: noTop ? 0 : 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.92)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {title}
         </div>
+        {right ? <div style={{ fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 700, whiteSpace: "nowrap" }}>{right}</div> : null}
       </div>
-      {right ? (
-        <div style={{ fontSize: 12, fontWeight: 850, color: "rgba(148,163,184,0.95)", whiteSpace: "nowrap" }}>{right}</div>
-      ) : null}
+      <div style={{ marginTop: 10 }}>{children}</div>
     </div>
   );
 }
 
-function Drawer({ open, title, onClose, children }) {
+/**
+ * KV row: stack K on top of V for mobile to avoid horizontal scroll
+ */
+function KV({ k, v, mono = false, stacked = false }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: stacked ? "column" : "row",
+        gap: stacked ? 6 : 10,
+        justifyContent: stacked ? "flex-start" : "space-between",
+        alignItems: stacked ? "flex-start" : "baseline",
+        padding: "8px 0",
+        borderBottom: "1px dashed rgba(148,163,184,0.28)",
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(148,163,184,0.95)", minWidth: 0 }}>{k}</div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 650,
+          color: "rgba(226,232,240,0.95)",
+          textAlign: stacked ? "left" : "right",
+          fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit",
+          overflowWrap: "anywhere",
+          wordBreak: "break-word",
+          maxWidth: stacked ? "100%" : "68%",
+          minWidth: 0,
+        }}
+      >
+        {v}
+      </div>
+    </div>
+  );
+}
+
+function Drawer({ open, onClose, title, children }) {
   const overlayRef = useRef(null);
 
   useEffect(() => {
@@ -586,613 +325,286 @@ function Drawer({ open, title, onClose, children }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(2,6,23,0.78)",
-        zIndex: 3000,
+        background: "rgba(2,6,23,0.72)",
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-end",
         padding: 12,
+        zIndex: 2000,
       }}
     >
       <div
         style={{
-          width: "min(1020px, 100%)",
-          maxHeight: "90vh",
+          width: "min(980px, 100%)",
+          maxHeight: "88vh",
           background: "rgba(15,23,42,0.92)",
-          border: "1px solid rgba(148,163,184,0.22)",
+          border: "1px solid rgba(148,163,184,0.26)",
           borderRadius: 18,
-          boxShadow: "0 30px 100px rgba(0,0,0,0.55)",
+          boxShadow: "0 34px 90px rgba(0,0,0,0.45)",
           overflow: "hidden",
-          backdropFilter: "blur(14px)",
+          backdropFilter: "blur(12px)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: 14, borderBottom: "1px solid rgba(148,163,184,0.14)" }}>
-          <div style={{ fontSize: 14, fontWeight: 950, color: "rgba(226,232,240,0.95)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title || "Details"}</div>
+        <div style={{ padding: 14, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.18)" }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "rgba(226,232,240,0.95)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title || "Details"}</div>
           <button
             onClick={onClose}
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "9px 12px",
+              border: "1px solid rgba(148,163,184,0.28)",
+              background: "rgba(30,41,59,0.72)",
+              padding: "8px 10px",
               borderRadius: 12,
-              border: "1px solid rgba(148,163,184,0.24)",
-              background: "rgba(2,6,23,0.35)",
-              color: "rgba(226,232,240,0.95)",
-              fontWeight: 900,
               cursor: "pointer",
+              fontWeight: 750,
+              color: "rgba(226,232,240,0.95)",
             }}
           >
-            <Icon name="x" tone="muted" size={16} />
             Close
           </button>
         </div>
-        <div style={{ padding: 14, overflow: "auto" }}>{children}</div>
+        <div style={{ padding: 14, overflow: "auto", minWidth: 0 }}>{children}</div>
       </div>
     </div>
   );
 }
 
-/* =========================
-   Autocomplete (Top 100 by market cap)
-========================= */
-async function fetchTop100Coins(signal) {
-  const url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false";
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Coin list HTTP ${res.status}`);
-  const data = await res.json();
-  const list = Array.isArray(data) ? data : [];
-  return list
-    .map((c) => ({
-      id: c?.id,
-      name: c?.name,
-      symbol: String(c?.symbol || "").toUpperCase(),
-      rank: Number(c?.market_cap_rank),
-      pair: `${String(c?.symbol || "").toUpperCase()}USDT`,
-    }))
-    .filter((x) => x.symbol && x.pair);
+function HorizonCard({ h, idx }) {
+  const title = h?.title || h?.label || `Horizon ${idx + 1}`;
+  const bias = h?.bias || null;
+  const clarity = h?.clarity || null;
+  const confidence = Number(h?.confidence);
+
+  const drivers = safeArr(h?.drivers);
+  const risks = safeArr(h?.risks);
+  const playbook = safeArr(h?.playbook);
+
+  const tone = bias ? toneForBias(bias) : "muted";
+
+  const chipBase = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    padding: "5px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 750,
+    whiteSpace: "nowrap",
+  };
+
+  const block = (label, items) => {
+    if (!items.length) return null;
+    return (
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 750, color: "rgba(148,163,184,0.95)" }}>{label}</div>
+        <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+          {items.slice(0, 5).map((b, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(226,232,240,0.55)", marginTop: 7, flexShrink: 0 }} />
+              <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.86)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>{String(b)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div
+      style={{
+        borderRadius: 16,
+        border: "1px solid rgba(148,163,184,0.20)",
+        background: "rgba(15,23,42,0.55)",
+        boxShadow: "0 14px 46px rgba(0,0,0,0.22)",
+        padding: 14,
+        minHeight: 150,
+        minWidth: 0,
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.95)" }}>{title}</div>
+
+      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {bias ? <span style={chipStyle(chipBase, tone)}>{String(bias)}</span> : null}
+        {clarity ? <span style={chipStyle(chipBase, "muted")}>Rõ xu hướng: {String(clarity)}</span> : null}
+        {Number.isFinite(confidence) ? <span style={chipStyle(chipBase, scoreToTone(confidence))}>Tin cậy: {fmtPct01(confidence)}</span> : null}
+      </div>
+
+      {block("Động lực chính", drivers)}
+      {block("Rủi ro / cản trở", risks)}
+      {block("Cách hành động", playbook)}
+    </div>
+  );
 }
 
-/* =========================
-   Setup components
-========================= */
-function SetupMiniRow({ item, onOpen }) {
-  const biasTone = toneForBias(item?.bias);
-  const scoreTone = scoreToTone(item?.final_score);
-  const fit = Number.isFinite(item?.context_fit) ? item.context_fit : null;
+function SetupCard({ setup, onOpen, dense = false, isWide, isMid }) {
+  const status = detectStatus(setup);
+  const sm = statusMeta(status);
 
-  const rr = Number.isFinite(item?.rr_tp1) ? item.rr_tp1 : null;
-  const dEntry = Number.isFinite(item?.distance_to_entry_pct) ? item.distance_to_entry_pct : null;
+  const bias = setup?.bias || "—";
+  const biasTone = toneForBias(bias);
 
-  // Execution / trigger state
-  const phase = String(item?.phase || item?.execution_state?.phase || "");
-  const reasonCodes = safeArr(item?.execution_state?.reason);
-  const insideEZ = !!item?.execution_state?.proximity?.inside_entry_zone;
-  const needTextRaw = safeArr(item?.reasons_vn)?.[0] || "";
+  const tf = setup?.timeframe ?? setup?.tf ?? null;
+  const type = setup?.type || null;
 
-  const phaseMeta = (() => {
-    const p = phase.toLowerCase();
-    if (p === "ready") return { label: "READY", tone: "pos" };
-    if (p === "waiting") return { label: "WAIT", tone: "warn" };
-    if (p === "missed") return { label: "NO TRADE", tone: "muted" };
-    if (p === "invalidated") return { label: "INVALID", tone: "neg" };
-    // fallback by reasons
-    if (reasonCodes.includes("inside_entry_zone")) return { label: "READY", tone: "pos" };
-    if (reasonCodes.some((r) => String(r).startsWith("waiting_"))) return { label: "WAIT", tone: "warn" };
-    return { label: phase ? phase.toUpperCase() : "—", tone: "muted" };
-  })();
+  const ez = Array.isArray(setup?.entry_zone) ? setup.entry_zone : null;
+  const ep = Number.isFinite(setup?.entry_preferred) ? setup.entry_preferred : Number.isFinite(setup?.entry) ? setup.entry : null;
+  const stop = Number.isFinite(setup?.stop) ? setup.stop : Number.isFinite(setup?.invalidation) ? setup.invalidation : null;
 
-  const triggerState = (() => {
-    if (phaseMeta.label === "READY") {
-      return insideEZ ? "Trong entry zone" : "Sẵn sàng (gần entry)";
-    }
-    if (reasonCodes.includes("waiting_trigger") || reasonCodes.includes("waiting_reversal_confirmation")) {
-      return "Chờ xác nhận trigger";
-    }
-    if (reasonCodes.includes("waiting_pullback_to_zone")) {
-      return "Chờ hồi về entry";
-    }
-    if (reasonCodes.includes("price_too_far_from_entry_zone") || reasonCodes.includes("avoid_chasing")) {
-      return "Xa entry, không đuổi";
-    }
-    if (phaseMeta.label === "INVALID") return "Kèo hỏng";
-    return "Theo dõi";
-  })();
+  const tp1 = Number.isFinite(setup?.targets?.tp1) ? setup.targets.tp1 : Number.isFinite(setup?.tp1) ? setup.tp1 : null;
+  const tp2 = Number.isFinite(setup?.targets?.tp2) ? setup.targets.tp2 : Number.isFinite(setup?.tp2) ? setup.tp2 : null;
 
-  const needText = (() => {
-    // show a very concrete next step if possible
-    if (phaseMeta.label === "READY") return "Có thể đặt lệnh theo plan";
-    if (needTextRaw) return needTextRaw;
-    if (triggerState) return triggerState;
-    return "Chờ điều kiện phù hợp";
-  })();
+  const finalScore =
+    Number.isFinite(setup?.final_score) ? setup.final_score : Number.isFinite(setup?.scores?.final_score) ? setup.scores.final_score : Number.isFinite(setup?.confidence) ? setup.confidence : null;
+
+  const rr =
+    Number.isFinite(setup?.execution_metrics?.rr_tp1) ? setup.execution_metrics.rr_tp1 : Number.isFinite(setup?.scores?.rr_tp1) ? setup.scores.rr_tp1 : Number.isFinite(setup?.rr_estimate_tp1) ? setup.rr_estimate_tp1 : null;
+
+  const qualityTier = setup?.quality_tier || setup?.scores?.quality_tier || null;
+  const phase = setup?.execution_state?.phase || null;
+  const readiness = setup?.execution_state?.readiness || null;
+  const orderType = setup?.execution_state?.order?.type || null;
+
+  const chipBase = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 750,
+    whiteSpace: "nowrap",
+    userSelect: "none",
+  };
+
+  const isCompact = !isMid;
+
+  const tileStyle = {
+    padding: isCompact ? 8 : 10,
+    borderRadius: 14,
+    background: "rgba(30,41,59,0.55)",
+    border: "1px solid rgba(148,163,184,0.18)",
+    textAlign: "center",
+    minHeight: isCompact ? 78 : 92,
+    display: "grid",
+    placeItems: "center",
+    alignContent: "center",
+    gap: isCompact ? 2 : 4,
+    minWidth: 0,
+    width: "100%",
+    backdropFilter: "blur(10px)",
+  };
+
+  const tileLabel = { fontSize: isCompact ? 10.5 : 11, fontWeight: 750, color: "rgba(148,163,184,0.95)", textAlign: "center", width: "100%" };
+  const tileMain = { marginTop: 2, fontSize: isCompact ? 12.5 : 13, fontWeight: 850, color: "rgba(226,232,240,0.95)", overflowWrap: "anywhere", textAlign: "center", width: "100%" };
+  const tileSub = { marginTop: 2, fontSize: isCompact ? 11.5 : 12, color: "rgba(226,232,240,0.80)", fontWeight: 650, overflowWrap: "anywhere", textAlign: "center", width: "100%" };
+
+  // IMPORTANT: Center the whole tile group (NOT just content inside tiles)
+  // Use inline-grid so the block can shrink-to-fit and be centered by outer wrapper.
+  const tileGroup = (
+    <div style={{ textAlign: "center" }}>
+      <div
+        style={{
+          marginTop: 12,
+          display: "inline-grid", // key: shrink-to-fit then center as inline element
+          gridTemplateColumns: isWide || isMid ? "repeat(4, minmax(0, 220px))" : "repeat(2, minmax(0, 220px))",
+          gap: isCompact ? 8 : 10,
+          justifyContent: "center",
+          alignItems: "stretch",
+          maxWidth: "100%",
+        }}
+      >
+        <div style={tileStyle}>
+          <div style={tileLabel}>Entry zone</div>
+          <div style={tileMain}>{ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}</div>
+          <div style={tileSub}>
+            Preferred: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{fmtNum(ep)}</b>
+          </div>
+        </div>
+
+        <div style={tileStyle}>
+          <div style={tileLabel}>Stop / Invalidation</div>
+          <div style={tileMain}>{fmtNum(stop)}</div>
+          <div style={tileSub}>
+            RR TP1: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
+          </div>
+        </div>
+
+        <div style={tileStyle}>
+          <div style={tileLabel}>Take Profit</div>
+          <div style={tileMain}>{Number.isFinite(tp1) ? `TP1: ${fmtNum(tp1)}` : "TP1: —"}</div>
+          <div style={tileSub}>{Number.isFinite(tp2) ? `TP2: ${fmtNum(tp2)}` : "\u00A0"}</div>
+        </div>
+
+        <div style={tileStyle}>
+          <div style={tileLabel}>Score / Execution</div>
+          <div style={tileMain}>Score: {Number.isFinite(finalScore) ? fmtPct01(finalScore) : "—"}</div>
+          <div style={tileSub}>
+            {phase ? `State: ${phase}` : "State: —"}
+            {orderType ? ` · ${orderType}` : ""}
+            {readiness ? ` · ${readiness}` : ""}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onOpen?.(item)}
+      onClick={() => onOpen?.(setup)}
       style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1.0fr)",
-        gap: 12,
-        alignItems: "center",
-        padding: "12px 12px",
-        borderRadius: 14,
-        border: "1px solid rgba(148,163,184,0.16)",
-        background: "rgba(2,6,23,0.25)",
         cursor: "pointer",
+        borderRadius: 18,
+        border: "1px solid rgba(148,163,184,0.18)",
+        background: "rgba(15,23,42,0.55)",
+        boxShadow: "0 16px 56px rgba(0,0,0,0.25)",
+        padding: dense ? 12 : 14,
+        transition: "transform 120ms ease, box-shadow 120ms ease",
+        minWidth: 0,
+        backdropFilter: "blur(12px)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-1px)";
+        e.currentTarget.style.boxShadow = "0 18px 66px rgba(0,0,0,0.32)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0px)";
+        e.currentTarget.style.boxShadow = "0 16px 56px rgba(0,0,0,0.25)";
       }}
     >
-      {/* Left: identity + status + what to wait for */}
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
-            {typeLabelVN(item?.type)} • {String(item?.bias || "")} • {tfLabelVN(item?.timeframe)}
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start", minWidth: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>{typeLabelVN(type)}</span>
+            <span style={chipStyle(chipBase, biasTone)}>{String(bias)}</span>
+            {tf ? <span style={chipStyle(chipBase, "muted")}>{tfLabelVN(tf)}</span> : null}
+            <span style={chipStyle(chipBase, sm.tone)}>{sm.label}</span>
+            {qualityTier ? <span style={chipStyle(chipBase, scoreToTone(finalScore))}>Tier {qualityTier}</span> : null}
           </div>
-          <span style={chipStyle(phaseMeta.tone)}>{phaseMeta.label}</span>
-          <span style={chipStyle(biasTone)}>{String(item?.bias || "—")}</span>
-          <span style={chipStyle("muted")}>{triggerState}</span>
-        </div>
-        <div style={{ marginTop: 6, fontSize: 12.0, fontWeight: 850, color: "rgba(226,232,240,0.78)", overflowWrap: "anywhere" }}>
-          <span style={{ color: "rgba(148,163,184,0.95)", fontWeight: 950 }}>Cần đợi:</span> {needText}
+
+          <div style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.78)", lineHeight: 1.45, fontWeight: 650, overflowWrap: "anywhere" }}>
+            <span style={{ color: "rgba(226,232,240,0.92)", fontWeight: 900 }}>Trigger:</span> {setup?.trigger || "—"}
+          </div>
+
+          {tileGroup}
         </div>
 
-        {item?.trigger ? (
-          <div style={{ marginTop: 6, fontSize: 11.5, fontWeight: 800, color: "rgba(148,163,184,0.95)", overflowWrap: "anywhere" }}>
-            <span style={{ color: "rgba(148,163,184,0.95)", fontWeight: 950 }}>Trigger:</span> {item.trigger}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Right: metrics */}
-      <div style={{ minWidth: 0, display: "grid", gap: 10 }}>
-        <Bar
-          value01={Number.isFinite(item?.final_score) ? item.final_score : 0}
-          tone={scoreTone === "pos" ? "pos" : scoreTone === "warn" ? "warn" : "cyan"}
-          labelLeft="Score"
-          labelRight={Number.isFinite(item?.final_score) ? pct(item.final_score, 0) : "—"}
-        />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
-            Fit<br />
-            <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(fit) ? pct(fit, 0) : "—"}</b>
-          </div>
-          <div style={{ fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
-            RR<br />
-            <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(rr) ? rr.toFixed(2) : "—"}</b>
-          </div>
-          <div style={{ fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.95)", textAlign: "right" }}>
-            ΔEntry<br />
-            <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(dEntry) ? pct(dEntry, 2) : "—"}</b>
-          </div>
+        <div style={{ flexShrink: 0, textAlign: "center", paddingTop: 2, minWidth: 62 }}>
+          <div style={{ fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 750 }}>View</div>
+          <div style={{ marginTop: 6, fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 700, overflowWrap: "anywhere" }}>{setup?.symbol || ""}</div>
         </div>
       </div>
     </div>
   );
 }
 
-function FocusSetupCard({ item, outlook, onOpen }) {
-  if (!item) return null;
-
-  const biasTone = toneForBias(item?.bias);
-  const scoreTone = scoreToTone(item?.final_score);
-  const fitTone = Number.isFinite(item?.context_fit) ? (item.context_fit >= 0.75 ? "pos" : item.context_fit >= 0.6 ? "warn" : "muted") : "muted";
-  const rrTone = Number.isFinite(item?.rr_tp1) ? (item.rr_tp1 >= 2 ? "pos" : item.rr_tp1 >= 1.2 ? "warn" : "muted") : "muted";
-
-  const ez = Array.isArray(item?.entry_zone) ? item.entry_zone : null;
-  const stop = Number.isFinite(item?.stop) ? item.stop : null;
-  const tp1 = Number.isFinite(item?.targets?.tp1) ? item.targets.tp1 : null;
-  const tp2 = Number.isFinite(item?.targets?.tp2) ? item.targets.tp2 : null;
-
-  const g = outlook?.guidance?.now || null;
-  const status = g?.status || item?.status || item?.phase || "—";
-  const st = statusMetaVN(status);
-
-  const glow =
-    biasTone === "pos" ? "rgba(34,197,94,0.35)"
-      : biasTone === "neg" ? "rgba(239,68,68,0.28)"
-        : "rgba(34,211,238,0.25)";
-
-  return (
-    <div
-      style={{
-        borderRadius: 20,
-        border: "1px solid rgba(148,163,184,0.16)",
-        background: "linear-gradient(180deg, rgba(15,23,42,0.80) 0%, rgba(2,6,23,0.55) 100%)",
-        boxShadow: `0 26px 88px rgba(0,0,0,0.45), 0 0 28px ${glow}`,
-        padding: 16,
-        backdropFilter: "blur(16px)",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ fontSize: 15, fontWeight: 980, color: "rgba(226,232,240,0.95)", letterSpacing: 0.2 }}>
-              {typeLabelVN(item?.type)} • {String(item?.bias || "")} • {tfLabelVN(item?.timeframe)}
-            </div>
-            <span style={chipStyle(st.tone)}>{st.label}</span>
-            <span style={chipStyle(biasTone)}>{String(item?.bias || "—")}</span>
-          </div>
-
-          <div style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.78)", fontWeight: 650, lineHeight: 1.45, overflowWrap: "anywhere" }}>
-            <span style={{ fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>Trigger:</span> {item?.trigger || "—"}
-          </div>
-        </div>
-
-        <button
-          onClick={() => onOpen?.(item)}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 14,
-            border: "1px solid rgba(148,163,184,0.22)",
-            background: "rgba(2,6,23,0.35)",
-            color: "rgba(226,232,240,0.95)",
-            fontWeight: 950,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-        >
-          View setup
-        </button>
-      </div>
-
-      <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
-          <div style={metricTileStyle()}>
-            <div style={metricLabelStyle()}>Entry zone</div>
-            <div style={metricValueStyle()}>{ez ? `${fmtNum(Math.min(ez[0], ez[1]))} → ${fmtNum(Math.max(ez[0], ez[1]))}` : "—"}</div>
-            <div style={metricSubStyle()}>Preferred: <b style={{ color: "rgba(226,232,240,0.95)" }}>{fmtNum(item?.entry_preferred)}</b></div>
-          </div>
-
-          <div style={metricTileStyle()}>
-            <div style={metricLabelStyle()}>Stop</div>
-            <div style={metricValueStyle()}>{fmtNum(stop)}</div>
-            <div style={metricSubStyle()}>ΔStop: <b style={{ color: "rgba(226,232,240,0.95)" }}>{Number.isFinite(item?.stop_distance_pct) ? pct(item.stop_distance_pct, 2) : "—"}</b></div>
-          </div>
-
-          <div style={metricTileStyle()}>
-            <div style={metricLabelStyle()}>Targets</div>
-            <div style={metricValueStyle()}>{Number.isFinite(tp1) ? `TP1 ${fmtNum(tp1)}` : "TP1 —"}</div>
-            <div style={metricSubStyle()}>{Number.isFinite(tp2) ? `TP2 ${fmtNum(tp2)}` : "\u00A0"}</div>
-          </div>
-
-          <div style={metricTileStyle()}>
-            <div style={metricLabelStyle()}>Execution</div>
-            <div style={metricValueStyle()}>{g?.status || item?.phase || "—"}</div>
-            <div style={metricSubStyle()}>{g?.summary || "—"}</div>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr", gap: 12, alignItems: "end" }}>
-          <Bar
-            value01={Number.isFinite(item?.final_score) ? item.final_score : 0}
-            tone={scoreTone === "pos" ? "pos" : scoreTone === "warn" ? "warn" : "cyan"}
-            labelLeft="Setup Score" helpKey="setup_score"
-            labelRight={Number.isFinite(item?.final_score) ? pct(item.final_score, 0) : "—"}
-          />
-          <Bar
-            value01={Number.isFinite(item?.context_fit) ? item.context_fit : 0}
-            tone={fitTone}
-            labelLeft="Context Fit" helpKey="context_fit"
-            labelRight={Number.isFinite(item?.context_fit) ? pct(item.context_fit, 0) : "—"}
-          />
-          <Bar
-            value01={Number.isFinite(item?.rr_tp1) ? clamp(item.rr_tp1 / 4, 0, 1) : 0}
-            tone={rrTone}
-            labelLeft="RR (TP1)"
-            labelRight={Number.isFinite(item?.rr_tp1) ? item.rr_tp1.toFixed(2) : "—"}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function metricTileStyle() {
-  return {
-    padding: 12,
-    borderRadius: 16,
-    border: "1px solid rgba(148,163,184,0.14)",
-    background: "rgba(2,6,23,0.28)",
-    minHeight: 92,
-    display: "grid",
-    alignContent: "center",
-    gap: 4,
-    textAlign: "center",
-  };
-}
-function metricLabelStyle() {
-  return { fontSize: 11, fontWeight: 850, color: "rgba(148,163,184,0.95)" };
-}
-function metricValueStyle() {
-  return { fontSize: 13.5, fontWeight: 980, color: "rgba(226,232,240,0.95)" };
-}
-function metricSubStyle() {
-  return { fontSize: 11.5, fontWeight: 700, color: "rgba(226,232,240,0.78)", overflowWrap: "anywhere" };
-}
-
-function BulletList({ items, tone = "muted" }) {
-  const xs = safeArr(items).filter(Boolean);
-  if (!xs.length) return <div style={{ fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 750 }}>—</div>;
-  return (
-    <div style={{ display: "grid", gap: 8 }}>
-      {xs.map((t, i) => (
-        <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <div style={{ width: 8, height: 8, borderRadius: 99, marginTop: 6, background: tone === "pos" ? "rgba(34,197,94,1)" : tone === "warn" ? "rgba(245,158,11,1)" : tone === "neg" ? "rgba(239,68,68,1)" : "rgba(148,163,184,0.85)" }} />
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: "rgba(226,232,240,0.86)", lineHeight: 1.45, overflowWrap: "anywhere" }}>{String(t)}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SetupDetails({ item }) {
-  if (!item) return null;
-
-  const biasTone = toneForBias(item?.bias);
-  const scoreTone = scoreToTone(item?.final_score);
-  const fitTone = Number.isFinite(item?.context_fit) ? (item.context_fit >= 0.75 ? "pos" : item.context_fit >= 0.6 ? "warn" : "muted") : "muted";
-
-  return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={chipStyle(biasTone)}>{String(item?.bias || "—")}</span>
-        <span style={chipStyle("muted")}>{tfLabelVN(item?.timeframe)}</span>
-        <span style={chipStyle(scoreTone)}>{Number.isFinite(item?.final_score) ? `Score ${pct(item.final_score, 0)}` : "Score —"}</span>
-        <span style={chipStyle(fitTone)}>{Number.isFinite(item?.context_fit) ? `Fit ${pct(item.context_fit, 0)}` : "Fit —"}</span>
-        <span style={chipStyle("cyan")}>{Number.isFinite(item?.rr_tp1) ? `RR ${item.rr_tp1.toFixed(2)}` : "RR —"}</span>
-        <span style={chipStyle("violet")}>{item?.symbol || ""}</span>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
-        <div style={detailCardStyle()}>
-          <SectionTitle icon="layers" tone="cyan" title="Entry / Stop / Targets" />
-          <KV k="Entry zone" v={Array.isArray(item?.entry_zone) ? `${fmtNum(Math.min(item.entry_zone[0], item.entry_zone[1]))} → ${fmtNum(Math.max(item.entry_zone[0], item.entry_zone[1]))}` : "—"} />
-          <KV k="Entry preferred" v={fmtNum(item?.entry_preferred)} />
-          <KV k="Stop" v={fmtNum(item?.stop)} />
-          <KV k="TP1" v={fmtNum(item?.targets?.tp1)} />
-          <KV k="TP2" v={fmtNum(item?.targets?.tp2)} />
-        </div>
-
-        <div style={detailCardStyle()}>
-          <SectionTitle icon="shield" tone="violet" title="Execution metrics" />
-          <KV k="Phase" v={String(item?.phase || item?.execution_state?.phase || "—")} />
-          <KV k="Readiness" v={String(item?.execution_state?.readiness || "—")} />
-          <KV k="ΔEntry" v={Number.isFinite(item?.distance_to_entry_pct) ? pct(item.distance_to_entry_pct, 2) : "—"} />
-          <KV k="ΔStop" v={Number.isFinite(item?.stop_distance_pct) ? pct(item.stop_distance_pct, 2) : "—"} />
-          <KV k="RR TP1" v={Number.isFinite(item?.rr_tp1) ? item.rr_tp1.toFixed(2) : "—"} />
-        </div>
-      </div>
-
-      <div style={detailCardStyle()}>
-        <SectionTitle icon="spark" tone="pos" title="Explainer" right="Retail playbook" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
-          <div style={miniBlockStyle()}>
-            <div style={miniBlockTitleStyle()}>Vì sao kèo này đáng chú ý</div>
-            <BulletList items={item?.explain?.why_this_setup} />
-          </div>
-          <div style={miniBlockStyle()}>
-            <div style={miniBlockTitleStyle()}>Cách vào lệnh</div>
-            <BulletList items={item?.explain?.entry_tactics} />
-          </div>
-          <div style={miniBlockStyle()}>
-            <div style={miniBlockTitleStyle()}>Điều kiện hỏng kèo</div>
-            <BulletList items={item?.explain?.invalidation} tone="neg" />
-          </div>
-          <div style={miniBlockStyle()}>
-            <div style={miniBlockTitleStyle()}>Quản trị lệnh</div>
-            <BulletList items={item?.explain?.management} tone="warn" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KV({ k, v }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px dashed rgba(148,163,184,0.22)" }}>
-      <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(148,163,184,0.95)" }}>{k}</div>
-      <div style={{ fontSize: 12, fontWeight: 850, color: "rgba(226,232,240,0.92)", textAlign: "right", overflowWrap: "anywhere" }}>{v}</div>
-    </div>
-  );
-}
-
-function detailCardStyle() {
-  return {
-    borderRadius: 18,
-    border: "1px solid rgba(148,163,184,0.16)",
-    background: "rgba(2,6,23,0.28)",
-    padding: 14,
-    backdropFilter: "blur(12px)",
-    minWidth: 0,
-  };
-}
-function miniBlockStyle() {
-  return {
-    padding: 12,
-    borderRadius: 16,
-    border: "1px solid rgba(148,163,184,0.14)",
-    background: "rgba(15,23,42,0.45)",
-    minWidth: 0,
-  };
-}
-function miniBlockTitleStyle() {
-  return { fontSize: 12.5, fontWeight: 950, color: "rgba(226,232,240,0.95)", marginBottom: 10 };
-}
-
-/* =========================
-   Market DNA panel
-========================= */
-function TrendCell({ tf, label }) {
-  const t = String(label || "range");
-  const isBull = t === "bull";
-  const isBear = t === "bear";
-  const icon = isBull ? "arrowUp" : isBear ? "arrowDown" : "dash";
-  const tone = isBull ? "pos" : isBear ? "neg" : "muted";
-
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "60px 1fr", gap: 10, alignItems: "center", padding: "8px 10px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.14)", background: "rgba(2,6,23,0.28)" }}>
-      <div style={{ fontSize: 12, fontWeight: 950, color: "rgba(226,232,240,0.92)" }}>{tfLabelVN(tf)}</div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <div style={{ fontSize: 12, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>{t.toUpperCase()}</div>
-        <Icon name={icon} tone={tone} size={18} />
-      </div>
-    </div>
-  );
-}
-
-function VolRow({ tf, v }) {
-  const vv = Number(v);
-  const tone = vv > 0.02 ? "neg" : vv > 0.012 ? "warn" : vv > 0.005 ? "cyan" : "muted";
-  return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <Bar value01={Number.isFinite(vv) ? clamp(vv / 0.04, 0, 1) : 0} tone={tone} labelLeft={`${tfLabelVN(tf)} ATR%`} labelRight={Number.isFinite(vv) ? pct(vv, 2) : "—"} />
-    </div>
-  );
-}
-
-function MarketDNA({ outlook, refPx, pxSrc, isMobile }) {
-  const ctx = outlook?.context || null;
-  const regime = ctx?.regime?.label || "—";
-  const composite = Number(ctx?.regime?.composite);
-  const strength = Number(ctx?.regime?.strength);
-  const orderflowText = ctx?.orderflow?.text || "—";
-  const orderflowFlag = ctx?.orderflow?.flag || "—";
-
-  const q = String(ctx?.data_quality || "—");
-  const dqTone = q.includes("Đủ") ? "pos" : q.includes("Thiếu") ? "warn" : "muted";
-
-  const tfTrend = ctx?.trend_by_tf || {};
-  const vol = ctx?.volatility_by_tf || {};
-
-  const deriv = ctx?.derivatives || {};
-  const fund = deriv?.funding_text;
-  const lev = deriv?.leverage_text;
-  const liq = deriv?.liquidation_text;
-  const liqLevel = deriv?.liquidation_level || "none";
-
-  const ofTone = orderflowFlag.includes("buy") ? "pos" : orderflowFlag.includes("sell") ? "neg" : "muted";
-  const liqTone = liqLevel === "high" ? "neg" : liqLevel === "mid" ? "warn" : "muted";
-
-  const regimeTone =
-    regime === "bull" ? "pos"
-      : regime === "bear" ? "neg"
-        : regime.includes("range") ? "warn"
-          : "muted";
-
-  return (
-    <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.16)", background: "rgba(15,23,42,0.60)", boxShadow: "0 18px 60px rgba(0,0,0,0.32)", padding: 14, backdropFilter: "blur(14px)" }}>
-      <SectionTitle icon="layers" tone="violet" title="Market DNA" right={isMobile ? "" : "Context"} />
-
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={chipStyle(regimeTone)}>Regime: {String(regime)}</span>
-        <span style={chipStyle("muted")}>Composite: {Number.isFinite(composite) ? composite.toFixed(2) : "—"}</span>
-        <span style={chipStyle("muted")}>Strength: {Number.isFinite(strength) ? strength.toFixed(2) : "—"}</span>
-        <span style={chipStyle(dqTone)}>Data: {q}</span>
-      </div>
-
-      <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-        <div style={{ padding: 12, borderRadius: 16, border: "1px solid rgba(148,163,184,0.14)", background: "rgba(2,6,23,0.28)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ fontSize: 12.5, fontWeight: 950, color: "rgba(226,232,240,0.95)" }}>Reference price</div>
-            <div style={{ fontSize: 12.5, fontWeight: 950, color: "rgba(226,232,240,0.95)" }}>
-              {Number.isFinite(refPx) ? fmtNum(refPx) : "—"} <span style={{ fontSize: 11.5, fontWeight: 800, color: "rgba(148,163,184,0.95)" }}>({pxSrc})</span>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 950, color: "rgba(226,232,240,0.95)" }}>Trend matrix</div>
-          <div style={{ display: "grid", gap: 8 }}>
-            {["5", "15", "60", "240", "D"].map((k) => (
-              <TrendCell key={k} tf={k} label={tfTrend?.[k]?.trend} />
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 950, color: "rgba(226,232,240,0.95)" }}>Volatility (ATR%)</div>
-          <div style={{ display: "grid", gap: 10 }}>
-            {["15", "60", "240", "D"].map((k) => (
-              <VolRow key={k} tf={k} v={vol?.[k]} />
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={chipStyle(ofTone)}>Orderflow</span>
-            <span style={{ fontSize: 12.5, fontWeight: 750, color: "rgba(226,232,240,0.80)", overflowWrap: "anywhere" }}>{orderflowText}</span>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={chipStyle(liqTone)}>Liquidation: {String(liqLevel)}</span>
-            {fund ? <span style={chipStyle("muted")}>{fund}</span> : null}
-            {lev ? <span style={chipStyle("muted")}>{lev}</span> : null}
-            {liq ? <span style={chipStyle("muted")}>{liq}</span> : null}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================
-   Loading pipeline (hi-tech)
-========================= */
-function useLoadingPipeline(isLoading) {
-  const steps = useMemo(
-    () => [
-      { key: "scan", label: "Scanning market structure" },
-      { key: "flow", label: "Measuring orderflow & volatility" },
-      { key: "deriv", label: "Evaluating derivatives risk" },
-      { key: "rank", label: "Ranking setups & execution quality" },
-      { key: "compose", label: "Composing snapshot & outlook" },
-    ],
-    []
-  );
-
-  const [idx, setIdx] = useState(0);
-  const [elapsedMs, setElapsedMs] = useState(0);
-
-  useEffect(() => {
-    if (!isLoading) {
-      setIdx(0);
-      setElapsedMs(0);
-      return;
-    }
-    let raf = null;
-    let start = performance.now();
-
-    const tick = () => {
-      const now = performance.now();
-      const elapsed = now - start;
-      setElapsedMs(elapsed);
-      const step = Math.floor(elapsed / 850);
-      setIdx(Math.min(step, steps.length - 1));
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => raf && cancelAnimationFrame(raf);
-  }, [isLoading, steps.length]);
-
-  // Monotonic progress: reach 100% and stay there until the real generation finishes.
-  // Avoid looping 80% -> 100% caused by fractional progress on the last step.
-  const total = steps.length * 850;
-  const progress01 = isLoading ? clamp(elapsedMs / total, 0, 1) : 0;
-
-  return { steps, idx, progress01 };
-}
-
-/* =========================
-   Main page (FULL REWRITE)
-========================= */
 export default function SnapshotViewerPage() {
-  // Responsive
   const [isWide, setIsWide] = useState(false);
   const [isMid, setIsMid] = useState(false);
+
   const lastWRef = useRef(0);
 
   useEffect(() => {
@@ -1200,165 +612,191 @@ export default function SnapshotViewerPage() {
       const w = window.innerWidth || 0;
       if (Math.abs(w - lastWRef.current) < 2) return;
       lastWRef.current = w;
-      setIsWide(w >= 1120);
-      setIsMid(w >= 820);
+
+      setIsWide(w >= 1024);
+      setIsMid(w >= 760);
     };
     onResize();
     window.addEventListener("resize", onResize);
+
     const vv = window.visualViewport;
     if (vv?.addEventListener) vv.addEventListener("resize", onResize);
+
     return () => {
       window.removeEventListener("resize", onResize);
       if (vv?.removeEventListener) vv.removeEventListener("resize", onResize);
     };
   }, []);
 
-  // Autocomplete
-  const [symbolInput, setSymbolInput] = useState("ETHUSDT");
+  const [controlsOpen, setControlsOpen] = useState(false);
+
+  const [symbolInput, setSymbolInput] = useState("BTCUSDT");
   const symbolInputRef = useRef(null);
-  const [topCoins, setTopCoins] = useState([]);
-  const [coinsLoading, setCoinsLoading] = useState(false);
-  const [coinsErr, setCoinsErr] = useState("");
-  const [suggOpen, setSuggOpen] = useState(false);
-  const [suggActive, setSuggActive] = useState(-1);
-  const suggWrapRef = useRef(null);
-
-  useEffect(() => {
-    let alive = true;
-    const ac = new AbortController();
-
-    const load = async () => {
-      setCoinsErr("");
-      setCoinsLoading(true);
-      try {
-        const list = await fetchTop100Coins(ac.signal);
-        if (!alive) return;
-        setTopCoins(list);
-      } catch (e) {
-        if (!alive) return;
-        if (String(e?.name || "").toLowerCase() === "aborterror") return;
-        setCoinsErr(String(e?.message || e));
-      } finally {
-        if (alive) setCoinsLoading(false);
-      }
-    };
-
-    load();
-    return () => {
-      alive = false;
-      try { ac.abort(); } catch { }
-    };
-  }, []);
-
-  useEffect(() => {
-    const onDoc = (e) => {
-      if (!suggWrapRef.current) return;
-      if (!suggWrapRef.current.contains(e.target)) setSuggOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
-  const safeSymbol = useMemo(() => String(symbolInput || "").toUpperCase().trim(), [symbolInput]);
-
-  const suggestions = useMemo(() => {
-    const q = String(symbolInput || "").toUpperCase().trim();
-    const xs = topCoins.slice().sort((a, b) => (a.rank || 999) - (b.rank || 999));
-    if (!q) return xs.slice(0, 12);
-    const q2 = q.endsWith("USDT") ? q.slice(0, -4) : q;
-    return xs
-      .filter((c) => c.pair.startsWith(q) || c.symbol.startsWith(q2) || String(c.name || "").toUpperCase().includes(q2))
-      .slice(0, 12);
-  }, [topCoins, symbolInput]);
-
-  const pickSuggestion = (c) => {
-    if (!c) return;
-    setSymbolInput(c.pair);
-    setSuggOpen(false);
-    setSuggActive(-1);
-    requestAnimationFrame(() => symbolInputRef.current?.focus());
-  };
-
-  // Snapshot state
-  const [snap, setSnap] = useState(null);
-  const [raw, setRaw] = useState("");
-  const [tab, setTab] = useState("cockpit"); // cockpit | all | debug
-  const [autoDownload, setAutoDownload] = useState(true);
 
   const [genLoading, setGenLoading] = useState(false);
   const [genErr, setGenErr] = useState("");
+  const [autoDownload, setAutoDownload] = useState(true);
 
-  const { steps, idx: loadIdx, progress01 } = useLoadingPipeline(genLoading);
+  const [raw, setRaw] = useState("");
+  const [snap, setSnap] = useState(null);
+  const [parseErr, setParseErr] = useState("");
 
-  // Drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedSetup, setSelectedSetup] = useState(null);
 
-  const onOpenItem = (it) => {
-    setSelectedItem(it);
+  const [tab, setTab] = useState("overview"); // overview | top | all
+
+  const [fText, setFText] = useState("");
+  const [fStatus, setFStatus] = useState("all");
+  const [fType, setFType] = useState("all");
+  const [fTf, setFTf] = useState("all");
+  const [fTradableOnly, setFTradableOnly] = useState(false);
+  const [sortBy, setSortBy] = useState("score_desc");
+
+  const safeSymbol = useMemo(() => String(symbolInput || "").toUpperCase().trim(), [symbolInput]);
+
+  const setupsV2 = snap?.unified?.setups_v2 || null;
+  const outlook = snap?.unified?.market_outlook_v1 || null;
+
+  const headlineObj = outlook?.headline || null;
+  const horizons = safeArr(outlook?.horizons);
+  const action = outlook?.action || null;
+  const flagObjs = safeArr(outlook?.flag_texts);
+
+  const primary = setupsV2?.primary || null;
+  const top = safeArr(setupsV2?.top_candidates);
+  const all = getCandidatesAll(setupsV2);
+
+  const tz = snap?.runtime?.tz || "America/Los_Angeles";
+  const symbol = snap?.symbol || snap?.request?.symbol || "—";
+  const generatedAt = Number(snap?.generated_at);
+  const quality = snap?.unified?.data_quality || "—";
+  const diagErrors = snap?.diagnostics?.errors?.length || 0;
+
+  const { px: refPx, src: pxSrc } = useMemo(() => getPrimaryPrice(snap), [snap]);
+
+  const allTypes = useMemo(() => uniq(all.map((s) => s?.type)).sort(), [all]);
+  const allTfs = useMemo(() => {
+    return uniq(all.map((s) => String(s?.timeframe ?? s?.tf ?? "").trim()).filter(Boolean)).sort((a, b) => {
+      const order = { "15": 1, "60": 2, "240": 3, "D": 4 };
+      return (order[a] || 99) - (order[b] || 99);
+    });
+  }, [all]);
+
+  const filteredAll = useMemo(() => {
+    let xs = all.slice();
+
+    const q = toLower(fText).trim();
+    if (q) {
+      xs = xs.filter((s) => {
+        const blob = [
+          s?.symbol,
+          s?.type,
+          s?.bias,
+          s?.timeframe,
+          s?.trigger,
+          safeArr(s?.eligibility?.reasons).join(" "),
+          safeArr(s?.execution_state?.reason).join(" "),
+          safeArr(s?.warnings).join(" "),
+        ].join(" ");
+        return toLower(blob).includes(q);
+      });
+    }
+
+    if (fStatus !== "all") xs = xs.filter((s) => toLower(detectStatus(s)) === toLower(fStatus));
+    if (fType !== "all") xs = xs.filter((s) => String(s?.type || "") === fType);
+    if (fTf !== "all") xs = xs.filter((s) => String(s?.timeframe ?? s?.tf ?? "") === fTf);
+
+    if (fTradableOnly) {
+      xs = xs.filter((s) => {
+        const t = s?.eligibility?.tradable;
+        const ex = s?.execution_state?.tradable;
+        return t === true || ex === true || toLower(detectStatus(s)) === "tradable";
+      });
+    }
+
+    const getScore = (s) =>
+      Number.isFinite(s?.final_score) ? s.final_score : Number.isFinite(s?.scores?.final_score) ? s.scores.final_score : Number.isFinite(s?.confidence) ? s.confidence : -1;
+
+    const getRr = (s) =>
+      Number.isFinite(s?.execution_metrics?.rr_tp1) ? s.execution_metrics.rr_tp1 : Number.isFinite(s?.scores?.rr_tp1) ? s.scores.rr_tp1 : Number.isFinite(s?.rr_estimate_tp1) ? s.rr_estimate_tp1 : -1;
+
+    const getTfOrder = (s) => {
+      const tf = String(s?.timeframe ?? s?.tf ?? "");
+      const order = { "15": 1, "60": 2, "240": 3, "D": 4 };
+      return order[tf] || 99;
+    };
+
+    xs.sort((a, b) => {
+      if (sortBy === "rr_desc") return getRr(b) - getRr(a);
+      if (sortBy === "tf_asc") return getTfOrder(a) - getTfOrder(b);
+      return getScore(b) - getScore(a);
+    });
+
+    return xs;
+  }, [all, fText, fStatus, fType, fTf, fTradableOnly, sortBy]);
+
+  const onOpenSetup = (s) => {
+    setSelectedSetup(s);
     setDrawerOpen(true);
   };
   const onCloseDrawer = () => {
     setDrawerOpen(false);
-    setSelectedItem(null);
+    setSelectedSetup(null);
   };
 
-  // Derived
-  const outlook = snap?.unified?.market_outlook_v1 || null;
-  const so = outlook?.setups_overview || null;
-  const byH = so?.by_horizon || null;
-  const items = safeArr(so?.items);
-  const h0 = byH?.h0_4h || null;
+  const applySnapshotObj = (obj, alsoSetRaw = true) => {
+    setParseErr("");
+    setGenErr("");
+    setSnap(obj);
+    setTab("overview");
+    if (alsoSetRaw) setRaw(JSON.stringify(obj, null, 2));
+    if (!isWide) setControlsOpen(false);
+  };
 
-  const focusIds = safeArr(h0?.focus);
-  const watchIds = safeArr(h0?.watchlist);
-  const avoidIds = safeArr(h0?.avoid);
+  const onPasteApply = () => {
+    setParseErr("");
+    const res = safeJsonParse(raw);
+    if (!res.ok) {
+      setSnap(null);
+      setParseErr(res.err || "Invalid JSON");
+      return;
+    }
+    applySnapshotObj(res.obj, false);
+  };
 
-  const focusItem = focusIds.length ? items.find((x) => x?.id === focusIds[0]) : null;
-  const watchItems = watchIds.map((id) => items.find((x) => x?.id === id)).filter(Boolean);
-  const avoidItems = avoidIds.map((id) => items.find((x) => x?.id === id)).filter(Boolean);
+  const onFilePick = async (file) => {
+    setParseErr("");
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setRaw(text);
+      const res = safeJsonParse(text);
+      if (!res.ok) {
+        setSnap(null);
+        setParseErr(res.err || "Invalid JSON");
+        return;
+      }
+      applySnapshotObj(res.obj, false);
+    } catch (e) {
+      setSnap(null);
+      setParseErr(String(e?.message || e));
+    }
+  };
 
-  const tz = snap?.runtime?.tz || "America/Los_Angeles";
-  const generatedAt = Number(snap?.generated_at);
-  const symbol = snap?.symbol || snap?.request?.symbol || safeSymbol || "—";
-
-  const { px: refPx, src: pxSrc } = useMemo(() => getPrimaryPrice(snap), [snap]);
-  const readiness01 = useMemo(() => computeReadiness(outlook), [outlook]);
-
-  const h0Obj = useMemo(() => safeArr(outlook?.horizons).find((h) => h?.key === "h0_4h") || null, [outlook]);
-  const headline = outlook?.headline || null;
-  const action = outlook?.action || null;
-
-  const status = outlook?.guidance?.now?.status || action?.status || "—";
-  const st = statusMetaVN(status);
-
-  const scoreTone = scoreToTone(focusItem?.final_score);
-  const pageBg =
-    "radial-gradient(1200px 700px at 10% 0%, rgba(99,102,241,0.26) 0%, rgba(99,102,241,0) 60%)," +
-    "radial-gradient(1100px 650px at 92% 12%, rgba(34,211,238,0.22) 0%, rgba(34,211,238,0) 55%)," +
-    "radial-gradient(900px 520px at 50% 110%, rgba(34,197,94,0.14) 0%, rgba(34,197,94,0) 55%)," +
-    "linear-gradient(180deg, rgba(2,6,23,1) 0%, rgba(15,23,42,1) 55%, rgba(2,6,23,1) 100%)";
-
-  const fontStack =
-    '"Be Vietnam Pro","Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial';
-
-  const shellMax = 1280;
-
-  // Actions
   const onGenerate = async () => {
     setGenErr("");
+    setParseErr("");
     setGenLoading(true);
     try {
       const snapObj = await buildMarketSnapshotV4(safeSymbol, { tz: "America/Los_Angeles" });
-      setSnap(snapObj);
-      setRaw(JSON.stringify(snapObj, null, 2));
+      applySnapshotObj(snapObj, true);
 
       if (autoDownload) {
         const ts = new Date().toISOString().replace(/[:.]/g, "-");
         const name = `market-snapshot-v4_${safeSymbol}_${ts}.json`;
         downloadJson(snapObj, name);
       }
-      setTab("cockpit");
     } catch (e) {
       setGenErr(String(e?.message || e));
     } finally {
@@ -1366,455 +804,750 @@ export default function SnapshotViewerPage() {
     }
   };
 
-  const onDownload = () => {
-    if (!snap) return;
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const name = `market-snapshot-v4_${(snap?.symbol || safeSymbol || "SNAP")}_${ts}.json`;
-    downloadJson(snap, name);
+  const fontStack =
+    '"Be Vietnam Pro","Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji"';
+
+  const styles = {
+    page: {
+      minHeight: "100vh",
+      color: "rgba(226,232,240,0.95)",
+      fontFamily: fontStack,
+      WebkitFontSmoothing: "antialiased",
+      MozOsxFontSmoothing: "grayscale",
+      textRendering: "optimizeLegibility",
+      background:
+        "radial-gradient(1200px 700px at 10% 0%, rgba(99,102,241,0.22) 0%, rgba(99,102,241,0) 60%)," +
+        "radial-gradient(1000px 600px at 90% 10%, rgba(14,165,233,0.20) 0%, rgba(14,165,233,0) 55%)," +
+        "radial-gradient(900px 520px at 50% 110%, rgba(34,197,94,0.14) 0%, rgba(34,197,94,0) 55%)," +
+        "linear-gradient(180deg, rgba(2,6,23,1) 0%, rgba(15,23,42,1) 50%, rgba(2,6,23,1) 100%)",
+    },
+
+    shell: {
+      maxWidth: 1180,
+      margin: "0 auto",
+      padding: isWide ? "18px 18px 28px" : "12px 12px 22px",
+      display: "grid",
+      gap: 12,
+    },
+
+    topbar: {
+      position: "sticky",
+      top: 0,
+      zIndex: 1000,
+      borderRadius: 16,
+      border: "1px solid rgba(148,163,184,0.18)",
+      background: "rgba(15,23,42,0.62)",
+      backdropFilter: "blur(14px)",
+      boxShadow: "0 18px 60px rgba(0,0,0,0.35)",
+      padding: isWide ? 14 : 12,
+    },
+
+    grid: {
+      display: "grid",
+      gridTemplateColumns: isWide ? "380px 1fr" : "1fr",
+      gap: 12,
+      alignItems: "start",
+    },
+
+    card: {
+      borderRadius: 18,
+      border: "1px solid rgba(148,163,184,0.18)",
+      background: "rgba(15,23,42,0.58)",
+      boxShadow: "0 18px 64px rgba(0,0,0,0.30)",
+      padding: 14,
+      minWidth: 0,
+      backdropFilter: "blur(14px)",
+    },
+
+    subtle: {
+      borderRadius: 16,
+      border: "1px solid rgba(148,163,184,0.16)",
+      background: "rgba(30,41,59,0.45)",
+      padding: 14,
+      minWidth: 0,
+      backdropFilter: "blur(12px)",
+    },
+
+    btn: (variant) => ({
+      padding: "10px 12px",
+      borderRadius: 14,
+      border: variant === "primary" ? "1px solid rgba(226,232,240,0.35)" : "1px solid rgba(148,163,184,0.22)",
+      background: variant === "primary" ? "rgba(226,232,240,0.10)" : "rgba(30,41,59,0.55)",
+      color: "rgba(226,232,240,0.95)",
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+      userSelect: "none",
+      whiteSpace: "nowrap",
+      backdropFilter: "blur(12px)",
+    }),
+
+    input: {
+      padding: "10px 12px",
+      borderRadius: 14,
+      border: "1px solid rgba(148,163,184,0.24)",
+      background: "rgba(2,6,23,0.35)",
+      fontSize: 12,
+      fontWeight: 700,
+      color: "rgba(226,232,240,0.95)",
+      outline: "none",
+      minWidth: 0,
+    },
+
+    select: {
+      padding: "10px 12px",
+      borderRadius: 14,
+      border: "1px solid rgba(148,163,184,0.24)",
+      background: "rgba(2,6,23,0.35)",
+      fontSize: 12,
+      fontWeight: 800,
+      color: "rgba(226,232,240,0.95)",
+      outline: "none",
+      cursor: "pointer",
+      minWidth: 0,
+    },
+
+    textarea: {
+      width: "100%",
+      minHeight: 190,
+      resize: "vertical",
+      borderRadius: 16,
+      border: "1px solid rgba(148,163,184,0.24)",
+      padding: 12,
+      outline: "none",
+      fontSize: 12,
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      background: "rgba(2,6,23,0.35)",
+      color: "rgba(226,232,240,0.95)",
+      overflowWrap: "anywhere",
+      wordBreak: "break-word",
+    },
+
+    divider: { height: 1, background: "rgba(148,163,184,0.16)", marginTop: 12, marginBottom: 12 },
+
+    segWrap: {
+      display: "inline-flex",
+      padding: 4,
+      borderRadius: 14,
+      border: "1px solid rgba(148,163,184,0.18)",
+      background: "rgba(2,6,23,0.25)",
+      gap: 4,
+      backdropFilter: "blur(12px)",
+    },
+
+    segBtn: (active) => ({
+      padding: "8px 10px",
+      borderRadius: 12,
+      border: "1px solid rgba(148,163,184,0.0)",
+      background: active ? "rgba(226,232,240,0.12)" : "transparent",
+      color: "rgba(226,232,240,0.95)",
+      fontWeight: 900,
+      fontSize: 12,
+      cursor: "pointer",
+      userSelect: "none",
+      minWidth: 72,
+      textAlign: "center",
+    }),
   };
 
-  const onPasteApply = () => {
-    const res = safeJsonParse(raw);
-    if (!res.ok) {
-      setGenErr(res.err || "Invalid JSON");
-      return;
-    }
-    setSnap(res.obj);
-    setGenErr("");
-    setTab("cockpit");
-  };
-
-  // UI styles
-  const btn = (variant) => ({
-    padding: "10px 12px",
-    borderRadius: 14,
-    border: variant === "primary" ? "1px solid rgba(226,232,240,0.34)" : "1px solid rgba(148,163,184,0.22)",
-    background: variant === "primary" ? "rgba(226,232,240,0.10)" : "rgba(2,6,23,0.30)",
-    color: "rgba(226,232,240,0.95)",
-    fontWeight: 950,
-    fontSize: 12,
-    cursor: "pointer",
-    userSelect: "none",
-    whiteSpace: "nowrap",
-    backdropFilter: "blur(12px)",
+  const chipsBase = {
     display: "inline-flex",
     alignItems: "center",
-    gap: 8,
-  });
-
-  const inputStyle = {
-    padding: "10px 12px",
-    borderRadius: 14,
-    border: "1px solid rgba(148,163,184,0.24)",
-    background: "rgba(2,6,23,0.35)",
+    justifyContent: "center",
+    gap: 6,
+    padding: "6px 10px",
+    borderRadius: 999,
     fontSize: 12,
     fontWeight: 850,
-    color: "rgba(226,232,240,0.95)",
-    outline: "none",
-    minWidth: 0,
-  };
-
-  const segWrap = {
-    display: "inline-flex",
-    padding: 4,
-    borderRadius: 14,
-    border: "1px solid rgba(148,163,184,0.18)",
-    background: "rgba(2,6,23,0.25)",
-    gap: 4,
-    backdropFilter: "blur(12px)",
-  };
-  const segBtn = (active) => ({
-    padding: "8px 10px",
-    borderRadius: 12,
-    border: "1px solid rgba(148,163,184,0.0)",
-    background: active ? "rgba(226,232,240,0.12)" : "transparent",
-    color: "rgba(226,232,240,0.95)",
-    fontWeight: 950,
-    fontSize: 12,
-    cursor: "pointer",
     userSelect: "none",
-    minWidth: 86,
-    textAlign: "center",
-  });
-
-  const card = {
-    borderRadius: 18,
-    border: "1px solid rgba(148,163,184,0.16)",
-    background: "rgba(15,23,42,0.60)",
-    boxShadow: "0 18px 64px rgba(0,0,0,0.32)",
-    padding: 14,
-    backdropFilter: "blur(14px)",
-    minWidth: 0,
+    whiteSpace: "nowrap",
   };
 
-  const heroCard = {
-    borderRadius: 20,
-    border: "1px solid rgba(148,163,184,0.16)",
-    background: "linear-gradient(180deg, rgba(15,23,42,0.78) 0%, rgba(2,6,23,0.55) 100%)",
-    boxShadow: "0 22px 78px rgba(0,0,0,0.45)",
-    padding: 16,
-    backdropFilter: "blur(16px)",
-    minWidth: 0,
+  const horizonsGridStyle = useMemo(() => {
+    if (isWide) return { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 };
+    if (isMid) return { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 };
+    return { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
+  }, [isWide, isMid]);
+
+  const ControlsOverlay = ({ open, onClose, children }) => {
+    if (isWide) return null;
+    if (!open) return null;
+    return (
+      <div
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onClose?.();
+        }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(2,6,23,0.78)",
+          zIndex: 1500,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-end",
+          padding: 12,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 720,
+            maxHeight: "86vh",
+            borderRadius: 18,
+            border: "1px solid rgba(148,163,184,0.20)",
+            background: "rgba(15,23,42,0.86)",
+            boxShadow: "0 34px 90px rgba(0,0,0,0.50)",
+            overflow: "hidden",
+            backdropFilter: "blur(14px)",
+          }}
+        >
+          <div style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(148,163,184,0.16)" }}>
+            <div style={{ fontWeight: 900, fontSize: 13, color: "rgba(226,232,240,0.95)" }}>Controls</div>
+            <button style={styles.btn("secondary")} onClick={onClose}>
+              Close
+            </button>
+          </div>
+          <div style={{ padding: 12, overflow: "auto" }}>{children}</div>
+        </div>
+      </div>
+    );
   };
 
-  // Guidance hero content
-  const g = outlook?.guidance?.now || null;
-  const doList = safeArr(g?.do);
-  const avoidList = safeArr(g?.avoid);
-  const reasonsVN = safeArr(g?.reasons_vn);
+  const ControlsPanel = (
+    <div style={{ display: "grid", gap: 12 }}>
+      <div style={styles.card}>
+        <div style={{ fontSize: 13, fontWeight: 900 }}>Generate Snapshot (v4)</div>
 
-  // Market headline chips
-  const chips = [];
-  // Compact meta (Ref + Updated + State) to reduce clutter in the top bar
-  if (Number.isFinite(refPx) || Number.isFinite(generatedAt)) {
-    const parts = [];
-    if (Number.isFinite(refPx)) parts.push(`Ref ${fmtNum(refPx)} (${pxSrc})`);
-    if (Number.isFinite(generatedAt)) parts.push(`Upd ${fmtTsShort(generatedAt, tz)}`);
-    if (parts.length) chips.push({ tone: "muted", text: parts.join(" • ") });
-  }
-  // State (READY/CHỜ/ĐỨNG NGOÀI...) sits with the other market chips, not the command controls
-  if (st?.label) chips.push({ tone: st.tone, text: `Trạng thái: ${st.label}` });
-  if (headline?.market_position) chips.push({ tone: "violet", text: headline.market_position });
-  if (headline?.trend_clarity) chips.push({ tone: "muted", text: headline.trend_clarity });
-  if (headline?.quick_risk) chips.push({ tone: "warn", text: headline.quick_risk });
-  if (headline?.data_quality) chips.push({ tone: "muted", text: headline.data_quality });
+        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
+          <input
+            ref={symbolInputRef}
+            value={symbolInput}
+            onChange={(e) => {
+              setSymbolInput(e.target.value);
+              requestAnimationFrame(() => {
+                if (symbolInputRef.current && document.activeElement !== symbolInputRef.current) {
+                  symbolInputRef.current.focus();
+                }
+              });
+            }}
+            onFocus={() => {
+              requestAnimationFrame(() => symbolInputRef.current?.focus());
+            }}
+            placeholder="BTCUSDT"
+            style={styles.input}
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <button style={styles.btn("primary")} onClick={onGenerate} disabled={genLoading || !safeSymbol}>
+            {genLoading ? "Generating..." : "Generate"}
+          </button>
+        </div>
 
-  const isMobile = !isMid;
+        <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.20)", background: "rgba(2,6,23,0.25)", fontSize: 12, fontWeight: 800 }}>
+            <input type="checkbox" checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)} />
+            Auto download JSON
+          </label>
+
+          <button
+            style={styles.btn("secondary")}
+            onClick={() => {
+              if (!snap) return;
+              const ts = new Date().toISOString().replace(/[:.]/g, "-");
+              const name = `market-snapshot-v4_${(snap?.symbol || safeSymbol || "SNAP")}_${ts}.json`;
+              downloadJson(snap, name);
+            }}
+            disabled={!snap}
+          >
+            Download
+          </button>
+        </div>
+
+        {genErr ? (
+          <div style={{ marginTop: 10, color: "rgb(239,68,68)", fontWeight: 850, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>{genErr}</div>
+        ) : null}
+
+        <div style={{ marginTop: 10, fontSize: 12, color: "rgba(148,163,184,0.95)", fontWeight: 650, lineHeight: 1.4 }}>
+          Gợi ý: Nếu 1 exchange bị CORS/geo, snapshot vẫn có thể tạo nhưng quality sẽ “partial” và errors tăng.
+        </div>
+      </div>
+
+      <div style={styles.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 900 }}>Load JSON</div>
+          <label style={{ ...styles.btn("secondary"), display: "inline-flex", alignItems: "center", gap: 8 }}>
+            Upload
+            <input type="file" accept="application/json,.json" onChange={(e) => onFilePick(e.target.files?.[0])} style={{ display: "none" }} />
+          </label>
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <textarea value={raw} onChange={(e) => setRaw(e.target.value)} placeholder='Paste snapshot JSON (market_snapshot v4)...' style={styles.textarea} />
+        </div>
+
+        {parseErr ? (
+          <div style={{ marginTop: 10, color: "rgb(239,68,68)", fontWeight: 850, whiteSpace: "pre-wrap", fontSize: 12, overflowWrap: "anywhere" }}>{parseErr}</div>
+        ) : null}
+
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button style={styles.btn("primary")} onClick={onPasteApply}>
+            Apply
+          </button>
+          <button style={styles.btn("secondary")} onClick={() => (snap ? copyText(JSON.stringify(snap, null, 2)) : null)} disabled={!snap}>
+            Copy snapshot
+          </button>
+          <button
+            style={styles.btn("secondary")}
+            onClick={() => {
+              setRaw("");
+              setSnap(null);
+              setParseErr("");
+              setGenErr("");
+              setSelectedSetup(null);
+              setDrawerOpen(false);
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const isKVStacked = !isMid;
+
+  const marketContextItems = useMemo(() => {
+    if (!headlineObj) return [];
+    const items = [];
+    if (headlineObj.market_position) items.push({ key: "market", icon: "up", tone: "muted", text: `${headlineObj.market_position}` });
+    if (headlineObj.quick_risk) items.push({ key: "risk", icon: "risk", tone: "warn", text: `${headlineObj.quick_risk}` });
+    if (headlineObj.trend_clarity) items.push({ key: "clarity", icon: "clarity", tone: "muted", text: `${headlineObj.trend_clarity}` });
+    if (headlineObj.data_quality) items.push({ key: "data", icon: "data", tone: "muted", text: `${headlineObj.data_quality}` });
+
+    // refine icon for market direction
+    if (items.length) {
+      const m = items.find((x) => x.key === "market");
+      if (m) {
+        const s = toLower(m.text);
+        if (s.includes("tăng") || s.includes("bull") || s.includes("up")) {
+          m.icon = "up";
+          m.tone = "pos";
+        } else if (s.includes("giảm") || s.includes("bear") || s.includes("down")) {
+          m.icon = "down";
+          m.tone = "neg";
+        } else {
+          m.icon = "dot";
+          m.tone = "muted";
+        }
+      }
+      const r = items.find((x) => x.key === "risk");
+      if (r) {
+        const s = toLower(r.text);
+        if (s.includes("cao") || s.includes("high")) r.tone = "neg";
+        else if (s.includes("trung") || s.includes("medium")) r.tone = "warn";
+        else r.tone = "muted";
+      }
+      const c = items.find((x) => x.key === "clarity");
+      if (c) {
+        const s = toLower(c.text);
+        if (s.includes("mạnh") || s.includes("strong")) c.tone = "pos";
+        else if (s.includes("yếu") || s.includes("weak")) c.tone = "muted";
+        else c.tone = "muted";
+      }
+      const d = items.find((x) => x.key === "data");
+      if (d) {
+        const s = toLower(d.text);
+        if (s.includes("tốt") || s.includes("good") || s.includes("ok")) d.tone = "pos";
+        else if (s.includes("kém") || s.includes("poor") || s.includes("partial")) d.tone = "warn";
+        else d.tone = "muted";
+      }
+    }
+    return items;
+  }, [headlineObj]);
 
   return (
-    <div style={{ minHeight: "100vh", background: pageBg, color: "rgba(226,232,240,0.95)", fontFamily: fontStack, WebkitFontSmoothing: "antialiased", MozOsxFontSmoothing: "grayscale" }}>
-      {/* Top Command Bar */}
-      <div style={{ position: "sticky", top: 0, zIndex: 2000, padding: isWide ? "14px 18px" : "12px 12px", borderBottom: "1px solid rgba(148,163,184,0.10)", background: "rgba(2,6,23,0.55)", backdropFilter: "blur(16px)" }}>
-        <div style={{ maxWidth: shellMax, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Icon name="spark" tone="cyan" size={18} />
-                <div style={{ fontSize: 15, fontWeight: 980, letterSpacing: 0.2 }}>{symbol}</div>
+    <div style={styles.page}>
+      <div style={styles.shell}>
+        <div style={styles.topbar}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 950, letterSpacing: 0.2 }}>{symbol}</div>
+                <span style={chipStyle(chipsBase, "muted")}>Quality: {String(quality)}</span>
+                <span style={chipStyle(chipsBase, diagErrors ? "warn" : "pos")}>Errors: {diagErrors}</span>
+                <span style={chipStyle(chipsBase, "muted")}>Ref: {Number.isFinite(refPx) ? fmtNum(refPx) : "—"} ({pxSrc})</span>
+              </div>
+
+              <div style={{ marginTop: 8, fontSize: 12.5, color: "rgba(226,232,240,0.72)", fontWeight: 650, lineHeight: 1.35, overflowWrap: "anywhere" }}>
+                Generated: <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{fmtTs(generatedAt, tz)}</b> · TZ:{" "}
+                <b style={{ color: "rgba(226,232,240,0.95)", fontWeight: 900 }}>{tz}</b>
               </div>
             </div>
-          </div>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <div ref={suggWrapRef} style={{ position: "relative", minWidth: isMid ? 220 : 180, flex: isMid ? "0 0 260px" : "1 1 180px" }}>
-              <input
-                ref={symbolInputRef}
-                value={symbolInput}
-                onChange={(e) => { setSymbolInput(e.target.value); setSuggOpen(true); setSuggActive(-1); }}
-                onFocus={() => setSuggOpen(true)}
-                onKeyDown={(e) => {
-                  if (!suggOpen) return;
-                  if (e.key === "ArrowDown") { e.preventDefault(); setSuggActive((v) => Math.min(v + 1, suggestions.length - 1)); }
-                  else if (e.key === "ArrowUp") { e.preventDefault(); setSuggActive((v) => Math.max(v - 1, 0)); }
-                  else if (e.key === "Enter") {
-                    if (suggActive >= 0 && suggestions[suggActive]) { e.preventDefault(); pickSuggestion(suggestions[suggActive]); }
-                  } else if (e.key === "Escape") { setSuggOpen(false); setSuggActive(-1); }
-                }}
-                placeholder="BTCUSDT"
-                style={{ ...inputStyle, width: "100%" }}
-                inputMode="text"
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-
-              {suggOpen ? (
-                <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, borderRadius: 16, border: "1px solid rgba(148,163,184,0.24)", background: "rgba(15,23,42,0.96)", boxShadow: "0 26px 70px rgba(0,0,0,0.55)", overflow: "hidden", zIndex: 2400, maxHeight: 320 }}>
-                  <div style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", gap: 10, borderBottom: "1px solid rgba(148,163,184,0.14)" }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 950, color: "rgba(148,163,184,0.95)" }}>Top 100 (market cap)</div>
-                    <div style={{ fontSize: 11.5, fontWeight: 850, color: "rgba(148,163,184,0.90)" }}>{coinsLoading ? "Loading..." : coinsErr ? "Unavailable" : `${topCoins.length} coins`}</div>
-                  </div>
-
-                  {coinsErr ? (
-                    <div style={{ padding: 12, fontSize: 12, fontWeight: 800, color: "rgba(226,232,240,0.85)" }}>
-                      Không tải được danh sách coin. Vẫn nhập thủ công (vd: BTCUSDT).<br />
-                      <span style={{ color: "rgba(239,68,68,0.95)" }}>{coinsErr}</span>
-                    </div>
-                  ) : suggestions.length ? (
-                    <div style={{ maxHeight: 280, overflow: "auto" }}>
-                      {suggestions.map((c, i) => {
-                        const active = i === suggActive;
-                        return (
-                          <div
-                            key={c.id || c.pair || i}
-                            onMouseEnter={() => setSuggActive(i)}
-                            onMouseDown={(e) => { e.preventDefault(); pickSuggestion(c); }}
-                            style={{
-                              padding: "10px 12px",
-                              display: "flex",
-                              justifyContent: "space-between",
-                              gap: 10,
-                              cursor: "pointer",
-                              background: active ? "rgba(226,232,240,0.10)" : "transparent",
-                              borderBottom: "1px solid rgba(148,163,184,0.10)",
-                            }}
-                          >
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)" }}>{c.pair}</div>
-                              <div style={{ marginTop: 2, fontSize: 11.5, fontWeight: 800, color: "rgba(148,163,184,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-                            </div>
-                            <div style={{ fontSize: 11.5, fontWeight: 950, color: "rgba(148,163,184,0.95)" }}>#{Number.isFinite(c.rank) ? c.rank : "—"}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div style={{ padding: 12, fontSize: 12, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>Không có gợi ý phù hợp.</div>
-                  )}
-                </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {!isWide ? (
+                <button
+                  style={styles.btn("secondary")}
+                  onClick={() => {
+                    setControlsOpen(true);
+                    requestAnimationFrame(() => symbolInputRef.current?.focus());
+                  }}
+                >
+                  Controls
+                </button>
               ) : null}
-            </div>
 
-            <button style={btn("primary")} onClick={onGenerate} disabled={genLoading || !safeSymbol}>
-              <Icon name="bolt" tone="cyan" size={16} />
-              {genLoading ? "Generating..." : "Generate"}
-            </button>
-
-            <button style={btn("secondary")} onClick={onDownload} disabled={!snap}>
-              <Icon name="download" tone="muted" size={16} />
-              Download
-            </button>
-
-            <label style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(2,6,23,0.25)", fontSize: 12, fontWeight: 950, color: "rgba(226,232,240,0.95)" }}>
-              <input type="checkbox" checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)} />
-              Auto download
-            </label>
-
-            <div style={segWrap}>
-              <button style={segBtn(tab === "cockpit")} onClick={() => setTab("cockpit")}>Cockpit</button>
-              <button style={segBtn(tab === "all")} onClick={() => setTab("all")} disabled={!snap}>All setups</button>
-              <button style={segBtn(tab === "debug")} onClick={() => setTab("debug")}>Debug</button>
+              <div style={styles.segWrap}>
+                <button style={styles.segBtn(tab === "overview")} onClick={() => setTab("overview")}>Overview</button>
+                <button style={styles.segBtn(tab === "top")} onClick={() => setTab("top")}>Top</button>
+                <button style={styles.segBtn(tab === "all")} onClick={() => setTab("all")}>All</button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Market headline banner (separate from command bar to reduce clutter) */}
-        {chips.length ? (
-          <div style={{ padding: isWide ? "10px 18px 0" : "10px 12px 0" }}>
-            <div
-              style={{
-                maxWidth: shellMax,
-                margin: "0 auto",
-                padding: "10px 12px",
-                borderRadius: 18,
-                border: "1px solid rgba(148,163,184,0.12)",
-                background: "rgba(15,23,42,0.40)",
-                boxShadow: "0 12px 48px rgba(0,0,0,0.28)",
-                backdropFilter: "blur(14px)",
-                overflowX: "auto",
-                display: "flex",
-                gap: 10,
-                alignItems: "center",
-                WebkitOverflowScrolling: "touch",
-              }}
-            >
-              {chips.map((c, i) => (
-                <span key={i} style={chipStyle(c.tone)}>{c.text}</span>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <ControlsOverlay open={controlsOpen} onClose={() => setControlsOpen(false)}>
+          {ControlsPanel}
+        </ControlsOverlay>
 
-        {genLoading ? (
-          <div style={{ maxWidth: shellMax, margin: "12px auto 0", padding: "0 0 4px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 12.5, fontWeight: 950, color: "rgba(226,232,240,0.92)" }}>
-                {steps[loadIdx]?.label}
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 900, color: "rgba(148,163,184,0.95)" }}>{Math.round(progress01 * 100)}%</div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <Bar value01={progress01} tone="cyan" />
-            </div>
-          </div>
-        ) : null}
+        <div style={styles.grid}>
+          {isWide ? <div style={{ position: "sticky", top: 92 }}>{ControlsPanel}</div> : null}
 
-        {genErr ? (
-          <div style={{ maxWidth: shellMax, margin: "10px auto 0", color: "rgba(239,68,68,0.95)", fontWeight: 900, fontSize: 12.5, whiteSpace: "pre-wrap" }}>
-            {genErr}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Main layout */}
-      <div style={{ maxWidth: shellMax, margin: "0 auto", padding: isWide ? "18px 18px 28px" : "14px 12px 22px" }}>
-        {tab === "cockpit" ? (
-          <div style={{ display: "grid", gridTemplateColumns: isWide ? "420px 1fr" : "1fr", gap: 14, alignItems: "start" }}>
-            {/* Left: Market DNA */}
-            <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
-              <MarketDNA outlook={outlook} refPx={refPx} pxSrc={pxSrc} isMobile={!isWide} />
-
-              <div style={card}>
-                <SectionTitle icon="clock" tone="muted" title="Horizon signals" right="30m → 2w" />
-                {safeArr(outlook?.horizons).length ? (
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {safeArr(outlook?.horizons).map((h) => {
-                      const biasTone = h?.bias === "Tăng" ? "pos" : h?.bias === "Giảm" ? "neg" : "muted";
-                      const confTone = scoreToTone(h?.confidence);
-                      return (
-                        <div key={h?.key || h?.title} style={{ padding: 12, borderRadius: 16, border: "1px solid rgba(148,163,184,0.14)", background: "rgba(2,6,23,0.28)" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                            <div style={{ fontSize: 12.5, fontWeight: 980, color: "rgba(226,232,240,0.95)" }}>{h?.title || "—"}</div>
-                            <span style={chipStyle(biasTone)}>{h?.bias || "—"}</span>
+          <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
+            {tab === "overview" ? (
+              <div style={styles.card}>
+                <Section title="Market Context" right={outlook ? "unified.market_outlook_v1" : "market_outlook_v1 not found"} noTop>
+                  {marketContextItems.length ? (
+                    <div style={styles.subtle}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: isMid ? "repeat(2, minmax(0, 1fr))" : "1fr",
+                          gap: 10,
+                          minWidth: 0,
+                        }}
+                      >
+                        {marketContextItems.map((it) => (
+                          <div
+                            key={it.key}
+                            style={{
+                              borderRadius: 16,
+                              border: "1px solid rgba(148,163,184,0.18)",
+                              background: "rgba(2,6,23,0.22)",
+                              padding: 12,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 10,
+                              minWidth: 0,
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.92)", overflowWrap: "anywhere", lineHeight: 1.35 }}>
+                              {it.text}
+                            </div>
+                            <span
+                              style={chipStyle(
+                                { ...chipsBase, padding: "6px 10px", gap: 8, color: "currentColor" },
+                                it.tone
+                              )}
+                            >
+                              <span style={{ display: "inline-flex", alignItems: "center" }}>
+                                <Icon name={it.icon} size={16} />
+                              </span>
+                            </span>
                           </div>
-                          <div style={{ marginTop: 10 }}>
-                            <Bar value01={Number.isFinite(h?.confidence) ? h.confidence : 0} tone={confTone === "pos" ? "pos" : confTone === "warn" ? "warn" : "cyan"} labelLeft="Confidence" labelRight={Number.isFinite(h?.confidence) ? pct(h.confidence, 0) : "—"} />
-                          </div>
+                        ))}
+                      </div>
+
+                      {flagObjs.length ? (
+                        <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {flagObjs.slice(0, 12).map((f, i) => {
+                            const tone = toLower(f?.tone) === "good" ? "pos" : toLower(f?.tone) === "bad" ? "neg" : toLower(f?.tone) === "warn" ? "warn" : "muted";
+                            return (
+                              <span key={f?.key || i} style={chipStyle(chipsBase, tone)}>
+                                {String(f?.text || f?.key || "")}
+                              </span>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
-                    Generate snapshot để xem market outlook.
-                  </div>
-                )}
-              </div>
-            </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có headline trong snapshot)</div>
+                  )}
 
-            {/* Right: Action area */}
-            <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
-              {/* Guidance Hero */}
-              <div style={heroCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Icon name={st.tone === "pos" ? "bolt" : st.tone === "warn" ? "clock" : st.tone === "neg" ? "x" : "shield"} tone={st.tone} size={20} />
-                        <div style={{ fontSize: 16, fontWeight: 980, color: "rgba(226,232,240,0.95)", letterSpacing: 0.2 }}>
-                          Guidance Now
+                  {action ? (
+                    <div style={{ marginTop: 12, borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(2,6,23,0.18)", padding: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>Action</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={chipStyle(chipsBase, "muted")}>Hành động: {action.status || "—"}</span>
+                          {action.setup_type_label ? <span style={chipStyle(chipsBase, "muted")}>Setup: {action.setup_type_label}</span> : null}
+                          {action.tf_label ? <span style={chipStyle(chipsBase, "muted")}>TF: {action.tf_label}</span> : null}
+                          {action.order_type ? (
+                            <span style={chipStyle(chipsBase, "muted")}>
+                              Order: {action.order_type}
+                              {action.order_price != null ? ` @ ${fmtNum(action.order_price)}` : ""}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
-                      <span style={chipStyle(st.tone)}>{st.label}</span>
-                      {h0Obj?.bias ? <span style={chipStyle(h0Obj.bias === "Tăng" ? "pos" : h0Obj.bias === "Giảm" ? "neg" : "muted")}>H0 bias: {h0Obj.bias}</span> : null}
-                      {Number.isFinite(readiness01) ? <span style={chipStyle("cyan")}>Readiness {pct(readiness01, 0)}</span> : null}
+
+                      {Array.isArray(action.summary) && action.summary.length ? (
+                        <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                          {action.summary.slice(0, 6).map((b, i) => (
+                            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                              <div style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(226,232,240,0.55)", marginTop: 7, flexShrink: 0 }} />
+                              <div style={{ fontSize: 12.5, color: "rgba(226,232,240,0.80)", lineHeight: 1.4, fontWeight: 650, overflowWrap: "anywhere" }}>{String(b)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
+                  ) : null}
 
-                    <div style={{ marginTop: 10, fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.86)", lineHeight: 1.5, overflowWrap: "anywhere" }}>
-                      {g?.summary || action?.summary?.[0] || headline?.market_position || "Generate snapshot để xem hướng hành động."}
-                    </div>
-                  </div>
-
-                  <div style={{ minWidth: 240, flex: "0 0 280px" }}>
-                    <Bar value01={readiness01} tone={st.tone === "pos" ? "pos" : st.tone === "warn" ? "warn" : st.tone === "neg" ? "neg" : "cyan"} labelLeft="Execution readiness" helpKey="readiness" labelRight={pct(readiness01, 0)} />
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: isMid ? "1fr 1fr" : "1fr", gap: 12 }}>
-                  <div style={{ padding: 12, borderRadius: 16, border: "1px solid rgba(148,163,184,0.14)", background: "rgba(2,6,23,0.28)" }}>
-                    <SectionTitle icon="bolt" tone="pos" title="Nên làm" />
-                    <BulletList items={doList.length ? doList : action?.summary} tone="pos" />
-                  </div>
-                  <div style={{ padding: 12, borderRadius: 16, border: "1px solid rgba(148,163,184,0.14)", background: "rgba(2,6,23,0.28)" }}>
-                    <SectionTitle icon="shield" tone="warn" title="Tránh" />
-                    <BulletList items={avoidList.length ? avoidList : reasonsVN} tone="warn" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Focus Setup */}
-              <div>
-                <SectionTitle icon="spark" tone="cyan" title="Focus Setup" right={h0?.note || "30m – 4 giờ"} />
-                {focusItem ? (
-                  <FocusSetupCard item={focusItem} outlook={outlook} onOpen={onOpenItem} />
-                ) : (
-                  <div style={{ ...card, fontSize: 12.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>
-                    Không có setup focus cho H0. Kiểm tra watchlist hoặc generate lại.
-                  </div>
-                )}
-              </div>
-
-              {/* Watchlist */}
-              <div style={card}>
-                <SectionTitle icon="clock" tone="warn" title="Watchlist" right={watchItems.length ? `${watchItems.length} setups` : ""} />
-                {watchItems.length ? (
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {watchItems.map((it) => (
-                      <SetupMiniRow key={it.id} item={it} onOpen={onOpenItem} />
+                  <div style={{ marginTop: 12, ...horizonsGridStyle }}>
+                    {(horizons.length ? horizons : [{ title: "30m–4h" }, { title: "1–3d" }, { title: "1–2w" }]).map((h, i) => (
+                      <HorizonCard key={i} h={h} idx={i} />
                     ))}
                   </div>
-                ) : (
-                  <div style={{ fontSize: 12.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>Watchlist trống.</div>
-                )}
-              </div>
+                </Section>
 
-              {/* Avoid */}
-              <div style={card}>
-                <SectionTitle icon="x" tone="neg" title="Avoid" right={avoidItems.length ? `${avoidItems.length} setups` : ""} />
-                {avoidItems.length ? (
+                <div style={styles.divider} />
+
+                <Section title="Primary Setup" right={primary ? "unified.setups_v2.primary" : "no primary setup"} noTop>
+                  {primary ? <SetupCard setup={primary} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} /> : <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Snapshot không có primary tradable setup)</div>}
+                </Section>
+
+                <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"}>
+                  {top.length ? (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {top.map((s, idx) => (
+                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates trong snapshot)</div>
+                  )}
+                </Section>
+              </div>
+            ) : null}
+
+            {tab === "top" ? (
+              <div style={styles.card}>
+                <Section title="Top Candidates" right={top.length ? `${top.length} setups` : "none"} noTop>
+                  {top.length ? (
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {top.map((s, idx) => (
+                        <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} isWide={isWide} isMid={isMid} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có top_candidates trong snapshot)</div>
+                  )}
+                </Section>
+              </div>
+            ) : null}
+
+            {tab === "all" ? (
+              <div style={styles.card}>
+                <Section title="All Candidates" right={`Showing ${filteredAll.length} / ${all.length}`} noTop>
                   <div style={{ display: "grid", gap: 10 }}>
-                    {avoidItems.map((it) => (
-                      <SetupMiniRow key={it.id} item={it} onOpen={onOpenItem} />
-                    ))}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isWide ? "1.1fr 0.65fr 0.7fr 0.6fr 0.7fr 0.8fr" : "1fr 1fr",
+                        gap: 10,
+                        alignItems: "center",
+                        minWidth: 0,
+                      }}
+                    >
+                      <input value={fText} onChange={(e) => setFText(e.target.value)} placeholder="Search trigger / reasons / warnings..." style={styles.input} />
+
+                      <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} style={styles.select}>
+                        <option value="all">Status: All</option>
+                        <option value="tradable">Tradable</option>
+                        <option value="waiting">Waiting</option>
+                        <option value="missed">Missed</option>
+                        <option value="invalidated">Invalidated</option>
+                        <option value="unavailable">Unavailable</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+
+                      <select value={fType} onChange={(e) => setFType(e.target.value)} style={styles.select}>
+                        <option value="all">Type: All</option>
+                        {allTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {typeLabelVN(t)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select value={fTf} onChange={(e) => setFTf(e.target.value)} style={styles.select}>
+                        <option value="all">TF: All</option>
+                        {allTfs.map((t) => (
+                          <option key={t} value={t}>
+                            {tfLabelVN(t)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={styles.select}>
+                        <option value="score_desc">Sort: Score desc</option>
+                        <option value="rr_desc">Sort: RR desc</option>
+                        <option value="tf_asc">Sort: TF asc</option>
+                      </select>
+
+                      <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(148,163,184,0.20)", background: "rgba(2,6,23,0.25)", fontSize: 12, fontWeight: 800 }}>
+                        <input type="checkbox" checked={fTradableOnly} onChange={(e) => setFTradableOnly(e.target.checked)} />
+                        Tradable only
+                      </label>
+                    </div>
+
+                    <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
+                      {filteredAll.length ? (
+                        filteredAll.map((s, idx) => <SetupCard key={pickSetupKey(s, idx)} setup={s} onOpen={onOpenSetup} dense isWide={isWide} isMid={isMid} />)
+                      ) : (
+                        <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650, fontSize: 13 }}>(Không có setup nào khớp filter)</div>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div style={{ fontSize: 12.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>Không có setup cần tránh.</div>
-                )}
+                </Section>
               </div>
-            </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
 
-        {tab === "all" ? (
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={card}>
-              <SectionTitle icon="layers" tone="cyan" title="All setups" right={`${items.length} items`} />
-              {items.length ? (
-                <div style={{ display: "grid", gap: 10 }}>
-                  {items.map((it) => (
-                    <SetupMiniRow key={it.id} item={it} onOpen={onOpenItem} />
-                  ))}
-                </div>
-              ) : (
-                <div style={{ fontSize: 12.5, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>Generate snapshot để xem setups.</div>
-              )}
-            </div>
-          </div>
-        ) : null}
-
-        {tab === "debug" ? (
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={card}>
-              <SectionTitle icon="layers" tone="muted" title="Debug JSON" right={snap ? "Loaded" : "Empty"} />
-              <div style={{ fontSize: 12.5, fontWeight: 800, color: "rgba(148,163,184,0.95)", marginBottom: 10 }}>
-                Paste snapshot JSON vào đây để debug UI (không bắt buộc).
-              </div>
-              <textarea
-                value={raw}
-                onChange={(e) => setRaw(e.target.value)}
+        <Drawer
+          open={drawerOpen}
+          onClose={onCloseDrawer}
+          title={
+            selectedSetup
+              ? `${selectedSetup.symbol || ""} · ${typeLabelVN(selectedSetup.type)} · ${selectedSetup.bias || ""} · ${tfLabelVN(selectedSetup.timeframe ?? selectedSetup.tf)}`
+              : "Details"
+          }
+        >
+          {selectedSetup ? (
+            <div style={{ display: "grid", gap: 14, minWidth: 0 }}>
+              <div
                 style={{
-                  width: "100%",
-                  minHeight: 260,
-                  resize: "vertical",
-                  borderRadius: 16,
-                  border: "1px solid rgba(148,163,184,0.24)",
-                  padding: 12,
-                  outline: "none",
-                  fontSize: 12,
-                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                  background: "rgba(2,6,23,0.35)",
-                  color: "rgba(226,232,240,0.95)",
-                  overflowWrap: "anywhere",
-                  wordBreak: "break-word",
+                  borderRadius: 18,
+                  border: "1px solid rgba(148,163,184,0.18)",
+                  background: "rgba(30,41,59,0.45)",
+                  padding: 14,
+                  minWidth: 0,
+                  backdropFilter: "blur(12px)",
                 }}
-              />
-              <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button style={btn("secondary")} onClick={onPasteApply}>Apply JSON</button>
-                <button style={btn("secondary")} onClick={() => { setRaw(""); setSnap(null); }}>Clear</button>
+              >
+                <div style={{ fontSize: 12, fontWeight: 850, color: "rgba(148,163,184,0.95)" }}>Trigger</div>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "rgba(226,232,240,0.95)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
+                  {selectedSetup.trigger || "—"}
+                </div>
+              </div>
+
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Trade Parameters</div>
+                <KV
+                  stacked={!isMid}
+                  k="Entry zone"
+                  v={
+                    Array.isArray(selectedSetup.entry_zone) && selectedSetup.entry_zone.length === 2
+                      ? `${fmtNum(Math.min(selectedSetup.entry_zone[0], selectedSetup.entry_zone[1]))} → ${fmtNum(Math.max(selectedSetup.entry_zone[0], selectedSetup.entry_zone[1]))}`
+                      : "—"
+                  }
+                />
+                <KV stacked={!isMid} k="Entry preferred" v={fmtNum(Number.isFinite(selectedSetup.entry_preferred) ? selectedSetup.entry_preferred : selectedSetup.entry)} />
+                <KV stacked={!isMid} k="Stop / Invalidation" v={fmtNum(Number.isFinite(selectedSetup.stop) ? selectedSetup.stop : selectedSetup.invalidation)} />
+                <KV stacked={!isMid} k="TP1" v={fmtNum(selectedSetup?.targets?.tp1)} />
+                <KV stacked={!isMid} k="TP2" v={fmtNum(selectedSetup?.targets?.tp2)} />
+                <KV
+                  stacked={!isMid}
+                  k="RR (TP1)"
+                  v={
+                    Number.isFinite(selectedSetup?.execution_metrics?.rr_tp1)
+                      ? selectedSetup.execution_metrics.rr_tp1.toFixed(2)
+                      : Number.isFinite(selectedSetup?.scores?.rr_tp1)
+                      ? selectedSetup.scores.rr_tp1.toFixed(2)
+                      : Number.isFinite(selectedSetup?.rr_estimate_tp1)
+                      ? selectedSetup.rr_estimate_tp1.toFixed(2)
+                      : "—"
+                  }
+                />
+              </div>
+
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 6, color: "rgba(226,232,240,0.95)" }}>Eligibility & Execution</div>
+                <KV stacked={!isMid} k="Status" v={statusMeta(detectStatus(selectedSetup)).label} />
+                <KV stacked={!isMid} k="Tradable" v={selectedSetup?.eligibility?.tradable === true || selectedSetup?.execution_state?.tradable === true ? "Yes" : "No / Unknown"} />
+                <KV stacked={!isMid} k="Phase" v={selectedSetup?.execution_state?.phase || "—"} />
+                <KV stacked={!isMid} k="Readiness" v={selectedSetup?.execution_state?.readiness || "—"} />
+                <KV
+                  stacked={!isMid}
+                  k="Order"
+                  v={
+                    selectedSetup?.execution_state?.order?.type
+                      ? `${selectedSetup.execution_state.order.type}${selectedSetup.execution_state.order.price != null ? ` @ ${fmtNum(selectedSetup.execution_state.order.price)}` : ""}`
+                      : "—"
+                  }
+                />
+                <KV
+                  stacked={!isMid}
+                  k="Reasons"
+                  v={
+                    safeArr(selectedSetup?.eligibility?.reasons).length || safeArr(selectedSetup?.execution_state?.reason).length
+                      ? uniq([...safeArr(selectedSetup?.eligibility?.reasons), ...safeArr(selectedSetup?.execution_state?.reason)]).slice(0, 12).join(" · ")
+                      : "—"
+                  }
+                />
+              </div>
+
+              <div style={{ borderRadius: 18, border: "1px solid rgba(148,163,184,0.18)", background: "rgba(15,23,42,0.55)", padding: 14, minWidth: 0, backdropFilter: "blur(12px)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: "rgba(226,232,240,0.95)" }}>Raw JSON</div>
+                  <button
+                    style={{
+                      border: "1px solid rgba(148,163,184,0.22)",
+                      background: "rgba(2,6,23,0.25)",
+                      padding: "8px 10px",
+                      borderRadius: 12,
+                      cursor: "pointer",
+                      fontWeight: 850,
+                      color: "rgba(226,232,240,0.95)",
+                    }}
+                    onClick={() => copyText(JSON.stringify(selectedSetup, null, 2))}
+                  >
+                    Copy
+                  </button>
+                </div>
+
+                <pre
+                  style={{
+                    marginTop: 10,
+                    padding: 12,
+                    borderRadius: 16,
+                    border: "1px solid rgba(148,163,184,0.22)",
+                    background: "rgba(2,6,23,0.25)",
+                    overflow: "auto",
+                    fontSize: 11.5,
+                    lineHeight: 1.45,
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    color: "rgba(226,232,240,0.95)",
+                    minWidth: 0,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+{JSON.stringify(selectedSetup, null, 2)}
+                </pre>
               </div>
             </div>
-          </div>
-        ) : null}
+          ) : (
+            <div style={{ color: "rgba(148,163,184,0.95)", fontWeight: 650 }}>No setup selected.</div>
+          )}
+        </Drawer>
       </div>
-
-      {/* Details drawer */}
-      <Drawer
-        open={drawerOpen}
-        title={selectedItem ? `${typeLabelVN(selectedItem.type)} • ${selectedItem.bias} • ${tfLabelVN(selectedItem.timeframe)} • ${selectedItem.symbol}` : "Setup details"}
-        onClose={onCloseDrawer}
-      >
-        <SetupDetails item={selectedItem} />
-      </Drawer>
     </div>
   );
 }
