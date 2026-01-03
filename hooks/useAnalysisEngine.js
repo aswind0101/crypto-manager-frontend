@@ -156,16 +156,18 @@ async function computeAnalysis({ symbol, preferExchange, preferTf }) {
   return { snapshot, setups, outlook };
 }
 
-export function useAnalysisEngine({ symbol, preferExchange = "bybit", preferTf = "60" }) {
-  const key = symbol ? ["analysis", symbol, preferExchange, preferTf] : null;
+export function useAnalysisEngine({ symbol, preferExchange = "bybit", preferTf = "60", enabled = true }) {
+  const key = enabled && symbol ? ["analysis", symbol, preferExchange, preferTf] : null;
 
   return useSWR(
     key,
     () => computeAnalysis({ symbol, preferExchange, preferTf }),
     {
-      refreshInterval: 25000,
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       shouldRetryOnError: false,
+      // refreshInterval bạn có thể bật sau khi đã phân tích xong:
+      // refreshInterval: enabled ? 25000 : 0,
     }
   );
 }
+
