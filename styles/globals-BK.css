@@ -556,42 +556,4 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
-/* =========================
-   Terminal Theme (SCOPED)
-   Không ảnh hưởng trang khác
-   ========================= */
-
-.terminal-theme {
-  --term-bg: 10 12 16;
-  --term-fg: 226 232 240;
-  --term-muted: 148 163 184;
-  color: rgb(var(--term-fg));
-  background: radial-gradient(1200px 600px at 20% 10%, rgba(56,189,248,0.12), transparent 55%),
-              radial-gradient(900px 500px at 85% 25%, rgba(168,85,247,0.10), transparent 60%),
-              radial-gradient(900px 500px at 50% 80%, rgba(34,197,94,0.08), transparent 60%),
-              rgb(var(--term-bg));
-  min-height: 100vh;
-}
-
-.terminal-theme .glass {
-  background: rgba(14, 17, 24, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  backdrop-filter: blur(12px);
-}
-
-.terminal-theme .grid-holo {
-  background-image:
-    linear-gradient(to right, rgba(148,163,184,0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(148,163,184,0.06) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: radial-gradient(ellipse at top, black 55%, transparent 88%);
-}
-
-.terminal-theme .neon-border {
-  box-shadow: 0 0 0 1px rgba(56,189,248,0.25), 0 0 40px rgba(56,189,248,0.10);
-}
-
-.terminal-theme .neon-text {
-  text-shadow: 0 0 18px rgba(56,189,248,0.25);
-}
 
