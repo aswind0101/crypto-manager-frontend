@@ -14,6 +14,7 @@ export type BybitStoreState = {
 
   lastMsgTs: number;          // thời điểm client nhận message (ms)
   lastHeartbeatTs: number;    // liveness gate: ms, cập nhật mỗi khi nhận bất kỳ message nào
+  lastProbeOkTs: number; // NEW: thời điểm probe REST OK gần nhất
 
   lastOrderbookTs: number;    // ts từ payload (ms)
   lastTradesTs: number;       // ts từ payload (ms)
@@ -43,6 +44,7 @@ export class BybitFeedStore {
     connected: false,
     lastMsgTs: 0,
     lastHeartbeatTs: 0,
+    lastProbeOkTs: 0,
 
     lastOrderbookTs: 0,
     lastTradesTs: 0,
@@ -66,6 +68,7 @@ export class BybitFeedStore {
     this.state.connected = false;
     this.state.lastMsgTs = 0;
     this.state.lastHeartbeatTs = 0;
+    this.state.lastProbeOkTs = 0;
 
     this.state.lastOrderbookTs = 0;
     this.state.lastTradesTs = 0;
@@ -159,4 +162,12 @@ export class BybitFeedStore {
       default: return null;
     }
   }
+  setProbeAlive(ok: boolean) {
+    if (ok) {
+      this.state.lastProbeOkTs = Date.now();
+    }
+    // emit để UI/snapshot update ngay
+    this.events.emit({ type: "ws_state", connected: this.state.connected });
+  }
+
 }

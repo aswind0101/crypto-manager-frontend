@@ -7,6 +7,7 @@ export type DataQualityInputs = {
 
   // LIVENESS GATE (quan trọng)
   wsAlive: boolean;
+  probeAlive: boolean; // NEW: REST probe OK trong window gần nhất
 
   bybitConnected: boolean;
   orderbookStaleMs: number;
@@ -24,6 +25,10 @@ export function scoreDataQuality(
 } {
   let score = 100;
   const reasons: string[] = [];
+  if (!i.probeAlive) {
+    score = Math.min(score, 30);
+    reasons.push("Bybit REST probe failed (VPN OFF or blocked)");
+  }
 
   // Nếu mất heartbeat => không bao giờ được grade A/B
   if (!i.wsAlive) {

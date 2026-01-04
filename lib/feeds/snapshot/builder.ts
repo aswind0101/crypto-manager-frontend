@@ -9,6 +9,7 @@ const TFS: Tf[] = ["1m", "3m", "5m", "15m", "1h", "4h", "1D"];
 
 // Nếu không nhận được bất kỳ message nào trong 6s => coi như WS dead
 const WS_DEAD_MS = 6000;
+const PROBE_DEAD_MS = 10000; // 10s: probe OK trong 10s gần nhất mới coi là alive
 
 export function buildUnifiedSnapshotFromBybit(args: {
   canon: string;
@@ -22,6 +23,9 @@ export function buildUnifiedSnapshotFromBybit(args: {
     st.connected &&
     st.lastHeartbeatTs > 0 &&
     now - st.lastHeartbeatTs < WS_DEAD_MS;
+  const probeAlive =
+    st.lastProbeOkTs > 0 &&
+    now - st.lastProbeOkTs < PROBE_DEAD_MS;
 
   const obTs = st.lastOrderbookTs || 0;
   const trTs = st.lastTradesTs || 0;
@@ -31,6 +35,7 @@ export function buildUnifiedSnapshotFromBybit(args: {
   const dataQuality = scoreDataQuality({
     now,
     wsAlive,
+    probeAlive, // NEW
     bybitConnected: st.connected,
     orderbookStaleMs: obTs ? now - obTs : 999_999,
     tradesStaleMs: trTs ? now - trTs : 999_999,
@@ -52,9 +57,9 @@ export function buildUnifiedSnapshotFromBybit(args: {
       orderflow:
         tf === "1m"
           ? {
-              orderbook: st.orderbook,
-              trades: st.trades.toArrayNewestFirst().slice(0, 1200),
-            }
+            orderbook: st.orderbook,
+            trades: st.trades.toArrayNewestFirst().slice(0, 1200),
+          }
           : undefined,
 
       diagnostics: { stale_ms: staleMs, partial: !candles },
@@ -68,7 +73,7 @@ export function buildUnifiedSnapshotFromBybit(args: {
 
     availability: {
       bybit: {
-        ok: st.connected && wsAlive,
+        ok: st.connected && wsAlive && probeAlive,
         notes: dataQuality.reasons.length ? dataQuality.reasons : undefined,
       },
       binance: { ok: false, notes: ["Not enabled (Task 2)"] },

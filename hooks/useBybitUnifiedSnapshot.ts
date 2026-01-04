@@ -30,7 +30,7 @@ export function useBybitUnifiedSnapshot(symbol: string) {
         const topics = [
           bybitOrderbookTopic(symbol, 200),
           bybitTradeTopic(symbol),
-          ...TFS.map(tf => bybitKlineTopic(tf, symbol)),
+          ...TFS.map((tf) => bybitKlineTopic(tf, symbol)),
         ];
         ws.subscribe(topics);
       },
@@ -41,6 +41,39 @@ export function useBybitUnifiedSnapshot(symbol: string) {
 
     wsRef.current = ws;
     ws.connect();
+
+    // -----------------------------
+    // ✅ NEW: REST probe (hard truth)
+    // -----------------------------
+    async function probeBybitOnce(timeoutMs = 2000) {
+      const ctrl = new AbortController();
+      const t = window.setTimeout(() => ctrl.abort(), timeoutMs);
+
+      try {
+        const res = await fetch("https://api.bybit.com/v5/market/time", {
+          method: "GET",
+          cache: "no-store",
+          signal: ctrl.signal,
+        });
+        return res.ok;
+      } catch {
+        return false;
+      } finally {
+        window.clearTimeout(t);
+      }
+    }
+
+    // Probe ngay 1 lần khi mount (để DQ phản ánh nhanh)
+    (async () => {
+      const ok = await probeBybitOnce();
+      store.setProbeAlive(ok);
+    })();
+
+    // Probe định kỳ mỗi 5s
+    const probeId = window.setInterval(async () => {
+      const ok = await probeBybitOnce();
+      store.setProbeAlive(ok);
+    }, 5000);
 
     // Event-driven snapshot updates (throttle nhẹ)
     let scheduled = false;
@@ -53,21 +86,25 @@ export function useBybitUnifiedSnapshot(symbol: string) {
         setSnapshot(snap);
       });
     });
-    // ✅ NEW: Periodic recompute tick (để DQ tụt khi WS im lặng / VPN tắt)
+
+    // ✅ Periodic recompute tick (để DQ tụt khi WS im lặng)
     const intervalId = window.setInterval(() => {
       const snap = buildUnifiedSnapshotFromBybit({ canon: symbol, clockSkewMs, bybit: store });
       setSnapshot(snap);
-    }, 1000); // 1000ms là đủ; nếu muốn nhạy hơn dùng 500ms
+    }, 1000);
+
     // Initial snapshot
     setSnapshot(buildUnifiedSnapshotFromBybit({ canon: symbol, clockSkewMs, bybit: store }));
 
     return () => {
       unsub();
-      window.clearInterval(intervalId); // ✅ nhớ clear
+      window.clearInterval(intervalId);
+      window.clearInterval(probeId); // ✅ NEW: clear probe interval
       ws.close();
       wsRef.current = null;
     };
   }, [symbol, store, clockSkewMs]);
+
 
   return snapshot;
 }
