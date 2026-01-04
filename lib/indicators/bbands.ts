@@ -1,4 +1,4 @@
-import { mean, stdev, safeDiv } from "../math";
+import { mean, stdev, safeDiv } from '../feeds/features/math';
 
 export function bbands(series: number[], period = 20, mult = 2) {
   const out = {
