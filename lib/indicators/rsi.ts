@@ -1,4 +1,4 @@
-import { safeDiv } from "../math";
+import { safeDiv } from '../feeds/features/math';
 
 export function rsi(series: number[], period = 14): number[] {
   if (series.length < period + 1) return [];

@@ -1,4 +1,4 @@
-import { safeDiv } from "./math";
+import { safeDiv } from '../feeds/features/math';
 
 export function adx(high: number[], low: number[], close: number[], period = 14) {
   const n = Math.min(high.length, low.length, close.length);
