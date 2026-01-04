@@ -1,29 +1,22 @@
 import { useState } from "react";
 import { DataStatusBar } from "../components/DataStatusBar";
-import { useFeaturesSnapshot } from "../hooks/useFeaturesSnapshot";
 import { FeaturesPanel } from "../components/FeaturesPanel";
+import { SetupsPanel } from "../components/SetupsPanel";
+import { useSetupsSnapshot } from "../hooks/useSetupsSnapshot";
 
 export default function Home() {
   const [symbol, setSymbol] = useState("ETHUSDT");
-
-  // ✅ CHỈ DÙNG 1 PIPELINE
-  const { snap, features } = useFeaturesSnapshot(symbol);
+  const { snap, features, setups } = useSetupsSnapshot(symbol);
 
   return (
     <div style={{ maxWidth: 980, margin: "20px auto", padding: 16 }}>
       <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-        <input
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-          style={{ padding: 6, fontSize: 14 }}
-        />
+        <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} />
       </div>
 
-      {/* Snapshot status */}
       <DataStatusBar snap={snap} />
-
-      {/* Feature Engine output */}
       <FeaturesPanel f={features} />
+      <SetupsPanel out={setups} />
     </div>
   );
 }
