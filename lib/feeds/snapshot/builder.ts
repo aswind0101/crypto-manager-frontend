@@ -7,6 +7,9 @@ import { scoreDataQuality } from "../quality/scoring";
 
 const TFS: Tf[] = ["1m", "3m", "5m", "15m", "1h", "4h", "1D"];
 
+// Nếu không nhận được bất kỳ message nào trong 6s => coi như WS dead
+const WS_DEAD_MS = 6000;
+
 export function buildUnifiedSnapshotFromBybit(args: {
   canon: string;
   clockSkewMs: number;
@@ -15,6 +18,11 @@ export function buildUnifiedSnapshotFromBybit(args: {
   const now = Date.now();
   const st = args.bybit.state;
 
+  const wsAlive =
+    st.connected &&
+    st.lastHeartbeatTs > 0 &&
+    now - st.lastHeartbeatTs < WS_DEAD_MS;
+
   const obTs = st.lastOrderbookTs || 0;
   const trTs = st.lastTradesTs || 0;
   const k1 = st.lastKlineTsByTf["1m"] || 0;
@@ -22,6 +30,7 @@ export function buildUnifiedSnapshotFromBybit(args: {
 
   const dataQuality = scoreDataQuality({
     now,
+    wsAlive,
     bybitConnected: st.connected,
     orderbookStaleMs: obTs ? now - obTs : 999_999,
     tradesStaleMs: trTs ? now - trTs : 999_999,
@@ -37,11 +46,7 @@ export function buildUnifiedSnapshotFromBybit(args: {
     return {
       tf,
       candles: candles
-        ? {
-            ohlcv: candles,
-            src: "bybit" as const,
-            ts_last: tsLast,
-          }
+        ? { ohlcv: candles, src: "bybit" as const, ts_last: tsLast }
         : undefined,
 
       orderflow:
@@ -52,10 +57,7 @@ export function buildUnifiedSnapshotFromBybit(args: {
             }
           : undefined,
 
-      diagnostics: {
-        stale_ms: staleMs,
-        partial: !candles,
-      },
+      diagnostics: { stale_ms: staleMs, partial: !candles },
     };
   });
 
@@ -65,7 +67,10 @@ export function buildUnifiedSnapshotFromBybit(args: {
     clock_skew_ms: args.clockSkewMs,
 
     availability: {
-      bybit: { ok: st.connected },
+      bybit: {
+        ok: st.connected && wsAlive,
+        notes: dataQuality.reasons.length ? dataQuality.reasons : undefined,
+      },
       binance: { ok: false, notes: ["Not enabled (Task 2)"] },
       okx: { ok: false, notes: ["Not enabled (Task 2)"] },
     },

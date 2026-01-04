@@ -4,6 +4,10 @@ export type DataQualityGrade = "A" | "B" | "C" | "D";
 
 export type DataQualityInputs = {
   now: number;
+
+  // LIVENESS GATE (quan trọng)
+  wsAlive: boolean;
+
   bybitConnected: boolean;
   orderbookStaleMs: number;
   tradesStaleMs: number;
@@ -20,6 +24,12 @@ export function scoreDataQuality(
 } {
   let score = 100;
   const reasons: string[] = [];
+
+  // Nếu mất heartbeat => không bao giờ được grade A/B
+  if (!i.wsAlive) {
+    score = Math.min(score, 40);
+    reasons.push("Bybit WS heartbeat lost");
+  }
 
   if (!i.bybitConnected) {
     score -= 40;
