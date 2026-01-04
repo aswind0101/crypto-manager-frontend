@@ -23,7 +23,17 @@ export type UnifiedSnapshot = {
       partial: boolean;
     };
   }>;
-
+  cross_exchange?: {
+    deviation_bps?: {
+      bybit_binance?: number; // (bybit - binance) / mid * 10_000
+    };
+    lead_lag?: {
+      leader: "bybit" | "binance" | "none";
+      lag_bars: number;   // số bar (1m) lệch, âm nghĩa bybit đi trước
+      score: number;      // 0..1 (corr chuẩn hoá)
+      window_bars: number;
+    };
+  };
   data_quality: {
     grade: "A" | "B" | "C" | "D";
     score: number;
