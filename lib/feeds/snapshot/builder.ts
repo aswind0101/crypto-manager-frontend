@@ -6,12 +6,13 @@ import type { BybitFeedStore } from "../bybit/store";
 import type { BinanceFeedStore } from "../binance/store";
 import { scoreDataQuality } from "../quality/scoring";
 
-// Timeframes
 const TFS: Tf[] = ["1m", "3m", "5m", "15m", "1h", "4h", "1D"];
 
 // Liveness windows
 const BYBIT_WS_DEAD_MS = 6000;
 const BINANCE_WS_DEAD_MS = 6000;
+
+// Bybit REST probe window (VPN gate)
 const PROBE_DEAD_MS = 10000;
 
 // ---------------------------
@@ -48,11 +49,18 @@ function corr(a: number[], b: number[]): number {
   const n = Math.min(a.length, b.length);
   if (n < 20) return 0;
 
-  let ma = 0, mb = 0;
-  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
-  ma /= n; mb /= n;
+  let ma = 0,
+    mb = 0;
+  for (let i = 0; i < n; i++) {
+    ma += a[i];
+    mb += b[i];
+  }
+  ma /= n;
+  mb /= n;
 
-  let num = 0, da = 0, db = 0;
+  let num = 0,
+    da = 0,
+    db = 0;
   for (let i = 0; i < n; i++) {
     const xa = a[i] - ma;
     const xb = b[i] - mb;
@@ -68,8 +76,8 @@ function corr(a: number[], b: number[]): number {
 function computeLeadLag(args: {
   bybit1m?: Candle[];
   binance1m?: Candle[];
-  windowBars?: number;   // default 120
-  maxLagBars?: number;   // default 3
+  windowBars?: number; // default 120
+  maxLagBars?: number; // default 3
 }) {
   const windowBars = args.windowBars ?? 120;
   const maxLag = args.maxLagBars ?? 3;
@@ -117,13 +125,13 @@ function computeLeadLag(args: {
   return {
     leader,
     lag_bars: best.lag,
-    score: Math.max(0, Math.min(1, (best.c + 1) / 2)), // normalize [-1..1] -> [0..1]
+    score: Math.max(0, Math.min(1, (best.c + 1) / 2)),
     window_bars: windowBars,
   };
 }
 
 // ---------------------------
-// Bybit-only snapshot (Task 1 + probe + liveness)
+// Bybit-only snapshot
 // ---------------------------
 export function buildUnifiedSnapshotFromBybit(args: {
   canon: string;
@@ -131,21 +139,18 @@ export function buildUnifiedSnapshotFromBybit(args: {
   bybit: BybitFeedStore;
 }): UnifiedSnapshot {
   const now = Date.now();
-  const st = args.bybit.state;
+  const st = args.bybit.state as any;
 
   const wsAlive =
-    st.connected &&
-    st.lastHeartbeatTs > 0 &&
-    now - st.lastHeartbeatTs < BYBIT_WS_DEAD_MS;
+    st.connected && st.lastHeartbeatTs > 0 && now - st.lastHeartbeatTs < BYBIT_WS_DEAD_MS;
 
-  const probeAlive =
-    (st as any).lastProbeOkTs > 0 &&
-    now - (st as any).lastProbeOkTs < PROBE_DEAD_MS;
+  // ✅ Probe gate (VPN hard truth)
+  const probeAlive = st.lastProbeOkTs > 0 && now - st.lastProbeOkTs < PROBE_DEAD_MS;
 
   const obTs = st.lastOrderbookTs || 0;
   const trTs = st.lastTradesTs || 0;
-  const k1 = st.lastKlineTsByTf["1m"] || 0;
-  const k5 = st.lastKlineTsByTf["5m"] || 0;
+  const k1 = st.lastKlineTsByTf?.["1m"] || 0;
+  const k5 = st.lastKlineTsByTf?.["5m"] || 0;
 
   const dataQuality = scoreDataQuality({
     now,
@@ -156,24 +161,25 @@ export function buildUnifiedSnapshotFromBybit(args: {
     tradesStaleMs: trTs ? now - trTs : 999_999,
     kline1mStaleMs: k1 ? now - k1 : 999_999,
     kline5mStaleMs: k5 ? now - k5 : 999_999,
-  });
+  } as any);
 
   const timeframes = TFS.map((tf) => {
-    const candles = st.klines[tf];
+    const candles = st.klines?.[tf] as Candle[] | undefined;
     const tsLast = candles?.length ? candles[candles.length - 1].ts : 0;
     const staleMs = tsLast ? now - tsLast : 999_999;
 
     return {
       tf,
-      candles: candles
-        ? { ohlcv: candles, src: "bybit" as const, ts_last: tsLast }
-        : undefined,
+      candles: candles ? { ohlcv: candles, src: "bybit" as const, ts_last: tsLast } : undefined,
+
+      // Binance candles will be attached in Bybit+Binance builder
+      candles_binance: undefined,
 
       orderflow:
         tf === "1m"
           ? {
               orderbook: st.orderbook,
-              trades: st.trades.toArrayNewestFirst().slice(0, 1200),
+              trades: st.trades?.toArrayNewestFirst?.().slice(0, 1200) ?? [],
             }
           : undefined,
 
@@ -189,10 +195,10 @@ export function buildUnifiedSnapshotFromBybit(args: {
     availability: {
       bybit: {
         ok: st.connected && wsAlive && probeAlive,
-        notes: dataQuality.reasons.length ? dataQuality.reasons : undefined,
+        notes: dataQuality.reasons?.length ? dataQuality.reasons : undefined,
       },
-      binance: { ok: false, notes: ["Not enabled (Task 2)"] },
-      okx: { ok: false, notes: ["Not enabled (Task 2)"] },
+      binance: { ok: false, notes: ["Not enabled"] },
+      okx: { ok: false, notes: ["Not enabled"] },
     },
 
     timeframes,
@@ -201,7 +207,7 @@ export function buildUnifiedSnapshotFromBybit(args: {
 }
 
 // ---------------------------
-// Bybit + Binance snapshot (Task 2)
+// ✅ Bybit + Binance snapshot (Task 2 + Task 3.1.1 attach candles_binance)
 // ---------------------------
 export function buildUnifiedSnapshotFromBybitBinance(args: {
   canon: string;
@@ -216,33 +222,48 @@ export function buildUnifiedSnapshotFromBybitBinance(args: {
   });
 
   const now = Date.now();
-  const bst = args.binance.state;
+  const bst = args.binance.state as any;
 
   const binanceAlive =
-    bst.connected &&
-    bst.lastHeartbeatTs > 0 &&
-    now - bst.lastHeartbeatTs < BINANCE_WS_DEAD_MS;
+    bst.connected && bst.lastHeartbeatTs > 0 && now - bst.lastHeartbeatTs < BINANCE_WS_DEAD_MS;
 
-  // availability.binance
   snap.availability.binance = {
     ok: binanceAlive,
     notes: binanceAlive ? undefined : ["Binance WS heartbeat lost"],
   };
 
-  // Cross-exchange based on 1m candles close
-  const bybit1m = args.bybit.state.klines["1m"];
-  const binance1m = bst.klines["1m"];
+  // ✅ Attach Binance candles into each timeframe node
+  for (const tfNode of snap.timeframes as any[]) {
+    const tf = tfNode.tf as Tf;
+    const bc = bst.klines?.[tf] as Candle[] | undefined;
 
-  const dev = computeDeviationBps(bybit1m, binance1m);
-  const ll = computeLeadLag({ bybit1m, binance1m, windowBars: 120, maxLagBars: 3 });
+    if (bc && bc.length) {
+      const tsLast = bc[bc.length - 1].ts;
+      tfNode.candles_binance = { ohlcv: bc, src: "binance" as const, ts_last: tsLast };
+    } else {
+      tfNode.candles_binance = undefined;
+    }
+  }
 
-  // attach cross_exchange (type may or may not exist in unifiedTypes yet)
-  (snap as any).cross_exchange = {
+  // Cross-exchange: use 1m if available, else fallback 5m
+  const by1m = (args.bybit.state as any).klines?.["1m"] as Candle[] | undefined;
+  const bn1m = bst.klines?.["1m"] as Candle[] | undefined;
+
+  const by5m = (args.bybit.state as any).klines?.["5m"] as Candle[] | undefined;
+  const bn5m = bst.klines?.["5m"] as Candle[] | undefined;
+
+  const dev =
+    computeDeviationBps(by1m, bn1m) ??
+    computeDeviationBps(by5m, bn5m);
+
+  const ll = computeLeadLag({ bybit1m: by1m ?? by5m, binance1m: bn1m ?? bn5m });
+
+  snap.cross_exchange = {
     deviation_bps: { bybit_binance: dev },
     lead_lag: ll,
   };
 
-  // DataQuality adjustment: Binance is cross-check, trừ nhẹ nếu chết
+  // DataQuality: Binance chỉ là cross-check, trừ nhẹ nếu Binance chết
   if (!binanceAlive) {
     const s0 = snap.data_quality.score;
     const s1 = Math.max(0, s0 - 10);
