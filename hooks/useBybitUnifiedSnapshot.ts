@@ -6,7 +6,7 @@ import type { Tf } from "../lib/feeds/core/types";
 import { buildUnifiedSnapshotFromBybit } from "../lib/feeds/snapshot/builder";
 import type { UnifiedSnapshot } from "../lib/feeds/snapshot/unifiedTypes";
 
-const TFS: Tf[] = ["1m","3m","5m","15m","1h","4h","1D"];
+const TFS: Tf[] = ["1m", "3m", "5m", "15m", "1h", "4h", "1D"];
 
 export function useBybitUnifiedSnapshot(symbol: string) {
   const storeRef = useRef<BybitFeedStore | null>(null);
@@ -53,12 +53,17 @@ export function useBybitUnifiedSnapshot(symbol: string) {
         setSnapshot(snap);
       });
     });
-
+    // ✅ NEW: Periodic recompute tick (để DQ tụt khi WS im lặng / VPN tắt)
+    const intervalId = window.setInterval(() => {
+      const snap = buildUnifiedSnapshotFromBybit({ canon: symbol, clockSkewMs, bybit: store });
+      setSnapshot(snap);
+    }, 1000); // 1000ms là đủ; nếu muốn nhạy hơn dùng 500ms
     // Initial snapshot
     setSnapshot(buildUnifiedSnapshotFromBybit({ canon: symbol, clockSkewMs, bybit: store }));
 
     return () => {
       unsub();
+      window.clearInterval(intervalId); // ✅ nhớ clear
       ws.close();
       wsRef.current = null;
     };
