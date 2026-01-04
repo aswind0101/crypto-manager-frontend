@@ -34,12 +34,10 @@ export function scoreCommon(f: FeaturesSnapshot) {
     if (Math.abs(f.cross.dev_z) >= 2.0) reasons.push("Deviation extreme (z)");
   }
 
-  // Orderflow: imbalance + aggression
-  const im = f.orderflow.imbalance.top200; // smoother
+  // Orderflow
+  const im = f.orderflow.imbalance.top200;
   if (Math.abs(im) >= 0.25) reasons.push("Book imbalance present");
 
-  if (score > 100) score = 100;
-  if (score < 0) score = 0;
-
+  score = Math.max(0, Math.min(100, score));
   return { score, grade: gradeFromScore(score), reasons };
 }

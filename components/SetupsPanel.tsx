@@ -7,7 +7,7 @@ export function SetupsPanel({ out }: { out: SetupEngineOutput | null }) {
   return (
     <div style={{ marginTop: 12, padding: 12, border: "1px solid #222", borderRadius: 10 }}>
       <div style={{ fontWeight: 700, marginBottom: 8 }}>
-        Setups (Intraday) {out.preferred_id ? `— Preferred: ${out.preferred_id}` : ""}
+        Setups (Intraday){out.preferred_id ? ` — Preferred: ${out.preferred_id}` : ""}
       </div>
 
       {out.setups.length === 0 ? (
@@ -34,6 +34,7 @@ export function SetupsPanel({ out }: { out: SetupEngineOutput | null }) {
                     {s.confidence.grade} ({s.confidence.score})
                   </div>
                 </div>
+
                 <div style={{ fontSize: 12, textAlign: "right" }}>
                   <div>Entry: {s.entry.mode}</div>
                   <div>
@@ -46,9 +47,7 @@ export function SetupsPanel({ out }: { out: SetupEngineOutput | null }) {
                 <div>SL: {s.stop.price.toFixed(2)} ({s.stop.basis})</div>
                 <div>
                   TP:{" "}
-                  {s.tp
-                    .map((t) => `${t.price.toFixed(2)} (${t.size_pct}%)`)
-                    .join(" • ")}
+                  {s.tp.map((t) => `${t.price.toFixed(2)} (${t.size_pct}%)`).join(" • ")}
                 </div>
               </div>
 

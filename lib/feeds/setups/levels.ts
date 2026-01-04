@@ -23,8 +23,8 @@ export function computePivotLevels(candles: Candle[], lookback = 2, maxLevels = 
     if (isLow) pivots.push({ price: l, kind: "S" });
   }
 
-  // Cluster gần nhau theo % để tăng strength
-  const eps = 0.0012; // 12 bps ~ intraday reasonable (tune later)
+  // Cluster gần nhau theo % để strength phản ánh “chạm nhiều lần”
+  const eps = 0.0012; // ~12 bps (tune sau)
   const clusters: Array<{ p: number; kind: "R" | "S"; n: number }> = [];
 
   for (const pv of pivots) {
@@ -46,7 +46,6 @@ export function computePivotLevels(candles: Candle[], lookback = 2, maxLevels = 
     .slice(0, maxLevels)
     .map((c) => ({ price: c.p, kind: c.kind, strength: c.n }));
 
-  // Sort theo giá để dễ tìm level gần nhất
   out.sort((a, b) => a.price - b.price);
   return out;
 }

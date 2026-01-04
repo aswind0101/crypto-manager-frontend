@@ -2,7 +2,7 @@ import type { Candle } from "../core/types";
 import type { FeaturesSnapshot } from "../features/types";
 import type { UnifiedSnapshot } from "../snapshot/unifiedTypes";
 import { computePivotLevels, nearestLevels } from "./levels";
-import { scoreCommon } from "./scoring";
+import { scoreCommon, gradeFromScore } from "./scoring";
 import type { SetupEngineOutput, TradeSetup, SetupSide } from "./types";
 
 function now() { return Date.now(); }
@@ -20,7 +20,7 @@ function atrProxyFromFeatures(f: FeaturesSnapshot) {
 }
 
 function makeEntryZone(price: number, atrp: number, side: SetupSide) {
-  // Intraday zone ~ 0.35 * ATR% around a reference
+  // Zone width ~ 0.35 * ATR% intraday
   const w = price * atrp * 0.35;
   if (side === "LONG") return { lo: price - w, hi: price + w * 0.15 };
   return { lo: price - w * 0.15, hi: price + w };
@@ -47,45 +47,36 @@ export function buildSetups(args: {
   const ts = now();
 
   const dq_ok = f.quality.dq_grade === "A" || f.quality.dq_grade === "B";
-  if (!dq_ok) {
-    return { ts, dq_ok: false, setups: [], preferred_id: undefined };
-  }
+  if (!dq_ok) return { ts, dq_ok: false, setups: [], preferred_id: undefined };
 
-  // Pull candles from snapshot (Bybit is execution)
-  const tf15 = (snap.timeframes.find((x) => x.tf === "15m")?.candles?.ohlcv ?? []) as Candle[];
-  const tf1h = (snap.timeframes.find((x) => x.tf === "1h")?.candles?.ohlcv ?? []) as Candle[];
+  // Bybit execution candles
+  const tf15 = (snap.timeframes.find((x: any) => x.tf === "15m")?.candles?.ohlcv ?? []) as Candle[];
+  const tf1h = (snap.timeframes.find((x: any) => x.tf === "1h")?.candles?.ohlcv ?? []) as Candle[];
   const px = lastClose(tf15) ?? lastClose(tf1h) ?? 0;
   if (!px) return { ts, dq_ok: true, setups: [], preferred_id: undefined };
 
-  // Levels from 15m + 1h (merge)
+  // Levels
   const lv15 = computePivotLevels(tf15, 2, 10);
   const lv1h = computePivotLevels(tf1h, 2, 10);
   const levels = [...lv15, ...lv1h].sort((a, b) => a.price - b.price);
 
   const { below, above } = nearestLevels(levels, px);
   const atrp = atrProxyFromFeatures(f);
-
   const common = scoreCommon(f);
 
   const setups: TradeSetup[] = [];
-
-  // --------------------------
-  // 1) TREND_PULLBACK (priority)
-  // --------------------------
   const biasSide = pickBiasSide(f);
-  if (biasSide) {
-    // Pullback reference: nearest support for LONG, resistance for SHORT
-    const ref = biasSide === "LONG" ? (below?.price ?? px) : (above?.price ?? px);
 
+  // 1) TREND_PULLBACK (ưu tiên)
+  if (biasSide) {
+    const ref = biasSide === "LONG" ? (below?.price ?? px) : (above?.price ?? px);
     const zone = makeEntryZone(ref, atrp, biasSide);
 
-    // SL: beyond structure by 0.5*ATR
     const slBuffer = px * atrp * 0.5;
     const sl = biasSide === "LONG"
       ? Math.min(zone.lo - slBuffer, (below?.price ?? zone.lo) - slBuffer)
       : Math.max(zone.hi + slBuffer, (above?.price ?? zone.hi) + slBuffer);
 
-    // TP: use nearest opposite level or R-multiple fallback
     const tp1 = biasSide === "LONG"
       ? (above?.price ?? (px + px * atrp * 1.2))
       : (below?.price ?? (px - px * atrp * 1.2));
@@ -108,15 +99,7 @@ export function buildSetups(args: {
     ];
 
     const ready = rr1 >= 1.5 && common.grade !== "D";
-    const triggerConfirmed = false; // Task 3.3 sẽ nâng chuẩn confirm; v1 chỉ set false
-    const status = ready ? "READY" : "FORMING";
-
     const confScore = Math.min(100, common.score + (rr1 >= 2 ? 6 : 0) + 4);
-    const confidence = {
-      score: confScore,
-      grade: (confScore >= 85 ? "A" : confScore >= 70 ? "B" : confScore >= 50 ? "C" : "D") as any,
-      reasons: [...common.reasons, "Trend pullback archetype"],
-    };
 
     setups.push({
       id: uid("tpb"),
@@ -126,15 +109,15 @@ export function buildSetups(args: {
       entry_tf: "15m",
       bias_tf: f.bias.tf,
 
-      status,
+      status: ready ? "READY" : "FORMING",
       created_ts: ts,
-      expires_ts: ts + 1000 * 60 * 90, // 90 phút
+      expires_ts: ts + 1000 * 60 * 90,
 
       entry: {
         mode: "LIMIT",
         zone,
         trigger: {
-          confirmed: triggerConfirmed,
+          confirmed: false, // Task 3.3
           checklist,
           summary: ready ? "Ready: wait for price into zone + confirm" : "Forming: conditions not sufficient yet",
         },
@@ -144,26 +127,33 @@ export function buildSetups(args: {
 
       tp: [
         { price: tp1, size_pct: 50, basis: "LEVEL", note: "Nearest key level" },
-        { price: biasSide === "LONG" ? (tp1 + px * atrp * 1.0) : (tp1 - px * atrp * 1.0), size_pct: 50, basis: "R_MULTIPLE", note: "Extension" },
+        {
+          price: biasSide === "LONG" ? (tp1 + px * atrp * 1.0) : (tp1 - px * atrp * 1.0),
+          size_pct: 50,
+          basis: "R_MULTIPLE",
+          note: "Extension",
+        },
       ],
 
       rr_min: rr1,
       rr_est: rr1 * 1.35,
 
-      confidence,
+      confidence: {
+        score: confScore,
+        grade: gradeFromScore(confScore),
+        reasons: [...common.reasons, "Trend pullback archetype"],
+      },
+
       tags: [`bias-${f.bias.trend_dir}`, "intraday", "pullback"],
     });
   }
 
-  // --------------------------
-  // 2) BREAKOUT (range → expansion)
-  // --------------------------
-  // Use BB width if available: squeeze then breakout candidate
-  if (typeof f.entry.volatility.bbWidth_15m === "number") {
+  // 2) BREAKOUT (squeeze → expansion)
+  if (typeof f.entry.volatility.bbWidth_15m === "number" && below && above) {
     const width = f.entry.volatility.bbWidth_15m;
-    const squeeze = width < 0.012; // tune per coin
-    if (squeeze && below && above) {
-      // breakout direction hint by bias or aggression
+    const squeeze = width < 0.012;
+
+    if (squeeze) {
       const dir: SetupSide =
         biasSide ??
         (f.orderflow.aggression_ratio >= 0.52 ? "LONG" : "SHORT");
@@ -177,6 +167,7 @@ export function buildSetups(args: {
 
       const rr1 = rr(entryMid, sl, tp1, dir);
       const ready = rr1 >= 1.6 && common.grade !== "D";
+      const confScore = Math.min(100, common.score + 8 + (rr1 >= 2 ? 4 : 0));
 
       setups.push({
         id: uid("brk"),
@@ -188,13 +179,13 @@ export function buildSetups(args: {
 
         status: ready ? "READY" : "FORMING",
         created_ts: ts,
-        expires_ts: ts + 1000 * 60 * 60, // 60 phút
+        expires_ts: ts + 1000 * 60 * 60,
 
         entry: {
           mode: "MARKET",
           zone,
           trigger: {
-            confirmed: false,
+            confirmed: false, // Task 3.3
             checklist: [
               { key: "squeeze", ok: true, note: `BBWidth15m=${width.toFixed(4)}` },
               { key: "level", ok: true, note: `Break ${dir === "LONG" ? "R" : "S"} @ ${brk.toFixed(2)}` },
@@ -214,22 +205,19 @@ export function buildSetups(args: {
         rr_est: rr1 * 1.25,
 
         confidence: {
-          score: Math.min(100, common.score + (squeeze ? 8 : 0) + (rr1 >= 2 ? 4 : 0)),
-          grade: common.grade,
+          score: confScore,
+          grade: gradeFromScore(confScore),
           reasons: [...common.reasons, "Breakout from squeeze"],
         },
 
-        tags: ["intraday", "breakout", squeeze ? "squeeze" : ""].filter(Boolean),
+        tags: ["intraday", "breakout", "squeeze"],
       });
     }
   }
 
-  // --------------------------
-  // 3) RANGE_MEAN_REVERT (when bias sideways)
-  // --------------------------
+  // 3) RANGE_MEAN_REVERT (bias sideways)
   if (f.bias.trend_dir === "sideways" && below && above) {
-    // mean reversion around support/resistance edges
-    const nearSupport = Math.abs(px - below.price) / px < 0.002; // 20 bps
+    const nearSupport = Math.abs(px - below.price) / px < 0.002;
     const nearRes = Math.abs(px - above.price) / px < 0.002;
 
     if (nearSupport || nearRes) {
@@ -238,11 +226,14 @@ export function buildSetups(args: {
 
       const zone = makeEntryZone(ref, atrp, dir);
       const sl = dir === "LONG" ? (ref - px * atrp * 0.9) : (ref + px * atrp * 0.9);
-      const midRange = (below.price + above.price) / 2;
 
+      const midRange = (below.price + above.price) / 2;
       const tp1 = midRange;
+
       const entryMid = (zone.lo + zone.hi) / 2;
       const rr1 = rr(entryMid, sl, tp1, dir);
+
+      const confScore = Math.min(100, common.score + 2);
 
       setups.push({
         id: uid("mr"),
@@ -254,13 +245,13 @@ export function buildSetups(args: {
 
         status: rr1 >= 1.3 ? "READY" : "FORMING",
         created_ts: ts,
-        expires_ts: ts + 1000 * 60 * 120, // 2h
+        expires_ts: ts + 1000 * 60 * 120,
 
         entry: {
           mode: "LIMIT",
           zone,
           trigger: {
-            confirmed: false,
+            confirmed: false, // Task 3.3
             checklist: [
               { key: "range", ok: true, note: "Bias sideways" },
               { key: "edge", ok: true, note: nearSupport ? "Near support" : "Near resistance" },
@@ -269,19 +260,19 @@ export function buildSetups(args: {
           },
         },
 
-        stop: { price: sl, basis: "STRUCTURE", note: "Below/above range edge + ATR buffer" },
+        stop: { price: sl, basis: "STRUCTURE", note: "Beyond edge + ATR buffer" },
 
         tp: [
           { price: tp1, size_pct: 70, basis: "LEVEL", note: "Mid-range" },
-          { price: dir === "LONG" ? (above.price) : (below.price), size_pct: 30, basis: "LEVEL", note: "Opposite edge (optional)" },
+          { price: dir === "LONG" ? above.price : below.price, size_pct: 30, basis: "LEVEL", note: "Opposite edge (optional)" },
         ],
 
         rr_min: rr1,
         rr_est: rr1 * 1.15,
 
         confidence: {
-          score: Math.min(100, common.score + 2),
-          grade: common.grade,
+          score: confScore,
+          grade: gradeFromScore(confScore),
           reasons: [...common.reasons, "Mean reversion in range"],
         },
 
@@ -290,7 +281,7 @@ export function buildSetups(args: {
     }
   }
 
-  // Preferred setup: ưu tiên READY + confidence cao nhất, loại D
+  // Preferred: READY + confidence cao nhất
   const candidates = setups
     .filter((s) => s.status === "READY" && s.confidence.grade !== "D")
     .sort((a, b) => b.confidence.score - a.confidence.score);
@@ -299,12 +290,11 @@ export function buildSetups(args: {
     ts,
     dq_ok: true,
     preferred_id: candidates[0]?.id,
-    setups: setups
-      .sort((a, b) => {
-        const pa = a.status === "READY" ? 0 : 1;
-        const pb = b.status === "READY" ? 0 : 1;
-        if (pa !== pb) return pa - pb;
-        return b.confidence.score - a.confidence.score;
-      }),
+    setups: setups.sort((a, b) => {
+      const pa = a.status === "READY" ? 0 : 1;
+      const pb = b.status === "READY" ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return b.confidence.score - a.confidence.score;
+    }),
   };
 }

@@ -49,12 +49,11 @@ export type TradeSetup = {
   stop: StopPlan;
   tp: TakeProfitPlan;
 
-  rr_min: number;  // RR nếu chỉ ăn TP1
-  rr_est: number;  // RR dự kiến (weighted)
+  rr_min: number;
+  rr_est: number;
 
   confidence: SetupConfidence;
-
-  tags: string[]; // e.g. ["bias-bull", "dev-z-extreme", "orderflow-confirm"]
+  tags: string[];
 };
 
 export type SetupEngineOutput = {
