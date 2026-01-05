@@ -200,6 +200,7 @@ function SystemStatusBar({
     mid,
     dev,
     lastTs,
+    staleSec,
     setupsCount,
     preferredId,
 }: {
@@ -211,12 +212,17 @@ function SystemStatusBar({
     mid: number;
     dev: any;
     lastTs?: number;
+    staleSec?: number;
     setupsCount: number;
     preferredId?: string;
-    staleSec?: number;
 }) {
     const now = Date.now();
-    const staleMs = lastTs ? Math.max(0, now - lastTs) : NaN;
+    const staleMs =
+        staleSec != null && Number.isFinite(staleSec)
+            ? Math.max(0, staleSec * 1000)
+            : lastTs
+                ? Math.max(0, now - lastTs)
+                : NaN;
     const warm = !Number.isFinite(mid);
     const health =
         !bybitOk ? "BYBIT DOWN" : !binanceOk ? "BINANCE DEGRADED" : !dqOk ? "DQ GATED" : warm ? "WARMING UP" : "OK";
@@ -360,8 +366,12 @@ function ScanPulse({
             <div className="dos-scanbar-meter" aria-label="scan activity">
                 <div
                     className={`dos-scanbar-fill ${bump ? "dos-scanbar-bump" : ""}`}
-                    style={{ width: `${Math.round(pct * 100)}%` }}
+                    style={{
+                        width: `${Math.round(pct * 100)}%`,
+                        animation: bump ? "scan-pulse 320ms ease-out" : undefined,
+                    }}
                 />
+
             </div>
         </div>
     );
@@ -736,9 +746,11 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                 mid={mid}
                 dev={dev}
                 lastTs={vSnap?.ts ?? vSnap?.generatedTs ?? vSnap?.generated_at ?? null}
+                staleSec={staleSec}
                 setupsCount={rows.length}
                 preferredId={preferredId}
             />
+
             <ScanPulse
                 title={scanStatus.title}
                 cls={scanStatus.cls}
@@ -1134,6 +1146,11 @@ export function DosOpsDashboard() {
 }
 .dos-scanbar-bump{
   filter: brightness(1.35);
+}
+@keyframes scan-pulse {
+  0%   { box-shadow: 0 0 0 rgba(134,239,172,0); }
+  40%  { box-shadow: 0 0 6px rgba(134,239,172,0.65); }
+  100% { box-shadow: 0 0 0 rgba(134,239,172,0); }
 }
 
         .dos-grid{
