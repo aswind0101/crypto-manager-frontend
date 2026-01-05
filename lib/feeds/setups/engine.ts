@@ -39,6 +39,20 @@ function pickBiasSide(f: FeaturesSnapshot): SetupSide | null {
   return null;
 }
 
+function capGradeForBiasIncomplete(grade: ReturnType<typeof gradeFromScore>, bias_incomplete: boolean) {
+  if (!bias_incomplete) return grade;
+  return grade === "A" ? "B" : grade;
+}
+
+function getBiasCompleteness(snap: UnifiedSnapshot, f: FeaturesSnapshot) {
+  const tf = (f.bias?.tf ?? "4h") as any;
+  const tfCandles = (snap.timeframes.find((x: any) => x.tf === tf)?.candles?.ohlcv ?? []) as Candle[];
+  // EMA200 requires ~200 candles; use a small buffer for stability.
+  const need = 210;
+  const complete = tfCandles.length >= need;
+  return { tf: String(tf), count: tfCandles.length, need, complete };
+}
+
 export function buildSetups(args: {
   snap: UnifiedSnapshot;
   features: FeaturesSnapshot;
@@ -65,10 +79,12 @@ export function buildSetups(args: {
   const common = scoreCommon(f);
 
   const setups: TradeSetup[] = [];
+  const biasMeta = getBiasCompleteness(snap, f);
+  const bias_incomplete = !biasMeta.complete;
   const biasSide = pickBiasSide(f);
 
-  // 1) TREND_PULLBACK (ưu tiên)
-  if (biasSide) {
+  // 1) TREND_PULLBACK (ưu tiên) — B+ policy: only when HTF bias is complete
+  if (biasSide && !bias_incomplete) {
     const ref = biasSide === "LONG" ? (below?.price ?? px) : (above?.price ?? px);
     const zone = makeEntryZone(ref, atrp, biasSide);
 
@@ -140,23 +156,27 @@ export function buildSetups(args: {
 
       confidence: {
         score: confScore,
-        grade: gradeFromScore(confScore),
+        grade: capGradeForBiasIncomplete(gradeFromScore(confScore), bias_incomplete),
         reasons: [...common.reasons, "Trend pullback archetype"],
       },
 
-      tags: [`bias-${f.bias.trend_dir}`, "intraday", "pullback"],
+      tags: ["intraday", "trend", "pullback"],
     });
   }
 
-  // 2) BREAKOUT (squeeze → expansion)
+  // 2) BREAKOUT (squeeze → expansion) — B+ policy: allowed even when HTF bias incomplete
   if (typeof f.entry.volatility.bbWidth_15m === "number" && below && above) {
     const width = f.entry.volatility.bbWidth_15m;
     const squeeze = width < 0.012;
 
     if (squeeze) {
+      const biasDir =
+        !bias_incomplete && (biasSide === "LONG" || biasSide === "SHORT")
+          ? biasSide
+          : undefined;
+
       const dir: SetupSide =
-        biasSide ??
-        (f.orderflow.aggression_ratio >= 0.52 ? "LONG" : "SHORT");
+        biasDir ?? (f.orderflow.aggression_ratio >= 0.52 ? "LONG" : "SHORT");
 
       const brk = dir === "LONG" ? above.price : below.price;
       const zone = makeEntryZone(brk, atrp, dir);
@@ -166,8 +186,15 @@ export function buildSetups(args: {
       const entryMid = (zone.lo + zone.hi) / 2;
 
       const rr1 = rr(entryMid, sl, tp1, dir);
-      const ready = rr1 >= 1.6 && common.grade !== "D";
-      const confScore = Math.min(100, common.score + 8 + (rr1 >= 2 ? 4 : 0));
+
+      const rr_req = bias_incomplete ? 2.0 : 1.6;
+      const ready = rr1 >= rr_req && common.grade !== "D";
+
+      let confScore = Math.min(100, common.score + 8 + (rr1 >= 2 ? 4 : 0));
+      if (bias_incomplete) {
+        confScore = Math.floor(confScore * 0.65);
+        confScore = Math.min(confScore, 82);
+      }
 
       setups.push({
         id: uid("brk"),
@@ -187,6 +214,13 @@ export function buildSetups(args: {
           trigger: {
             confirmed: false, // Task 3.3
             checklist: [
+              {
+                key: "bias",
+                ok: !bias_incomplete,
+                note: bias_incomplete
+                  ? `HTF bias incomplete (${biasMeta.tf} ${biasMeta.count}/${biasMeta.need})`
+                  : `Bias ${f.bias.trend_dir} (${f.bias.tf})`,
+              },
               { key: "squeeze", ok: true, note: `BBWidth15m=${width.toFixed(4)}` },
               { key: "level", ok: true, note: `Break ${dir === "LONG" ? "R" : "S"} @ ${brk.toFixed(2)}` },
             ],
@@ -198,7 +232,7 @@ export function buildSetups(args: {
 
         tp: [
           { price: tp1, size_pct: 60, basis: "R_MULTIPLE", note: "Expansion target" },
-          { price: dir === "LONG" ? (tp1 + px * atrp * 1.0) : (tp1 - px * atrp * 1.0), size_pct: 40, basis: "R_MULTIPLE" },
+          { price: dir === "LONG" ? (tp1 + px * atrp * 1.0) : (tp1 - px * atrp * 1.0), size_pct: 40, basis: "R_MULTIPLE", note: "Continuation" },
         ],
 
         rr_min: rr1,
@@ -206,8 +240,8 @@ export function buildSetups(args: {
 
         confidence: {
           score: confScore,
-          grade: gradeFromScore(confScore),
-          reasons: [...common.reasons, "Breakout from squeeze"],
+          grade: capGradeForBiasIncomplete(gradeFromScore(confScore), bias_incomplete),
+          reasons: [...common.reasons, "Breakout from squeeze", ...(bias_incomplete ? [`HTF bias incomplete (${biasMeta.tf})`] : [])],
         },
 
         tags: ["intraday", "breakout", "squeeze"],
@@ -215,7 +249,7 @@ export function buildSetups(args: {
     }
   }
 
-  // 3) RANGE_MEAN_REVERT (bias sideways)
+  // 3) RANGE_MEAN_REVERT (bias sideways) — B+ policy: allowed even when HTF bias incomplete (with stricter RR)
   if (f.bias.trend_dir === "sideways" && below && above) {
     const nearSupport = Math.abs(px - below.price) / px < 0.002;
     const nearRes = Math.abs(px - above.price) / px < 0.002;
@@ -233,7 +267,12 @@ export function buildSetups(args: {
       const entryMid = (zone.lo + zone.hi) / 2;
       const rr1 = rr(entryMid, sl, tp1, dir);
 
-      const confScore = Math.min(100, common.score + 2);
+      let confScore = Math.min(100, common.score + 2);
+
+      if (bias_incomplete) {
+        confScore = Math.floor(confScore * 0.65);
+        confScore = Math.min(confScore, 82);
+      }
 
       setups.push({
         id: uid("mr"),
@@ -243,7 +282,7 @@ export function buildSetups(args: {
         entry_tf: "15m",
         bias_tf: f.bias.tf,
 
-        status: rr1 >= 1.3 ? "READY" : "FORMING",
+        status: rr1 >= (bias_incomplete ? 1.6 : 1.3) ? "READY" : "FORMING",
         created_ts: ts,
         expires_ts: ts + 1000 * 60 * 120,
 
@@ -253,6 +292,13 @@ export function buildSetups(args: {
           trigger: {
             confirmed: false, // Task 3.3
             checklist: [
+              {
+                key: "bias",
+                ok: !bias_incomplete,
+                note: bias_incomplete
+                  ? `HTF bias incomplete (${biasMeta.tf} ${biasMeta.count}/${biasMeta.need})`
+                  : "Bias sideways",
+              },
               { key: "range", ok: true, note: "Bias sideways" },
               { key: "edge", ok: true, note: nearSupport ? "Near support" : "Near resistance" },
             ],
@@ -272,8 +318,8 @@ export function buildSetups(args: {
 
         confidence: {
           score: confScore,
-          grade: gradeFromScore(confScore),
-          reasons: [...common.reasons, "Mean reversion in range"],
+          grade: capGradeForBiasIncomplete(gradeFromScore(confScore), bias_incomplete),
+          reasons: [...common.reasons, "Mean reversion in range", ...(bias_incomplete ? [`HTF bias incomplete (${biasMeta.tf})`] : [])],
         },
 
         tags: ["intraday", "range", nearSupport ? "support" : "resistance"],
