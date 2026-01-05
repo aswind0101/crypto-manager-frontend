@@ -66,25 +66,11 @@ function applyCloseConfirm(out: any, snap: any): any {
   const candles = getTimeframeCandles(snap, tf);
   const last = lastConfirmedCandle(candles);
   if (!last) return out;
-
-  // ✅ DEBUG: xác nhận close-confirm đang chạy
-  console.log("[3.3a] close-confirm candle", {
-    tf,
-    ts: last.ts,
-    close: last.c,
-    confirm: last.confirm,
-  });
-
   const tnow = Date.now();
 
   const updated = out.setups.map((s: any) => {
     if (!s) return s;
-    // ✅ DEBUG: log mọi setup được kiểm tra
-    console.log("[3.3a] check setup", {
-      id: s.id,
-      type: s.type,
-      status: s.status,
-    });
+
     // Expiry
     if (typeof s.expires_ts === "number" && tnow > s.expires_ts) {
       return { ...s, status: "EXPIRED" };
