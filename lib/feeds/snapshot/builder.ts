@@ -33,7 +33,21 @@ function computeDeviationBps(bybit1m?: Candle[], binance1m?: Candle[]) {
 
   return ((b - n) / mid) * 10000;
 }
+function bestBidAsk(ob?: { bids: Array<[number, number]>; asks: Array<[number, number]> }) {
+  if (!ob?.bids?.length || !ob?.asks?.length) return undefined;
 
+  // robust: compute max bid and min ask (works even if arrays are not sorted)
+  let bid = -Infinity;
+  for (const [p] of ob.bids) if (p > bid) bid = p;
+
+  let ask = Infinity;
+  for (const [p] of ob.asks) if (p < ask) ask = p;
+
+  if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask <= 0) return undefined;
+  if (ask < bid) return undefined; // crossed book guard
+
+  return { bid, ask, mid: (bid + ask) / 2 };
+}
 function returns1m(candles: Candle[], windowBars: number): number[] {
   const xs = candles.slice(-windowBars - 1);
   const out: number[] = [];
@@ -178,19 +192,27 @@ export function buildUnifiedSnapshotFromBybit(args: {
       orderflow:
         tf === "1m"
           ? {
-              orderbook: st.orderbook,
-              trades: st.trades?.toArrayNewestFirst?.().slice(0, 1200) ?? [],
-            }
+            orderbook: st.orderbook,
+            trades: st.trades?.toArrayNewestFirst?.().slice(0, 1200) ?? [],
+          }
           : undefined,
 
       diagnostics: { stale_ms: staleMs, partial: !candles },
     };
   });
 
+  const px = (() => {
+    const ob = st.orderbook;
+    const ba = bestBidAsk(ob);
+    if (!ba) return undefined;
+    return { ...ba, ts: ob.ts };
+  })();
+
   return {
     canon: args.canon,
     ts_generated: now,
     clock_skew_ms: args.clockSkewMs,
+    price: px,
 
     availability: {
       bybit: {
@@ -276,8 +298,8 @@ export function buildUnifiedSnapshotFromBybitBinance(args: {
 
     snap.data_quality.grade =
       s1 >= 85 ? "A" :
-      s1 >= 70 ? "B" :
-      s1 >= 50 ? "C" : "D";
+        s1 >= 70 ? "B" :
+          s1 >= 50 ? "C" : "D";
   }
 
   return snap;

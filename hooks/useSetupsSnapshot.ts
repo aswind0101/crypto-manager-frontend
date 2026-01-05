@@ -2,8 +2,6 @@ import { useMemo } from "react";
 import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
 
-// Local minimal candle shape. Kept here to avoid coupling this hook to
-// internal type re-export locations.
 type Candle = {
   ts: number;
   o: number;
@@ -11,11 +9,11 @@ type Candle = {
   l: number;
   c: number;
   v: number;
-  confirm?: boolean;
+  confirm: boolean;
 };
 
 function getTimeframeCandles(snap: any, tf: string): Candle[] {
-  const node = snap?.timeframes?.find((x: any) => x?.tf === tf);
+  const node = snap?.timeframes?.find((x: any) => String(x?.tf) === tf);
   const arr = node?.candles?.ohlcv;
   return Array.isArray(arr) ? (arr as Candle[]) : [];
 }
@@ -35,13 +33,24 @@ function lastConfirmedCandle(candles: Candle[]): Candle | undefined {
   return undefined;
 }
 
+function upsertChecklist(
+  list: Array<{ key: string; ok: boolean; note?: string }>,
+  item: { key: string; ok: boolean; note?: string }
+) {
+  const out = Array.isArray(list) ? [...list] : [];
+  const idx = out.findIndex((x) => x?.key === item.key);
+  if (idx >= 0) out[idx] = item;
+  else out.push(item);
+  return out;
+}
+
 function parseBreakLevelFromChecklist(setup: any): number | undefined {
   const items = setup?.entry?.trigger?.checklist;
   if (!Array.isArray(items)) return undefined;
 
   for (const it of items) {
     const note = String(it?.note ?? "");
-    // Expected note format from engine: "Break R @ 1234.56" (or S)
+    // engine note format: "Break R @ 1234.56" (or S)
     const m = note.match(/@\s*([0-9]+(?:\.[0-9]+)?)/);
     if (m) {
       const v = Number(m[1]);
@@ -53,10 +62,86 @@ function parseBreakLevelFromChecklist(setup: any): number | undefined {
 
 function candleCloseStrengthPct(c: Candle, side: "LONG" | "SHORT") {
   const range = Math.max(1e-9, c.h - c.l);
-  if (side === "LONG") return (c.c - c.l) / range; // 1.0 means close at high
-  return (c.h - c.c) / range; // 1.0 means close at low
+  if (side === "LONG") return (c.c - c.l) / range; // 1.0 close at high
+  return (c.h - c.c) / range; // 1.0 close at low
 }
 
+/**
+ * 3.3b PRE-TRIGGER (intrabar) using snap.price.mid (orderbook-derived)
+ * - Does NOT change status to TRIGGERED.
+ * - Only updates checklist + summary for READY setups.
+ */
+function applyPreTrigger(out: any, snap: any): any {
+  if (!out || !Array.isArray(out.setups) || !snap?.price?.mid) return out;
+// Log test mid price
+  const mid = snap.price.mid as number;
+  console.log("[3.3b] mid-price", snap.price);
+
+
+  const updated = out.setups.map((s: any) => {
+    if (!s || s.status !== "READY") return s;
+
+    const trg = s.entry?.trigger;
+    if (!trg) return s;
+
+    let checklist = Array.isArray(trg.checklist) ? trg.checklist : [];
+    let summary = String(trg.summary ?? "");
+
+    if (s.type === "BREAKOUT") {
+      const brk = parseBreakLevelFromChecklist(s);
+      if (!brk) return s;
+
+      const distBps = ((mid - brk) / brk) * 10000;
+      // "testing level" band: within 5 bps OR slightly below for LONG / above for SHORT
+      const ok =
+        s.side === "LONG"
+          ? distBps >= -5
+          : distBps <= 5;
+
+      checklist = upsertChecklist(checklist, {
+        key: "pre_trigger",
+        ok,
+        note: `mid=${mid.toFixed(2)} | brk=${brk.toFixed(2)} | dist=${distBps.toFixed(1)}bps`,
+      });
+
+      if (ok) summary = "PRE-TRIGGER: price is testing breakout level (await close-confirm)";
+    }
+
+    if (s.type === "RANGE_MEAN_REVERT" || s.type === "TREND_PULLBACK") {
+      const zone = s?.entry?.zone;
+      if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
+
+      const inZone = mid >= zone.lo && mid <= zone.hi;
+
+      checklist = upsertChecklist(checklist, {
+        key: "pre_trigger",
+        ok: inZone,
+        note: `mid=${mid.toFixed(2)} | zone=[${zone.lo.toFixed(2)}, ${zone.hi.toFixed(2)}]`,
+      });
+
+      if (inZone) summary = "PRE-TRIGGER: price is inside entry zone (await close-confirm)";
+    }
+
+    return {
+      ...s,
+      entry: {
+        ...s.entry,
+        trigger: {
+          ...trg,
+          checklist,
+          summary,
+        },
+      },
+    };
+  });
+
+  return { ...out, setups: updated };
+}
+
+/**
+ * 3.3a CLOSE-CONFIRM trigger evaluation
+ * - READY -> TRIGGERED / INVALIDATED / EXPIRED using last confirmed candle.
+ */
 function applyCloseConfirm(out: any, snap: any): any {
   if (!out || !Array.isArray(out.setups) || !snap) return out;
 
@@ -66,6 +151,7 @@ function applyCloseConfirm(out: any, snap: any): any {
   const candles = getTimeframeCandles(snap, tf);
   const last = lastConfirmedCandle(candles);
   if (!last) return out;
+
   const tnow = Date.now();
 
   const updated = out.setups.map((s: any) => {
@@ -86,26 +172,20 @@ function applyCloseConfirm(out: any, snap: any): any {
     // Only attempt to TRIGGER if currently READY.
     if (s.status !== "READY") return s;
 
-    // Setup-type specific close-confirm logic
     if (s.type === "BREAKOUT") {
       const brk = parseBreakLevelFromChecklist(s);
       if (!brk) return s;
 
       const strength = candleCloseStrengthPct(last, s.side);
-      const buffer = brk * 0.001; // 0.10% buffer (phase 3.3a, conservative)
+      const buffer = brk * 0.001; // 0.10% buffer
       const passPrice = s.side === "LONG" ? last.c > brk + buffer : last.c < brk - buffer;
-
-      // Require close to be near the breakout direction (top/bottom 30%)
       const passStrength = strength >= 0.7;
 
       if (passPrice && passStrength) {
         return {
           ...s,
           status: "TRIGGERED",
-          entry: {
-            ...s.entry,
-            trigger: { ...s.entry.trigger, confirmed: true },
-          },
+          entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
         };
       }
       return s;
@@ -115,7 +195,6 @@ function applyCloseConfirm(out: any, snap: any): any {
       const zone = s?.entry?.zone;
       if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
 
-      // Close-confirm: touch zone then close back past the zone edge (simple, robust)
       if (s.side === "LONG") {
         const touched = last.l <= zone.hi;
         const reclaimed = last.c >= zone.hi;
@@ -124,16 +203,12 @@ function applyCloseConfirm(out: any, snap: any): any {
           return {
             ...s,
             status: "TRIGGERED",
-            entry: {
-              ...s.entry,
-              trigger: { ...s.entry.trigger, confirmed: true },
-            },
+            entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
           };
         }
         return s;
       }
 
-      // SHORT
       const touched = last.h >= zone.lo;
       const reclaimed = last.c <= zone.lo;
       const hasRejection = last.h > last.c;
@@ -141,18 +216,13 @@ function applyCloseConfirm(out: any, snap: any): any {
         return {
           ...s,
           status: "TRIGGERED",
-          entry: {
-            ...s.entry,
-            trigger: { ...s.entry.trigger, confirmed: true },
-          },
+          entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
         };
       }
       return s;
     }
 
     if (s.type === "TREND_PULLBACK") {
-      // When this archetype is enabled (HTF bias complete), confirm similarly:
-      // touch zone then close back through the zone edge.
       const zone = s?.entry?.zone;
       if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
 
@@ -192,9 +262,14 @@ export function useSetupsSnapshot(symbol: string) {
 
   const setups = useMemo(() => {
     if (!snap || !features) return null;
+
     const base = buildSetups({ snap, features });
-    // Task 3.3a: close-confirm trigger evaluation (production-safe)
-    return applyCloseConfirm(base, snap);
+
+    // 3.3b: intrabar PRE-TRIGGER using mid-price (orderbook authority)
+    const withPre = applyPreTrigger(base, snap);
+
+    // 3.3a: close-confirm evaluation -> TRIGGERED / INVALIDATED / EXPIRED
+    return applyCloseConfirm(withPre, snap);
   }, [snap, features]);
 
   return { snap, features, setups };

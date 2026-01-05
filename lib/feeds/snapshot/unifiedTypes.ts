@@ -5,6 +5,15 @@ export type UnifiedSnapshot = {
   ts_generated: number;
   clock_skew_ms: number;
 
+  // ✅ Realtime price derived from orderbook (authority for PRE-TRIGGER)
+  price?: {
+    bid: number;
+    ask: number;
+    mid: number;
+    ts: number; // timestamp of the underlying orderbook
+  };
+
+
   availability: {
     bybit: { ok: boolean; notes?: string[] };
     binance: { ok: boolean; notes?: string[] };
