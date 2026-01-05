@@ -1,5 +1,5 @@
-import { DosConsole } from "../components/DosConsole";
+import { DosOpsDashboard } from "../components/DosOpsDashboard";
 
 export default function Home() {
-  return <DosConsole />;
+  return <DosOpsDashboard />;
 }
