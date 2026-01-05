@@ -38,25 +38,39 @@ function actionLabel(s: AnyObj) {
     const status = String(s?.status ?? "");
     const mode = String(s?.entry?.mode ?? "");
     const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
-    const hasClose = checklist.some((x: AnyObj) => String(x?.key ?? "") === "close_confirm");
-    const closeOk = checklist.find((x: AnyObj) => String(x?.key ?? "") === "close_confirm")?.ok === true;
 
-    if (status === "INVALIDATED") return "INVALID";
+    const closeItem = checklist.find((x: AnyObj) => String(x?.key ?? "") === "close_confirm");
+    const hasClose = Boolean(closeItem);
+    const closeOk = closeItem?.ok === true;
+
+    // Terminal states
+    if (status === "INVALIDATED") return "INVALIDATED";
     if (status === "EXPIRED") return "EXPIRED";
-    if (status === "TRIGGERED") return mode === "MARKET" ? "ENTER NOW" : "CONFIRMED";
-    if (status === "READY") {
-        if (hasClose && !closeOk) return "WAIT CLOSE";
-        return mode === "LIMIT" ? "PLACE LIMIT" : "ARMED";
+
+    // Triggered state (close-confirm already satisfied)
+    if (status === "TRIGGERED") {
+        // Clarify execution intent
+        return mode === "MARKET" ? "ENTER MARKET (CONFIRMED)" : "TRIGGERED (WAIT EXEC)";
     }
+
+    // Ready state: eligible but may require close_confirm depending on trigger checklist
+    if (status === "READY") {
+        if (hasClose && !closeOk) return "WAIT CLOSE (CONFIRM)";
+        return mode === "LIMIT" ? "PLACE LIMIT (ARMED)" : "READY (ARMED)";
+    }
+
+    // Forming / other states: show next required condition if available
     const next = checklist.find((x: AnyObj) => x && x.ok === false);
     if (next?.key) {
         const k = String(next.key);
         if (k === "retest") return "WAIT RETEST";
-        if (k === "close_confirm") return "WAIT CLOSE";
+        if (k === "close_confirm") return "WAIT CLOSE (CONFIRM)";
         return `WAIT ${k.toUpperCase()}`;
     }
-    return "WATCH";
+
+    return "NO ACTION";
 }
+
 function distanceBps(px: number, z: AnyObj) {
     if (!Number.isFinite(px) || !z) return NaN;
     const lo = Number(z.lo);
@@ -67,6 +81,13 @@ function distanceBps(px: number, z: AnyObj) {
     const ref = px || hi || lo;
     return (dist / ref) * 10000;
 }
+function distLabelFor(mid: number, z: AnyObj, mode?: string) {
+    const dist = Number.isFinite(mid) ? distanceBps(mid, z) : NaN;
+    if (!Number.isFinite(dist)) return "—";
+    if (dist === 0) return String(mode ?? "") === "LIMIT" ? "IN (MID)" : "IN";
+    return `${dist.toFixed(0)}bps`;
+}
+
 function marketScan(features: AnyObj, tf: string) {
     const ms = features?.market_structure?.[tf];
     const trend = String(ms?.trend ?? "—");
@@ -403,8 +424,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
     const action = selected ? actionLabel(selected) : "—";
     const z = selected?.entry?.zone;
-    const dist = Number.isFinite(mid) ? distanceBps(mid, z) : NaN;
-    const distLabel = !Number.isFinite(dist) ? "—" : dist === 0 ? "IN" : `${dist.toFixed(0)}bps`;
+    const distLabel = distLabelFor(mid, z, String(selected?.entry?.mode ?? ""));
+
     const prog = selected ? triggerProgress(selected) : { ok: 0, total: 0, pct: 0, checklist: [], next: null };
 
     const renderDetails = (inDrawer: boolean) => {
@@ -433,7 +454,7 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                 <div className="dos-panel-head dos-panel-head-row">
                     <div className="dos-strong">DETAILS</div>
                     {inDrawer ? (
-                        <button className="dos-btn dos-btn-sm" onClick={() => setDrawerOpen(false)}>
+                        <button className="dos-btn dos-btn-sm" {...tap(() => setDrawerOpen(false))}>
                             CLOSE
                         </button>
                     ) : (
@@ -460,10 +481,10 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                         </div>
 
                         <div className="dos-summary-right">
-                            <button className={`dos-btn dos-btn-sm ${isPinned ? "dos-btn-active" : ""}`} onClick={togglePin}>
+                            <button className={`dos-btn dos-btn-sm ${isPinned ? "dos-btn-active" : ""}`} {...tap(togglePin)}>
                                 {isPinned ? "PINNED" : "PIN"}
                             </button>
-                            <button className="dos-btn dos-btn-sm" onClick={copyTicket}>
+                            <button className="dos-btn dos-btn-sm" {...tap(copyTicket)}>
                                 COPY
                             </button>
                         </div>
@@ -494,7 +515,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                     {/* Checklist */}
                     <div className="dos-blockhead-row">
                         <div className="dos-blockhead">CHECKLIST</div>
-                        <button className="dos-btn dos-btn-sm" onClick={() => setExpandedChecklist((x) => !x)}>
+                        <button className="dos-btn dos-btn-sm" {...tap(() => setExpandedChecklist((x) => !x))}>
                             {expandedChecklist ? "HIDE" : "SHOW"}
                         </button>
                     </div>
@@ -527,7 +548,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                     {/* Reasons */}
                     <div className="dos-blockhead-row">
                         <div className="dos-blockhead">CONFLUENCE</div>
-                        <button className="dos-btn dos-btn-sm" onClick={() => setExpandedReasons((x) => !x)}>
+                        <button className="dos-btn dos-btn-sm" {...tap(() => setExpandedChecklist((x) => !x))}>
                             {expandedReasons ? "HIDE" : "SHOW"}
                         </button>
                     </div>
@@ -673,8 +694,8 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                     const prog = triggerProgress(s);
 
                                     const z = s?.entry?.zone;
-                                    const dist = Number.isFinite(mid) ? distanceBps(mid, z) : NaN;
-                                    const distLabel = !Number.isFinite(dist) ? "—" : dist === 0 ? "IN" : `${dist.toFixed(0)}bps`;
+                                    const distLabel = distLabelFor(mid, z, String(s?.entry?.mode ?? ""));
+
                                     const act = actionLabel(s);
                                     const pin = Boolean(pinned[id]);
 
@@ -733,7 +754,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
             {/* Drawer for narrow screens */}
             {isNarrow ? (
                 <div className={`dos-drawer ${drawerOpen ? "dos-drawer-on" : ""}`}>
-                    <div className="dos-drawer-scrim" onClick={() => setDrawerOpen(false)} />
+                    <div className="dos-drawer-scrim" {...tap(() => setDrawerOpen(false))} />
                     <div className="dos-drawer-sheet">{renderDetails(true)}</div>
                 </div>
             ) : null}
