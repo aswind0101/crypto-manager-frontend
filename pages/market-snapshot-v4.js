@@ -5,7 +5,7 @@ import { SetupsPanel } from "../components/SetupsPanel";
 import { useSetupsSnapshot } from "../hooks/useSetupsSnapshot";
 
 export default function Home() {
-  const [symbol, setSymbol] = useState("BTCUSDT");
+  const [symbol, setSymbol] = useState("ETHUSDT");
   const { snap, features, setups } = useSetupsSnapshot(symbol);
 
   return (
