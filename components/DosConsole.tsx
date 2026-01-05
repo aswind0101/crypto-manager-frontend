@@ -194,6 +194,16 @@ function SystemStatusBar({
 
     const healthCls =
         health === "OK" ? "dos-ok" : health === "WARMING UP" || health.includes("DEGRADED") ? "dos-warn" : "dos-bad";
+    const pipeStr =
+        stage <= 1
+            ? `FETCH[${bar(0.7, 6)}] NORMALIZE[${bar(0.1, 6)}] FEATURES[${bar(0.1, 6)}] SETUPS[${bar(0.1, 6)}] DONE[${bar(0.1, 6)}]`
+            : stage === 2
+                ? `FETCH[${bar(1, 6)}] NORMALIZE[${bar(0.7, 6)}] FEATURES[${bar(0.1, 6)}] SETUPS[${bar(0.1, 6)}] DONE[${bar(0.1, 6)}]`
+                : stage === 3
+                    ? `FETCH[${bar(1, 6)}] NORMALIZE[${bar(1, 6)}] FEATURES[${bar(0.7, 6)}] SETUPS[${bar(0.1, 6)}] DONE[${bar(0.1, 6)}]`
+                    : stage === 4
+                        ? `FETCH[${bar(1, 6)}] NORMALIZE[${bar(1, 6)}] FEATURES[${bar(1, 6)}] SETUPS[${bar(0.7, 6)}] DONE[${bar(0.1, 6)}]`
+                        : `FETCH[${bar(1, 6)}] NORMALIZE[${bar(1, 6)}] FEATURES[${bar(1, 6)}] SETUPS[${bar(1, 6)}] DONE[${bar(1, 6)}]`;
 
     return (
         <div className="dos-sysbar">
@@ -209,7 +219,7 @@ function SystemStatusBar({
                 </span>
 
                 <span className="dos-pill dos-dim">
-                    PIPE: <span className="dos-mono">{bar(stage >= 1 ? 0.25 : 0.05, 10)} </span>
+                    PIPE: <span className="dos-mono">{pipeStr}</span>
                 </span>
 
                 <span className="dos-pill dos-dim">
@@ -354,7 +364,7 @@ function AnalysisSession({
                     binanceOk={binanceOk}
                     mid={mid}
                     dev={dev}
-                    lastTs={vSnap?.ts}
+                    lastTs={vSnap?.ts ?? vSnap?.generatedTs ?? vSnap?.generated_at ?? null}
                     setupsCount={rows.length}
                     preferredId={preferredId}
                 />
@@ -423,7 +433,27 @@ function AnalysisSession({
                         {rows.length === 0 ? (
                             <div className="dos-pad">
                                 {dqOk ? (
-                                    <>NO SETUPS (valid). Market context / RR / retest filters blocked candidates.</>
+                                    <div className="dos-pad">
+                                        <div className="dos-strong">NO SETUPS (valid)</div>
+                                        <div className="dos-dim" style={{ marginTop: 6 }}>
+                                            Filters blocked candidates due to RR / structure / retest requirements, or insufficient context.
+                                        </div>
+
+                                        <div className="dos-hr" />
+
+                                        <pre className="dos-pre">{`Context snapshot:
+15m: ${scan15.trend}   H ${fmt(scan15.sH, 2)}   L ${fmt(scan15.sL, 2)}
+1h : ${scan1h.trend}   flags: ${scan1h.fl}
+DQ : ${dq} ${dqOk ? "" : "(GATED)"}
+MID: ${Number.isFinite(mid) ? fmt(mid, 2) : "— (warming)"}
+DEV: ${Number.isFinite(Number(dev)) ? `${Number(dev).toFixed(1)}bps` : "—"}
+
+Wait for:
+• A fresh SWEEP at range edges, or
+• BOS/CHOCH confirmation on close, or
+• Retest into an entry zone with RR >= threshold`}</pre>
+                                    </div>
+
                                 ) : (
                                     <>DQ GATED. Fix feeds/liveness before trusting setups.</>
                                 )}
