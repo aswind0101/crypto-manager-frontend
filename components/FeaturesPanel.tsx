@@ -18,13 +18,23 @@ export function FeaturesPanel({ f }: { f: FeaturesSnapshot | null }) {
     return (
       <div>
         <div style={{ opacity: 0.7 }}>Market Structure ({label})</div>
+
         <div>
           Trend: <b>{ms.trend ?? "—"}</b>
         </div>
+
         <div>
           Swing H / L: {swingH != null ? fmt(swingH, 2) : "—"} /{" "}
           {swingL != null ? fmt(swingL, 2) : "—"}
         </div>
+
+        {/* === DEBUG RẤT NHỎ – chỉ để test MS === */}
+        {label === "15m" ? (
+          <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>
+            <div>confirmedCandles15m: {ms.confirmed_count ?? "—"}</div>
+            <div>recentSwings.length: {Array.isArray(ms.recentSwings) ? ms.recentSwings.length : "—"}</div>
+          </div>
+        ) : null}
 
         <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>
           <div>
@@ -106,7 +116,6 @@ export function FeaturesPanel({ f }: { f: FeaturesSnapshot | null }) {
           </div>
         </div>
 
-        {/* Market Structure blocks (UI-as-debugger) */}
         {renderMS("15m", ms15)}
         {renderMS("1h", ms1h)}
       </div>
