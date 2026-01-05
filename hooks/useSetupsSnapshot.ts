@@ -66,6 +66,138 @@ function candleCloseStrengthPct(c: Candle, side: "LONG" | "SHORT") {
   return (c.h - c.c) / range; // 1.0 close at low
 }
 
+function clamp(n: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function getChecklistOk(setup: any, key: string): boolean {
+  const items = setup?.entry?.trigger?.checklist;
+  if (!Array.isArray(items)) return false;
+  const it = items.find((x: any) => x?.key === key);
+  return Boolean(it?.ok);
+}
+
+function bpsDistanceToZone(mid: number, zone?: { lo: number; hi: number }) {
+  if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number" || mid <= 0) return 9999;
+  if (mid >= zone.lo && mid <= zone.hi) return 0;
+  const d = Math.min(Math.abs(mid - zone.lo), Math.abs(mid - zone.hi));
+  return (d / mid) * 10000;
+}
+
+function bpsDistanceToLevel(mid: number, level?: number) {
+  if (!Number.isFinite(mid) || !Number.isFinite(level) || mid <= 0 || (level as number) <= 0) return 9999;
+  return (Math.abs(mid - (level as number)) / (level as number)) * 10000;
+}
+
+/**
+ * Task 5.2 — Priority Score
+ * - priority_score: 0–100 (higher = should watch first)
+ * - Sorted primarily by priority_score, then confidence_score.
+ *
+ * Uses:
+ * - distance-to-entry (mid-price vs zone/level)
+ * - pre_trigger progress (intrabar)
+ * - status (READY favored)
+ * - DQ penalty
+ * - expiry proximity penalty
+ * - confidence as secondary input
+ */
+function applyPriorityScore(out: any, snap: any, features: any): any {
+  if (!out || !Array.isArray(out.setups)) return out;
+
+  const mid = snap?.price?.mid;
+  const now = Date.now();
+
+  const dqGrade = String(features?.quality?.dq_grade ?? "");
+  const dqBoost = dqGrade === "A" ? 8 : dqGrade === "B" ? 4 : -25;
+
+  const withScore = out.setups.map((s: any) => {
+    if (!s) return s;
+
+    const conf = Number(s?.confidence?.score ?? 0);
+    const status = String(s?.status ?? "");
+
+    // Distance score (dominant)
+    let distBps = 9999;
+    if (Number.isFinite(mid)) {
+      if (s.type === "BREAKOUT") {
+        const brk = parseBreakLevelFromChecklist(s);
+        distBps = bpsDistanceToLevel(mid, brk);
+      } else {
+        distBps = bpsDistanceToZone(mid, s?.entry?.zone);
+      }
+    }
+
+    // Map distance (bps) -> score bucket.
+    // 0 bps => 55, 10 bps => ~35, 25 bps => ~5
+    const distScore = clamp(55 - distBps * 2.0, 0, 55);
+
+    // Status score
+    const statusScore =
+      status === "READY" ? 18 :
+      status === "FORMING" ? 8 :
+      status === "TRIGGERED" ? 0 :
+      status === "INVALIDATED" ? 0 :
+      status === "EXPIRED" ? 0 :
+      0;
+
+    // PRE-TRIGGER progress score (intrabar)
+    const preOk = getChecklistOk(s, "pre_trigger");
+    const preScore = preOk ? 15 : 0;
+
+    // Expiry penalty: if close to expires, deprioritize
+    let expiryPenalty = 0;
+    if (typeof s.expires_ts === "number") {
+      const minsLeft = (s.expires_ts - now) / 60000;
+      if (minsLeft <= 0) expiryPenalty = 30;
+      else if (minsLeft < 10) expiryPenalty = 18;
+      else if (minsLeft < 20) expiryPenalty = 10;
+    }
+
+    // Confidence only secondary (avoid double-counting)
+    const confScore = clamp(conf * 0.20, 0, 20);
+
+    // Combine
+    let score = distScore + statusScore + preScore + dqBoost + confScore - expiryPenalty;
+    score = clamp(Math.round(score), 0, 100);
+
+    const reasons: string[] = [];
+    if (Number.isFinite(mid)) {
+      reasons.push(`dist=${distBps.toFixed(1)}bps`);
+    } else {
+      reasons.push("no-mid");
+    }
+    if (preOk) reasons.push("pre_trigger");
+    if (dqBoost < 0) reasons.push(`dq=${dqGrade}`);
+    if (expiryPenalty > 0) reasons.push("near-expiry");
+
+    return {
+      ...s,
+      // non-breaking additive fields (UI test can ignore)
+      priority_score: score,
+      priority_reasons: reasons.slice(0, 4),
+    };
+  });
+
+  const sorted = [...withScore].sort((a: any, b: any) => {
+    const pa = Number(a?.priority_score ?? 0);
+    const pb = Number(b?.priority_score ?? 0);
+    if (pb !== pa) return pb - pa;
+
+    const ca = Number(a?.confidence?.score ?? 0);
+    const cb = Number(b?.confidence?.score ?? 0);
+    return cb - ca;
+  });
+
+  const preferred = sorted.find((s: any) => s?.status === "READY")?.id ?? sorted[0]?.id;
+
+  return {
+    ...out,
+    preferred_id: preferred,
+    setups: sorted,
+  };
+}
+
 /**
  * 3.3b PRE-TRIGGER (intrabar) using snap.price.mid (orderbook-derived)
  * - Does NOT change status to TRIGGERED.
@@ -73,8 +205,9 @@ function candleCloseStrengthPct(c: Candle, side: "LONG" | "SHORT") {
  */
 function applyPreTrigger(out: any, snap: any): any {
   if (!out || !Array.isArray(out.setups) || !snap?.price?.mid) return out;
+
   const mid = snap.price.mid as number;
-  //console.log("[3.3b] mid-price", snap.price);
+
   const updated = out.setups.map((s: any) => {
     if (!s || s.status !== "READY") return s;
 
@@ -90,10 +223,7 @@ function applyPreTrigger(out: any, snap: any): any {
 
       const distBps = ((mid - brk) / brk) * 10000;
       // "testing level" band: within 5 bps OR slightly below for LONG / above for SHORT
-      const ok =
-        s.side === "LONG"
-          ? distBps >= -5
-          : distBps <= 5;
+      const ok = s.side === "LONG" ? distBps >= -5 : distBps <= 5;
 
       checklist = upsertChecklist(checklist, {
         key: "pre_trigger",
@@ -266,7 +396,10 @@ export function useSetupsSnapshot(symbol: string) {
     const withPre = applyPreTrigger(base, snap);
 
     // 3.3a: close-confirm evaluation -> TRIGGERED / INVALIDATED / EXPIRED
-    return applyCloseConfirm(withPre, snap);
+    const withConfirm = applyCloseConfirm(withPre, snap);
+
+    // 5.2: priority scoring + sorting
+    return applyPriorityScore(withConfirm, snap, features);
   }, [snap, features]);
 
   return { snap, features, setups };
