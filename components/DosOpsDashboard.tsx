@@ -457,9 +457,7 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                         <button className="dos-btn dos-btn-sm" {...tap(() => setDrawerOpen(false))}>
                             CLOSE
                         </button>
-                    ) : (
-                        <span className="dos-dim dos-mono">hotkeys: ↑↓ nav • P pin • C copy</span>
-                    )}
+                    ) : null}
                 </div>
 
                 <div className="dos-panel-body">
@@ -1136,10 +1134,6 @@ export function DosOpsDashboard() {
                         <span className="dos-chip dos-dim">
                             <span>MODE</span>
                             <span className="dos-mono">{paused ? "FROZEN" : "LIVE"}</span>
-                        </span>
-                        <span className="dos-chip dos-dim">
-                            <span>HOTKEYS</span>
-                            <span className="dos-mono">↑↓ nav • P pin • C copy • A analyze • S stop • R reset</span>
                         </span>
                     </div>
                 </div>
