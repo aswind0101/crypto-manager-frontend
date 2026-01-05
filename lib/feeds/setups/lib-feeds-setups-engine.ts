@@ -40,11 +40,6 @@ function rr(entry: number, stop: number, tp: number, side: SetupSide) {
   if (risk <= 0 || reward <= 0) return 0;
   return reward / risk;
 }
-const LSR_RR_MIN = 2.8;
-
-// Freshness window (ms): 6 candles
-const LSR_FRESH_15M_MS = 6 * 15 * 60 * 1000;
-const LSR_FRESH_1H_MS = 6 * 60 * 60 * 1000;
 
 function pickBiasSide(f: FeaturesSnapshot): SetupSide | null {
   if (f.bias.trend_dir === "bull") return "LONG";
@@ -374,108 +369,6 @@ export function buildSetups(args: {
 
         tags: ["intraday", "breakout", "squeeze"],
       });
-    }
-  }
-  /**
-   * 2c) LIQUIDITY_SWEEP_REVERSAL (Task 3.4c)
-   * - New archetype (does NOT override RANGE_MEAN_REVERT)
-   * - FORMING when sweep is fresh
-   * - READY only when price returns into entry zone (zone around swept level)
-   * - TRIGGERED remains close-confirm only (handled by Trigger Engine)
-   */
-  const ms1h = (f as any).market_structure?.["1h"];
-  const sweep15 = ms15?.lastSweep;
-  const sweep1h = ms1h?.lastSweep;
-
-  // choose freshest sweep source (prefer 15m if both valid)
-  const sweepPick = (() => {
-    const ok15 =
-      sweep15 && typeof sweep15.ts === "number" &&
-      (ts - sweep15.ts) <= LSR_FRESH_15M_MS;
-
-    const ok1h =
-      sweep1h && typeof sweep1h.ts === "number" &&
-      (ts - sweep1h.ts) <= LSR_FRESH_1H_MS;
-
-    if (ok15) return { ms: ms15, sweep: sweep15 };
-    if (ok1h) return { ms: ms1h, sweep: sweep1h };
-    return null;
-  })();
-
-  if (sweepPick) {
-    const { ms: msSrc, sweep } = sweepPick;
-
-    const side: SetupSide = sweep.dir === "DOWN" ? "LONG" : "SHORT";
-    const level = sweep.level; // reclaimed level (swept swing)
-    const zone = makeRetestZone(level, atrp, side);
-
-    // SL outside sweep wick
-    const wick = side === "LONG" ? sweep.low : sweep.high;
-    const slBuffer = Math.max(px * 0.0006, px * atrp * 0.15); // floor bps + ATR component
-    const sl = side === "LONG" ? (wick - slBuffer) : (wick + slBuffer);
-
-    // TP at opposite swing if available
-    const oppSwing = side === "LONG" ? msSrc?.lastSwingHigh : msSrc?.lastSwingLow;
-    if (oppSwing && typeof oppSwing.price === "number") {
-      const tp1 = oppSwing.price;
-
-      const entryMid = (zone.lo + zone.hi) / 2;
-      const rr1 = rr(entryMid, sl, tp1, side);
-
-      if (rr1 >= LSR_RR_MIN) {
-        // READY only when current price is back in entry zone (using px close; intrabar mid is handled elsewhere)
-        const ready = px >= zone.lo && px <= zone.hi;
-
-        let confScore = Math.min(100, common.score + 5 + (rr1 >= 3.2 ? 3 : 0));
-
-        setups.push({
-          id: uid("lsr"),
-          canon: snap.canon,
-          type: "LIQUIDITY_SWEEP_REVERSAL",
-          side,
-          entry_tf: "15m",
-          bias_tf: f.bias.tf,
-
-          status: ready ? "READY" : "FORMING",
-          created_ts: ts,
-          expires_ts: ts + 1000 * 60 * 120, // 2h (consistent with MR horizon)
-
-          entry: {
-            mode: "LIMIT",
-            zone,
-            trigger: {
-              confirmed: false, // Task 3.3
-              checklist: [
-                { key: "sweep", ok: true, note: `${sweep.dir} @ ${sweep.level.toFixed(2)}` },
-                { key: "retest", ok: ready, note: ready ? "Price in entry zone" : "Waiting retest into zone" },
-                { key: "close_confirm", ok: false, note: "Trigger on candle close only" },
-              ],
-              summary: "Liquidity sweep reversal: wait retest then close-confirm reclaim",
-            },
-          },
-
-          stop: { price: sl, basis: "LIQUIDITY", note: "Outside sweep wick" },
-
-          tp: [
-            { price: tp1, size_pct: 100, basis: "LEVEL", note: "Opposite swing liquidity" },
-          ],
-
-          rr_min: LSR_RR_MIN,
-          rr_est: rr1,
-
-          confidence: {
-            score: confScore,
-            grade: gradeFromScore(confScore),
-            reasons: [
-              ...common.reasons,
-              `Sweep ${sweep.dir} (${String(msSrc?.tf ?? "n/a")})`,
-              `Level ${sweep.level.toFixed(2)} → TP ${tp1.toFixed(2)}`,
-            ],
-          },
-
-          tags: ["intraday", "lsr", "sweep_reversal"],
-        });
-      }
     }
   }
 

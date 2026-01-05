@@ -1,10 +1,6 @@
 export type SetupSide = "LONG" | "SHORT";
 export type SetupStatus = "FORMING" | "READY" | "TRIGGERED" | "INVALIDATED" | "EXPIRED";
-export type SetupType =
-  | "TREND_PULLBACK"
-  | "BREAKOUT"
-  | "RANGE_MEAN_REVERT"
-  | "LIQUIDITY_SWEEP_REVERSAL";
+export type SetupType = "TREND_PULLBACK" | "BREAKOUT" | "RANGE_MEAN_REVERT";
 
 export type EntryPlan = {
   mode: "LIMIT" | "MARKET";
