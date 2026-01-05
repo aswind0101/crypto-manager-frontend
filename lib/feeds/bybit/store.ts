@@ -86,12 +86,26 @@ export class BybitFeedStore {
   seedKlines(tf: Tf, candles: Candle[]) {
     if (!candles || candles.length === 0) return;
 
-    // Merge by timestamp, keep oldest-first, cap history
+    // 1) Chuẩn hoá confirm cho dữ liệu seed:
+    // - Tất cả candle trừ candle cuối: coi như đã đóng => confirm=true
+    // - Candle cuối: giữ nguyên nếu có confirm, nếu không có thì để false (an toàn, tránh fake close)
+    const sorted = [...candles].sort((a, b) => a.ts - b.ts);
+    const normalized = sorted.map((c, i) => {
+      const isLast = i === sorted.length - 1;
+
+      // preserve if explicitly boolean; otherwise infer
+      const hasBool = typeof (c as any).confirm === "boolean";
+      const confirm = hasBool ? Boolean((c as any).confirm) : (isLast ? false : true);
+
+      return { ...c, confirm };
+    });
+
+    // 2) Merge by timestamp, keep oldest-first, cap history
     const existing = this.state.klines[tf] || [];
     const map = new Map<number, Candle>();
 
     for (const c of existing) map.set(c.ts, c);
-    for (const c of candles) map.set(c.ts, c);
+    for (const c of normalized) map.set(c.ts, c);
 
     const merged = Array.from(map.values())
       .sort((a, b) => a.ts - b.ts)
