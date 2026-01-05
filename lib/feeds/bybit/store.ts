@@ -53,7 +53,6 @@ export class BybitFeedStore {
     trades: new RingBuffer<Trade>(4000),
     klines: {},
   };
-
   setSymbol(symbol: string, depth = 200) {
     this.symbol = symbol;
     this.depth = depth;
@@ -83,6 +82,26 @@ export class BybitFeedStore {
     }
 
     this.events.emit({ type: "ws_state", connected });
+  }
+  seedKlines(tf: Tf, candles: Candle[]) {
+    if (!candles || candles.length === 0) return;
+
+    // Merge by timestamp, keep oldest-first, cap history
+    const existing = this.state.klines[tf] || [];
+    const map = new Map<number, Candle>();
+
+    for (const c of existing) map.set(c.ts, c);
+    for (const c of candles) map.set(c.ts, c);
+
+    const merged = Array.from(map.values())
+      .sort((a, b) => a.ts - b.ts)
+      .slice(-1200);
+
+    this.state.klines[tf] = merged;
+    this.state.lastKlineTsByTf[tf] = merged[merged.length - 1]?.ts || 0;
+
+    // IMPORTANT: EventBus requires a typed event object
+    this.events.emit({ type: "kline", tf });
   }
 
   onWsMessage(msg: any) {
@@ -169,5 +188,4 @@ export class BybitFeedStore {
     // emit để UI/snapshot update ngay
     this.events.emit({ type: "ws_state", connected: this.state.connected });
   }
-
 }

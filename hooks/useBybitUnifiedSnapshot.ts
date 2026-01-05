@@ -18,7 +18,7 @@ import {
   binanceSubscribeMsg,
 } from "../lib/feeds/binance/streams";
 
-import type { Tf } from "../lib/feeds/core/types";
+import type { Candle, Tf } from "../lib/feeds/core/types";
 import type { UnifiedSnapshot } from "../lib/feeds/snapshot/unifiedTypes";
 import { buildUnifiedSnapshotFromBybitBinance } from "../lib/feeds/snapshot/builder";
 
@@ -51,7 +51,110 @@ export function useBybitUnifiedSnapshot(symbol: string) {
 
     // reset stores
     bybitStore.setSymbol(symbol, 200);
+
     binanceStore.setSymbol();
+    // -----------------------------
+    // ✅ REST backfill to warm up klines (required for indicators/levels/setups)
+    // -----------------------------
+    function tfToBybitInterval(tf: Tf) {
+      switch (tf) {
+        case "1m": return "1";
+        case "3m": return "3";
+        case "5m": return "5";
+        case "15m": return "15";
+        case "1h": return "60";
+        case "4h": return "240";
+        case "1D": return "D";
+        default: return null;
+      }
+    }
+
+    async function fetchBybitKlines(args: {
+      symbol: string;
+      tf: Tf;
+      limit: number;
+      signal: AbortSignal;
+    }): Promise<Candle[]> {
+      const { symbol, tf, limit, signal } = args;
+      const interval = tfToBybitInterval(tf);
+      if (!interval) return [];
+
+      const url =
+        `https://api.bybit.com/v5/market/kline` +
+        `?category=linear&symbol=${encodeURIComponent(symbol)}` +
+        `&interval=${encodeURIComponent(interval)}` +
+        `&limit=${encodeURIComponent(String(limit))}`;
+
+      const res = await fetch(url, { method: "GET", cache: "no-store", signal });
+      if (!res.ok) return [];
+
+      const json = await res.json().catch(() => null);
+      const list = json?.result?.list;
+      if (!Array.isArray(list)) return [];
+
+      // Bybit returns newest-first; normalize to oldest-first
+      const out: Candle[] = [];
+      for (const row of list) {
+        // Common format: [startTime, open, high, low, close, volume, turnover]
+        if (!Array.isArray(row) || row.length < 6) continue;
+
+        const ts = Number(row[0]);
+        const o = Number(row[1]);
+        const h = Number(row[2]);
+        const l = Number(row[3]);
+        const c = Number(row[4]);
+        const v = Number(row[5]);
+
+        if (!Number.isFinite(ts) || !Number.isFinite(o) || !Number.isFinite(h) ||
+          !Number.isFinite(l) || !Number.isFinite(c) || !Number.isFinite(v)) {
+          continue;
+        }
+
+        // If Candle has other fields (e.g., confirm), extra fields are harmless.
+        out.push({ ts, o, h, l, c, v } as Candle);
+      }
+
+      out.sort((a, b) => a.ts - b.ts);
+      return out;
+    }
+
+    const backfillAbort = new AbortController();
+
+    async function backfillWarmup() {
+      // Minimum set needed for your engine/features path:
+      // - engine derives px from 15m/1h
+      // - HTF bias commonly uses 1h/4h
+      const plan: Array<{ tf: Tf; limit: number }> = [
+        { tf: "5m", limit: 300 },
+        { tf: "15m", limit: 300 },
+        { tf: "1h", limit: 200 },
+        { tf: "4h", limit: 200 },
+      ];
+
+      const results = await Promise.allSettled(
+        plan.map(async (p) => {
+          const candles = await fetchBybitKlines({
+            symbol,
+            tf: p.tf,
+            limit: p.limit,
+            signal: backfillAbort.signal,
+          });
+          return { tf: p.tf, candles };
+        })
+      );
+
+      for (const r of results) {
+        if (r.status !== "fulfilled") continue;
+        const { tf, candles } = r.value;
+        if (!candles || candles.length === 0) continue;
+
+        // seedKlines is added in store.ts patch
+        (bybitStore as any).seedKlines?.(tf, candles);
+      }
+    }
+
+    // Fire-and-forget warmup; WS continues in parallel
+    backfillWarmup().catch(() => { });
 
     // -----------------------------
     // Bybit WS
@@ -168,6 +271,7 @@ export function useBybitUnifiedSnapshot(symbol: string) {
     setSnapshot(build());
 
     return () => {
+      backfillAbort.abort();
       unsubBybit();
       unsubBinance();
 
