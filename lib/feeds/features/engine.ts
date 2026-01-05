@@ -15,6 +15,8 @@ import { aggressionRatio } from "../../orderflow/aggression";
 
 import { deviationZ } from "./cross/deviationZ";
 import { consensusScore } from "./cross/consensus";
+import { computeMarketStructureSnapshot } from "./marketStructure";
+
 
 function pickCandles(input: FeatureEngineInput, tf: any): Candle[] | undefined {
   const slot = input.candles?.[tf];
@@ -167,6 +169,28 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
   if (c5 && b5 && c5.length >= 40 && b5.length >= 40) {
     consensus_score = consensusScore({ bybit: c5, binance: b5, windowBars: 30 });
   }
+  const market_structure = computeMarketStructureSnapshot({
+    tfs: ["15m", "1h"],
+    candlesByTf: {
+      "15m": c15,
+      "1h": c1h,
+    },
+    pivotWindow: 2,
+    swingsCap: 20,
+  });
+
+  // log chỉ khi có event (để không spam)
+  const ms15 = market_structure["15m"];
+  if (ms15?.lastBOS || ms15?.lastCHOCH || ms15?.lastSweep) {
+    console.log("[3.4] MS 15m", {
+      trend: ms15.trend,
+      swingH: ms15.lastSwingHigh?.price,
+      swingL: ms15.lastSwingLow?.price,
+      bos: ms15.lastBOS,
+      choch: ms15.lastCHOCH,
+      sweep: ms15.lastSweep,
+    });
+  }
 
   return {
     canon: input.canon,
@@ -212,7 +236,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
       lead_lag: input.cross?.lead_lag,
       consensus_score,
     },
-
+    market_structure,
     flags: {
       partial,
       notes: notes.length ? notes : undefined,

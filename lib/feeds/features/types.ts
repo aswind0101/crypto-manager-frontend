@@ -47,6 +47,7 @@ export type FeaturesSnapshot = {
     lead_lag?: { leader: "bybit" | "binance" | "none"; lag_bars: number; score: number };
     consensus_score?: number; // 0..1
   };
+  market_structure?: MarketStructureSnapshot;
 
   flags: {
     partial: boolean;
@@ -77,3 +78,55 @@ export type FeatureEngineInput = {
     lead_lag?: { leader: "bybit" | "binance" | "none"; lag_bars: number; score: number };
   };
 };
+
+export type MarketTrend = "BULL" | "BEAR" | "RANGE" | "UNKNOWN";
+export type SwingType = "HIGH" | "LOW";
+
+export type SwingPoint = {
+  type: SwingType;
+  ts: number;
+  price: number;
+  strength: number;
+};
+
+export type StructureEvent = {
+  kind: "BOS" | "CHOCH";
+  dir: "UP" | "DOWN";
+  tf: string;
+  ts: number;
+  level: number;
+  close: number;
+};
+
+export type SweepEvent = {
+  dir: "UP" | "DOWN";
+  tf: string;
+  ts: number;
+  level: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+export type MarketStructureTF = {
+  tf: string;
+  trend: MarketTrend;
+
+  lastSwingHigh?: SwingPoint;
+  lastSwingLow?: SwingPoint;
+  recentSwings: SwingPoint[];
+
+  lastBOS?: StructureEvent;
+  lastCHOCH?: StructureEvent;
+  lastSweep?: SweepEvent;
+
+  bosUp: boolean;
+  bosDown: boolean;
+  chochUp: boolean;
+  chochDown: boolean;
+  sweepUp: boolean;
+  sweepDown: boolean;
+};
+
+export type MarketStructureSnapshot = Record<string, MarketStructureTF>;
+
