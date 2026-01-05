@@ -716,7 +716,15 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                 setupsCount={rows.length}
                 preferredId={preferredId}
             />
-
+            <ScanPulse
+                title={scanStatus.title}
+                cls={scanStatus.cls}
+                dq={dq}
+                bybitOk={bybitOk}
+                binanceOk={binanceOk}
+                staleSec={staleSec}
+                pulse={pulse}
+            />
             <div className="dos-grid">
                 {/* LEFT */}
                 <div className="dos-panel">
@@ -772,15 +780,6 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                         {/* Feed */}
                         <div className="dos-list">
                             <div className="dos-list-head dos-list-head-row">
-                                <ScanPulse
-                                    title={scanStatus.title}
-                                    cls={scanStatus.cls}
-                                    dq={dq}
-                                    bybitOk={bybitOk}
-                                    binanceOk={binanceOk}
-                                    staleSec={staleSec}
-                                    pulse={pulse}
-                                />
                                 <div className="dos-strong">SETUP FEED</div>
 
                                 <div className="dos-filters">
