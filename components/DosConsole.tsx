@@ -6,128 +6,18 @@ type AnyObj = any;
 const mono =
   "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
 
-const styles: Record<string, React.CSSProperties> = {
-  screen: {
-    background: "#050505",
-    color: "#cfe9cf",
-    fontFamily: mono,
-    minHeight: "100vh",
-    padding: 14,
-  },
-  frame: {
-    border: "1px solid #1f3b1f",
-    borderRadius: 10,
-    overflow: "hidden",
-    boxShadow: "0 0 0 1px #0a140a inset",
-  },
-  header: {
-    padding: "10px 12px",
-    borderBottom: "1px solid #1f3b1f",
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    background: "#070a07",
-  },
-  title: { fontWeight: 900, letterSpacing: 0.6 },
-  left: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" },
-  right: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" },
-  input: {
-    width: 140,
-    padding: "8px 10px",
-    borderRadius: 8,
-    border: "1px solid #2a532a",
-    background: "#020302",
-    color: "#cfe9cf",
-    outline: "none",
-    fontFamily: mono,
-  },
-  btn: {
-    padding: "7px 10px",
-    borderRadius: 8,
-    border: "1px solid #2a532a",
-    background: "#081008",
-    color: "#cfe9cf",
-    cursor: "pointer",
-    fontFamily: mono,
-    fontWeight: 800,
-  },
-  btnDanger: {
-    borderColor: "#6b2b2b",
-    background: "#140808",
-  },
-  btnActive: {
-    background: "#0c1b0c",
-    boxShadow: "0 0 0 1px #2a532a inset",
-  },
-  chip: {
-    padding: "3px 10px",
-    border: "1px solid #2a532a",
-    borderRadius: 999,
-    background: "#020302",
-    fontSize: 12,
-    display: "inline-flex",
-    gap: 8,
-    alignItems: "center",
-    whiteSpace: "nowrap",
-  },
-  chipDim: { opacity: 0.75 },
-  body: { display: "grid", gridTemplateColumns: "420px 1fr", gap: 10, padding: 12 },
-  panel: { border: "1px solid #1f3b1f", borderRadius: 10, overflow: "hidden", background: "#050705" },
-  panelHead: { padding: "8px 10px", borderBottom: "1px solid #1f3b1f", background: "#070a07", fontWeight: 900 },
-  panelBody: { padding: 10 },
-  hr: { borderTop: "1px dashed #1f3b1f", margin: "10px 0" },
-  line: { display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" },
-  k: { opacity: 0.85 },
-  v: { fontWeight: 800 },
-  list: { border: "1px solid #1f3b1f", borderRadius: 10, overflow: "hidden", background: "#040604" },
-  listHead: { padding: "8px 10px", borderBottom: "1px solid #1f3b1f", background: "#070a07", fontWeight: 900 },
-  row: {
-    padding: "7px 10px",
-    borderBottom: "1px solid #0d170d",
-    cursor: "pointer",
-    display: "grid",
-    gridTemplateColumns: "26px 1fr",
-    gap: 8,
-    alignItems: "baseline",
-  },
-  rowLast: { borderBottom: "none" },
-  rowSelected: { background: "#0b170b" },
-  rowPreferred: { background: "#102010" },
-  rowDim: { opacity: 0.65 },
-  marker: { fontWeight: 900 },
-  mono: { fontFamily: mono },
-  reverse: { background: "#cfe9cf", color: "#061006", padding: "0 6px", borderRadius: 6, fontWeight: 900 },
-  ok: { color: "#86efac" },
-  warn: { color: "#fde68a" },
-  bad: { color: "#fca5a5" },
-  small: { fontSize: 12, opacity: 0.9 },
-  pre: {
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
-    fontFamily: mono,
-    fontSize: 12,
-    lineHeight: 1.45,
-    margin: 0,
-  },
-};
-
 function fmt(n: any, dp = 2) {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
   return x.toFixed(dp);
 }
-
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
-
 function bar(pct01: number, width = 10) {
   const filled = clamp(Math.round(pct01 * width), 0, width);
   return "█".repeat(filled) + "░".repeat(width - filled);
 }
-
 function typeShort(t: string) {
   if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
   if (t === "RANGE_MEAN_REVERT") return "RMR";
@@ -136,7 +26,12 @@ function typeShort(t: string) {
   if (t === "FAILED_SWEEP_CONTINUATION") return "FSC";
   return (t || "—").slice(0, 6).toUpperCase();
 }
-
+function triggerProgress(s: AnyObj) {
+  const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
+  const total = checklist.length || 0;
+  const ok = checklist.filter((x: AnyObj) => x?.ok === true).length;
+  return { ok, total, pct: total ? ok / total : 0, checklist };
+}
 function actionLabel(s: AnyObj) {
   const status = String(s?.status ?? "");
   const mode = String(s?.entry?.mode ?? "");
@@ -160,14 +55,6 @@ function actionLabel(s: AnyObj) {
   }
   return "WATCH";
 }
-
-function triggerProgress(s: AnyObj) {
-  const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
-  const total = checklist.length || 0;
-  const ok = checklist.filter((x: AnyObj) => x?.ok === true).length;
-  return { ok, total, pct: total ? ok / total : 0, checklist };
-}
-
 function distanceBps(px: number, z: AnyObj) {
   if (!Number.isFinite(px) || !z) return NaN;
   const lo = Number(z.lo);
@@ -178,7 +65,6 @@ function distanceBps(px: number, z: AnyObj) {
   const ref = px || hi || lo;
   return (dist / ref) * 10000;
 }
-
 function marketScan(features: AnyObj, tf: string) {
   const ms = features?.market_structure?.[tf];
   const trend = String(ms?.trend ?? "—");
@@ -196,8 +82,59 @@ function marketScan(features: AnyObj, tf: string) {
   return { trend, sH, sL, bos, choch, sweep, fl: fl.length ? fl.join(" ") : "—" };
 }
 
+async function copyText(text: string) {
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  // Fallback
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function buildTicketText(s: AnyObj) {
+  const side = String(s?.side ?? "—");
+  const type = String(s?.type ?? "—");
+  const status = String(s?.status ?? "—");
+  const tf = `${String(s?.bias_tf ?? "—")}→${String(s?.entry_tf ?? "—")}→${String(s?.trigger_tf ?? "—")}`;
+  const mode = String(s?.entry?.mode ?? "—");
+  const z = s?.entry?.zone;
+  const entry =
+    mode === "LIMIT" && z ? `[${fmt(z.lo, 2)}–${fmt(z.hi, 2)}]` : mode === "MARKET" ? "MARKET" : "—";
+  const sl = `${fmt(s?.stop?.price, 2)} (${String(s?.stop?.basis ?? "—")})`;
+  const tps = Array.isArray(s?.tp) && s.tp.length ? s.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—";
+  const rr = `RRmin ${fmt(s?.rr_min, 2)}  RRest ${fmt(s?.rr_est, 2)}`;
+  const act = actionLabel(s);
+
+  return [
+    `SYMBOL: ${String(s?.canon ?? "")}`,
+    `SIDE: ${side}  TYPE: ${type}  STATUS: ${status}`,
+    `TF: ${tf}`,
+    `ENTRY (${mode}): ${entry}`,
+    `SL: ${sl}`,
+    `TP: ${tps}`,
+    rr,
+    `ACTION: ${act}`,
+    `ID: ${String(s?.id ?? "")}`,
+  ].join("\n");
+}
+
 function Pipeline({ stage }: { stage: number }) {
-  // 0 none, 1 fetch, 2 normalize, 3 features, 4 setups, 5 done
   const steps = [
     { name: "FETCH", idx: 1 },
     { name: "NORMALIZE", idx: 2 },
@@ -206,9 +143,9 @@ function Pipeline({ stage }: { stage: number }) {
     { name: "DONE", idx: 5 },
   ];
   return (
-    <div style={{ ...styles.chip, ...styles.chipDim }}>
+    <div className="dos-chip dos-dim">
       <span>PIPELINE</span>
-      <span style={styles.mono}>
+      <span className="dos-mono">
         {steps
           .map((s) => {
             const pct = stage >= s.idx ? 1 : stage === s.idx - 1 ? 0.55 : 0.1;
@@ -223,16 +160,14 @@ function Pipeline({ stage }: { stage: number }) {
 function AnalysisSession({
   symbol,
   paused,
-  onSelectCount,
 }: {
   symbol: string;
   paused: boolean;
-  onSelectCount?: (n: number) => void;
 }) {
   const { snap, features, setups } = useSetupsSnapshot(symbol);
 
-  // freeze view when paused
-  const [view, setView] = useState<{ snap: AnyObj | null; features: AnyObj | null; setups: AnyObj | null }>({
+  // Freeze view when paused
+  const [frozen, setFrozen] = useState<{ snap: AnyObj | null; features: AnyObj | null; setups: AnyObj | null }>({
     snap: null,
     features: null,
     setups: null,
@@ -240,12 +175,12 @@ function AnalysisSession({
 
   useEffect(() => {
     if (paused) return;
-    setView({ snap: snap ?? null, features: features ?? null, setups: setups ?? null });
+    setFrozen({ snap: snap ?? null, features: features ?? null, setups: setups ?? null });
   }, [paused, snap, features, setups]);
 
-  const vSnap = paused ? view.snap : snap;
-  const vFeat = paused ? view.features : features;
-  const vSet = paused ? view.setups : setups;
+  const vSnap = paused ? frozen.snap : snap;
+  const vFeat = paused ? frozen.features : features;
+  const vSet = paused ? frozen.setups : setups;
 
   const dq = String(vFeat?.quality?.dq_grade ?? "—");
   const dqOk = Boolean(vSet?.dq_ok ?? vFeat?.quality?.dq_ok);
@@ -255,12 +190,11 @@ function AnalysisSession({
   const mid = Number(vSnap?.price?.mid ?? vSnap?.price?.last);
   const dev = vFeat?.cross?.deviation_bps ?? vFeat?.cross?.dev_bps;
 
-  const stage =
-    !vSnap ? 1 : !vFeat ? 2 : !vSet ? 3 : Array.isArray(vSet?.setups) ? 5 : 4;
+  // Pipeline stage heuristic
+  const stage = !vSnap ? 1 : !vFeat ? 2 : !vSet ? 3 : Array.isArray(vSet?.setups) ? 5 : 4;
 
   const rows: AnyObj[] = useMemo(() => {
     const arr = (vSet?.setups ?? []) as AnyObj[];
-    // sort by priority_score then confidence
     return [...arr].sort((a, b) => {
       const pa = Number(a?.priority_score ?? -1);
       const pb = Number(b?.priority_score ?? -1);
@@ -271,30 +205,20 @@ function AnalysisSession({
     });
   }, [vSet]);
 
-  useEffect(() => onSelectCount?.(rows.length), [rows.length, onSelectCount]);
-
   const preferredId = vSet?.preferred_id;
 
-  // selection state (by index)
+  // Selection + expand (touch-friendly)
   const [idx, setIdx] = useState(0);
   const [expanded, setExpanded] = useState(true);
+  const selected = rows[idx] ?? null;
 
-  // when rows change, clamp selection
   useEffect(() => {
     setIdx((cur) => clamp(cur, 0, Math.max(0, rows.length - 1)));
   }, [rows.length]);
 
-  const selected = rows[idx] ?? null;
-
-  const scan15 = marketScan(vFeat, "15m");
-  const scan1h = marketScan(vFeat, "1h");
-  const scan4h = marketScan(vFeat, "4h");
-  const scan1d = marketScan(vFeat, "1d");
-
-  // hotkeys inside session
+  // Keyboard navigation (works with iPad keyboard; harmless on touch)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      // avoid interfering with input typing: if focus on input, skip
       const ae = document.activeElement as HTMLElement | null;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
 
@@ -313,96 +237,114 @@ function AnalysisSession({
     return () => window.removeEventListener("keydown", onKey);
   }, [rows.length]);
 
+  const scan15 = marketScan(vFeat, "15m");
+  const scan1h = marketScan(vFeat, "1h");
+  const scan4h = marketScan(vFeat, "4h");
+  const scan1d = marketScan(vFeat, "1d");
+
+  const touchPrev = () => setIdx((x) => clamp(x - 1, 0, Math.max(0, rows.length - 1)));
+  const touchNext = () => setIdx((x) => clamp(x + 1, 0, Math.max(0, rows.length - 1)));
+  const touchExpand = () => setExpanded((x) => !x);
+  const touchCopy = async () => {
+    if (!selected) return;
+    await copyText(buildTicketText(selected));
+  };
+
   return (
     <>
-      {/* status line */}
-      <div style={{ ...styles.chip, ...styles.chipDim }}>
-        <span>FEEDS</span>
-        <span style={bybitOk ? styles.ok : styles.bad}>BYBIT:{bybitOk ? "OK" : "DOWN"}</span>
-        <span style={binanceOk ? styles.ok : styles.warn}>BINANCE:{binanceOk ? "OK" : "DOWN"}</span>
-        <span>
-          DQ:<span style={{ fontWeight: 900 }}>{dq}</span> {dqOk ? "" : "(GATED)"}
-        </span>
-        <span>
-          MID:<span style={{ fontWeight: 900 }}>{Number.isFinite(mid) ? fmt(mid, 2) : "—"}</span>
-        </span>
-        <span>
-          DEV:<span style={{ fontWeight: 900 }}>{Number.isFinite(Number(dev)) ? `${Number(dev).toFixed(1)}bps` : "—"}</span>
-        </span>
-        <span>TS:{vSnap?.ts ? new Date(vSnap.ts).toLocaleTimeString() : "—"}</span>
-      </div>
+      <div className="dos-row dos-gap">
+        <div className="dos-chip dos-dim">
+          <span>FEEDS</span>
+          <span className={bybitOk ? "dos-ok" : "dos-bad"}>BYBIT:{bybitOk ? "OK" : "DOWN"}</span>
+          <span className={binanceOk ? "dos-ok" : "dos-warn"}>BINANCE:{binanceOk ? "OK" : "DOWN"}</span>
+          <span>
+            DQ:<span className="dos-strong">{dq}</span> {dqOk ? "" : "(GATED)"}
+          </span>
+          <span>
+            MID:<span className="dos-strong">{Number.isFinite(mid) ? fmt(mid, 2) : "— (warming)"}</span>
+          </span>
+          <span>
+            DEV:<span className="dos-strong">{Number.isFinite(Number(dev)) ? `${Number(dev).toFixed(1)}bps` : "—"}</span>
+          </span>
+          <span>TS:{vSnap?.ts ? new Date(vSnap.ts).toLocaleTimeString() : "—"}</span>
+        </div>
 
-      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Pipeline stage={stage} />
-        <div style={{ ...styles.chip, ...styles.chipDim }}>
+
+        <div className="dos-chip dos-dim">
           <span>SETUPS</span>
-          <span style={styles.mono}>
-            {Array.isArray(rows) ? `${rows.length}` : "—"}{" "}
-            {preferredId ? `preferred=${preferredId}` : ""}
+          <span className="dos-mono">
+            {Array.isArray(rows) ? `${rows.length}` : "—"} {preferredId ? `preferred=${preferredId}` : ""}
           </span>
         </div>
       </div>
 
-      <div style={styles.body}>
+      <div className="dos-grid">
         {/* LEFT: outlook */}
-        <div style={styles.panel}>
-          <div style={styles.panelHead}>MARKET OUTLOOK (SCAN)</div>
-          <div style={styles.panelBody}>
-            <div style={styles.small}>
-              <div style={styles.line}>
-                <span style={styles.k}>15m</span>
-                <span style={styles.v}>
-                  {scan15.trend} | H {fmt(scan15.sH, 2)} L {fmt(scan15.sL, 2)}
-                </span>
+        <div className="dos-panel">
+          <div className="dos-panel-head">MARKET OUTLOOK (SCAN)</div>
+          <div className="dos-panel-body">
+            <div className="dos-small">
+              <div className="dos-line">
+                <span className="dos-k">15m</span>
+                <span className="dos-v">{scan15.trend} | H {fmt(scan15.sH, 2)} L {fmt(scan15.sL, 2)}</span>
               </div>
-              <div style={styles.line}>
-                <span style={styles.k}>1h</span>
-                <span style={styles.v}>
-                  {scan1h.trend} | {scan1h.fl}
-                </span>
+              <div className="dos-line">
+                <span className="dos-k">1h</span>
+                <span className="dos-v">{scan1h.trend} | {scan1h.fl}</span>
               </div>
-              <div style={styles.line}>
-                <span style={styles.k}>4h</span>
-                <span style={styles.v}>
-                  {scan4h.trend} | {scan4h.fl}
-                </span>
+              <div className="dos-line">
+                <span className="dos-k">4h</span>
+                <span className="dos-v">{scan4h.trend} | {scan4h.fl}</span>
               </div>
-              <div style={styles.line}>
-                <span style={styles.k}>1d</span>
-                <span style={styles.v}>
-                  {scan1d.trend} | {scan1d.fl}
-                </span>
+              <div className="dos-line">
+                <span className="dos-k">1d</span>
+                <span className="dos-v">{scan1d.trend} | {scan1d.fl}</span>
               </div>
             </div>
 
-            <div style={styles.hr} />
+            <div className="dos-hr" />
 
-            <div style={styles.small}>
-              <div style={{ fontWeight: 900, marginBottom: 6 }}>Key Signals</div>
-              <pre style={styles.pre}>
-{`15m BOS:   ${scan15.bos}
+            <div className="dos-small">
+              <div className="dos-strong" style={{ marginBottom: 6 }}>Key Signals</div>
+              <pre className="dos-pre">{`15m BOS:   ${scan15.bos}
 15m CHOCH: ${scan15.choch}
 15m SWEEP: ${scan15.sweep}
 
 1h  BOS:   ${scan1h.bos}
 1h  CHOCH: ${scan1h.choch}
-1h  SWEEP: ${scan1h.sweep}`}
-              </pre>
+1h  SWEEP: ${scan1h.sweep}`}</pre>
             </div>
           </div>
         </div>
 
-        {/* RIGHT: setup feed + details */}
-        <div>
-          <div style={styles.list}>
-            <div style={styles.listHead}>SETUP FEED (SORT=P) — ↑/↓ select, Enter expand</div>
+        {/* RIGHT: feed + details */}
+        <div className="dos-right">
+          <div className="dos-list">
+            <div className="dos-list-head">
+              <div className="dos-strong">SETUP FEED (SORT=P)</div>
+              <div className="dos-touchbar">
+                <button className="dos-btn" onClick={touchPrev} disabled={!rows.length} aria-label="Previous setup">
+                  Prev
+                </button>
+                <button className="dos-btn" onClick={touchNext} disabled={!rows.length} aria-label="Next setup">
+                  Next
+                </button>
+                <button className="dos-btn" onClick={touchExpand} disabled={!rows.length} aria-label="Expand details">
+                  {expanded ? "Collapse" : "Expand"}
+                </button>
+                <button className="dos-btn" onClick={touchCopy} disabled={!selected} aria-label="Copy ticket">
+                  Copy Ticket
+                </button>
+              </div>
+            </div>
 
-            {(rows.length === 0) ? (
-              <div style={{ padding: 12, opacity: 0.9 }}>
+            {rows.length === 0 ? (
+              <div className="dos-pad">
                 {dqOk ? (
                   <>NO SETUPS (valid). Market context / RR / retest filters blocked candidates.</>
                 ) : (
-                  <>DQ GATED. Fix feeds / liveness before trusting setups.</>
+                  <>DQ GATED. Fix feeds/liveness before trusting setups.</>
                 )}
               </div>
             ) : (
@@ -427,32 +369,31 @@ function AnalysisSession({
                 return (
                   <div
                     key={id || i}
-                    style={{
-                      ...styles.row,
-                      ...(i === rows.length - 1 ? styles.rowLast : {}),
-                      ...(isPreferred ? styles.rowPreferred : {}),
-                      ...(isSelected ? styles.rowSelected : {}),
-                      ...(dead ? styles.rowDim : {}),
-                    }}
+                    className={[
+                      "dos-rowitem",
+                      isPreferred ? "dos-preferred" : "",
+                      isSelected ? "dos-selected" : "",
+                      dead ? "dos-dimrow" : "",
+                    ].join(" ")}
                     onClick={() => setIdx(i)}
+                    role="button"
+                    tabIndex={0}
                   >
-                    <div style={styles.marker}>{isPreferred ? ">" : " "}</div>
-                    <div>
-                      <span style={styles.mono}>
-                        {String(i + 1).padStart(2, " ")}{" "}
-                        <span style={s?.side === "LONG" ? styles.ok : styles.bad}>
-                          {String(s?.side ?? "").padEnd(5, " ")}
-                        </span>{" "}
-                        <span style={{ fontWeight: 900 }}>{typeShort(String(s?.type ?? ""))}</span>{" "}
-                        <span style={styles.reverse}>{String(s?.status ?? "").padEnd(9, " ")}</span>{" "}
-                        P{String(Math.round(p)).padStart(2, "0")}{" "}
-                        C{String(Math.round(c)).padStart(2, "0")}({g}){" "}
-                        T{ok}/{total}{" "}
-                        {tf}{" "}
-                        Δ{distLabel}{" "}
-                        RR{fmt(s?.rr_min, 2)}{" "}
-                        <span style={{ fontWeight: 900 }}>{act}</span>
-                      </span>
+                    <div className="dos-marker">{isPreferred ? ">" : " "}</div>
+                    <div className="dos-mono">
+                      {String(i + 1).padStart(2, " ")}{" "}
+                      <span className={s?.side === "LONG" ? "dos-ok" : "dos-bad"}>
+                        {String(s?.side ?? "").padEnd(5, " ")}
+                      </span>{" "}
+                      <span className="dos-strong">{typeShort(String(s?.type ?? ""))}</span>{" "}
+                      <span className="dos-reverse">{String(s?.status ?? "").padEnd(9, " ")}</span>{" "}
+                      P{String(Math.round(p)).padStart(2, "0")}{" "}
+                      C{String(Math.round(c)).padStart(2, "0")}({g}){" "}
+                      T{ok}/{total}{" "}
+                      {tf}{" "}
+                      Δ{distLabel}{" "}
+                      RR{fmt(s?.rr_min, 2)}{" "}
+                      <span className="dos-strong">{act}</span>
                     </div>
                   </div>
                 );
@@ -460,52 +401,50 @@ function AnalysisSession({
             )}
           </div>
 
-          {/* details */}
-          <div style={{ ...styles.panel, marginTop: 10 }}>
-            <div style={styles.panelHead}>SELECTED SETUP DETAILS</div>
-            <div style={styles.panelBody}>
+          <div className="dos-panel dos-mt">
+            <div className="dos-panel-head">SELECTED SETUP DETAILS</div>
+            <div className="dos-panel-body">
               {!selected ? (
-                <div style={{ opacity: 0.85 }}>No setup selected.</div>
+                <div className="dos-dim">No setup selected.</div>
               ) : (
                 <>
-                  <div style={styles.small}>
-                    <div style={styles.line}>
-                      <span style={styles.k}>ID</span>
-                      <span style={styles.v}>{String(selected.id ?? "—")}</span>
+                  <div className="dos-small">
+                    <div className="dos-line">
+                      <span className="dos-k">ID</span>
+                      <span className="dos-v">{String(selected.id ?? "—")}</span>
                     </div>
-                    <div style={styles.line}>
-                      <span style={styles.k}>TYPE</span>
-                      <span style={styles.v}>{String(selected.type ?? "—")}</span>
+                    <div className="dos-line">
+                      <span className="dos-k">TYPE</span>
+                      <span className="dos-v">{String(selected.type ?? "—")}</span>
                     </div>
-                    <div style={styles.line}>
-                      <span style={styles.k}>TF</span>
-                      <span style={styles.v}>
+                    <div className="dos-line">
+                      <span className="dos-k">TF</span>
+                      <span className="dos-v">
                         {String(selected.bias_tf ?? "—")}→{String(selected.entry_tf ?? "—")}→{String(selected.trigger_tf ?? "—")}
                       </span>
                     </div>
-                    <div style={styles.line}>
-                      <span style={styles.k}>STATUS</span>
-                      <span style={styles.v}>
+                    <div className="dos-line">
+                      <span className="dos-k">STATUS</span>
+                      <span className="dos-v">
                         {String(selected.status ?? "—")}{" "}
-                        <span style={{ marginLeft: 8 }} />
                         CONFIRMED:{" "}
-                        <span style={selected?.entry?.trigger?.confirmed ? styles.ok : styles.warn}>
+                        <span className={selected?.entry?.trigger?.confirmed ? "dos-ok" : "dos-warn"}>
                           {selected?.entry?.trigger?.confirmed ? "YES" : "NO"}
                         </span>{" "}
-                        <span style={{ marginLeft: 8 }} />
-                        ACTION: <span style={{ fontWeight: 900 }}>{actionLabel(selected)}</span>
+                        ACTION: <span className="dos-strong">{actionLabel(selected)}</span>
                       </span>
                     </div>
                   </div>
 
-                  <div style={styles.hr} />
+                  <div className="dos-hr" />
 
-                  <div style={styles.small}>
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>EXECUTION TICKET</div>
-                    <pre style={styles.pre}>
-{`ENTRY (${String(selected?.entry?.mode ?? "—")}): ${
+                  <div className="dos-small">
+                    <div className="dos-strong" style={{ marginBottom: 6 }}>EXECUTION TICKET</div>
+                    <pre className="dos-pre">{`ENTRY (${String(selected?.entry?.mode ?? "—")}): ${
   selected?.entry?.mode === "LIMIT" && selected?.entry?.zone
     ? `[${fmt(selected.entry.zone.lo, 2)}–${fmt(selected.entry.zone.hi, 2)}]`
+    : selected?.entry?.mode === "MARKET"
+    ? "MARKET"
     : "—"
 }
 SL: ${fmt(selected?.stop?.price, 2)} (${String(selected?.stop?.basis ?? "—")})
@@ -513,50 +452,47 @@ TP: ${(Array.isArray(selected?.tp) && selected.tp.length)
   ? selected.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ")
   : "—"}
 RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}
-PRIORITY: ${Number(selected?.priority_score ?? 0).toFixed(0)}   CONF: ${Number(selected?.confidence?.score ?? 0).toFixed(0)} (${String(selected?.confidence?.grade ?? "—")})`}
-                    </pre>
+PRIORITY: ${Number(selected?.priority_score ?? 0).toFixed(0)}   CONF: ${Number(selected?.confidence?.score ?? 0).toFixed(0)} (${String(selected?.confidence?.grade ?? "—")})`}</pre>
                   </div>
 
-                  <div style={styles.hr} />
+                  <div className="dos-hr" />
 
-                  <div style={styles.small}>
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>
+                  <div className="dos-small">
+                    <div className="dos-strong" style={{ marginBottom: 6 }}>
                       TRIGGER CHECKLIST {expanded ? "(expanded)" : "(collapsed)"}
                     </div>
                     {expanded ? (
-                      <div style={{ display: "grid", gap: 6 }}>
+                      <div className="dos-stack">
                         {triggerProgress(selected).checklist.length ? (
                           triggerProgress(selected).checklist.map((it: AnyObj, i: number) => (
-                            <div key={String(it?.key ?? i)} style={{ display: "flex", gap: 10 }}>
-                              <span style={it?.ok ? styles.ok : styles.warn}>
+                            <div key={String(it?.key ?? i)} className="dos-itemline">
+                              <span className={it?.ok ? "dos-ok" : "dos-warn"}>
                                 [{it?.ok ? "OK" : "WAIT"}]
                               </span>
-                              <span style={{ minWidth: 120 }}>{String(it?.key ?? "")}</span>
-                              <span style={{ opacity: 0.9 }}>{String(it?.note ?? "")}</span>
+                              <span className="dos-key">{String(it?.key ?? "")}</span>
+                              <span className="dos-note">{String(it?.note ?? "")}</span>
                             </div>
                           ))
                         ) : (
-                          <div style={{ opacity: 0.85 }}>No checklist.</div>
+                          <div className="dos-dim">No checklist.</div>
                         )}
                       </div>
                     ) : (
-                      <div style={{ opacity: 0.85 }}>
-                        Press Enter to expand checklist and confluence.
-                      </div>
+                      <div className="dos-dim">Tap Expand to view checklist + confluence.</div>
                     )}
                   </div>
 
                   {expanded ? (
                     <>
-                      <div style={styles.hr} />
-                      <div style={styles.small}>
-                        <div style={{ fontWeight: 900, marginBottom: 6 }}>WHY (CONFLUENCE)</div>
+                      <div className="dos-hr" />
+                      <div className="dos-small">
+                        <div className="dos-strong" style={{ marginBottom: 6 }}>WHY (CONFLUENCE)</div>
                         {(selected?.confidence?.reasons ?? []).length ? (
-                          <pre style={styles.pre}>
+                          <pre className="dos-pre">
 {(selected.confidence.reasons as AnyObj[]).slice(0, 12).map((r: AnyObj) => `• ${String(r)}`).join("\n")}
                           </pre>
                         ) : (
-                          <div style={{ opacity: 0.85 }}>No reasons provided.</div>
+                          <div className="dos-dim">No reasons provided.</div>
                         )}
                       </div>
                     </>
@@ -572,13 +508,14 @@ PRIORITY: ${Number(selected?.priority_score ?? 0).toFixed(0)}   CONF: ${Number(s
 }
 
 export function DosConsole() {
-  // draft vs committed for Analyze workflow
+  // draft vs committed: only Analyze commits
   const [draftSymbol, setDraftSymbol] = useState("BTCUSDT");
   const [symbol, setSymbol] = useState("BTCUSDT");
 
-  // sessionKey forces full remount => "like fresh load"
+  // remount to simulate fresh load (reset pipeline)
   const [sessionKey, setSessionKey] = useState(1);
 
+  // freeze view
   const [paused, setPaused] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -602,23 +539,20 @@ export function DosConsole() {
     inputRef.current?.focus();
   };
 
-  // Global hotkeys for console controls (not arrows)
+  // Global controls hotkeys (iPad keyboard / desktop)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const ae = document.activeElement as HTMLElement | null;
       const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA");
 
-      // A: analyze (when not typing) / Enter in input handled by input
       if (!typing && (e.key === "a" || e.key === "A")) {
         e.preventDefault();
         commitAnalyze();
       }
-      // S: stop/resume
       if (!typing && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
         stopToggle();
       }
-      // R: reset
       if (!typing && (e.key === "r" || e.key === "R")) {
         e.preventDefault();
         resetAll();
@@ -629,17 +563,104 @@ export function DosConsole() {
   }, [draftSymbol]);
 
   return (
-    <div style={styles.screen}>
-      <div style={styles.frame}>
-        <div style={styles.header}>
-          <div style={styles.left}>
-            <span style={styles.title}>DOS TRADING CONSOLE</span>
+    <div className="dos-screen">
+      <style>{`
+        .dos-screen{
+          background:#050505; color:#cfe9cf; font-family:${mono};
+          min-height:100dvh;
+          padding: calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 12px);
+        }
+        .dos-frame{
+          border:1px solid #1f3b1f; border-radius:12px; overflow:hidden;
+          box-shadow: 0 0 0 1px #0a140a inset;
+          background:#050705;
+        }
+        .dos-header{
+          position: sticky; top: 0; z-index: 5;
+          padding:10px 12px; border-bottom:1px solid #1f3b1f; background:#070a07;
+          display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;
+        }
+        .dos-title{ font-weight:900; letter-spacing:0.6px; }
+        .dos-left,.dos-right{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+        .dos-input{
+          width:150px; padding:10px 10px; border-radius:10px;
+          border:1px solid #2a532a; background:#020302; color:#cfe9cf; outline:none;
+          font-family:${mono}; font-size:16px; /* iOS zoom prevention */
+        }
+        .dos-btn{
+          min-height:44px; padding:10px 12px; border-radius:10px;
+          border:1px solid #2a532a; background:#081008; color:#cfe9cf; cursor:pointer;
+          font-family:${mono}; font-weight:900;
+        }
+        .dos-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+        .dos-btn-danger{ border-color:#6b2b2b; background:#140808; }
+        .dos-btn-active{ background:#0c1b0c; box-shadow:0 0 0 1px #2a532a inset; }
+        .dos-chip{
+          padding:4px 10px; border:1px solid #2a532a; border-radius:999px;
+          background:#020302; font-size:12px; display:inline-flex; gap:8px; align-items:center; white-space:nowrap;
+          min-height:30px;
+        }
+        .dos-mono{ font-family:${mono}; }
+        .dos-strong{ font-weight:900; }
+        .dos-dim{ opacity:0.8; }
+        .dos-ok{ color:#86efac; }
+        .dos-warn{ color:#fde68a; }
+        .dos-bad{ color:#fca5a5; }
+        .dos-row{ display:flex; flex-wrap:wrap; align-items:center; }
+        .dos-gap{ gap:10px; }
+        .dos-grid{
+          display:grid; gap:10px; padding:12px;
+          grid-template-columns: 420px 1fr;
+          align-items:start;
+        }
+        .dos-panel{ border:1px solid #1f3b1f; border-radius:12px; overflow:hidden; background:#050705; }
+        .dos-panel-head{ padding:9px 10px; border-bottom:1px solid #1f3b1f; background:#070a07; font-weight:900; }
+        .dos-panel-body{ padding:10px; }
+        .dos-hr{ border-top:1px dashed #1f3b1f; margin:10px 0; }
+        .dos-small{ font-size:12px; opacity:0.95; }
+        .dos-line{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+        .dos-k{ opacity:0.85; }
+        .dos-v{ font-weight:900; }
+        .dos-pre{ margin:0; white-space:pre-wrap; word-break:break-word; font-family:${mono}; font-size:12px; line-height:1.45; }
+        .dos-list{ border:1px solid #1f3b1f; border-radius:12px; overflow:hidden; background:#040604; }
+        .dos-list-head{
+          padding:9px 10px; border-bottom:1px solid #1f3b1f; background:#070a07;
+          display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+        }
+        .dos-touchbar{ display:flex; gap:8px; flex-wrap:wrap; }
+        .dos-pad{ padding:12px; opacity:0.9; }
+        .dos-rowitem{
+          padding:12px 10px; border-bottom:1px solid #0d170d;
+          display:grid; grid-template-columns: 24px 1fr; gap:8px; align-items:baseline;
+          cursor:pointer;
+        }
+        .dos-rowitem:last-child{ border-bottom:none; }
+        .dos-marker{ font-weight:900; }
+        .dos-selected{ background:#0b170b; }
+        .dos-preferred{ background:#102010; }
+        .dos-dimrow{ opacity:0.6; }
+        .dos-reverse{ background:#cfe9cf; color:#061006; padding:0 6px; border-radius:6px; font-weight:900; }
+        .dos-right{ min-width:0; }
+        .dos-mt{ margin-top:10px; }
+        .dos-stack{ display:grid; gap:6px; }
+        .dos-itemline{ display:flex; gap:10px; flex-wrap:wrap; }
+        .dos-key{ min-width:120px; }
+        .dos-note{ opacity:0.9; }
+        @media (max-width: 980px){
+          .dos-grid{ grid-template-columns: 1fr; }
+        }
+      `}</style>
 
-            <span style={{ ...styles.chip, ...styles.chipDim }}>
+      <div className="dos-frame">
+        <div className="dos-header">
+          <div className="dos-left">
+            <span className="dos-title">DOS TRADING CONSOLE</span>
+
+            <span className="dos-chip dos-dim">
               <span>SYMBOL</span>
               <input
                 ref={inputRef}
-                style={styles.input}
+                className="dos-input"
                 value={draftSymbol}
                 onChange={(e) => setDraftSymbol(String(e.target.value).toUpperCase())}
                 onKeyDown={(e) => {
@@ -652,41 +673,40 @@ export function DosConsole() {
               />
             </span>
 
-            <button style={styles.btn} onClick={commitAnalyze} title="Analyze (A / Enter)">
+            <button className="dos-btn" onClick={commitAnalyze} title="Analyze (A / Enter)">
               ANALYZE
             </button>
 
             <button
-              style={{ ...styles.btn, ...(paused ? styles.btnActive : {}), ...styles.btnDanger }}
+              className={`dos-btn dos-btn-danger ${paused ? "dos-btn-active" : ""}`}
               onClick={stopToggle}
               title="Stop/Resume (S)"
             >
               {paused ? "RESUME" : "STOP"}
             </button>
 
-            <button style={styles.btn} onClick={resetAll} title="Reset (R)">
+            <button className="dos-btn" onClick={resetAll} title="Reset (R)">
               RESET
             </button>
 
-            <span style={{ ...styles.chip, ...styles.chipDim }}>
+            <span className="dos-chip dos-dim">
               <span>SESSION</span>
-              <span style={styles.mono}>#{sessionKey}</span>
+              <span className="dos-mono">#{sessionKey}</span>
             </span>
           </div>
 
-          <div style={styles.right}>
-            <span style={{ ...styles.chip, ...styles.chipDim }}>
+          <div className="dos-right">
+            <span className="dos-chip dos-dim">
               <span>MODE</span>
-              <span style={styles.mono}>{paused ? "FROZEN" : "LIVE"}</span>
+              <span className="dos-mono">{paused ? "FROZEN" : "LIVE"}</span>
             </span>
-            <span style={{ ...styles.chip, ...styles.chipDim }}>
+            <span className="dos-chip dos-dim">
               <span>HOTKEYS</span>
-              <span style={styles.mono}>↑↓ select • Enter expand • A analyze • S stop • R reset</span>
+              <span className="dos-mono">↑↓ select • Enter expand • A analyze • S stop • R reset</span>
             </span>
           </div>
         </div>
 
-        {/* Analysis session remounts on Analyze to simulate fresh load */}
         <div style={{ padding: 12 }}>
           <AnalysisSession key={`${symbol}:${sessionKey}`} symbol={symbol} paused={paused} />
         </div>
