@@ -137,6 +137,8 @@ export function buildSetups(args: {
       side: biasSide,
       entry_tf: "5m",
       bias_tf: f.bias.tf,
+      trigger_tf: "5m",
+
 
       status: ready ? "READY" : "FORMING",
       created_ts: ts,
@@ -233,6 +235,7 @@ export function buildSetups(args: {
       side: dir,
       entry_tf: "5m",
       bias_tf: f.bias.tf,
+      trigger_tf: "5m",
 
       status: ready ? "READY" : "FORMING",
       created_ts: ts,
@@ -331,6 +334,7 @@ export function buildSetups(args: {
         side: dir,
         entry_tf: "5m",
         bias_tf: f.bias.tf,
+        trigger_tf: "5m",
 
         status: ready ? "READY" : "FORMING",
         created_ts: ts,
@@ -435,6 +439,7 @@ export function buildSetups(args: {
           side,
           entry_tf: "15m",
           bias_tf: f.bias.tf,
+          trigger_tf: "5m",
 
           status: ready ? "READY" : "FORMING",
           created_ts: ts,
@@ -554,6 +559,7 @@ export function buildSetups(args: {
           side: dir,
           entry_tf: "5m",
           bias_tf: f.bias.tf,
+          trigger_tf: "5m",
 
           status: (rr1 >= rrNeed && common.grade !== "D") ? (ready ? "READY" : "FORMING") : "FORMING",
           created_ts: ts,
@@ -607,8 +613,6 @@ export function buildSetups(args: {
       }
     }
   }
-
-
   // 3) RANGE_MEAN_REVERT (bias sideways) — B+ policy: allowed even when HTF bias incomplete (with stricter RR)
   if (f.bias.trend_dir === "sideways" && below && above) {
     const nearSupport = Math.abs(px - below.price) / px < 0.002;
@@ -641,6 +645,7 @@ export function buildSetups(args: {
         side: dir,
         entry_tf: "15m",
         bias_tf: f.bias.tf,
+        trigger_tf: "5m",
 
         status: rr1 >= (bias_incomplete ? 1.6 : 1.3) ? "READY" : "FORMING",
         created_ts: ts,

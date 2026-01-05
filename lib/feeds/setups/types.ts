@@ -45,6 +45,7 @@ export type TradeSetup = {
 
   entry_tf: "5m" | "15m";
   bias_tf: "1h" | "4h";
+  trigger_tf: "5m" | "15m";
 
   status: SetupStatus;
   created_ts: number;
