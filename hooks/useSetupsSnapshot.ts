@@ -73,11 +73,8 @@ function candleCloseStrengthPct(c: Candle, side: "LONG" | "SHORT") {
  */
 function applyPreTrigger(out: any, snap: any): any {
   if (!out || !Array.isArray(out.setups) || !snap?.price?.mid) return out;
-// Log test mid price
   const mid = snap.price.mid as number;
-  console.log("[3.3b] mid-price", snap.price);
-
-
+  //console.log("[3.3b] mid-price", snap.price);
   const updated = out.setups.map((s: any) => {
     if (!s || s.status !== "READY") return s;
 
