@@ -180,6 +180,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
   });
 
   // log chỉ khi có event (để không spam)
+  /*
   const ms15 = market_structure["15m"];
   if (ms15?.lastBOS || ms15?.lastCHOCH || ms15?.lastSweep) {
     console.log("[3.4] MS 15m", {
@@ -190,7 +191,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
       choch: ms15.lastCHOCH,
       sweep: ms15.lastSweep,
     });
-  }
+  }*/
 
   return {
     canon: input.canon,
