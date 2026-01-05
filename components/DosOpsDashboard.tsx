@@ -311,6 +311,60 @@ function scanStatusModel(opts: {
         evidence: [`SETUPS=${rowsCount}`],
     };
 }
+function stalePct(staleSec?: number) {
+    if (staleSec == null || !Number.isFinite(staleSec)) return 0;
+    // map 0..5s to 1..0 (fresh -> full bar)
+    const x = clamp(1 - staleSec / 5, 0, 1);
+    return x;
+}
+
+function ScanPulse({
+    title,
+    cls,
+    dq,
+    bybitOk,
+    binanceOk,
+    staleSec,
+    pulse,
+}: {
+    title: string;
+    cls: string; // dos-ok / dos-warn / dos-bad
+    dq: string;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    staleSec?: number;
+    pulse: number; // increments on new data tick
+}) {
+    const pct = stalePct(staleSec);
+    const staleLabel = staleSec == null || !Number.isFinite(staleSec) ? "—" : `${staleSec.toFixed(1)}s`;
+
+    // "pulse" creates a brief visual bump without fake progress
+    const bump = pulse % 2 === 0;
+
+    const staleCls = pct > 0.7 ? "dos-ok" : pct > 0.3 ? "dos-warn" : "dos-bad";
+
+    return (
+        <div className="dos-scanbar">
+            <div className="dos-scanbar-top">
+                <span className={`dos-strong ${cls}`}>{title}</span>
+
+                <span className="dos-dim dos-small">
+                    DQ <span className="dos-strong">{dq}</span> • FEEDS{" "}
+                    <span className={bybitOk ? "dos-ok" : "dos-bad"}>BYBIT</span>{" "}
+                    <span className={binanceOk ? "dos-ok" : "dos-warn"}>BINANCE</span> • STALE{" "}
+                    <span className={staleCls}>{staleLabel}</span>
+                </span>
+            </div>
+
+            <div className="dos-scanbar-meter" aria-label="scan activity">
+                <div
+                    className={`dos-scanbar-fill ${bump ? "dos-scanbar-bump" : ""}`}
+                    style={{ width: `${Math.round(pct * 100)}%` }}
+                />
+            </div>
+        </div>
+    );
+}
 
 function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }) {
     const { snap, features, setups } = useSetupsSnapshot(symbol);
@@ -367,6 +421,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const [statusFilter, setStatusFilter] = useState<"ALL" | "FORMING" | "READY" | "TRIGGERED" | "DEAD">("ALL");
     const [showPinnedOnly, setShowPinnedOnly] = useState(false);
     const [pinned, setPinned] = useState<Record<string, boolean>>({});
+    const [pulse, setPulse] = useState(0);
+    const lastTickRef = useRef<number | null>(null);
 
     const rows = useMemo(() => {
         let r = allRows;
@@ -396,10 +452,21 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         return r;
     }, [allRows, pinned, statusFilter, showPinnedOnly]);
     const now = Date.now();
-    const staleSec =
-        vSnap?.ts || vSnap?.generatedTs
-            ? (now - (vSnap.ts ?? vSnap.generatedTs)) / 1000
-            : undefined;
+    const baseTs = Number(vSnap?.ts ?? vSnap?.generatedTs ?? vSnap?.generated_at ?? NaN);
+    const staleSec = Number.isFinite(baseTs) ? (now - baseTs) / 1000 : undefined;
+    useEffect(() => {
+        if (paused) return; // freeze means no pulse changes
+        if (!Number.isFinite(baseTs)) return;
+        if (lastTickRef.current == null) {
+            lastTickRef.current = baseTs;
+            return;
+        }
+        if (baseTs !== lastTickRef.current) {
+            lastTickRef.current = baseTs;
+            setPulse((p) => p + 1);
+        }
+    }, [paused, baseTs]);
+
 
     const scanStatus = scanStatusModel({
         mid,
@@ -705,20 +772,15 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                         {/* Feed */}
                         <div className="dos-list">
                             <div className="dos-list-head dos-list-head-row">
-                                <div className="dos-pad">
-                                    <div className={`dos-strong ${scanStatus.cls}`}>
-                                        {scanStatus.title}
-                                    </div>
-                                    <div className="dos-dim" style={{ marginTop: 6 }}>
-                                        {scanStatus.detail}
-                                    </div>
-
-                                    {scanStatus.evidence.length ? (
-                                        <div className="dos-small dos-dim" style={{ marginTop: 6 }}>
-                                            {scanStatus.evidence.join(" • ")}
-                                        </div>
-                                    ) : null}
-                                </div>
+                                <ScanPulse
+                                    title={scanStatus.title}
+                                    cls={scanStatus.cls}
+                                    dq={dq}
+                                    bybitOk={bybitOk}
+                                    binanceOk={binanceOk}
+                                    staleSec={staleSec}
+                                    pulse={pulse}
+                                />
                                 <div className="dos-strong">SETUP FEED</div>
 
                                 <div className="dos-filters">
@@ -743,6 +805,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                     </button>
                                 </div>
                             </div>
+
 
                             {rows.length === 0 ? (
                                 <div className="dos-pad">
@@ -1021,6 +1084,34 @@ export function DosOpsDashboard() {
 .dos-btn, .dos-rowitem, .dos-tab, .dos-drawer-scrim{
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+.dos-scanbar{
+  padding:10px 12px;
+  border-bottom:1px solid #0d170d;
+  background:#050705;
+}
+.dos-scanbar-top{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-end;
+  flex-wrap:wrap;
+}
+.dos-scanbar-meter{
+  margin-top:8px;
+  height:8px;
+  border-radius:999px;
+  overflow:hidden;
+  background:#020302;
+  border:1px solid #1f3b1f;
+}
+.dos-scanbar-fill{
+  height:100%;
+  background:#2a532a;
+  transition: width 220ms ease;
+}
+.dos-scanbar-bump{
+  filter: brightness(1.35);
 }
 
         .dos-grid{
