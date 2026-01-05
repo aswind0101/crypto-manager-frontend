@@ -213,6 +213,7 @@ function SystemStatusBar({
     lastTs?: number;
     setupsCount: number;
     preferredId?: string;
+    staleSec?: number;
 }) {
     const now = Date.now();
     const staleMs = lastTs ? Math.max(0, now - lastTs) : NaN;
@@ -452,20 +453,42 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         return r;
     }, [allRows, pinned, statusFilter, showPinnedOnly]);
     const now = Date.now();
+
+    // Prefer feed timestamp if present, otherwise use an internal activity clock.
+    // Tick detection: any meaningful mid/last change (or ts change if available).
+    const tickKey = String(
+        vSnap?.ts ??
+        vSnap?.generatedTs ??
+        vSnap?.generated_at ??
+        vSnap?.price?.mid ??
+        vSnap?.price?.last ??
+        ""
+    );
+
+    // Activity clock: last time we observed a tick (ms)
+    const lastActivityMsRef = useRef<number | null>(null);
+
+    // Derive staleSec
     const baseTs = Number(vSnap?.ts ?? vSnap?.generatedTs ?? vSnap?.generated_at ?? NaN);
-    const staleSec = Number.isFinite(baseTs) ? (now - baseTs) / 1000 : undefined;
+    const staleSec = Number.isFinite(baseTs)
+        ? (now - baseTs) / 1000
+        : lastActivityMsRef.current != null
+            ? (now - lastActivityMsRef.current) / 1000
+            : undefined;
+
+    // Pulse on tick
     useEffect(() => {
-        if (paused) return; // freeze means no pulse changes
-        if (!Number.isFinite(baseTs)) return;
-        if (lastTickRef.current == null) {
-            lastTickRef.current = baseTs;
-            return;
-        }
-        if (baseTs !== lastTickRef.current) {
-            lastTickRef.current = baseTs;
-            setPulse((p) => p + 1);
-        }
-    }, [paused, baseTs]);
+        if (paused) return;
+
+        // If we don't even have a mid/last yet, don't start pulsing.
+        const px = Number(vSnap?.price?.mid ?? vSnap?.price?.last);
+        if (!Number.isFinite(px) && !tickKey) return;
+
+        // Update internal activity clock and pulse
+        lastActivityMsRef.current = Date.now();
+        setPulse((p) => p + 1);
+    }, [paused, tickKey]);
+
 
 
     const scanStatus = scanStatusModel({
@@ -681,7 +704,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                     {/* Reasons */}
                     <div className="dos-blockhead-row">
                         <div className="dos-blockhead">CONFLUENCE</div>
-                        <button className="dos-btn dos-btn-sm" {...tap(() => setExpandedChecklist((x) => !x))}>
+                        <button className="dos-btn dos-btn-sm" {...tap(() => setExpandedReasons((x) => !x))}>
                             {expandedReasons ? "HIDE" : "SHOW"}
                         </button>
                     </div>
