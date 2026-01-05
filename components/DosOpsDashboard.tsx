@@ -258,6 +258,59 @@ function SystemStatusBar({
         </div>
     );
 }
+function scanStatusModel(opts: {
+    mid: number;
+    dqOk: boolean;
+    dq: string;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    rowsCount: number;
+    staleSec?: number;
+}) {
+    const { mid, dqOk, dq, bybitOk, binanceOk, rowsCount, staleSec } = opts;
+
+    if (!Number.isFinite(mid)) {
+        return {
+            title: "SCAN: CONNECTING",
+            cls: "dos-warn",
+            detail: "Connecting feeds / warming up market data.",
+            evidence: [],
+        };
+    }
+
+    if (!dqOk) {
+        return {
+            title: "SCAN: PAUSED (DQ GATED)",
+            cls: "dos-bad",
+            detail: "Analysis suppressed due to insufficient data quality.",
+            evidence: [
+                `DQ=${dq}`,
+                `BYBIT=${bybitOk ? "OK" : "DOWN"}`,
+                `BINANCE=${binanceOk ? "OK" : "DEGRADED"}`,
+            ],
+        };
+    }
+
+    if (rowsCount === 0) {
+        return {
+            title: "SCAN: LIVE",
+            cls: "dos-ok",
+            detail: "Scanning market structure & waiting for close-confirm triggers.",
+            evidence: [
+                `DQ=${dq}`,
+                staleSec != null ? `STALE=${staleSec.toFixed(1)}s` : null,
+                `SETUPS=0 (valid)`,
+            ].filter(Boolean) as string[],
+        };
+    }
+
+    return {
+        title: "SCAN: LIVE",
+        cls: "dos-ok",
+        detail: "Active setups detected and ranked by priority.",
+        evidence: [`SETUPS=${rowsCount}`],
+    };
+}
 
 function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }) {
     const { snap, features, setups } = useSetupsSnapshot(symbol);
@@ -342,6 +395,21 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
         return r;
     }, [allRows, pinned, statusFilter, showPinnedOnly]);
+    const now = Date.now();
+    const staleSec =
+        vSnap?.ts || vSnap?.generatedTs
+            ? (now - (vSnap.ts ?? vSnap.generatedTs)) / 1000
+            : undefined;
+
+    const scanStatus = scanStatusModel({
+        mid,
+        dqOk,
+        dq,
+        bybitOk,
+        binanceOk,
+        rowsCount: rows.length,
+        staleSec,
+    });
 
     const selected = useMemo(() => {
         if (!rows.length) return null;
@@ -637,6 +705,20 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                         {/* Feed */}
                         <div className="dos-list">
                             <div className="dos-list-head dos-list-head-row">
+                                <div className="dos-pad">
+                                    <div className={`dos-strong ${scanStatus.cls}`}>
+                                        {scanStatus.title}
+                                    </div>
+                                    <div className="dos-dim" style={{ marginTop: 6 }}>
+                                        {scanStatus.detail}
+                                    </div>
+
+                                    {scanStatus.evidence.length ? (
+                                        <div className="dos-small dos-dim" style={{ marginTop: 6 }}>
+                                            {scanStatus.evidence.join(" • ")}
+                                        </div>
+                                    ) : null}
+                                </div>
                                 <div className="dos-strong">SETUP FEED</div>
 
                                 <div className="dos-filters">
