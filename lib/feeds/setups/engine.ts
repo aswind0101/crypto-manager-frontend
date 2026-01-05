@@ -26,6 +26,14 @@ function makeEntryZone(price: number, atrp: number, side: SetupSide) {
   return { lo: price - w * 0.15, hi: price + w };
 }
 
+// Task 3.4b: retest zone around BOS level (wider than simple “testing level” bps band)
+function makeRetestZone(level: number, atrp: number, side: SetupSide) {
+  // floor in bps to avoid being too tight in low ATR regimes
+  const w = Math.max(level * 0.0008, level * atrp * 0.25); // max(8 bps, 0.25*ATR)
+  if (side === "LONG") return { lo: level - w, hi: level + w * 0.6 };   // allow slightly above
+  return { lo: level - w * 0.6, hi: level + w };                         // allow slightly below
+}
+
 function rr(entry: number, stop: number, tp: number, side: SetupSide) {
   const risk = side === "LONG" ? (entry - stop) : (stop - entry);
   const reward = side === "LONG" ? (tp - entry) : (entry - tp);
@@ -122,7 +130,7 @@ export function buildSetups(args: {
       canon: snap.canon,
       type: "TREND_PULLBACK",
       side: biasSide,
-      entry_tf: "15m",
+      entry_tf: "5m",
       bias_tf: f.bias.tf,
 
       status: ready ? "READY" : "FORMING",
@@ -135,66 +143,181 @@ export function buildSetups(args: {
         trigger: {
           confirmed: false, // Task 3.3
           checklist,
-          summary: ready ? "Ready: wait for price into zone + confirm" : "Forming: conditions not sufficient yet",
+          summary: "Trend pullback: wait for entry zone touch + close-confirm reclaim",
         },
       },
 
-      stop: { price: sl, basis: "STRUCTURE", note: "Beyond pivot + ATR buffer" },
+      stop: { price: sl, basis: "STRUCTURE", note: "Below/above zone + buffer" },
 
       tp: [
-        { price: tp1, size_pct: 50, basis: "LEVEL", note: "Nearest key level" },
-        {
-          price: biasSide === "LONG" ? (tp1 + px * atrp * 1.0) : (tp1 - px * atrp * 1.0),
-          size_pct: 50,
-          basis: "R_MULTIPLE",
-          note: "Extension",
-        },
+        { price: tp1, size_pct: 70, basis: "LEVEL", note: "Nearest pivot target" },
+        { price: biasSide === "LONG" ? (tp1 + px * atrp * 0.8) : (tp1 - px * atrp * 0.8), size_pct: 30, basis: "R_MULTIPLE", note: "Extension" },
       ],
 
       rr_min: rr1,
-      rr_est: rr1 * 1.35,
+      rr_est: rr1 * 1.2,
+
+      confidence: {
+        score: confScore,
+        grade: gradeFromScore(confScore),
+        reasons: [...common.reasons, "Trend pullback in bias direction"],
+      },
+
+      tags: ["intraday", "pullback", f.bias.trend_dir],
+    });
+  }
+
+  /**
+   * 2) BREAKOUT + RETEST (Task 3.4b)
+   * - Uses market structure: 15m lastBOS level
+   * - Entry is a RETEST zone around BOS level
+   * - Trigger remains close-confirm (handled in hook) and requires “touched retest zone + close beyond level”
+   *
+   * B+ policy:
+   * - Allowed even when HTF EMA200 incomplete, but stricter RR + capped grade (A->B).
+   */
+  let createdStructureBreakout = false;
+  const ms15 = (f as any).market_structure?.["15m"];
+  const bos = ms15?.lastBOS;
+
+  // Freshness window for BOS (in ms): 6 * 15m = 90m
+  const BOS_FRESH_MS = 90 * 60 * 1000;
+
+  if (bos && typeof bos.level === "number" && typeof bos.ts === "number" && (ts - bos.ts) <= BOS_FRESH_MS) {
+    const dir: SetupSide = bos.dir === "UP" ? "LONG" : "SHORT";
+    const level = bos.level;
+
+    const zone = makeRetestZone(level, atrp, dir);
+
+    // Stop: prefer swing opposite if available; otherwise below/above level with ATR buffer
+    const buffer = level * Math.max(atrp * 0.9, 0.0012); // at least 12 bps, scaled by ATR
+    let sl = dir === "LONG" ? (level - buffer) : (level + buffer);
+
+    const swingH = ms15?.lastSwingHigh?.price;
+    const swingL = ms15?.lastSwingLow?.price;
+
+    if (dir === "LONG" && typeof swingL === "number" && swingL < level) {
+      sl = Math.min(sl, swingL - buffer * 0.35);
+    }
+    if (dir === "SHORT" && typeof swingH === "number" && swingH > level) {
+      sl = Math.max(sl, swingH + buffer * 0.35);
+    }
+
+    // TP: nearest pivot in breakout direction; fallback to ATR projection
+    const tp1 =
+      dir === "LONG"
+        ? (above?.price ?? (level + level * atrp * 2.0))
+        : (below?.price ?? (level - level * atrp * 2.0));
+
+    const entryMid = (zone.lo + zone.hi) / 2;
+    const rr1 = rr(entryMid, sl, tp1, dir);
+
+    let confScore = Math.min(100, common.score + 7); // BOS event adds confidence slightly
+    if (bias_incomplete) {
+      confScore = Math.floor(confScore * 0.70);
+      confScore = Math.min(confScore, 84);
+    }
+
+    const rrNeed = bias_incomplete ? 1.8 : 1.5;
+    const ready = rr1 >= rrNeed && common.grade !== "D";
+
+    setups.push({
+      id: uid("brt"),
+      canon: snap.canon,
+      type: "BREAKOUT",
+      side: dir,
+      entry_tf: "5m",
+      bias_tf: f.bias.tf,
+
+      status: ready ? "READY" : "FORMING",
+      created_ts: ts,
+      expires_ts: ts + 1000 * 60 * 60,
+
+      entry: {
+        mode: "LIMIT",
+        zone,
+        trigger: {
+          confirmed: false, // Task 3.3 (in hook)
+          checklist: [
+            {
+              key: "bias",
+              ok: !bias_incomplete,
+              note: bias_incomplete
+                ? `HTF bias incomplete (${biasMeta.tf} ${biasMeta.count}/${biasMeta.need})`
+                : `Bias ${f.bias.trend_dir} (${f.bias.tf})`,
+            },
+            { key: "bos", ok: true, note: `BOS ${bos.dir} @ ${level.toFixed(2)} (15m)` },
+            // Keep a “level” item with "@ <number>" so existing parsing logic works without assumptions
+            { key: "level", ok: true, note: `Break ${dir === "LONG" ? "R" : "S"} @ ${level.toFixed(2)}` },
+            { key: "retest", ok: false, note: `Wait retest zone [${zone.lo.toFixed(2)}–${zone.hi.toFixed(2)}]` },
+          ],
+          summary: "Breakout+Retest: wait for price to retest BOS level, then 5m close-confirm beyond level",
+        },
+      },
+
+      stop: { price: sl, basis: "STRUCTURE", note: "Below/above BOS level (prefer swing) + buffer" },
+
+      tp: [
+        { price: tp1, size_pct: 60, basis: "LEVEL", note: "Nearest pivot target" },
+        { price: dir === "LONG" ? (tp1 + level * atrp * 1.0) : (tp1 - level * atrp * 1.0), size_pct: 40, basis: "R_MULTIPLE", note: "Continuation" },
+      ],
+
+      rr_min: rr1,
+      rr_est: rr1 * 1.20,
 
       confidence: {
         score: confScore,
         grade: capGradeForBiasIncomplete(gradeFromScore(confScore), bias_incomplete),
-        reasons: [...common.reasons, "Trend pullback archetype"],
+        reasons: [
+          ...common.reasons,
+          "BOS detected (15m)",
+          "Retest-based breakout plan",
+          ...(bias_incomplete ? [`HTF bias incomplete (${biasMeta.tf})`] : []),
+        ],
       },
 
-      tags: ["intraday", "trend", "pullback"],
+      tags: ["intraday", "breakout", "bos", "retest"],
     });
+
+    createdStructureBreakout = true;
   }
 
-  // 2) BREAKOUT (squeeze → expansion) — B+ policy: allowed even when HTF bias incomplete
-  if (typeof f.entry.volatility.bbWidth_15m === "number" && below && above) {
+  /**
+   * 2b) BREAKOUT (legacy: squeeze → expansion)
+   * - Keep as fallback when structure BOS is not available/fresh.
+   */
+  if (!createdStructureBreakout) {
+    // Need squeeze: BB width very low
     const width = f.entry.volatility.bbWidth_15m;
-    const squeeze = width < 0.012;
+    const squeeze = typeof width === "number" ? width < 0.02 : false;
 
-    if (squeeze) {
-      const biasDir =
-        !bias_incomplete && (biasSide === "LONG" || biasSide === "SHORT")
-          ? biasSide
-          : undefined;
-
-      const dir: SetupSide =
-        biasDir ?? (f.orderflow.aggression_ratio >= 0.52 ? "LONG" : "SHORT");
+    if (squeeze && below && above) {
+      // pick direction: bias if present else mean cross
+      let dir: SetupSide = "LONG";
+      if (biasSide) dir = biasSide;
+      else dir = (f.cross.dev_bps != null && f.cross.dev_bps > 0) ? "SHORT" : "LONG";
 
       const brk = dir === "LONG" ? above.price : below.price;
       const zone = makeEntryZone(brk, atrp, dir);
 
-      const sl = dir === "LONG" ? (brk - px * atrp * 0.8) : (brk + px * atrp * 0.8);
-      const tp1 = dir === "LONG" ? (brk + px * atrp * 1.6) : (brk - px * atrp * 1.6);
-      const entryMid = (zone.lo + zone.hi) / 2;
+      const sl = dir === "LONG"
+        ? (brk - px * atrp * 1.1)
+        : (brk + px * atrp * 1.1);
 
+      const tp1 = dir === "LONG"
+        ? (brk + px * atrp * 1.8)
+        : (brk - px * atrp * 1.8);
+
+      const entryMid = (zone.lo + zone.hi) / 2;
       const rr1 = rr(entryMid, sl, tp1, dir);
 
-      const rr_req = bias_incomplete ? 2.0 : 1.6;
-      const ready = rr1 >= rr_req && common.grade !== "D";
-
-      let confScore = Math.min(100, common.score + 8 + (rr1 >= 2 ? 4 : 0));
+      let confScore = Math.min(100, common.score + 3);
       if (bias_incomplete) {
-        confScore = Math.floor(confScore * 0.65);
-        confScore = Math.min(confScore, 82);
+        confScore = Math.floor(confScore * 0.70);
+        confScore = Math.min(confScore, 84);
       }
+
+      const ready = rr1 >= (bias_incomplete ? 1.8 : 1.5) && common.grade !== "D";
 
       setups.push({
         id: uid("brk"),
@@ -221,7 +344,7 @@ export function buildSetups(args: {
                   ? `HTF bias incomplete (${biasMeta.tf} ${biasMeta.count}/${biasMeta.need})`
                   : `Bias ${f.bias.trend_dir} (${f.bias.tf})`,
               },
-              { key: "squeeze", ok: true, note: `BBWidth15m=${width.toFixed(4)}` },
+              { key: "squeeze", ok: true, note: `BBWidth15m=${width!.toFixed(4)}` },
               { key: "level", ok: true, note: `Break ${dir === "LONG" ? "R" : "S"} @ ${brk.toFixed(2)}` },
             ],
             summary: "Breakout: wait for 5m close beyond level + follow-through",
