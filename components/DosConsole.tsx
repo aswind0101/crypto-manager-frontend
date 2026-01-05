@@ -410,208 +410,197 @@ function AnalysisSession({
                 </div>
 
                 {/* RIGHT: feed + details */}
+                {/* RIGHT: feed + details */}
                 <div className="dos-right">
-                    <div className="dos-list">
-                        <div className="dos-list-head">
-                            <div className="dos-strong">SETUP FEED (SORT=P)</div>
-                            <div className="dos-touchbar">
-                                <button className="dos-btn" onClick={touchPrev} disabled={!rows.length} aria-label="Previous setup">
-                                    Prev
-                                </button>
-                                <button className="dos-btn" onClick={touchNext} disabled={!rows.length} aria-label="Next setup">
-                                    Next
-                                </button>
-                                <button className="dos-btn" onClick={touchExpand} disabled={!rows.length} aria-label="Expand details">
-                                    {expanded ? "Collapse" : "Expand"}
-                                </button>
-                                <button className="dos-btn" onClick={touchCopy} disabled={!selected} aria-label="Copy ticket">
-                                    Copy Ticket
-                                </button>
+                    <div className="dos-rightgrid">
+                        {/* (A) Setup Feed panel */}
+                        <div className="dos-list">
+                            <div className="dos-list-head">
+                                <div className="dos-strong">SETUP FEED (SORT=P)</div>
+                                <div className="dos-touchbar">
+                                    <button className="dos-btn" onClick={touchPrev} disabled={!rows.length} aria-label="Previous setup">
+                                        Prev
+                                    </button>
+                                    <button className="dos-btn" onClick={touchNext} disabled={!rows.length} aria-label="Next setup">
+                                        Next
+                                    </button>
+                                    <button className="dos-btn" onClick={touchExpand} disabled={!rows.length} aria-label="Expand details">
+                                        {expanded ? "Collapse" : "Expand"}
+                                    </button>
+                                    <button className="dos-btn" onClick={touchCopy} disabled={!selected} aria-label="Copy ticket">
+                                        Copy Ticket
+                                    </button>
+                                </div>
                             </div>
+
+                            {rows.length === 0 ? (
+                                <div className="dos-pad">
+                                    {dqOk ? (
+                                        <>NO SETUPS (valid). Market context / RR / retest filters blocked candidates.</>
+                                    ) : (
+                                        <>DQ GATED. Fix feeds/liveness before trusting setups.</>
+                                    )}
+                                </div>
+                            ) : (
+                                rows.map((s, i) => {
+                                    const id = String(s?.id ?? "");
+                                    const isPreferred = preferredId && id === preferredId;
+                                    const isSelected = i === idx;
+                                    const dead = s?.status === "INVALIDATED" || s?.status === "EXPIRED";
+
+                                    const p = Number(s?.priority_score ?? 0);
+                                    const c = Number(s?.confidence?.score ?? 0);
+                                    const g = String(s?.confidence?.grade ?? "—");
+                                    const { ok, total } = triggerProgress(s);
+
+                                    const z = s?.entry?.zone;
+                                    const dist = Number.isFinite(mid) ? distanceBps(mid, z) : NaN;
+                                    const distLabel = !Number.isFinite(dist) ? "—" : dist === 0 ? "IN" : `${dist.toFixed(0)}bps`;
+
+                                    const tf = `${String(s?.bias_tf ?? "—")}→${String(s?.entry_tf ?? "—")}→${String(s?.trigger_tf ?? "—")}`;
+                                    const act = actionLabel(s);
+
+                                    return (
+                                        <div
+                                            key={id || i}
+                                            className={[
+                                                "dos-rowitem",
+                                                isPreferred ? "dos-preferred" : "",
+                                                isSelected ? "dos-selected" : "",
+                                                dead ? "dos-dimrow" : "",
+                                            ].join(" ")}
+                                            onClick={() => setIdx(i)}
+                                            role="button"
+                                            tabIndex={0}
+                                        >
+                                            <div className="dos-marker">{isPreferred ? ">" : " "}</div>
+                                            <div className="dos-mono">
+                                                {String(i + 1).padStart(2, " ")}{" "}
+                                                <span className={s?.side === "LONG" ? "dos-ok" : "dos-bad"}>
+                                                    {String(s?.side ?? "").padEnd(5, " ")}
+                                                </span>{" "}
+                                                <span className="dos-strong">{typeShort(String(s?.type ?? ""))}</span>{" "}
+                                                <span className="dos-reverse">{String(s?.status ?? "").padEnd(9, " ")}</span>{" "}
+                                                P{String(Math.round(p)).padStart(2, "0")}{" "}
+                                                C{String(Math.round(c)).padStart(2, "0")}({g}){" "}
+                                                T{ok}/{total}{" "}
+                                                {tf}{" "}
+                                                Δ{distLabel}{" "}
+                                                RR{fmt(s?.rr_min, 2)}{" "}
+                                                <span className="dos-strong">{act}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
 
-                        {rows.length === 0 ? (
-                            <div className="dos-pad">
-                                {dqOk ? (
-                                    <div className="dos-pad">
-                                        <div className="dos-strong">NO SETUPS (valid)</div>
-                                        <div className="dos-dim" style={{ marginTop: 6 }}>
-                                            Filters blocked candidates due to RR / structure / retest requirements, or insufficient context.
+                        {/* (B) Selected Details panel */}
+                        <div className="dos-panel">
+                            <div className="dos-panel-head">SELECTED SETUP DETAILS</div>
+                            <div className="dos-panel-body">
+                                {!selected ? (
+                                    <div className="dos-dim">No setup selected.</div>
+                                ) : (
+                                    <>
+                                        <div className="dos-small">
+                                            <div className="dos-line">
+                                                <span className="dos-k">ID</span>
+                                                <span className="dos-v">{String(selected.id ?? "—")}</span>
+                                            </div>
+                                            <div className="dos-line">
+                                                <span className="dos-k">TYPE</span>
+                                                <span className="dos-v">{String(selected.type ?? "—")}</span>
+                                            </div>
+                                            <div className="dos-line">
+                                                <span className="dos-k">TF</span>
+                                                <span className="dos-v">
+                                                    {String(selected.bias_tf ?? "—")}→{String(selected.entry_tf ?? "—")}→{String(selected.trigger_tf ?? "—")}
+                                                </span>
+                                            </div>
+                                            <div className="dos-line">
+                                                <span className="dos-k">STATUS</span>
+                                                <span className="dos-v">
+                                                    {String(selected.status ?? "—")}{" "}
+                                                    CONFIRMED:{" "}
+                                                    <span className={selected?.entry?.trigger?.confirmed ? "dos-ok" : "dos-warn"}>
+                                                        {selected?.entry?.trigger?.confirmed ? "YES" : "NO"}
+                                                    </span>{" "}
+                                                    ACTION: <span className="dos-strong">{actionLabel(selected)}</span>
+                                                </span>
+                                            </div>
                                         </div>
 
                                         <div className="dos-hr" />
 
-                                        <pre className="dos-pre">{`Context snapshot:
-15m: ${scan15.trend}   H ${fmt(scan15.sH, 2)}   L ${fmt(scan15.sL, 2)}
-1h : ${scan1h.trend}   flags: ${scan1h.fl}
-DQ : ${dq} ${dqOk ? "" : "(GATED)"}
-MID: ${Number.isFinite(mid) ? fmt(mid, 2) : "— (warming)"}
-DEV: ${Number.isFinite(Number(dev)) ? `${Number(dev).toFixed(1)}bps` : "—"}
-
-Wait for:
-• A fresh SWEEP at range edges, or
-• BOS/CHOCH confirmation on close, or
-• Retest into an entry zone with RR >= threshold`}</pre>
-                                    </div>
-
-                                ) : (
-                                    <>DQ GATED. Fix feeds/liveness before trusting setups.</>
-                                )}
-                            </div>
-                        ) : (
-                            rows.map((s, i) => {
-                                const id = String(s?.id ?? "");
-                                const isPreferred = preferredId && id === preferredId;
-                                const isSelected = i === idx;
-                                const dead = s?.status === "INVALIDATED" || s?.status === "EXPIRED";
-
-                                const p = Number(s?.priority_score ?? 0);
-                                const c = Number(s?.confidence?.score ?? 0);
-                                const g = String(s?.confidence?.grade ?? "—");
-                                const { ok, total } = triggerProgress(s);
-
-                                const z = s?.entry?.zone;
-                                const dist = Number.isFinite(mid) ? distanceBps(mid, z) : NaN;
-                                const distLabel = !Number.isFinite(dist) ? "—" : dist === 0 ? "IN" : `${dist.toFixed(0)}bps`;
-
-                                const tf = `${String(s?.bias_tf ?? "—")}→${String(s?.entry_tf ?? "—")}→${String(s?.trigger_tf ?? "—")}`;
-                                const act = actionLabel(s);
-
-                                return (
-                                    <div
-                                        key={id || i}
-                                        className={[
-                                            "dos-rowitem",
-                                            isPreferred ? "dos-preferred" : "",
-                                            isSelected ? "dos-selected" : "",
-                                            dead ? "dos-dimrow" : "",
-                                        ].join(" ")}
-                                        onClick={() => setIdx(i)}
-                                        role="button"
-                                        tabIndex={0}
-                                    >
-                                        <div className="dos-marker">{isPreferred ? ">" : " "}</div>
-                                        <div className="dos-mono">
-                                            {String(i + 1).padStart(2, " ")}{" "}
-                                            <span className={s?.side === "LONG" ? "dos-ok" : "dos-bad"}>
-                                                {String(s?.side ?? "").padEnd(5, " ")}
-                                            </span>{" "}
-                                            <span className="dos-strong">{typeShort(String(s?.type ?? ""))}</span>{" "}
-                                            <span className="dos-reverse">{String(s?.status ?? "").padEnd(9, " ")}</span>{" "}
-                                            P{String(Math.round(p)).padStart(2, "0")}{" "}
-                                            C{String(Math.round(c)).padStart(2, "0")}({g}){" "}
-                                            T{ok}/{total}{" "}
-                                            {tf}{" "}
-                                            Δ{distLabel}{" "}
-                                            RR{fmt(s?.rr_min, 2)}{" "}
-                                            <span className="dos-strong">{act}</span>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-
-                    <div className="dos-panel dos-mt">
-                        <div className="dos-panel-head">SELECTED SETUP DETAILS</div>
-                        <div className="dos-panel-body">
-                            {!selected ? (
-                                <div className="dos-dim">No setup selected.</div>
-                            ) : (
-                                <>
-                                    <div className="dos-small">
-                                        <div className="dos-line">
-                                            <span className="dos-k">ID</span>
-                                            <span className="dos-v">{String(selected.id ?? "—")}</span>
-                                        </div>
-                                        <div className="dos-line">
-                                            <span className="dos-k">TYPE</span>
-                                            <span className="dos-v">{String(selected.type ?? "—")}</span>
-                                        </div>
-                                        <div className="dos-line">
-                                            <span className="dos-k">TF</span>
-                                            <span className="dos-v">
-                                                {String(selected.bias_tf ?? "—")}→{String(selected.entry_tf ?? "—")}→{String(selected.trigger_tf ?? "—")}
-                                            </span>
-                                        </div>
-                                        <div className="dos-line">
-                                            <span className="dos-k">STATUS</span>
-                                            <span className="dos-v">
-                                                {String(selected.status ?? "—")}{" "}
-                                                CONFIRMED:{" "}
-                                                <span className={selected?.entry?.trigger?.confirmed ? "dos-ok" : "dos-warn"}>
-                                                    {selected?.entry?.trigger?.confirmed ? "YES" : "NO"}
-                                                </span>{" "}
-                                                ACTION: <span className="dos-strong">{actionLabel(selected)}</span>
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="dos-hr" />
-
-                                    <div className="dos-small">
-                                        <div className="dos-strong" style={{ marginBottom: 6 }}>EXECUTION TICKET</div>
-                                        <pre className="dos-pre">{`ENTRY (${String(selected?.entry?.mode ?? "—")}): ${selected?.entry?.mode === "LIMIT" && selected?.entry?.zone
-                                            ? `[${fmt(selected.entry.zone.lo, 2)}–${fmt(selected.entry.zone.hi, 2)}]`
-                                            : selected?.entry?.mode === "MARKET"
-                                                ? "MARKET"
-                                                : "—"
-                                            }
+                                        <div className="dos-small">
+                                            <div className="dos-strong" style={{ marginBottom: 6 }}>
+                                                EXECUTION TICKET
+                                            </div>
+                                            <pre className="dos-pre">{`ENTRY (${String(selected?.entry?.mode ?? "—")}): ${selected?.entry?.mode === "LIMIT" && selected?.entry?.zone
+                                                    ? `[${fmt(selected.entry.zone.lo, 2)}–${fmt(selected.entry.zone.hi, 2)}]`
+                                                    : selected?.entry?.mode === "MARKET"
+                                                        ? "MARKET"
+                                                        : "—"
+                                                }
 SL: ${fmt(selected?.stop?.price, 2)} (${String(selected?.stop?.basis ?? "—")})
 TP: ${(Array.isArray(selected?.tp) && selected.tp.length)
-                                                ? selected.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ")
-                                                : "—"}
-RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}
-PRIORITY: ${Number(selected?.priority_score ?? 0).toFixed(0)}   CONF: ${Number(selected?.confidence?.score ?? 0).toFixed(0)} (${String(selected?.confidence?.grade ?? "—")})`}</pre>
-                                    </div>
-
-                                    <div className="dos-hr" />
-
-                                    <div className="dos-small">
-                                        <div className="dos-strong" style={{ marginBottom: 6 }}>
-                                            TRIGGER CHECKLIST {expanded ? "(expanded)" : "(collapsed)"}
+                                                    ? selected.tp.map((x) => fmt(x.price, 2)).join(" | ")
+                                                    : "—"}
+RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</pre>
                                         </div>
-                                        {expanded ? (
-                                            <div className="dos-stack">
-                                                {triggerProgress(selected).checklist.length ? (
-                                                    triggerProgress(selected).checklist.map((it: AnyObj, i: number) => (
-                                                        <div key={String(it?.key ?? i)} className="dos-itemline">
-                                                            <span className={it?.ok ? "dos-ok" : "dos-warn"}>
-                                                                [{it?.ok ? "OK" : "WAIT"}]
-                                                            </span>
-                                                            <span className="dos-key">{String(it?.key ?? "")}</span>
-                                                            <span className="dos-note">{String(it?.note ?? "")}</span>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="dos-dim">No checklist.</div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="dos-dim">Tap Expand to view checklist + confluence.</div>
-                                        )}
-                                    </div>
 
-                                    {expanded ? (
-                                        <>
-                                            <div className="dos-hr" />
-                                            <div className="dos-small">
-                                                <div className="dos-strong" style={{ marginBottom: 6 }}>WHY (CONFLUENCE)</div>
-                                                {(selected?.confidence?.reasons ?? []).length ? (
-                                                    <pre className="dos-pre">
-                                                        {(selected.confidence.reasons as AnyObj[]).slice(0, 12).map((r: AnyObj) => `• ${String(r)}`).join("\n")}
-                                                    </pre>
-                                                ) : (
-                                                    <div className="dos-dim">No reasons provided.</div>
-                                                )}
+                                        <div className="dos-hr" />
+
+                                        <div className="dos-small">
+                                            <div className="dos-strong" style={{ marginBottom: 6 }}>
+                                                TRIGGER CHECKLIST
                                             </div>
-                                        </>
-                                    ) : null}
-                                </>
-                            )}
+                                            {expanded ? (
+                                                <div className="dos-stack">
+                                                    {triggerProgress(selected).checklist.length ? (
+                                                        triggerProgress(selected).checklist.map((it, i) => (
+                                                            <div key={String(it?.key ?? i)} className="dos-itemline">
+                                                                <span className={it?.ok ? "dos-ok" : "dos-warn"}>
+                                                                    [{it?.ok ? "OK" : "WAIT"}]
+                                                                </span>
+                                                                <span className="dos-key">{String(it?.key ?? "")}</span>
+                                                                <span className="dos-note">{String(it?.note ?? "")}</span>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="dos-dim">No checklist.</div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="dos-dim">Tap Expand to view checklist + confluence.</div>
+                                            )}
+                                        </div>
+
+                                        {expanded ? (
+                                            <>
+                                                <div className="dos-hr" />
+                                                <div className="dos-small">
+                                                    <div className="dos-strong" style={{ marginBottom: 6 }}>
+                                                        WHY (CONFLUENCE)
+                                                    </div>
+                                                    {(selected?.confidence?.reasons ?? []).length ? (
+                                                        <pre className="dos-pre">
+                                                            {(selected.confidence.reasons as any[]).slice(0, 12).map((r) => `• ${String(r)}`).join("\n")}
+                                                        </pre>
+                                                    ) : (
+                                                        <div className="dos-dim">No reasons provided.</div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : null}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
+
             </div>
         </>
     );
@@ -697,6 +686,25 @@ export function DosConsole() {
           border:1px solid #2a532a; background:#020302; color:#cfe9cf; outline:none;
           font-family:${mono}; font-size:16px; /* iOS zoom prevention */
         }
+          /* RIGHT AREA: Setup Feed + Selected Details side-by-side (iPad landscape) */
+.dos-rightgrid{
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr; /* Feed rộng hơn Details */
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+.dos-rightgrid > *{
+  min-width: 0; /* cực quan trọng để tránh overflow */
+}
+
+/* On smaller screens (iPhone / portrait), stack vertically */
+@media (max-width: 980px){
+  .dos-rightgrid{
+    grid-template-columns: 1fr;
+  }
+}
+
         .dos-btn{
           min-height:44px; padding:10px 12px; border-radius:10px;
           border:1px solid #2a532a; background:#081008; color:#cfe9cf; cursor:pointer;
