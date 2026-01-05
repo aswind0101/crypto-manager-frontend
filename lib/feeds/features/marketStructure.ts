@@ -67,11 +67,27 @@ function detectSweep(
 ): SweepEvent | undefined {
   // Sweep UP: wick > swingHigh, close back below
   if (lastHigh && candle.h > lastHigh.price && candle.c < lastHigh.price) {
-    return { dir: "UP", tf, ts: candle.ts, level: lastHigh.price, high: candle.h, low: candle.l, close: candle.c };
+    return {
+      dir: "UP",
+      tf,
+      ts: candle.ts,
+      level: lastHigh.price,
+      high: candle.h,
+      low: candle.l,
+      close: candle.c,
+    };
   }
   // Sweep DOWN: wick < swingLow, close back above
   if (lastLow && candle.l < lastLow.price && candle.c > lastLow.price) {
-    return { dir: "DOWN", tf, ts: candle.ts, level: lastLow.price, high: candle.h, low: candle.l, close: candle.c };
+    return {
+      dir: "DOWN",
+      tf,
+      ts: candle.ts,
+      level: lastLow.price,
+      high: candle.h,
+      low: candle.l,
+      close: candle.c,
+    };
   }
   return undefined;
 }
@@ -108,7 +124,12 @@ export function computeMarketStructureTF(args: {
   let lastCHOCH: StructureEvent | undefined;
   let lastSweep: SweepEvent | undefined;
 
-  let bosUp = false, bosDown = false, chochUp = false, chochDown = false, sweepUp = false, sweepDown = false;
+  let bosUp = false,
+    bosDown = false,
+    chochUp = false,
+    chochDown = false,
+    sweepUp = false,
+    sweepDown = false;
 
   if (last && (lastSwingHigh || lastSwingLow)) {
     lastSweep = detectSweep(tf, last, lastSwingHigh, lastSwingLow);
@@ -146,6 +167,10 @@ export function computeMarketStructureTF(args: {
   return {
     tf,
     trend,
+
+    // ✅ thêm để UI biết chắc có bao nhiêu candle confirm
+    confirmed_count: conf.length,
+
     lastSwingHigh,
     lastSwingLow,
     recentSwings: swings,

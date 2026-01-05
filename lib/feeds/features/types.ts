@@ -111,7 +111,8 @@ export type SweepEvent = {
 export type MarketStructureTF = {
   tf: string;
   trend: MarketTrend;
-
+  confirmed_count: number;
+  
   lastSwingHigh?: SwingPoint;
   lastSwingLow?: SwingPoint;
   recentSwings: SwingPoint[];
