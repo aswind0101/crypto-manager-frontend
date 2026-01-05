@@ -4,7 +4,8 @@ export type SetupType =
   | "TREND_PULLBACK"
   | "BREAKOUT"
   | "RANGE_MEAN_REVERT"
-  | "LIQUIDITY_SWEEP_REVERSAL";
+  | "LIQUIDITY_SWEEP_REVERSAL"
+  | "FAILED_SWEEP_CONTINUATION";
 
 export type EntryPlan = {
   mode: "LIMIT" | "MARKET";

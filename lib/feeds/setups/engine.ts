@@ -478,6 +478,105 @@ export function buildSetups(args: {
       }
     }
   }
+  /**
+   * 2d) FAILED_SWEEP_CONTINUATION (Task 3.4d)
+   * - Wick attempts sweep but fails to reclaim
+   * - Market continues with BOS
+   * - Continuation setup (NOT reversal)
+   */
+  if (!ms15?.lastSweep && ms15?.lastBOS) {
+    const bos = ms15.lastBOS;
+    const side: SetupSide = bos.dir === "UP" ? "LONG" : "SHORT";
+
+    // Infer failed sweep wick from recent candles
+    const recent = tf15.slice(-6);
+
+    let wickExtreme: number | null = null;
+
+    for (const c of recent) {
+      if (side === "LONG" && c.h > bos.level && c.c < bos.level) {
+        wickExtreme = Math.max(wickExtreme ?? -Infinity, c.h);
+      }
+      if (side === "SHORT" && c.l < bos.level && c.c > bos.level) {
+        wickExtreme = Math.min(wickExtreme ?? Infinity, c.l);
+      }
+    }
+
+    if (wickExtreme != null) {
+      const zone = makeRetestZone(bos.level, atrp, side);
+
+      const slBuffer = Math.max(px * 0.0006, px * atrp * 0.15);
+      const sl =
+        side === "LONG"
+          ? wickExtreme + slBuffer
+          : wickExtreme - slBuffer;
+
+      const entryMid = (zone.lo + zone.hi) / 2;
+      const tp1 =
+        side === "LONG"
+          ? entryMid + (entryMid - sl) * 2
+          : entryMid - (sl - entryMid) * 2;
+
+      const rr1 = rr(entryMid, sl, tp1, side);
+
+      if (rr1 >= 2.0) {
+        const ready = px >= zone.lo && px <= zone.hi;
+
+        setups.push({
+          id: uid("fsc"),
+          canon: snap.canon,
+          type: "FAILED_SWEEP_CONTINUATION",
+          side,
+          entry_tf: "15m",
+          bias_tf: f.bias.tf,
+
+          status: ready ? "READY" : "FORMING",
+          created_ts: ts,
+          expires_ts: ts + 1000 * 60 * 120,
+
+          entry: {
+            mode: "LIMIT",
+            zone,
+            trigger: {
+              confirmed: false,
+              checklist: [
+                { key: "failed_sweep", ok: true },
+                { key: "bos", ok: true, note: `${bos.dir} @ ${bos.level.toFixed(2)}` },
+                { key: "retest", ok: ready },
+                { key: "close_confirm", ok: false },
+              ],
+              summary: "Failed sweep → continuation after BOS; wait retest then close-confirm",
+            },
+          },
+
+          stop: {
+            price: sl,
+            basis: "LIQUIDITY",
+            note: "Outside failed sweep wick",
+          },
+
+          tp: [
+            { price: tp1, size_pct: 100, basis: "R_MULTIPLE", note: "2R continuation" },
+          ],
+
+          rr_min: 2.0,
+          rr_est: rr1,
+
+          confidence: {
+            score: Math.min(100, common.score + 4),
+            grade: gradeFromScore(common.score + 4),
+            reasons: [
+              ...common.reasons,
+              "Failed sweep continuation",
+              `BOS ${bos.dir} @ ${bos.level.toFixed(2)}`,
+            ],
+          },
+
+          tags: ["intraday", "failed_sweep", "continuation"],
+        });
+      }
+    }
+  }
 
   // 3) RANGE_MEAN_REVERT (bias sideways) — B+ policy: allowed even when HTF bias incomplete (with stricter RR)
   if (f.bias.trend_dir === "sideways" && below && above) {
