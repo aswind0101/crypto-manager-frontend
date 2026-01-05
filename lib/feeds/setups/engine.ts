@@ -479,60 +479,85 @@ export function buildSetups(args: {
     }
   }
   /**
-   * 2d) FAILED_SWEEP_CONTINUATION (Task 3.4d)
-   * - Wick attempts sweep but fails to reclaim
-   * - Market continues with BOS
-   * - Continuation setup (NOT reversal)
-   */
-  if (!ms15?.lastSweep && ms15?.lastBOS) {
+ * 2d) FAILED_SWEEP_CONTINUATION (Task 3.4d)
+ * Idea:
+ * - Fresh BOS on 15m
+ * - BOS candle cluster shows "stop-run displacement" (wick through level + close holds beyond)
+ * - Plan is continuation via retest of BOS level (close-confirm handled by Trigger Engine)
+ */
+  if (ms15?.lastBOS && typeof ms15.lastBOS.level === "number" && typeof ms15.lastBOS.ts === "number") {
     const bos = ms15.lastBOS;
-    const side: SetupSide = bos.dir === "UP" ? "LONG" : "SHORT";
 
-    // Infer failed sweep wick from recent candles
-    const recent = tf15.slice(-6);
+    // Freshness window for BOS (reuse same as breakout structure)
+    const BOS_FRESH_MS = 90 * 60 * 1000;
+    if ((ts - bos.ts) <= BOS_FRESH_MS) {
+      const dir: SetupSide = bos.dir === "UP" ? "LONG" : "SHORT";
+      const level = bos.level;
 
-    let wickExtreme: number | null = null;
+      // Look at a small confirmed window around BOS to detect displacement wick through the level
+      const recent = tf15.filter(c => c.confirm).slice(-10);
 
-    for (const c of recent) {
-      if (side === "LONG" && c.h > bos.level && c.c < bos.level) {
-        wickExtreme = Math.max(wickExtreme ?? -Infinity, c.h);
+      const wickBuf = Math.max(level * 0.0008, level * atrp * 0.20); // floor + ATR component
+      let wickExtreme: number | null = null;
+      let hasDisplacement = false;
+
+      for (const c of recent) {
+        if (dir === "LONG") {
+          // Wick through level and close holds above -> stop-run + acceptance
+          if (c.h > level + wickBuf && c.c > level) {
+            hasDisplacement = true;
+            wickExtreme = Math.max(wickExtreme ?? -Infinity, c.h);
+          }
+        } else {
+          // Wick through level and close holds below -> stop-run + acceptance
+          if (c.l < level - wickBuf && c.c < level) {
+            hasDisplacement = true;
+            wickExtreme = Math.min(wickExtreme ?? Infinity, c.l);
+          }
+        }
       }
-      if (side === "SHORT" && c.l < bos.level && c.c > bos.level) {
-        wickExtreme = Math.min(wickExtreme ?? Infinity, c.l);
-      }
-    }
 
-    if (wickExtreme != null) {
-      const zone = makeRetestZone(bos.level, atrp, side);
+      if (hasDisplacement && wickExtreme != null) {
+        const zone = makeRetestZone(level, atrp, dir);
 
-      const slBuffer = Math.max(px * 0.0006, px * atrp * 0.15);
-      const sl =
-        side === "LONG"
-          ? wickExtreme + slBuffer
-          : wickExtreme - slBuffer;
+        // SL outside displacement wick
+        const slBuffer = Math.max(level * 0.0008, level * atrp * 0.35);
+        const sl =
+          dir === "LONG"
+            ? (wickExtreme + slBuffer)
+            : (wickExtreme - slBuffer);
 
-      const entryMid = (zone.lo + zone.hi) / 2;
-      const tp1 =
-        side === "LONG"
-          ? entryMid + (entryMid - sl) * 2
-          : entryMid - (sl - entryMid) * 2;
+        // TP: use nearest pivot in continuation direction (same philosophy as breakout structure)
+        const tp1 =
+          dir === "LONG"
+            ? (above?.price ?? (level + level * atrp * 2.0))
+            : (below?.price ?? (level - level * atrp * 2.0));
 
-      const rr1 = rr(entryMid, sl, tp1, side);
+        const entryMid = (zone.lo + zone.hi) / 2;
+        const rr1 = rr(entryMid, sl, tp1, dir);
 
-      if (rr1 >= 2.0) {
-        const ready = px >= zone.lo && px <= zone.hi;
+        // Continuation should have decent RR, but not as strict as LSR
+        const rrNeed = bias_incomplete ? 2.1 : 2.0;
+        const ready = rr1 >= rrNeed && common.grade !== "D" && (px >= zone.lo && px <= zone.hi);
+
+        // Confidence: breakout + displacement premium; cap if HTF bias incomplete
+        let confScore = Math.min(100, common.score + 8);
+        if (bias_incomplete) {
+          confScore = Math.floor(confScore * 0.75);
+          confScore = Math.min(confScore, 84);
+        }
 
         setups.push({
           id: uid("fsc"),
           canon: snap.canon,
           type: "FAILED_SWEEP_CONTINUATION",
-          side,
-          entry_tf: "15m",
+          side: dir,
+          entry_tf: "5m",
           bias_tf: f.bias.tf,
 
-          status: ready ? "READY" : "FORMING",
+          status: (rr1 >= rrNeed && common.grade !== "D") ? (ready ? "READY" : "FORMING") : "FORMING",
           created_ts: ts,
-          expires_ts: ts + 1000 * 60 * 120,
+          expires_ts: ts + 1000 * 60 * 60,
 
           entry: {
             mode: "LIMIT",
@@ -540,43 +565,49 @@ export function buildSetups(args: {
             trigger: {
               confirmed: false,
               checklist: [
-                { key: "failed_sweep", ok: true },
-                { key: "bos", ok: true, note: `${bos.dir} @ ${bos.level.toFixed(2)}` },
-                { key: "retest", ok: ready },
-                { key: "close_confirm", ok: false },
+                {
+                  key: "bias",
+                  ok: !bias_incomplete,
+                  note: bias_incomplete
+                    ? `HTF bias incomplete (${biasMeta.tf} ${biasMeta.count}/${biasMeta.need})`
+                    : `Bias ${f.bias.trend_dir} (${f.bias.tf})`,
+                },
+                { key: "bos", ok: true, note: `BOS ${bos.dir} @ ${level.toFixed(2)} (15m)` },
+                { key: "displacement", ok: true, note: `Wick through level (buf ${wickBuf.toFixed(2)})` },
+                { key: "retest", ok: ready, note: ready ? "Price in retest zone" : `Wait retest [${zone.lo.toFixed(2)}–${zone.hi.toFixed(2)}]` },
+                { key: "close_confirm", ok: false, note: "Trigger on candle close only" },
               ],
-              summary: "Failed sweep → continuation after BOS; wait retest then close-confirm",
+              summary: "Failed sweep → continuation: BOS with displacement wick; wait retest then close-confirm continuation",
             },
           },
 
-          stop: {
-            price: sl,
-            basis: "LIQUIDITY",
-            note: "Outside failed sweep wick",
-          },
+          stop: { price: sl, basis: "LIQUIDITY", note: "Outside displacement wick" },
 
           tp: [
-            { price: tp1, size_pct: 100, basis: "R_MULTIPLE", note: "2R continuation" },
+            { price: tp1, size_pct: 70, basis: "LEVEL", note: "Nearest pivot continuation" },
+            { price: dir === "LONG" ? (tp1 + level * atrp * 1.0) : (tp1 - level * atrp * 1.0), size_pct: 30, basis: "R_MULTIPLE", note: "Extension" },
           ],
 
-          rr_min: 2.0,
-          rr_est: rr1,
+          rr_min: rr1,
+          rr_est: rr1 * 1.15,
 
           confidence: {
-            score: Math.min(100, common.score + 4),
-            grade: gradeFromScore(common.score + 4),
+            score: confScore,
+            grade: capGradeForBiasIncomplete(gradeFromScore(confScore), bias_incomplete),
             reasons: [
               ...common.reasons,
-              "Failed sweep continuation",
-              `BOS ${bos.dir} @ ${bos.level.toFixed(2)}`,
+              "Failed sweep continuation (displacement wick + BOS acceptance)",
+              `BOS ${bos.dir} @ ${level.toFixed(2)}`,
+              ...(bias_incomplete ? [`HTF bias incomplete (${biasMeta.tf})`] : []),
             ],
           },
 
-          tags: ["intraday", "failed_sweep", "continuation"],
+          tags: ["intraday", "failed_sweep", "continuation", "bos", "retest"],
         });
       }
     }
   }
+
 
   // 3) RANGE_MEAN_REVERT (bias sideways) — B+ policy: allowed even when HTF bias incomplete (with stricter RR)
   if (f.bias.trend_dir === "sideways" && below && above) {
