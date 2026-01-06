@@ -540,6 +540,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     // UX state
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedSig, setSelectedSig] = useState<string | null>(null);
+    // Freeze DETAILS model to avoid jitter on tick updates
+    const [detailModel, setDetailModel] = useState<AnyObj | null>(null);
 
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [expandedChecklist, setExpandedChecklist] = useState(true);
@@ -664,6 +666,14 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     }, [rows, selectedId]);
 
     const selectedKey = selected ? String((selected as AnyObj)?.__uiKey ?? "") : "";
+    // Update frozen detail model ONLY when selection changes
+    useEffect(() => {
+        if (!selected) {
+            setDetailModel(null);
+            return;
+        }
+        setDetailModel(selected);
+    }, [selectedKey]);
 
 
     useEffect(() => {
@@ -723,10 +733,11 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
 
     const copyTicket = async () => {
-        if (!selected) return;
-        const ok = await copyText(buildTicketText(selected));
+        if (!detailModel) return;
+        const ok = await copyText(buildTicketText(detailModel));
         setToast(ok ? "COPIED TICKET" : "COPY FAILED");
     };
+
 
     const pick = (s: AnyObj) => {
         const key = String(s?.__uiKey ?? s?.id ?? "");
@@ -740,10 +751,14 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const z = selected?.entry?.zone;
     const distLabel = distLabelFor(mid, z, String(selected?.entry?.mode ?? ""));
 
-    const prog = selected ? triggerProgress(selected) : { ok: 0, total: 0, pct: 0, checklist: [], next: null };
+    const prog = detailModel
+        ? triggerProgress(detailModel)
+        : { ok: 0, total: 0, pct: 0, checklist: [], next: null };
+
 
     const renderDetails = (inDrawer: boolean) => {
-        if (!selected) {
+        const s = detailModel;
+        if (!s) {
             return (
                 <div className="dos-panel">
                     <div className="dos-panel-head">DETAILS</div>
@@ -754,7 +769,7 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
         const isPinned = Boolean(selectedKey && pinned[selectedKey]);
 
-        const mode = String(selected?.entry?.mode ?? "—");
+        const mode = String(s?.entry?.mode ?? "—");
         const entry =
             mode === "LIMIT" && selected?.entry?.zone
                 ? `[${fmt(selected.entry.zone.lo, 2)}–${fmt(selected.entry.zone.hi, 2)}]`
