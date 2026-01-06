@@ -23,6 +23,16 @@ function showFlags(fl?: string) {
     if (!s || s === "—" || s === "-") return "";
     return s;
 }
+function htfBiasLabel(features: any) {
+    const dir = String(features?.bias?.trend_dir ?? "").trim();
+    const tf = String(features?.bias?.tf ?? "").trim();
+
+    if (!dir && !tf) return "—";
+    if (!dir) return `— (${tf || "?"})`;
+    if (!tf) return `${dir.toUpperCase()} (?)`;
+
+    return `${dir.toUpperCase()} (${tf})`;
+}
 
 function typeShort(t: string) {
     if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
@@ -440,14 +450,6 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const vFeat = paused ? frozen.features : features;
     const vSet = paused ? frozen.setups : setups;
 
-    useEffect(() => {
-        // One-time-ish debug: log HTF shape when it changes
-        // (Remove after fixing HTF display)
-        // eslint-disable-next-line no-console
-        console.log("[HTF]", vFeat?.htf);
-    }, [vFeat?.htf]);
-
-
     const dq = String(vFeat?.quality?.dq_grade ?? "—");
     const dqOk = Boolean(vSet?.dq_ok ?? vFeat?.quality?.dq_ok);
     const bybitOk = Boolean(vFeat?.quality?.bybit_ok);
@@ -524,11 +526,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     // Prefer feed timestamp if present, otherwise use an internal activity clock.
     // Tick detection: any meaningful mid/last change (or ts change if available).
     const tickKey = String(
-        vSnap?.ts ??
-        vSnap?.generatedTs ??
-        vSnap?.generated_at ??
+        vSnap?.price?.ts ??
         vSnap?.price?.mid ??
-        vSnap?.price?.last ??
         ""
     );
 
@@ -536,9 +535,9 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const lastActivityMsRef = useRef<number | null>(null);
 
     // Derive staleSec
-    const baseTs = Number(vSnap?.ts ?? vSnap?.generatedTs ?? vSnap?.generated_at ?? NaN);
-    const staleSec = Number.isFinite(baseTs)
-        ? (now - baseTs) / 1000
+    const priceTs = Number(vSnap?.price?.ts);
+    const staleSec = Number.isFinite(priceTs)
+        ? (now - priceTs) / 1000
         : lastActivityMsRef.current != null
             ? (now - lastActivityMsRef.current) / 1000
             : undefined;
@@ -548,7 +547,7 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         if (paused) return;
 
         // If we don't even have a mid/last yet, don't start pulsing.
-        const px = Number(vSnap?.price?.mid ?? vSnap?.price?.last);
+        const px = Number(vSnap?.price?.mid);
         if (!Number.isFinite(px) && !tickKey) return;
 
         // Update internal activity clock and pulse
@@ -790,22 +789,50 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
 
     function invalidationLabel(ms: AnyObj) {
         if (!ms) return "—";
-        if (ms.trend === "UP") return fmt(ms.lastSwingLow?.price, 2);
-        if (ms.trend === "DOWN") return fmt(ms.lastSwingHigh?.price, 2);
+
+        const trend = String(ms.trend ?? "");
+        if (!trend || trend === "—") return "—";
+
+        if (trend === "RANGE") return "n/a";
+
+        if (trend === "UP") {
+            const x = ms.lastSwingLow?.price;
+            return Number.isFinite(Number(x)) ? fmt(x, 2) : "pending";
+        }
+
+        if (trend === "DOWN") {
+            const x = ms.lastSwingHigh?.price;
+            return Number.isFinite(Number(x)) ? fmt(x, 2) : "pending";
+        }
+
         return "—";
     }
+
 
     function eventsLabel(ms: AnyObj) {
         if (!ms) return "—";
         const ev: string[] = [];
 
-        if (ms.lastBOS) ev.push(`BOS${ms.lastBOS.dir === "UP" ? "↑" : "↓"}`);
-        if (ms.lastCHOCH) ev.push(`CHOCH${ms.lastCHOCH.dir === "UP" ? "↑" : "↓"}`);
-        if (ms.lastSweep) ev.push(`SWP${ms.lastSweep.dir === "UP" ? "↑" : "↓"}`);
+        if (ms.lastBOS) {
+            const d = ms.lastBOS.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastBOS.price ?? ms.lastBOS.level;
+            ev.push(`BOS${d} ${fmt(p, 0)}`);
+        }
+
+        if (ms.lastCHOCH) {
+            const d = ms.lastCHOCH.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastCHOCH.price ?? ms.lastCHOCH.level;
+            ev.push(`CHOCH${d} ${fmt(p, 0)}`);
+        }
+
+        if (ms.lastSweep) {
+            const d = ms.lastSweep.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastSweep.price ?? ms.lastSweep.level;
+            ev.push(`SWP${d} ${fmt(p, 0)}`);
+        }
 
         return ev.length ? ev.slice(0, 2).join(" ") : "—";
     }
-
 
     return (
         <>
@@ -817,7 +844,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                 binanceOk={binanceOk}
                 mid={mid}
                 dev={dev}
-                lastTs={vSnap?.ts ?? vSnap?.generatedTs ?? vSnap?.generated_at ?? null}
+                lastTs={vSnap?.price?.ts ?? null}
                 staleSec={staleSec}
                 setupsCount={rows.length}
                 preferredId={preferredId}
