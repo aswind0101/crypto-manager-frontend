@@ -328,10 +328,11 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
     dev_z = deviationZ({ bybit: c15, binance: b15, windowBars: 120 });
   }
 
-  let consensus_score: number | undefined = undefined;
-  if (c5 && b5 && c5.length >= 40 && b5.length >= 40) {
-    consensus_score = consensusScore({ bybit: c5, binance: b5, windowBars: 30 });
-  }
+  const consensus_score = consensusScore({
+    dev_bps,
+    lead_lag: input.cross?.lead_lag,
+  });
+
   const market_structure = computeMarketStructureSnapshot({
     tfs: ["15m", "1h", "4h"], // NEW: add 4h
     candlesByTf: {

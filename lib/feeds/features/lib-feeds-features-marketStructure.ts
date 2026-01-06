@@ -131,37 +131,80 @@ export function computeMarketStructureTF(args: {
     sweepUp = false,
     sweepDown = false;
 
+  // Detect BOS/CHOCH as "most recent confirmed event" (not only on last candle).
+  // We scan confirmed candles left-to-right, using swing points as structural levels.
+  if (conf.length && swingsAll.length) {
+    // Build swing lookup by timestamp (ts should match candle.ts)
+    const swingsByTs = new Map<number, SwingPoint[]>();
+    for (const sp of swingsAll) {
+      const arr = swingsByTs.get(sp.ts);
+      if (arr) arr.push(sp);
+      else swingsByTs.set(sp.ts, [sp]);
+    }
+
+    let curHigh: SwingPoint | undefined = undefined;
+    let curLow: SwingPoint | undefined = undefined;
+
+    // flags specifically for the LAST confirmed candle (for UI signals)
+    bosUp = false;
+    bosDown = false;
+    chochUp = false;
+    chochDown = false;
+
+    // Walk all confirmed candles to find latest BOS/CHOCH
+    for (let i = 0; i < conf.length; i++) {
+      const c = conf[i];
+      const isLast = i === conf.length - 1;
+
+      // Update current swing levels if this candle forms a swing
+      const sps = swingsByTs.get(c.ts);
+      if (sps?.length) {
+        for (const sp of sps) {
+          if (sp.type === "HIGH") curHigh = sp;
+          else if (sp.type === "LOW") curLow = sp;
+        }
+      }
+
+      const brokeUp = Boolean(curHigh && c.c > curHigh.price);
+      const brokeDown = Boolean(curLow && c.c < curLow.price);
+
+      if (brokeUp) {
+        if (trend === "BEAR") {
+          lastCHOCH = mkStructureEvent("CHOCH", "UP", tf, curHigh!.price, c);
+          if (isLast) chochUp = true;
+          trend = "BULL";
+        } else {
+          lastBOS = mkStructureEvent("BOS", "UP", tf, curHigh!.price, c);
+          if (isLast) bosUp = true;
+          trend = "BULL";
+        }
+
+        // prevent repeated triggers while price stays above the same level
+        curHigh = undefined;
+      } else if (brokeDown) {
+        if (trend === "BULL") {
+          lastCHOCH = mkStructureEvent("CHOCH", "DOWN", tf, curLow!.price, c);
+          if (isLast) chochDown = true;
+          trend = "BEAR";
+        } else {
+          lastBOS = mkStructureEvent("BOS", "DOWN", tf, curLow!.price, c);
+          if (isLast) bosDown = true;
+          trend = "BEAR";
+        }
+
+        // prevent repeated triggers while price stays below the same level
+        curLow = undefined;
+      } else {
+        if (trend === "UNKNOWN") trend = "RANGE";
+      }
+    }
+  }
+
+  // Sweeps are still evaluated on the last confirmed candle against the last swings (as before).
   if (last && (lastSwingHigh || lastSwingLow)) {
     lastSweep = detectSweep(tf, last, lastSwingHigh, lastSwingLow);
     if (lastSweep?.dir === "UP") sweepUp = true;
     if (lastSweep?.dir === "DOWN") sweepDown = true;
-
-    const brokeUp = Boolean(lastSwingHigh && last.c > lastSwingHigh.price);
-    const brokeDown = Boolean(lastSwingLow && last.c < lastSwingLow.price);
-
-    if (brokeUp) {
-      if (trend === "BEAR") {
-        lastCHOCH = mkStructureEvent("CHOCH", "UP", tf, lastSwingHigh!.price, last);
-        chochUp = true;
-        trend = "BULL";
-      } else {
-        lastBOS = mkStructureEvent("BOS", "UP", tf, lastSwingHigh!.price, last);
-        bosUp = true;
-        trend = "BULL";
-      }
-    } else if (brokeDown) {
-      if (trend === "BULL") {
-        lastCHOCH = mkStructureEvent("CHOCH", "DOWN", tf, lastSwingLow!.price, last);
-        chochDown = true;
-        trend = "BEAR";
-      } else {
-        lastBOS = mkStructureEvent("BOS", "DOWN", tf, lastSwingLow!.price, last);
-        bosDown = true;
-        trend = "BEAR";
-      }
-    } else {
-      if (trend === "UNKNOWN") trend = "RANGE";
-    }
   }
 
   return {
