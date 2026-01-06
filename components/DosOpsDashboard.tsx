@@ -1479,8 +1479,8 @@ export function DosOpsDashboard() {
 }
 .dos-mo-row{
   display:grid;
-  grid-template-columns: 52px 90px 140px 110px 1fr;
-  gap:10px;
+  grid-template-columns: 52px 76px 132px 84px minmax(120px, 1fr);
+  gap:8px;
   padding:8px 10px;
   border-top:1px solid #0d1f0d;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
