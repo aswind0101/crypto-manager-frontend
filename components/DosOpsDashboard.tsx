@@ -4,1132 +4,1150 @@ import { useSetupsSnapshot } from "../hooks/useSetupsSnapshot";
 type AnyObj = any;
 
 const uiMono =
-  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
+    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
 const uiSans =
-  "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'";
+    "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'";
 
 function fmt(n: any, dp = 2) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return "—";
-  return x.toFixed(dp);
+    const x = Number(n);
+    if (!Number.isFinite(x)) return "—";
+    return x.toFixed(dp);
 }
 function clamp(n: number, lo: number, hi: number) {
-  return Math.max(lo, Math.min(hi, n));
+    return Math.max(lo, Math.min(hi, n));
 }
 function bar(pct01: number, width = 10) {
-  const filled = clamp(Math.round(pct01 * width), 0, width);
-  return "█".repeat(filled) + "░".repeat(width - filled);
+    const filled = clamp(Math.round(pct01 * width), 0, width);
+    return "█".repeat(filled) + "░".repeat(width - filled);
 }
 function typeShort(t: string) {
-  if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
-  if (t === "RANGE_MEAN_REVERT") return "RMR";
-  if (t === "TREND_PULLBACK") return "TPB";
-  if (t === "BREAKOUT") return "BRK";
-  if (t === "FAILED_SWEEP_CONTINUATION") return "FSC";
-  return (t || "—").slice(0, 6).toUpperCase();
+    if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
+    if (t === "RANGE_MEAN_REVERT") return "RMR";
+    if (t === "TREND_PULLBACK") return "TPB";
+    if (t === "BREAKOUT") return "BRK";
+    if (t === "FAILED_SWEEP_CONTINUATION") return "FSC";
+    return (t || "—").slice(0, 6).toUpperCase();
 }
 
 function setupSig(s: AnyObj) {
-  return [
-    String(s?.canon ?? ""),
-    String(s?.side ?? ""),
-    String(s?.type ?? ""),
-    String(s?.bias_tf ?? ""),
-    String(s?.entry_tf ?? ""),
-    String(s?.trigger_tf ?? ""),
-  ].join("|");
+    return [
+        String(s?.canon ?? ""),
+        String(s?.side ?? ""),
+        String(s?.type ?? ""),
+        String(s?.bias_tf ?? ""),
+        String(s?.entry_tf ?? ""),
+        String(s?.trigger_tf ?? ""),
+    ].join("|");
 }
 
 function triggerProgress(s: AnyObj) {
-  const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
-  const total = checklist.length || 0;
-  const ok = checklist.filter((x: AnyObj) => x?.ok === true).length;
-  const pct = total ? ok / total : 0;
-  const next = checklist.find((x: AnyObj) => x && x.ok === false) ?? null;
-  return { ok, total, pct, checklist, next };
+    const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
+    const total = checklist.length || 0;
+    const ok = checklist.filter((x: AnyObj) => x?.ok === true).length;
+    const pct = total ? ok / total : 0;
+    const next = checklist.find((x: AnyObj) => x && x.ok === false) ?? null;
+    return { ok, total, pct, checklist, next };
 }
 
 function actionLabel(s: AnyObj) {
-  const status = String(s?.status ?? "");
-  const mode = String(s?.entry?.mode ?? "");
-  const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
+    const status = String(s?.status ?? "");
+    const mode = String(s?.entry?.mode ?? "");
+    const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
 
-  const closeItem = checklist.find((x: AnyObj) => String(x?.key ?? "") === "close_confirm");
-  const hasClose = Boolean(closeItem);
-  const closeOk = closeItem?.ok === true;
+    const closeItem = checklist.find((x: AnyObj) => String(x?.key ?? "") === "close_confirm");
+    const hasClose = Boolean(closeItem);
+    const closeOk = closeItem?.ok === true;
 
-  if (status === "INVALIDATED") return "INVALIDATED";
-  if (status === "EXPIRED") return "EXPIRED";
+    if (status === "INVALIDATED") return "INVALIDATED";
+    if (status === "EXPIRED") return "EXPIRED";
 
-  if (status === "TRIGGERED") {
-    return mode === "MARKET" ? "ENTER MARKET (CONFIRMED)" : "TRIGGERED (WAIT EXEC)";
-  }
+    if (status === "TRIGGERED") {
+        return mode === "MARKET" ? "ENTER MARKET (CONFIRMED)" : "TRIGGERED (WAIT EXEC)";
+    }
 
-  if (status === "READY") {
-    if (hasClose && !closeOk) return "WAIT CLOSE (CONFIRM)";
-    return mode === "LIMIT" ? "PLACE LIMIT (ARMED)" : "READY (ARMED)";
-  }
+    if (status === "READY") {
+        if (hasClose && !closeOk) return "WAIT CLOSE (CONFIRM)";
+        return mode === "LIMIT" ? "PLACE LIMIT (ARMED)" : "READY (ARMED)";
+    }
 
-  const next = checklist.find((x: AnyObj) => x && x.ok === false);
-  if (next?.key) {
-    const k = String(next.key);
-    if (k === "retest") return "WAIT RETEST";
-    if (k === "close_confirm") return "WAIT CLOSE (CONFIRM)";
-    return `WAIT ${k.toUpperCase()}`;
-  }
+    const next = checklist.find((x: AnyObj) => x && x.ok === false);
+    if (next?.key) {
+        const k = String(next.key);
+        if (k === "retest") return "WAIT RETEST";
+        if (k === "close_confirm") return "WAIT CLOSE (CONFIRM)";
+        return `WAIT ${k.toUpperCase()}`;
+    }
 
-  return "NO ACTION";
+    return "NO ACTION";
 }
 
 function distanceBps(px: number, z: AnyObj) {
-  if (!Number.isFinite(px) || !z) return NaN;
-  const lo = Number(z.lo);
-  const hi = Number(z.hi);
-  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return NaN;
-  if (px >= lo && px <= hi) return 0;
-  const dist = px > hi ? px - hi : lo - px;
-  const ref = px || hi || lo;
-  return (dist / ref) * 10000;
+    if (!Number.isFinite(px) || !z) return NaN;
+    const lo = Number(z.lo);
+    const hi = Number(z.hi);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return NaN;
+    if (px >= lo && px <= hi) return 0;
+    const dist = px > hi ? px - hi : lo - px;
+    const ref = px || hi || lo;
+    return (dist / ref) * 10000;
 }
 function distLabelFor(mid: number, z: AnyObj, mode?: string) {
-  const dist = Number.isFinite(mid) ? distanceBps(mid, z) : NaN;
-  if (!Number.isFinite(dist)) return "—";
-  if (dist === 0) return String(mode ?? "") === "LIMIT" ? "IN (MID)" : "IN";
-  return `${dist.toFixed(0)}bps`;
+    const dist = Number.isFinite(mid) ? distanceBps(mid, z) : NaN;
+    if (!Number.isFinite(dist)) return "—";
+    if (dist === 0) return String(mode ?? "") === "LIMIT" ? "IN (MID)" : "IN";
+    return `${dist.toFixed(0)}bps`;
 }
 
 function resolveMS(features: AnyObj, tf: string) {
-  const msRoot = features?.market_structure;
-  if (!msRoot) return null;
+    const msRoot = features?.market_structure;
+    if (!msRoot) return null;
 
-  if (typeof msRoot === "object" && !Array.isArray(msRoot) && msRoot[tf]) return msRoot[tf];
+    if (typeof msRoot === "object" && !Array.isArray(msRoot) && msRoot[tf]) return msRoot[tf];
 
-  if (Array.isArray(msRoot)) {
-    const hit = msRoot.find((x: AnyObj) => String(x?.tf ?? "") === tf);
-    if (hit) return hit;
-  }
-
-  const aliases: Record<string, string[]> = {
-    "15m": ["15m", "15", "M15", "15min"],
-    "1h": ["1h", "60m", "60", "H1", "1H", "1hr", "1hour"],
-    "4h": ["4h", "240m", "240", "H4", "4H"],
-    "1d": ["1d", "D1", "1D", "24h", "1440m", "1440"],
-  };
-
-  const keys = aliases[tf] ?? [tf];
-  for (const k of keys) {
-    if (typeof msRoot === "object" && !Array.isArray(msRoot) && msRoot[k]) return msRoot[k];
     if (Array.isArray(msRoot)) {
-      const hit = msRoot.find((x: AnyObj) => String(x?.tf ?? "") === k);
-      if (hit) return hit;
+        const hit = msRoot.find((x: AnyObj) => String(x?.tf ?? "") === tf);
+        if (hit) return hit;
     }
-  }
-  return null;
+
+    const aliases: Record<string, string[]> = {
+        "15m": ["15m", "15", "M15", "15min"],
+        "1h": ["1h", "60m", "60", "H1", "1H", "1hr", "1hour"],
+        "4h": ["4h", "240m", "240", "H4", "4H"],
+        "1d": ["1d", "D1", "1D", "24h", "1440m", "1440"],
+    };
+
+    const keys = aliases[tf] ?? [tf];
+    for (const k of keys) {
+        if (typeof msRoot === "object" && !Array.isArray(msRoot) && msRoot[k]) return msRoot[k];
+        if (Array.isArray(msRoot)) {
+            const hit = msRoot.find((x: AnyObj) => String(x?.tf ?? "") === k);
+            if (hit) return hit;
+        }
+    }
+    return null;
 }
 
 function marketScan(features: AnyObj, tf: string) {
-  const ms = resolveMS(features, tf);
-  const trend = String(ms?.trend ?? "—");
-  const sH = ms?.lastSwingHigh?.price ?? ms?.lastSwingHigh;
-  const sL = ms?.lastSwingLow?.price ?? ms?.lastSwingLow;
+    const ms = resolveMS(features, tf);
+    const trend = String(ms?.trend ?? "—");
+    const sH = ms?.lastSwingHigh?.price ?? ms?.lastSwingHigh;
+    const sL = ms?.lastSwingLow?.price ?? ms?.lastSwingLow;
 
-  const bos = ms?.lastBOS ? `${ms.lastBOS.dir} @ ${fmt(ms.lastBOS.price ?? ms.lastBOS.level, 2)}` : "—";
-  const choch = ms?.lastCHOCH ? `${ms.lastCHOCH.dir} @ ${fmt(ms.lastCHOCH.price ?? ms.lastCHOCH.level, 2)}` : "—";
-  const sweep = ms?.lastSweep ? `${ms.lastSweep.dir} @ ${fmt(ms.lastSweep.price ?? ms.lastSweep.level, 2)}` : "—";
+    const bos = ms?.lastBOS ? `${ms.lastBOS.dir} @ ${fmt(ms.lastBOS.price ?? ms.lastBOS.level, 2)}` : "—";
+    const choch = ms?.lastCHOCH ? `${ms.lastCHOCH.dir} @ ${fmt(ms.lastCHOCH.price ?? ms.lastCHOCH.level, 2)}` : "—";
+    const sweep = ms?.lastSweep ? `${ms.lastSweep.dir} @ ${fmt(ms.lastSweep.price ?? ms.lastSweep.level, 2)}` : "—";
 
-  const flags = ms?.flags ?? {};
-  const fl: string[] = [];
-  if (flags.bosUp) fl.push("BOS↑");
-  if (flags.bosDown) fl.push("BOS↓");
-  if (flags.sweepUp) fl.push("SWP↑");
-  if (flags.sweepDown) fl.push("SWP↓");
+    const flags = ms?.flags ?? {};
+    const fl: string[] = [];
+    if (flags.bosUp) fl.push("BOS↑");
+    if (flags.bosDown) fl.push("BOS↓");
+    if (flags.sweepUp) fl.push("SWP↑");
+    if (flags.sweepDown) fl.push("SWP↓");
 
-  return { trend, sH, sL, bos, choch, sweep, fl: fl.length ? fl.join(" ") : "—" };
+    return { trend, sH, sL, bos, choch, sweep, fl: fl.length ? fl.join(" ") : "—" };
 }
 
 function biasByTfLabel(features: AnyObj, tf: string) {
-  const b = features?.bias_by_tf?.[tf];
-  if (!b) return "—";
+    const b = features?.bias_by_tf?.[tf];
+    if (!b) return "—";
 
-  const complete = Boolean(b.complete);
-  const have = Number(b.have ?? 0);
-  const need = Number(b.need ?? 210);
+    const complete = Boolean(b.complete);
+    const have = Number(b.have ?? 0);
+    const need = Number(b.need ?? 210);
 
-  if (!complete) return `PENDING (${have}/${need})`;
+    if (!complete) return `PENDING (${have}/${need})`;
 
-  const dir = String(b.trend_dir ?? "").trim();
-  const str = Number(b.trend_strength);
-  const vr = String(b.vol_regime ?? "").trim();
+    const dir = String(b.trend_dir ?? "").trim();
+    const str = Number(b.trend_strength);
+    const vr = String(b.vol_regime ?? "").trim();
 
-  const DIR =
-    dir === "bull" ? "BULL" :
-    dir === "bear" ? "BEAR" :
-    dir === "sideways" ? "SIDE" :
-    dir ? dir.toUpperCase() : "—";
+    const DIR =
+        dir === "bull" ? "BULL" :
+            dir === "bear" ? "BEAR" :
+                dir === "sideways" ? "SIDE" :
+                    dir ? dir.toUpperCase() : "—";
 
-  const sPct = Number.isFinite(str) ? Math.round(str * 100) : null;
-  const core = sPct != null ? `${DIR} ${sPct}%` : DIR;
-  const vol = vr ? ` • ${vr.toUpperCase()}` : "";
-  return `${core}${vol}`;
+    const sPct = Number.isFinite(str) ? Math.round(str * 100) : null;
+    const core = sPct != null ? `${DIR} ${sPct}%` : DIR;
+    const vol = vr ? ` • ${vr.toUpperCase()}` : "";
+    return `${core}${vol}`;
 }
 
 async function copyText(text: string) {
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
+    try {
+        if (navigator?.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch { }
+    try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+    } catch {
+        return false;
     }
-  } catch { }
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    ta.style.top = "0";
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
-  } catch {
-    return false;
-  }
 }
 
 function buildTicketText(s: AnyObj) {
-  const side = String(s?.side ?? "—");
-  const type = String(s?.type ?? "—");
-  const status = String(s?.status ?? "—");
-  const tf = `${String(s?.bias_tf ?? "—")}→${String(s?.entry_tf ?? "—")}→${String(s?.trigger_tf ?? "—")}`;
-  const mode = String(s?.entry?.mode ?? "—");
-  const z = s?.entry?.zone;
-  const entry =
-    mode === "LIMIT" && z ? `[${fmt(z.lo, 2)}–${fmt(z.hi, 2)}]` : mode === "MARKET" ? "MARKET" : "—";
-  const sl = `${fmt(s?.stop?.price, 2)} (${String(s?.stop?.basis ?? "—")})`;
-  const tps = Array.isArray(s?.tp) && s.tp.length ? s.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—";
-  const rr = `RRmin ${fmt(s?.rr_min, 2)}  RRest ${fmt(s?.rr_est, 2)}`;
-  const act = actionLabel(s);
+    const side = String(s?.side ?? "—");
+    const type = String(s?.type ?? "—");
+    const status = String(s?.status ?? "—");
+    const tf = `${String(s?.bias_tf ?? "—")}→${String(s?.entry_tf ?? "—")}→${String(s?.trigger_tf ?? "—")}`;
+    const mode = String(s?.entry?.mode ?? "—");
+    const z = s?.entry?.zone;
+    const entry =
+        mode === "LIMIT" && z ? `[${fmt(z.lo, 2)}–${fmt(z.hi, 2)}]` : mode === "MARKET" ? "MARKET" : "—";
+    const sl = `${fmt(s?.stop?.price, 2)} (${String(s?.stop?.basis ?? "—")})`;
+    const tps = Array.isArray(s?.tp) && s.tp.length ? s.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—";
+    const rr = `RRmin ${fmt(s?.rr_min, 2)}  RRest ${fmt(s?.rr_est, 2)}`;
+    const act = actionLabel(s);
 
-  return [
-    `SYMBOL: ${String(s?.canon ?? "")}`,
-    `SIDE: ${side}  TYPE: ${type}  STATUS: ${status}`,
-    `TF: ${tf}`,
-    `ENTRY (${mode}): ${entry}`,
-    `SL: ${sl}`,
-    `TP: ${tps}`,
-    rr,
-    `ACTION: ${act}`,
-    `ID: ${String(s?.id ?? "")}`,
-  ].join("\n");
+    return [
+        `SYMBOL: ${String(s?.canon ?? "")}`,
+        `SIDE: ${side}  TYPE: ${type}  STATUS: ${status}`,
+        `TF: ${tf}`,
+        `ENTRY (${mode}): ${entry}`,
+        `SL: ${sl}`,
+        `TP: ${tps}`,
+        rr,
+        `ACTION: ${act}`,
+        `ID: ${String(s?.id ?? "")}`,
+    ].join("\n");
 }
 
 function useIsNarrow(breakpoint = 980) {
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width:${breakpoint}px)`);
-    const on = () => setNarrow(Boolean(mq.matches));
-    on();
-    mq.addEventListener?.("change", on);
-    return () => mq.removeEventListener?.("change", on);
-  }, [breakpoint]);
-  return narrow;
+    const [narrow, setNarrow] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia(`(max-width:${breakpoint}px)`);
+        const on = () => setNarrow(Boolean(mq.matches));
+        on();
+        mq.addEventListener?.("change", on);
+        return () => mq.removeEventListener?.("change", on);
+    }, [breakpoint]);
+    return narrow;
 }
 
 function Toast({ msg, onDone }: { msg: string; onDone: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 1300);
-    return () => clearTimeout(t);
-  }, [onDone]);
-  return <div className="toast">{msg}</div>;
+    useEffect(() => {
+        const t = setTimeout(onDone, 1300);
+        return () => clearTimeout(t);
+    }, [onDone]);
+    return <div className="toast">{msg}</div>;
 }
 function tap(fn: () => void) {
-  return {
-    onPointerUp: (e: React.PointerEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      fn();
-    },
-    onClick: (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      fn();
-    },
-  };
+    return {
+        onPointerUp: (e: React.PointerEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fn();
+        },
+        onClick: (e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fn();
+        },
+    };
 }
 
 function stalePct(staleSec?: number) {
-  if (staleSec == null || !Number.isFinite(staleSec)) return 0;
-  return clamp(1 - staleSec / 5, 0, 1);
+    if (staleSec == null || !Number.isFinite(staleSec)) return 0;
+    return clamp(1 - staleSec / 5, 0, 1);
 }
 
 function ScanPulse({
-  title,
-  tone,
-  dq,
-  bybitOk,
-  binanceOk,
-  staleSec,
-  pulse,
+    title,
+    tone,
+    dq,
+    bybitOk,
+    binanceOk,
+    staleSec,
+    pulse,
 }: {
-  title: string;
-  tone: "ok" | "warn" | "bad";
-  dq: string;
-  bybitOk: boolean;
-  binanceOk: boolean;
-  staleSec?: number;
-  pulse: number;
+    title: string;
+    tone: "ok" | "warn" | "bad";
+    dq: string;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    staleSec?: number;
+    pulse: number;
 }) {
-  const pct = stalePct(staleSec);
-  const staleLabel = staleSec == null || !Number.isFinite(staleSec) ? "—" : `${staleSec.toFixed(1)}s`;
-  const bump = pulse % 2 === 0;
+    const pct = stalePct(staleSec);
+    const staleLabel = staleSec == null || !Number.isFinite(staleSec) ? "—" : `${staleSec.toFixed(1)}s`;
+    const bump = pulse % 2 === 0;
 
-  const staleTone = pct > 0.7 ? "ok" : pct > 0.3 ? "warn" : "bad";
+    const staleTone = pct > 0.7 ? "ok" : pct > 0.3 ? "warn" : "bad";
 
-  return (
-    <div className="scan">
-      <div className="scanTop">
-        <div className={`scanTitle ${tone}`}>{title}</div>
-        <div className="scanMeta">
-          <span className="chip">DQ <span className="monoStrong">{dq}</span></span>
-          <span className="chip">
-            FEEDS{" "}
-            <span className={bybitOk ? "ok" : "bad"}>BYBIT</span>{" "}
-            <span className={binanceOk ? "ok" : "warn"}>BINANCE</span>
-          </span>
-          <span className="chip">
-            STALE <span className={staleTone}>{staleLabel}</span>
-          </span>
+    return (
+        <div className="scan">
+            <div className="scanTop">
+                <div className={`scanTitle ${tone}`}>{title}</div>
+                <div className="scanMeta">
+                    <span className="chip">DQ <span className="monoStrong">{dq}</span></span>
+                    <span className="chip">
+                        FEEDS{" "}
+                        <span className={bybitOk ? "ok" : "bad"}>BYBIT</span>{" "}
+                        <span className={binanceOk ? "ok" : "warn"}>BINANCE</span>
+                    </span>
+                    <span className="chip">
+                        STALE <span className={staleTone}>{staleLabel}</span>
+                    </span>
+                </div>
+            </div>
+
+            <div className="scanMeter" aria-label="scan activity">
+                <div
+                    className={`scanFill ${bump ? "scanBump" : ""}`}
+                    style={{
+                        width: `${Math.round(pct * 100)}%`,
+                        animation: bump ? "scanPulse 320ms ease-out" : undefined,
+                    }}
+                />
+            </div>
         </div>
-      </div>
-
-      <div className="scanMeter" aria-label="scan activity">
-        <div
-          className={`scanFill ${bump ? "scanBump" : ""}`}
-          style={{
-            width: `${Math.round(pct * 100)}%`,
-            animation: bump ? "scanPulse 320ms ease-out" : undefined,
-          }}
-        />
-      </div>
-    </div>
-  );
+    );
 }
 
 function statusTone(opts: {
-  mid: number;
-  dqOk: boolean;
-  bybitOk: boolean;
-  binanceOk: boolean;
-  rowsCount: number;
+    mid: number;
+    dqOk: boolean;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    rowsCount: number;
 }) {
-  const { mid, dqOk, bybitOk, binanceOk, rowsCount } = opts;
+    const { mid, dqOk, bybitOk, binanceOk, rowsCount } = opts;
 
-  if (!Number.isFinite(mid)) return { title: "SCAN: CONNECTING", tone: "warn" as const };
-  if (!dqOk) return { title: "SCAN: PAUSED (DQ GATED)", tone: "bad" as const };
-  if (!bybitOk) return { title: "SCAN: DEGRADED (BYBIT DOWN)", tone: "bad" as const };
-  if (!binanceOk) return { title: "SCAN: DEGRADED (BINANCE)", tone: "warn" as const };
-  if (rowsCount === 0) return { title: "SCAN: LIVE (NO SETUPS)", tone: "ok" as const };
-  return { title: "SCAN: LIVE", tone: "ok" as const };
+    if (!Number.isFinite(mid)) return { title: "SCAN: CONNECTING", tone: "warn" as const };
+    if (!dqOk) return { title: "SCAN: PAUSED (DQ GATED)", tone: "bad" as const };
+    if (!bybitOk) return { title: "SCAN: DEGRADED (BYBIT DOWN)", tone: "bad" as const };
+    if (!binanceOk) return { title: "SCAN: DEGRADED (BINANCE)", tone: "warn" as const };
+    if (rowsCount === 0) return { title: "SCAN: LIVE (NO SETUPS)", tone: "ok" as const };
+    return { title: "SCAN: LIVE", tone: "ok" as const };
 }
 
 function SystemRibbon({
-  paused,
-  dq,
-  dqOk,
-  bybitOk,
-  binanceOk,
-  mid,
-  dev,
-  lastTs,
-  staleSec,
-  setupsCount,
-  preferredId,
+    paused,
+    dq,
+    dqOk,
+    bybitOk,
+    binanceOk,
+    mid,
+    dev,
+    lastTs,
+    staleSec,
+    setupsCount,
+    preferredId,
 }: {
-  paused: boolean;
-  dq: string;
-  dqOk: boolean;
-  bybitOk: boolean;
-  binanceOk: boolean;
-  mid: number;
-  dev: any;
-  lastTs?: number;
-  staleSec?: number;
-  setupsCount: number;
-  preferredId?: string;
+    paused: boolean;
+    dq: string;
+    dqOk: boolean;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    mid: number;
+    dev: any;
+    lastTs?: number;
+    staleSec?: number;
+    setupsCount: number;
+    preferredId?: string;
 }) {
-  const now = Date.now();
-  const staleMs =
-    staleSec != null && Number.isFinite(staleSec)
-      ? Math.max(0, staleSec * 1000)
-      : lastTs
-        ? Math.max(0, now - lastTs)
-        : NaN;
+    const now = Date.now();
+    const staleMs =
+        staleSec != null && Number.isFinite(staleSec)
+            ? Math.max(0, staleSec * 1000)
+            : lastTs
+                ? Math.max(0, now - lastTs)
+                : NaN;
 
-  const warm = !Number.isFinite(mid);
-  const health =
-    !bybitOk ? "BYBIT DOWN" :
-    !binanceOk ? "BINANCE DEGRADED" :
-    !dqOk ? "DQ GATED" :
-    warm ? "WARMING UP" : "OK";
+    const warm = !Number.isFinite(mid);
+    const health =
+        !bybitOk ? "BYBIT DOWN" :
+            !binanceOk ? "BINANCE DEGRADED" :
+                !dqOk ? "DQ GATED" :
+                    warm ? "WARMING UP" : "OK";
 
-  const healthTone =
-    health === "OK" ? "ok" :
-    health.includes("WARM") || health.includes("DEGRADED") ? "warn" : "bad";
+    const healthTone =
+        health === "OK" ? "ok" :
+            health.includes("WARM") || health.includes("DEGRADED") ? "warn" : "bad";
 
-  const staleTone =
-    !Number.isFinite(staleMs) ? "warn" :
-    staleMs < 1500 ? "ok" :
-    staleMs < 5000 ? "warn" : "bad";
+    const staleTone =
+        !Number.isFinite(staleMs) ? "warn" :
+            staleMs < 1500 ? "ok" :
+                staleMs < 5000 ? "warn" : "bad";
 
-  return (
-    <div className="ribbon">
-      <span className={`pill ${paused ? "warn" : "ok"}`}>{paused ? "FROZEN" : "LIVE"}</span>
-      <span className={`pill ${healthTone}`}>HEALTH: {health}</span>
-      <span className="pill dim">
-        DQ: <span className="monoStrong">{dq}</span> {!dqOk ? <span className="warn"> (GATED)</span> : null}
-      </span>
-      <span className="pill dim">
-        MID: <span className="monoStrong">{Number.isFinite(mid) ? fmt(mid, 2) : "—"}</span>
-        {warm ? <span className="warn"> (warm)</span> : null}
-      </span>
-      <span className="pill dim">
-        DEV: <span className="monoStrong">{Number.isFinite(Number(dev)) ? `${Number(dev).toFixed(1)}bps` : "—"}</span>
-      </span>
-      <span className="pill dim">
-        FEEDS: <span className={bybitOk ? "ok" : "bad"}>BYBIT</span>{" "}
-        <span className={binanceOk ? "ok" : "warn"}>BINANCE</span>
-      </span>
-      <span className="pill dim">
-        SETUPS: <span className="monoStrong">{setupsCount}</span>
-        {preferredId ? <span className="dim"> pref</span> : null}
-      </span>
-      <span className="pill dim">
-        STALE: <span className={staleTone}>{Number.isFinite(staleMs) ? `${(staleMs / 1000).toFixed(1)}s` : "—"}</span>
-      </span>
-    </div>
-  );
+    return (
+        <div className="ribbon">
+            <span className={`pill ${paused ? "warn" : "ok"}`}>{paused ? "FROZEN" : "LIVE"}</span>
+            <span className={`pill ${healthTone}`}>HEALTH: {health}</span>
+            <span className="pill dim">
+                DQ: <span className="monoStrong">{dq}</span> {!dqOk ? <span className="warn"> (GATED)</span> : null}
+            </span>
+            <span className="pill dim">
+                MID: <span className="monoStrong">{Number.isFinite(mid) ? fmt(mid, 2) : "—"}</span>
+                {warm ? <span className="warn"> (warm)</span> : null}
+            </span>
+            <span className="pill dim">
+                DEV: <span className="monoStrong">{Number.isFinite(Number(dev)) ? `${Number(dev).toFixed(1)}bps` : "—"}</span>
+            </span>
+            <span className="pill dim">
+                FEEDS: <span className={bybitOk ? "ok" : "bad"}>BYBIT</span>{" "}
+                <span className={binanceOk ? "ok" : "warn"}>BINANCE</span>
+            </span>
+            <span className="pill dim">
+                SETUPS: <span className="monoStrong">{setupsCount}</span>
+                {preferredId ? <span className="dim"> pref</span> : null}
+            </span>
+            <span className="pill dim">
+                STALE: <span className={staleTone}>{Number.isFinite(staleMs) ? `${(staleMs / 1000).toFixed(1)}s` : "—"}</span>
+            </span>
+        </div>
+    );
 }
 
 function SectionCard({
-  title,
-  right,
-  children,
-  className,
+    title,
+    right,
+    children,
+    className,
 }: {
-  title: string;
-  right?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
+    title: string;
+    right?: React.ReactNode;
+    children: React.ReactNode;
+    className?: string;
 }) {
-  return (
-    <div className={`card ${className ?? ""}`}>
-      <div className="cardHead">
-        <div className="cardTitle">{title}</div>
-        {right ? <div className="cardRight">{right}</div> : null}
-      </div>
-      <div className="cardBody">{children}</div>
-    </div>
-  );
+    return (
+        <div className={`card ${className ?? ""}`}>
+            <div className="cardHead">
+                <div className="cardTitle">{title}</div>
+                {right ? <div className="cardRight">{right}</div> : null}
+            </div>
+            <div className="cardBody">{children}</div>
+        </div>
+    );
 }
 
 function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }) {
-  const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
-  const isNarrow = useIsNarrow(980);
+    const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
+    const isNarrow = useIsNarrow(980);
 
-  // Freeze when paused
-  const [frozen, setFrozen] = useState<{ snap: AnyObj | null; features: AnyObj | null; setups: AnyObj | null }>({
-    snap: null,
-    features: null,
-    setups: null,
-  });
-  useEffect(() => {
-    if (paused) return;
-    setFrozen({ snap: snap ?? null, features: features ?? null, setups: setups ?? null });
-  }, [paused, snap, features, setups]);
-
-  const vSnap = paused ? frozen.snap : snap;
-  const vFeat = paused ? frozen.features : features;
-  const vSet = paused ? frozen.setups : setups;
-
-  const dq = String(vFeat?.quality?.dq_grade ?? "—");
-  const dqOk = Boolean(vSet?.dq_ok ?? vFeat?.quality?.dq_ok);
-  const bybitOk = Boolean(vFeat?.quality?.bybit_ok);
-  const binanceOk = Boolean(vFeat?.quality?.binance_ok);
-
-  const mid = Number.isFinite(Number(vSnap?.price?.mid))
-    ? Number(vSnap.price.mid)
-    : (Number.isFinite(Number(vSnap?.price?.bid)) && Number.isFinite(Number(vSnap?.price?.ask)))
-      ? (Number(vSnap.price.bid) + Number(vSnap.price.ask)) / 2
-      : NaN;
-
-  const dev = vFeat?.cross?.deviation_bps ?? vFeat?.cross?.dev_bps;
-  const preferredId = vSet?.preferred_id;
-
-  const scan15 = marketScan(vFeat, "15m");
-  const scan1h = marketScan(vFeat, "1h");
-  const scan4h = marketScan(vFeat, "4h");
-  const scan1d = marketScan(vFeat, "1d");
-
-  const allRows: AnyObj[] = useMemo(() => {
-    const arr = (vSet?.setups ?? []) as AnyObj[];
-    return [...arr].sort((a, b) => {
-      const pa = Number(a?.priority_score ?? -1);
-      const pb = Number(b?.priority_score ?? -1);
-      if (pb !== pa) return pb - pa;
-      const ca = Number(a?.confidence?.score ?? -1);
-      const cb = Number(b?.confidence?.score ?? -1);
-      return cb - ca;
+    // Freeze when paused
+    const [frozen, setFrozen] = useState<{ snap: AnyObj | null; features: AnyObj | null; setups: AnyObj | null }>({
+        snap: null,
+        features: null,
+        setups: null,
     });
-  }, [vSet]);
+    useEffect(() => {
+        if (paused) return;
+        setFrozen({ snap: snap ?? null, features: features ?? null, setups: setups ?? null });
+    }, [paused, snap, features, setups]);
 
-  // Selection + Freeze DETAILS
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedSig, setSelectedSig] = useState<string | null>(null);
+    const vSnap = paused ? frozen.snap : snap;
+    const vFeat = paused ? frozen.features : features;
+    const vSet = paused ? frozen.setups : setups;
 
-  const [detailModel, setDetailModel] = useState<AnyObj | null>(null);
+    const dq = String(vFeat?.quality?.dq_grade ?? "—");
+    const dqOk = Boolean(vSet?.dq_ok ?? vFeat?.quality?.dq_ok);
+    const bybitOk = Boolean(vFeat?.quality?.bybit_ok);
+    const binanceOk = Boolean(vFeat?.quality?.binance_ok);
 
-  // UI
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [expandedChecklist, setExpandedChecklist] = useState(true);
-  const [expandedReasons, setExpandedReasons] = useState(false);
+    const mid = Number.isFinite(Number(vSnap?.price?.mid))
+        ? Number(vSnap.price.mid)
+        : (Number.isFinite(Number(vSnap?.price?.bid)) && Number.isFinite(Number(vSnap?.price?.ask)))
+            ? (Number(vSnap.price.bid) + Number(vSnap.price.ask)) / 2
+            : NaN;
 
-  // Filters / pinned
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "FORMING" | "READY" | "TRIGGERED" | "DEAD">("ALL");
-  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [pinned, setPinned] = useState<Record<string, boolean>>({});
-  const [pulse, setPulse] = useState(0);
+    const dev = vFeat?.cross?.deviation_bps ?? vFeat?.cross?.dev_bps;
+    const preferredId = vSet?.preferred_id;
 
-  const rows = useMemo(() => {
-    let r = allRows;
+    const scan15 = marketScan(vFeat, "15m");
+    const scan1h = marketScan(vFeat, "1h");
+    const scan4h = marketScan(vFeat, "4h");
+    const scan1d = marketScan(vFeat, "1d");
 
-    if (statusFilter !== "ALL") {
-      r = r.filter((x) => {
-        const st = String(x?.status ?? "");
-        if (statusFilter === "DEAD") return st === "INVALIDATED" || st === "EXPIRED";
-        return st === statusFilter;
-      });
+    const allRows: AnyObj[] = useMemo(() => {
+        const arr = (vSet?.setups ?? []) as AnyObj[];
+        return [...arr].sort((a, b) => {
+            const pa = Number(a?.priority_score ?? -1);
+            const pb = Number(b?.priority_score ?? -1);
+            if (pb !== pa) return pb - pa;
+            const ca = Number(a?.confidence?.score ?? -1);
+            const cb = Number(b?.confidence?.score ?? -1);
+            return cb - ca;
+        });
+    }, [vSet]);
+
+    // Selection + Freeze DETAILS
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedSig, setSelectedSig] = useState<string | null>(null);
+
+    const [detailModel, setDetailModel] = useState<AnyObj | null>(null);
+
+    // Freeze a price anchor for DETAILS to avoid layout shifts caused by live mid updates
+    const [detailMid, setDetailMid] = useState<number>(NaN);
+
+
+    // UI
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [expandedChecklist, setExpandedChecklist] = useState(true);
+    const [expandedReasons, setExpandedReasons] = useState(false);
+
+    // Filters / pinned
+    const [statusFilter, setStatusFilter] = useState<"ALL" | "FORMING" | "READY" | "TRIGGERED" | "DEAD">("ALL");
+    const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+    const [pinned, setPinned] = useState<Record<string, boolean>>({});
+    const [pulse, setPulse] = useState(0);
+
+    const rows = useMemo(() => {
+        let r = allRows;
+
+        if (statusFilter !== "ALL") {
+            r = r.filter((x) => {
+                const st = String(x?.status ?? "");
+                if (statusFilter === "DEAD") return st === "INVALIDATED" || st === "EXPIRED";
+                return st === statusFilter;
+            });
+        }
+
+        const withKey = r.map((x) => {
+            const rawId = String(x?.id ?? "").trim();
+            const z = x?.entry?.zone;
+            const fp = [
+                String(x?.canon ?? ""),
+                String(x?.side ?? ""),
+                String(x?.type ?? ""),
+                String(x?.bias_tf ?? ""),
+                String(x?.entry_tf ?? ""),
+                String(x?.trigger_tf ?? ""),
+                z ? `${Number(z.lo)}-${Number(z.hi)}` : "",
+                String(x?.stop?.price ?? ""),
+                String(x?.rr_min ?? ""),
+            ].join("|");
+
+            const uiKey = rawId ? rawId : fp;
+            return { ...x, __uiKey: uiKey };
+        });
+
+        let out = withKey;
+
+        if (showPinnedOnly) {
+            out = out.filter((x) => pinned[String(x.__uiKey)]);
+        }
+
+        out = [...out].sort((a, b) => {
+            const pa = pinned[String(a.__uiKey)] ? 1 : 0;
+            const pb = pinned[String(b.__uiKey)] ? 1 : 0;
+            if (pb !== pa) return pb - pa;
+            return 0;
+        });
+
+        return out;
+    }, [allRows, pinned, statusFilter, showPinnedOnly]);
+
+    const now = Date.now();
+    const tickKey = String(vSnap?.price?.ts ?? vSnap?.price?.mid ?? "");
+    const lastActivityMsRef = useRef<number | null>(null);
+
+    const priceTs = Number(vSnap?.price?.ts);
+    const staleSec = Number.isFinite(priceTs)
+        ? (now - priceTs) / 1000
+        : lastActivityMsRef.current != null
+            ? (now - lastActivityMsRef.current) / 1000
+            : undefined;
+
+    useEffect(() => {
+        if (paused) return;
+        const px = Number(vSnap?.price?.mid);
+        if (!Number.isFinite(px) && !tickKey) return;
+        lastActivityMsRef.current = Date.now();
+        setPulse((p) => p + 1);
+    }, [paused, tickKey, vSnap]);
+
+    // Selected row from current rows
+    const selected = useMemo(() => {
+        if (!rows.length) return null;
+        if (selectedId) return rows.find((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId) ?? rows[0];
+        return rows[0];
+    }, [rows, selectedId]);
+
+    const selectedKey = selected ? String((selected as AnyObj)?.__uiKey ?? "") : "";
+
+    // Stable selection rebind (from your previous fix)
+    useEffect(() => {
+        if (!rows.length) return;
+
+        if (selectedId && rows.some((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId)) return;
+
+        if (selectedSig) {
+            const hit = rows.find((x: AnyObj) => setupSig(x) === selectedSig);
+            if (hit) {
+                setSelectedId(String(hit?.__uiKey ?? ""));
+                setSelectedSig(setupSig(hit));
+                return;
+            }
+        }
+
+        const first = rows[0] as AnyObj;
+        setSelectedId(String(first?.__uiKey ?? ""));
+        setSelectedSig(setupSig(first));
+    }, [rows, selectedId, selectedSig]);
+
+    // Freeze DETAILS model ONLY when selection changes
+    // Freeze DETAILS model ONLY when selection changes
+    useEffect(() => {
+        if (!selected) {
+            setDetailModel(null);
+            setDetailMid(NaN);
+            return;
+        }
+        setDetailModel(selected);
+
+        // Anchor "mid" used inside DETAILS to prevent flex-wrap / reflow jitter
+        setDetailMid(Number.isFinite(mid) ? mid : NaN);
+    }, [selectedKey]);
+
+
+    const togglePin = () => {
+        if (!selectedKey) return;
+        setPinned((p) => ({ ...p, [selectedKey]: !p[selectedKey] }));
+    };
+
+    const pick = (s: AnyObj) => {
+        const key = String(s?.__uiKey ?? s?.id ?? "");
+        setSelectedId(key);
+        setSelectedSig(setupSig(s));
+        if (isNarrow) setDrawerOpen(true);
+    };
+
+    // Use frozen model for details to prevent jitter
+    const s = detailModel;
+    const action = s ? actionLabel(s) : "—";
+    const z = s?.entry?.zone;
+    const distLabel = distLabelFor(detailMid, z, String(s?.entry?.mode ?? ""));
+
+    const prog = s ? triggerProgress(s) : { ok: 0, total: 0, pct: 0, checklist: [], next: null };
+
+    const [toast, setToast] = useState<string | null>(null);
+
+    const copyTicket = async () => {
+        if (!s) return;
+        const ok = await copyText(buildTicketText(s));
+        setToast(ok ? "COPIED TICKET" : "COPY FAILED");
+    };
+
+    // Navigation
+    const selectedIndex = useMemo(() => {
+        if (!rows.length) return 0;
+        if (!selectedKey) return 0;
+        const i = rows.findIndex((x: AnyObj) => String(x?.__uiKey ?? x?.id ?? "") === selectedKey);
+        return i >= 0 ? i : 0;
+    }, [rows, selectedKey]);
+
+    const prev = () => {
+        if (!rows.length) return;
+        const i = clamp(selectedIndex - 1, 0, rows.length - 1);
+        setSelectedId(String((rows[i] as AnyObj)?.__uiKey ?? (rows[i] as AnyObj)?.id ?? ""));
+        if (isNarrow) setDrawerOpen(true);
+    };
+    const next = () => {
+        if (!rows.length) return;
+        const i = clamp(selectedIndex + 1, 0, rows.length - 1);
+        setSelectedId(String((rows[i] as AnyObj)?.__uiKey ?? (rows[i] as AnyObj)?.id ?? ""));
+        if (isNarrow) setDrawerOpen(true);
+    };
+
+    function invalidationLabel(ms: AnyObj) {
+        if (!ms) return "—";
+        const trend = String(ms.trend ?? "");
+        if (!trend || trend === "—") return "—";
+        if (trend === "RANGE") return "n/a";
+        if (trend === "UP") {
+            const x = ms.lastSwingLow?.price;
+            return Number.isFinite(Number(x)) ? fmt(x, 2) : "pending";
+        }
+        if (trend === "DOWN") {
+            const x = ms.lastSwingHigh?.price;
+            return Number.isFinite(Number(x)) ? fmt(x, 2) : "pending";
+        }
+        return "—";
     }
 
-    const withKey = r.map((x) => {
-      const rawId = String(x?.id ?? "").trim();
-      const z = x?.entry?.zone;
-      const fp = [
-        String(x?.canon ?? ""),
-        String(x?.side ?? ""),
-        String(x?.type ?? ""),
-        String(x?.bias_tf ?? ""),
-        String(x?.entry_tf ?? ""),
-        String(x?.trigger_tf ?? ""),
-        z ? `${Number(z.lo)}-${Number(z.hi)}` : "",
-        String(x?.stop?.price ?? ""),
-        String(x?.rr_min ?? ""),
-      ].join("|");
-
-      const uiKey = rawId ? rawId : fp;
-      return { ...x, __uiKey: uiKey };
-    });
-
-    let out = withKey;
-
-    if (showPinnedOnly) {
-      out = out.filter((x) => pinned[String(x.__uiKey)]);
+    function eventsLabel(ms: AnyObj) {
+        if (!ms) return "—";
+        const ev: string[] = [];
+        if (ms.lastBOS) {
+            const d = ms.lastBOS.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastBOS.price ?? ms.lastBOS.level;
+            ev.push(`BOS${d} ${fmt(p, 0)}`);
+        }
+        if (ms.lastCHOCH) {
+            const d = ms.lastCHOCH.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastCHOCH.price ?? ms.lastCHOCH.level;
+            ev.push(`CHOCH${d} ${fmt(p, 0)}`);
+        }
+        if (ms.lastSweep) {
+            const d = ms.lastSweep.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastSweep.price ?? ms.lastSweep.level;
+            ev.push(`SWP${d} ${fmt(p, 0)}`);
+        }
+        return ev.length ? ev.slice(0, 2).join(" ") : "—";
     }
 
-    out = [...out].sort((a, b) => {
-      const pa = pinned[String(a.__uiKey)] ? 1 : 0;
-      const pb = pinned[String(b.__uiKey)] ? 1 : 0;
-      if (pb !== pa) return pb - pa;
-      return 0;
-    });
+    const scan = statusTone({ mid, dqOk, bybitOk, binanceOk, rowsCount: rows.length });
 
-    return out;
-  }, [allRows, pinned, statusFilter, showPinnedOnly]);
+    const DetailsPanel = ({ inSheet }: { inSheet: boolean }) => {
+        if (!s) {
+            return (
+                <SectionCard title="Details" className={inSheet ? "sheetCard" : ""}>
+                    <div className="muted">No setup selected.</div>
+                </SectionCard>
+            );
+        }
 
-  const now = Date.now();
-  const tickKey = String(vSnap?.price?.ts ?? vSnap?.price?.mid ?? "");
-  const lastActivityMsRef = useRef<number | null>(null);
+        const isPinned = Boolean(selectedKey && pinned[selectedKey]);
 
-  const priceTs = Number(vSnap?.price?.ts);
-  const staleSec = Number.isFinite(priceTs)
-    ? (now - priceTs) / 1000
-    : lastActivityMsRef.current != null
-      ? (now - lastActivityMsRef.current) / 1000
-      : undefined;
+        const mode = String(s?.entry?.mode ?? "—");
+        const entry =
+            mode === "LIMIT" && s?.entry?.zone
+                ? `[${fmt(s.entry.zone.lo, 2)}–${fmt(s.entry.zone.hi, 2)}]`
+                : mode === "MARKET"
+                    ? "MARKET"
+                    : "—";
 
-  useEffect(() => {
-    if (paused) return;
-    const px = Number(vSnap?.price?.mid);
-    if (!Number.isFinite(px) && !tickKey) return;
-    lastActivityMsRef.current = Date.now();
-    setPulse((p) => p + 1);
-  }, [paused, tickKey, vSnap]);
+        const blockers =
+            Array.isArray(s?.execution?.blockers) && s.execution.blockers.length ? s.execution.blockers.join(", ") : "";
 
-  // Selected row from current rows
-  const selected = useMemo(() => {
-    if (!rows.length) return null;
-    if (selectedId) return rows.find((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId) ?? rows[0];
-    return rows[0];
-  }, [rows, selectedId]);
+        const reasons: AnyObj[] = Array.isArray(s?.confidence?.reasons) ? s.confidence.reasons : [];
 
-  const selectedKey = selected ? String((selected as AnyObj)?.__uiKey ?? "") : "";
+        return (
+            <SectionCard
+                title="Details"
+                className={inSheet ? "sheetCard" : ""}
+                right={
+                    <div className="rowActions">
+                        <button className={`btn ghost ${isPinned ? "active" : ""}`} {...tap(togglePin)}>
+                            {isPinned ? "Pinned" : "Pin"}
+                        </button>
+                        <button className="btn ghost" {...tap(copyTicket)}>
+                            Copy
+                        </button>
+                        {inSheet ? (
+                            <button className="btn" {...tap(() => setDrawerOpen(false))}>
+                                Close
+                            </button>
+                        ) : null}
+                    </div>
+                }
+            >
+                {/* Summary header (fixed height-ish) */}
+                <div className="summary">
+                    <div className="summaryTop">
+                        <div className="summaryLeft">
+                            <div className="titleLine">
+                                <span className={`tag side ${s?.side === "LONG" ? "ok" : "bad"}`}>{String(s?.side ?? "—")}</span>
+                                <span className="tag type">{typeShort(String(s?.type ?? ""))}</span>
+                                <span className="tag status">{String(s?.status ?? "—")}</span>
+                            </div>
 
-  // Stable selection rebind (from your previous fix)
-  useEffect(() => {
-    if (!rows.length) return;
+                            <div className="metaLine">
+                                <span className="mono">TF {String(s?.bias_tf ?? "—")}→{String(s?.entry_tf ?? "—")}→{String(s?.trigger_tf ?? "—")}</span>
+                                <span className="dot">•</span>
+                                <span className="mono">Δ {distLabel}</span>
+                                <span className="dot">•</span>
+                                <span className="mono">RR {fmt(s?.rr_min, 2)}</span>
+                                <span className="dot">•</span>
+                                <span className="mono">P {Math.round(Number(s?.priority_score ?? 0))}</span>
+                                <span className="dot">•</span>
+                                <span className="mono">C {Math.round(Number(s?.confidence?.score ?? 0))} ({String(s?.confidence?.grade ?? "—")})</span>
+                            </div>
+                        </div>
 
-    if (selectedId && rows.some((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId)) return;
+                        <div className="summaryRight">
+                            <div className="kpi">
+                                <div className="kpiLabel">Trigger</div>
+                                <div className="kpiValue mono">
+                                    {prog.ok}/{prog.total} {bar(prog.pct, 10)}
+                                </div>
+                                {prog.next?.key ? <div className="kpiHint warn mono">next={String(prog.next.key)}</div> : <div className="kpiHint muted">—</div>}
+                            </div>
+                        </div>
+                    </div>
 
-    if (selectedSig) {
-      const hit = rows.find((x: AnyObj) => setupSig(x) === selectedSig);
-      if (hit) {
-        setSelectedId(String(hit?.__uiKey ?? ""));
-        setSelectedSig(setupSig(hit));
-        return;
-      }
-    }
+                    <div className="summaryChips">
+                        <span className="chip">
+                            SETUP: <span className="monoStrong">{String(s?.status ?? "—")}</span>
+                        </span>
+                        <span className="chip">
+                            EXEC: <span className="monoStrong">{action}</span>
+                            {s?.execution?.reason ? <span className="muted"> • {String(s.execution.reason)}</span> : null}
+                        </span>
+                        {blockers ? (
+                            <span className="chip warn">
+                                blockers=<span className="monoStrong">{blockers}</span>
+                            </span>
+                        ) : null}
+                    </div>
+                </div>
 
-    const first = rows[0] as AnyObj;
-    setSelectedId(String(first?.__uiKey ?? ""));
-    setSelectedSig(setupSig(first));
-  }, [rows, selectedId, selectedSig]);
+                {/* Execution (kept info) */}
+                <div className="subHead">Execution</div>
+                <div className="kvGrid">
+                    <div className="kv">
+                        <div className="k">Entry</div>
+                        <div className="v monoStrong">{`(${mode}) ${entry}`}</div>
+                    </div>
+                    <div className="kv">
+                        <div className="k">SL</div>
+                        <div className="v monoStrong">{`${fmt(s?.stop?.price, 2)} (${String(s?.stop?.basis ?? "—")})`}</div>
+                    </div>
+                    <div className="kv">
+                        <div className="k">TP</div>
+                        <div className="v monoStrong">
+                            {(Array.isArray(s?.tp) && s.tp.length) ? s.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—"}
+                        </div>
+                    </div>
+                    <div className="kv">
+                        <div className="k">RR</div>
+                        <div className="v monoStrong">{`min ${fmt(s?.rr_min, 2)} • est ${fmt(s?.rr_est, 2)}`}</div>
+                    </div>
+                </div>
 
-  // Freeze DETAILS model ONLY when selection changes
-  useEffect(() => {
-    if (!selected) {
-      setDetailModel(null);
-      return;
-    }
-    setDetailModel(selected);
-  }, [selectedKey]);
+                {/* Checklist */}
+                <div className="subHeadRow">
+                    <div className="subHead">Checklist</div>
+                    <button className="btn ghost" {...tap(() => setExpandedChecklist((x) => !x))}>
+                        {expandedChecklist ? "Hide" : "Show"}
+                    </button>
+                </div>
 
-  const togglePin = () => {
-    if (!selectedKey) return;
-    setPinned((p) => ({ ...p, [selectedKey]: !p[selectedKey] }));
-  };
+                {expandedChecklist ? (
+                    <div className="listBox">
+                        {prog.checklist.length ? (
+                            prog.checklist.map((it: AnyObj, i: number) => {
+                                const key = String(it?.key ?? i);
+                                const ok = Boolean(it?.ok);
+                                const isNext = prog.next && String(prog.next?.key ?? "") === key;
+                                return (
+                                    <div key={key} className={`lineItem ${isNext ? "next" : ""}`}>
+                                        <span className={`badge ${ok ? "ok" : "warn"}`}>{ok ? "OK" : "WAIT"}</span>
+                                        <span className="monoStrong">{key}</span>
+                                        <span className="muted">{String(it?.note ?? "")}</span>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="muted">No checklist.</div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="muted">Hidden.</div>
+                )}
 
-  const pick = (s: AnyObj) => {
-    const key = String(s?.__uiKey ?? s?.id ?? "");
-    setSelectedId(key);
-    setSelectedSig(setupSig(s));
-    if (isNarrow) setDrawerOpen(true);
-  };
+                {/* Confluence */}
+                <div className="subHeadRow">
+                    <div className="subHead">Confluence</div>
+                    <button className="btn ghost" {...tap(() => setExpandedReasons((x) => !x))}>
+                        {expandedReasons ? "Hide" : "Show"}
+                    </button>
+                </div>
 
-  // Use frozen model for details to prevent jitter
-  const s = detailModel;
-  const action = s ? actionLabel(s) : "—";
-  const z = s?.entry?.zone;
-  const distLabel = distLabelFor(mid, z, String(s?.entry?.mode ?? ""));
-  const prog = s ? triggerProgress(s) : { ok: 0, total: 0, pct: 0, checklist: [], next: null };
+                {expandedReasons ? (
+                    reasons.length ? (
+                        <div className="listBox">
+                            {reasons.map((r: AnyObj, i: number) => (
+                                <div key={i} className="lineItem">
+                                    <span className="badge dim">•</span>
+                                    <span className="muted">{String(r)}</span>
+                                </div>
+                            ))}
 
-  const [toast, setToast] = useState<string | null>(null);
-
-  const copyTicket = async () => {
-    if (!s) return;
-    const ok = await copyText(buildTicketText(s));
-    setToast(ok ? "COPIED TICKET" : "COPY FAILED");
-  };
-
-  // Navigation
-  const selectedIndex = useMemo(() => {
-    if (!rows.length) return 0;
-    if (!selectedKey) return 0;
-    const i = rows.findIndex((x: AnyObj) => String(x?.__uiKey ?? x?.id ?? "") === selectedKey);
-    return i >= 0 ? i : 0;
-  }, [rows, selectedKey]);
-
-  const prev = () => {
-    if (!rows.length) return;
-    const i = clamp(selectedIndex - 1, 0, rows.length - 1);
-    setSelectedId(String((rows[i] as AnyObj)?.__uiKey ?? (rows[i] as AnyObj)?.id ?? ""));
-    if (isNarrow) setDrawerOpen(true);
-  };
-  const next = () => {
-    if (!rows.length) return;
-    const i = clamp(selectedIndex + 1, 0, rows.length - 1);
-    setSelectedId(String((rows[i] as AnyObj)?.__uiKey ?? (rows[i] as AnyObj)?.id ?? ""));
-    if (isNarrow) setDrawerOpen(true);
-  };
-
-  function invalidationLabel(ms: AnyObj) {
-    if (!ms) return "—";
-    const trend = String(ms.trend ?? "");
-    if (!trend || trend === "—") return "—";
-    if (trend === "RANGE") return "n/a";
-    if (trend === "UP") {
-      const x = ms.lastSwingLow?.price;
-      return Number.isFinite(Number(x)) ? fmt(x, 2) : "pending";
-    }
-    if (trend === "DOWN") {
-      const x = ms.lastSwingHigh?.price;
-      return Number.isFinite(Number(x)) ? fmt(x, 2) : "pending";
-    }
-    return "—";
-  }
-
-  function eventsLabel(ms: AnyObj) {
-    if (!ms) return "—";
-    const ev: string[] = [];
-    if (ms.lastBOS) {
-      const d = ms.lastBOS.dir === "UP" ? "↑" : "↓";
-      const p = ms.lastBOS.price ?? ms.lastBOS.level;
-      ev.push(`BOS${d} ${fmt(p, 0)}`);
-    }
-    if (ms.lastCHOCH) {
-      const d = ms.lastCHOCH.dir === "UP" ? "↑" : "↓";
-      const p = ms.lastCHOCH.price ?? ms.lastCHOCH.level;
-      ev.push(`CHOCH${d} ${fmt(p, 0)}`);
-    }
-    if (ms.lastSweep) {
-      const d = ms.lastSweep.dir === "UP" ? "↑" : "↓";
-      const p = ms.lastSweep.price ?? ms.lastSweep.level;
-      ev.push(`SWP${d} ${fmt(p, 0)}`);
-    }
-    return ev.length ? ev.slice(0, 2).join(" ") : "—";
-  }
-
-  const scan = statusTone({ mid, dqOk, bybitOk, binanceOk, rowsCount: rows.length });
-
-  const DetailsPanel = ({ inSheet }: { inSheet: boolean }) => {
-    if (!s) {
-      return (
-        <SectionCard title="Details" className={inSheet ? "sheetCard" : ""}>
-          <div className="muted">No setup selected.</div>
-        </SectionCard>
-      );
-    }
-
-    const isPinned = Boolean(selectedKey && pinned[selectedKey]);
-
-    const mode = String(s?.entry?.mode ?? "—");
-    const entry =
-      mode === "LIMIT" && s?.entry?.zone
-        ? `[${fmt(s.entry.zone.lo, 2)}–${fmt(s.entry.zone.hi, 2)}]`
-        : mode === "MARKET"
-          ? "MARKET"
-          : "—";
-
-    const blockers =
-      Array.isArray(s?.execution?.blockers) && s.execution.blockers.length ? s.execution.blockers.join(", ") : "";
-
-    const reasons: AnyObj[] = Array.isArray(s?.confidence?.reasons) ? s.confidence.reasons : [];
+                        </div>
+                    ) : (
+                        <div className="muted">No reasons provided.</div>
+                    )
+                ) : (
+                    <div className="muted">Hidden.</div>
+                )}
+            </SectionCard>
+        );
+    };
 
     return (
-      <SectionCard
-        title="Details"
-        className={inSheet ? "sheetCard" : ""}
-        right={
-          <div className="rowActions">
-            <button className={`btn ghost ${isPinned ? "active" : ""}`} {...tap(togglePin)}>
-              {isPinned ? "Pinned" : "Pin"}
-            </button>
-            <button className="btn ghost" {...tap(copyTicket)}>
-              Copy
-            </button>
-            {inSheet ? (
-              <button className="btn" {...tap(() => setDrawerOpen(false))}>
-                Close
-              </button>
-            ) : null}
-          </div>
-        }
-      >
-        {/* Summary header (fixed height-ish) */}
-        <div className="summary">
-          <div className="summaryTop">
-            <div className="summaryLeft">
-              <div className="titleLine">
-                <span className={`tag side ${s?.side === "LONG" ? "ok" : "bad"}`}>{String(s?.side ?? "—")}</span>
-                <span className="tag type">{typeShort(String(s?.type ?? ""))}</span>
-                <span className="tag status">{String(s?.status ?? "—")}</span>
-              </div>
+        <>
+            <SystemRibbon
+                paused={paused}
+                dq={dq}
+                dqOk={dqOk}
+                bybitOk={bybitOk}
+                binanceOk={binanceOk}
+                mid={mid}
+                dev={dev}
+                lastTs={vSnap?.price?.ts ?? null}
+                staleSec={staleSec}
+                setupsCount={rows.length}
+                preferredId={preferredId}
+            />
 
-              <div className="metaLine">
-                <span className="mono">TF {String(s?.bias_tf ?? "—")}→{String(s?.entry_tf ?? "—")}→{String(s?.trigger_tf ?? "—")}</span>
-                <span className="dot">•</span>
-                <span className="mono">Δ {distLabel}</span>
-                <span className="dot">•</span>
-                <span className="mono">RR {fmt(s?.rr_min, 2)}</span>
-                <span className="dot">•</span>
-                <span className="mono">P {Math.round(Number(s?.priority_score ?? 0))}</span>
-                <span className="dot">•</span>
-                <span className="mono">C {Math.round(Number(s?.confidence?.score ?? 0))} ({String(s?.confidence?.grade ?? "—")})</span>
-              </div>
-            </div>
+            <ScanPulse
+                title={scan.title}
+                tone={scan.tone}
+                dq={dq}
+                bybitOk={bybitOk}
+                binanceOk={binanceOk}
+                staleSec={staleSec}
+                pulse={pulse}
+            />
 
-            <div className="summaryRight">
-              <div className="kpi">
-                <div className="kpiLabel">Trigger</div>
-                <div className="kpiValue mono">
-                  {prog.ok}/{prog.total} {bar(prog.pct, 10)}
-                </div>
-                {prog.next?.key ? <div className="kpiHint warn mono">next={String(prog.next.key)}</div> : <div className="kpiHint muted">—</div>}
-              </div>
-            </div>
-          </div>
+            <div className="layout">
+                {/* Left column: Market & Signals */}
+                <div className="stack">
+                    <SectionCard title="Market Outlook">
+                        <div className="tableWrap">
+                            <div className="tbl">
+                                <div className="tblRow head">
+                                    <div className="c tf">TF</div>
+                                    <div className="c">Trend</div>
+                                    <div className="c">Bias</div>
+                                    <div className="c">Invalid</div>
+                                    <div className="c events">Events</div>
+                                </div>
 
-          <div className="summaryChips">
-            <span className="chip">
-              SETUP: <span className="monoStrong">{String(s?.status ?? "—")}</span>
-            </span>
-            <span className="chip">
-              EXEC: <span className="monoStrong">{action}</span>
-              {s?.execution?.reason ? <span className="muted"> • {String(s.execution.reason)}</span> : null}
-            </span>
-            {blockers ? (
-              <span className="chip warn">
-                blockers=<span className="monoStrong">{blockers}</span>
-              </span>
-            ) : null}
-          </div>
-        </div>
+                                {["15m", "1h", "4h", "1d"].map((tf) => {
+                                    const ms = resolveMS(vFeat, tf);
+                                    const bias = biasByTfLabel(vFeat, tf);
+                                    const inval = invalidationLabel(ms);
+                                    const events = eventsLabel(ms);
 
-        {/* Execution (kept info) */}
-        <div className="subHead">Execution</div>
-        <div className="kvGrid">
-          <div className="kv">
-            <div className="k">Entry</div>
-            <div className="v monoStrong">{`(${mode}) ${entry}`}</div>
-          </div>
-          <div className="kv">
-            <div className="k">SL</div>
-            <div className="v monoStrong">{`${fmt(s?.stop?.price, 2)} (${String(s?.stop?.basis ?? "—")})`}</div>
-          </div>
-          <div className="kv">
-            <div className="k">TP</div>
-            <div className="v monoStrong">
-              {(Array.isArray(s?.tp) && s.tp.length) ? s.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—"}
-            </div>
-          </div>
-          <div className="kv">
-            <div className="k">RR</div>
-            <div className="v monoStrong">{`min ${fmt(s?.rr_min, 2)} • est ${fmt(s?.rr_est, 2)}`}</div>
-          </div>
-        </div>
+                                    return (
+                                        <div className="tblRow" key={tf}>
+                                            <div className="c tf monoStrong">{tf}</div>
+                                            <div className="c">{String(ms?.trend ?? "—")}</div>
+                                            <div className="c mono">{bias}</div>
+                                            <div className="c mono">{inval}</div>
+                                            <div className="c mono events">{events}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
 
-        {/* Checklist */}
-        <div className="subHeadRow">
-          <div className="subHead">Checklist</div>
-          <button className="btn ghost" {...tap(() => setExpandedChecklist((x) => !x))}>
-            {expandedChecklist ? "Hide" : "Show"}
-          </button>
-        </div>
+                        <div className="divider" />
 
-        {expandedChecklist ? (
-          <div className="listBox">
-            {prog.checklist.length ? (
-              prog.checklist.map((it: AnyObj, i: number) => {
-                const key = String(it?.key ?? i);
-                const ok = Boolean(it?.ok);
-                const isNext = prog.next && String(prog.next?.key ?? "") === key;
-                return (
-                  <div key={key} className={`lineItem ${isNext ? "next" : ""}`}>
-                    <span className={`badge ${ok ? "ok" : "warn"}`}>{ok ? "OK" : "WAIT"}</span>
-                    <span className="monoStrong">{key}</span>
-                    <span className="muted">{String(it?.note ?? "")}</span>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="muted">No checklist.</div>
-            )}
-          </div>
-        ) : (
-          <div className="muted">Hidden.</div>
-        )}
+                        <div className="subHead">Key Signals</div>
+                        <div className="tableWrap">
+                            <div className="tbl tblSignals">
+                                <div className="tblRow head">
+                                    <div className="c tf">TF</div>
+                                    <div className="c">BOS</div>
+                                    <div className="c">CHOCH</div>
+                                    <div className="c">SWEEP</div>
+                                    <div className="c">SwingH</div>
+                                    <div className="c">SwingL</div>
+                                    <div className="c">Flags</div>
+                                </div>
 
-        {/* Confluence */}
-        <div className="subHeadRow">
-          <div className="subHead">Confluence</div>
-          <button className="btn ghost" {...tap(() => setExpandedReasons((x) => !x))}>
-            {expandedReasons ? "Hide" : "Show"}
-          </button>
-        </div>
-
-        {expandedReasons ? (
-          reasons.length ? (
-            <div className="listBox">
-              {reasons.slice(0, 14).map((r: AnyObj, i: number) => (
-                <div key={i} className="lineItem">
-                  <span className="badge dim">•</span>
-                  <span className="muted">{String(r)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="muted">No reasons provided.</div>
-          )
-        ) : (
-          <div className="muted">Hidden.</div>
-        )}
-      </SectionCard>
-    );
-  };
-
-  return (
-    <>
-      <SystemRibbon
-        paused={paused}
-        dq={dq}
-        dqOk={dqOk}
-        bybitOk={bybitOk}
-        binanceOk={binanceOk}
-        mid={mid}
-        dev={dev}
-        lastTs={vSnap?.price?.ts ?? null}
-        staleSec={staleSec}
-        setupsCount={rows.length}
-        preferredId={preferredId}
-      />
-
-      <ScanPulse
-        title={scan.title}
-        tone={scan.tone}
-        dq={dq}
-        bybitOk={bybitOk}
-        binanceOk={binanceOk}
-        staleSec={staleSec}
-        pulse={pulse}
-      />
-
-      <div className="layout">
-        {/* Left column: Market & Signals */}
-        <div className="stack">
-          <SectionCard title="Market Outlook">
-            <div className="tableWrap">
-              <div className="tbl">
-                <div className="tblRow head">
-                  <div className="c tf">TF</div>
-                  <div className="c">Trend</div>
-                  <div className="c">Bias</div>
-                  <div className="c">Invalid</div>
-                  <div className="c events">Events</div>
+                                {[
+                                    ["15m", scan15],
+                                    ["1h", scan1h],
+                                    ["4h", scan4h],
+                                    ["1d", scan1d],
+                                ].map(([tf, ss]: any) => (
+                                    <div className="tblRow" key={tf}>
+                                        <div className="c tf monoStrong">{tf}</div>
+                                        <div className="c mono">{ss?.bos ?? "—"}</div>
+                                        <div className="c mono">{ss?.choch ?? "—"}</div>
+                                        <div className="c mono">{ss?.sweep ?? "—"}</div>
+                                        <div className="c mono">{Number.isFinite(Number(ss?.sH)) ? fmt(ss?.sH, 2) : "—"}</div>
+                                        <div className="c mono">{Number.isFinite(Number(ss?.sL)) ? fmt(ss?.sL, 2) : "—"}</div>
+                                        <div className="c mono">{ss?.fl ?? "—"}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </SectionCard>
                 </div>
 
-                {["15m", "1h", "4h", "1d"].map((tf) => {
-                  const ms = resolveMS(vFeat, tf);
-                  const bias = biasByTfLabel(vFeat, tf);
-                  const inval = invalidationLabel(ms);
-                  const events = eventsLabel(ms);
-
-                  return (
-                    <div className="tblRow" key={tf}>
-                      <div className="c tf monoStrong">{tf}</div>
-                      <div className="c">{String(ms?.trend ?? "—")}</div>
-                      <div className="c mono">{bias}</div>
-                      <div className="c mono">{inval}</div>
-                      <div className="c mono events">{events}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="divider" />
-
-            <div className="subHead">Key Signals</div>
-            <div className="tableWrap">
-              <div className="tbl">
-                <div className="tblRow head">
-                  <div className="c tf">TF</div>
-                  <div className="c">BOS</div>
-                  <div className="c">CHOCH</div>
-                  <div className="c">SWEEP</div>
-                </div>
-
-                {[
-                  ["15m", scan15],
-                  ["1h", scan1h],
-                  ["4h", scan4h],
-                  ["1d", scan1d],
-                ].map(([tf, ss]: any) => (
-                  <div className="tblRow" key={tf}>
-                    <div className="c tf monoStrong">{tf}</div>
-                    <div className="c mono">{ss?.bos ?? "—"}</div>
-                    <div className="c mono">{ss?.choch ?? "—"}</div>
-                    <div className="c mono">{ss?.sweep ?? "—"}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </SectionCard>
-        </div>
-
-        {/* Right column: Feed + Details */}
-        <div className="rightCol">
-          <SectionCard
-            title="Setups"
-            right={
-              <div className="filters">
-                <button className={`seg ${statusFilter === "ALL" ? "on" : ""}`} onClick={() => setStatusFilter("ALL")}>All</button>
-                <button className={`seg ${statusFilter === "FORMING" ? "on" : ""}`} onClick={() => setStatusFilter("FORMING")}>Forming</button>
-                <button className={`seg ${statusFilter === "READY" ? "on" : ""}`} onClick={() => setStatusFilter("READY")}>Ready</button>
-                <button className={`seg ${statusFilter === "TRIGGERED" ? "on" : ""}`} onClick={() => setStatusFilter("TRIGGERED")}>Triggered</button>
-                <button className={`seg ${statusFilter === "DEAD" ? "on" : ""}`} onClick={() => setStatusFilter("DEAD")}>Dead</button>
-                <button className={`seg ${showPinnedOnly ? "on" : ""}`} onClick={() => setShowPinnedOnly((x) => !x)}>Pinned</button>
-              </div>
-            }
-            className="feedCard"
-          >
-            {rows.length === 0 ? (
-              <div className="empty">
-                {dqOk ? (
-                  <>
-                    <div className="emptyTitle">No setups (valid)</div>
-                    <div className="muted">Filters blocked candidates due to RR / structure / retest requirements.</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="emptyTitle bad">DQ gated</div>
-                    <div className="muted">Fix feeds/liveness before trusting setups.</div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="feed">
-                {rows.map((row) => {
-                  const id = String((row as AnyObj)?.__uiKey ?? row?.id ?? "");
-                  const engineId = String(row?.id ?? "").trim();
-                  const isPreferred = preferredId && engineId === preferredId;
-                  const isSelected = selectedId ? id === selectedId : false;
-                  const dead = row?.status === "INVALIDATED" || row?.status === "EXPIRED";
-                  const p = Number(row?.priority_score ?? 0);
-                  const c = Number(row?.confidence?.score ?? 0);
-                  const g = String(row?.confidence?.grade ?? "—");
-
-                  const pr = triggerProgress(row);
-
-                  const zz = row?.entry?.zone;
-                  const dl = distLabelFor(mid, zz, String(row?.entry?.mode ?? ""));
-                  const act = actionLabel(row);
-
-                  const pin = Boolean(pinned[id]);
-
-                  return (
-                    <div
-                      key={id}
-                      className={[
-                        "feedRow",
-                        isSelected ? "selected" : "",
-                        isPreferred ? "preferred" : "",
-                        dead ? "dead" : "",
-                      ].join(" ")}
-                      {...tap(() => pick(row))}
-                      role="button"
-                      tabIndex={0}
+                {/* Right column: Feed + Details */}
+                <div className="rightCol">
+                    <SectionCard
+                        title="Setups"
+                        right={
+                            <div className="filters">
+                                <button className={`seg ${statusFilter === "ALL" ? "on" : ""}`} onClick={() => setStatusFilter("ALL")}>All</button>
+                                <button className={`seg ${statusFilter === "FORMING" ? "on" : ""}`} onClick={() => setStatusFilter("FORMING")}>Forming</button>
+                                <button className={`seg ${statusFilter === "READY" ? "on" : ""}`} onClick={() => setStatusFilter("READY")}>Ready</button>
+                                <button className={`seg ${statusFilter === "TRIGGERED" ? "on" : ""}`} onClick={() => setStatusFilter("TRIGGERED")}>Triggered</button>
+                                <button className={`seg ${statusFilter === "DEAD" ? "on" : ""}`} onClick={() => setStatusFilter("DEAD")}>Dead</button>
+                                <button className={`seg ${showPinnedOnly ? "on" : ""}`} onClick={() => setShowPinnedOnly((x) => !x)}>Pinned</button>
+                            </div>
+                        }
+                        className="feedCard"
                     >
-                      <div className="feedMark">
-                        {isSelected ? "●" : pin ? "★" : isPreferred ? "✓" : " "}
-                      </div>
+                        {rows.length === 0 ? (
+                            <div className="empty">
+                                {dqOk ? (
+                                    <>
+                                        <div className="emptyTitle">No setups (valid)</div>
+                                        <div className="muted">Filters blocked candidates due to RR / structure / retest requirements.</div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="emptyTitle bad">DQ gated</div>
+                                        <div className="muted">Fix feeds/liveness before trusting setups.</div>
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="feed">
+                                {rows.map((row) => {
+                                    const id = String((row as AnyObj)?.__uiKey ?? row?.id ?? "");
+                                    const engineId = String(row?.id ?? "").trim();
+                                    const isPreferred = preferredId && engineId === preferredId;
+                                    const isSelected = selectedId ? id === selectedId : false;
+                                    const dead = row?.status === "INVALIDATED" || row?.status === "EXPIRED";
+                                    const p = Number(row?.priority_score ?? 0);
+                                    const c = Number(row?.confidence?.score ?? 0);
+                                    const g = String(row?.confidence?.grade ?? "—");
 
-                      <div className="feedMain">
-                        <div className="feedTop">
-                          <div className="feedTitle">
-                            <span className={`tag side ${row?.side === "LONG" ? "ok" : "bad"}`}>{String(row?.side ?? "—")}</span>
-                            <span className="tag type">{typeShort(String(row?.type ?? ""))}</span>
-                            <span className="tag status">{String(row?.status ?? "—")}</span>
-                          </div>
+                                    const pr = triggerProgress(row);
 
-                          <div className="feedBadges">
-                            <span className="chip mono">Δ {dl}</span>
-                            <span className="chip mono">RR {fmt(row?.rr_min, 2)}</span>
-                            <span className="chip mono">P {String(Math.round(p))}</span>
-                            <span className="chip mono">C {String(Math.round(c))} ({g})</span>
-                          </div>
-                        </div>
+                                    const zz = row?.entry?.zone;
+                                    const dl = distLabelFor(mid, zz, String(row?.entry?.mode ?? ""));
+                                    const act = actionLabel(row);
 
-                        <div className="feedBottom">
-                          <span className="muted mono">T {pr.ok}/{pr.total} {bar(pr.pct, 10)}</span>
-                          <span className="muted mono">S:{String(row?.status ?? "—")} | E:{act}</span>
-                        </div>
-                      </div>
+                                    const pin = Boolean(pinned[id]);
+
+                                    return (
+                                        <div
+                                            key={id}
+                                            className={[
+                                                "feedRow",
+                                                isSelected ? "selected" : "",
+                                                isPreferred ? "preferred" : "",
+                                                dead ? "dead" : "",
+                                            ].join(" ")}
+                                            {...tap(() => pick(row))}
+                                            role="button"
+                                            tabIndex={0}
+                                        >
+                                            <div className="feedMark">
+                                                {isSelected ? "●" : pin ? "★" : isPreferred ? "✓" : " "}
+                                            </div>
+
+                                            <div className="feedMain">
+                                                <div className="feedTop">
+                                                    <div className="feedTitle">
+                                                        <span className={`tag side ${row?.side === "LONG" ? "ok" : "bad"}`}>{String(row?.side ?? "—")}</span>
+                                                        <span className="tag type">{typeShort(String(row?.type ?? ""))}</span>
+                                                        <span className="tag status">{String(row?.status ?? "—")}</span>
+                                                    </div>
+
+                                                    <div className="feedBadges">
+                                                        <span className="chip mono">Δ {dl}</span>
+                                                        <span className="chip mono">RR {fmt(row?.rr_min, 2)}</span>
+                                                        <span className="chip mono">P {String(Math.round(p))}</span>
+                                                        <span className="chip mono">C {String(Math.round(c))} ({g})</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="feedBottom">
+                                                    <span className="muted mono">T {pr.ok}/{pr.total} {bar(pr.pct, 10)}</span>
+                                                    <span className="muted mono">S:{String(row?.status ?? "—")} | E:{act}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </SectionCard>
+
+                    {/* Desktop/iPad: details side-by-side; Mobile: details via sheet */}
+                    {!isNarrow ? <DetailsPanel inSheet={false} /> : null}
+                </div>
+            </div>
+
+            {/* Bottom Sheet for mobile */}
+            {isNarrow ? (
+                <div className={`sheet ${drawerOpen ? "on" : ""}`}>
+                    <div className="sheetScrim" {...tap(() => setDrawerOpen(false))} />
+                    <div className="sheetBody">
+                        <DetailsPanel inSheet={true} />
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </SectionCard>
+                </div>
+            ) : null}
 
-          {/* Desktop/iPad: details side-by-side; Mobile: details via sheet */}
-          {!isNarrow ? <DetailsPanel inSheet={false} /> : null}
-        </div>
-      </div>
+            {/* Command bar */}
+            <div className="cmd">
+                <button className="btn" {...tap(prev)} disabled={!rows.length}>Prev</button>
+                <button className="btn" {...tap(next)} disabled={!rows.length}>Next</button>
 
-      {/* Bottom Sheet for mobile */}
-      {isNarrow ? (
-        <div className={`sheet ${drawerOpen ? "on" : ""}`}>
-          <div className="sheetScrim" {...tap(() => setDrawerOpen(false))} />
-          <div className="sheetBody">
-            <DetailsPanel inSheet={true} />
-          </div>
-        </div>
-      ) : null}
+                <button
+                    className={`btn ghost ${selectedKey && pinned[selectedKey] ? "active" : ""}`}
+                    {...tap(togglePin)}
+                    disabled={!s}
+                >
+                    Pin
+                </button>
 
-      {/* Command bar */}
-      <div className="cmd">
-        <button className="btn" {...tap(prev)} disabled={!rows.length}>Prev</button>
-        <button className="btn" {...tap(next)} disabled={!rows.length}>Next</button>
+                <button className="btn ghost" {...tap(copyTicket)} disabled={!s}>Copy</button>
 
-        <button
-          className={`btn ghost ${selectedKey && pinned[selectedKey] ? "active" : ""}`}
-          {...tap(togglePin)}
-          disabled={!s}
-        >
-          Pin
-        </button>
+                <button className="btn ghost" {...tap(() => setExpandedChecklist((x) => !x))} disabled={!s}>
+                    Checklist
+                </button>
 
-        <button className="btn ghost" {...tap(copyTicket)} disabled={!s}>Copy</button>
+                <button className="btn ghost" {...tap(() => setExpandedReasons((x) => !x))} disabled={!s}>
+                    Reasons
+                </button>
 
-        <button className="btn ghost" {...tap(() => setExpandedChecklist((x) => !x))} disabled={!s}>
-          Checklist
-        </button>
+                {isNarrow ? (
+                    <button className="btn" {...tap(() => setDrawerOpen(true))} disabled={!s}>
+                        Details
+                    </button>
+                ) : null}
+            </div>
 
-        <button className="btn ghost" {...tap(() => setExpandedReasons((x) => !x))} disabled={!s}>
-          Reasons
-        </button>
-
-        {isNarrow ? (
-          <button className="btn" {...tap(() => setDrawerOpen(true))} disabled={!s}>
-            Details
-          </button>
-        ) : null}
-      </div>
-
-      {toast ? <Toast msg={toast} onDone={() => setToast(null)} /> : null}
-    </>
-  );
+            {toast ? <Toast msg={toast} onDone={() => setToast(null)} /> : null}
+        </>
+    );
 }
 
 export function DosOpsDashboard() {
-  const [draftSymbol, setDraftSymbol] = useState("BTCUSDT");
-  const [symbol, setSymbol] = useState("BTCUSDT");
-  const [sessionKey, setSessionKey] = useState(1);
-  const [paused, setPaused] = useState(false);
+    const [draftSymbol, setDraftSymbol] = useState("BTCUSDT");
+    const [symbol, setSymbol] = useState("BTCUSDT");
+    const [sessionKey, setSessionKey] = useState(1);
+    const [paused, setPaused] = useState(false);
 
-  const inputRef = useRef<HTMLInputElement | null>(null);
+    const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const commitAnalyze = () => {
-    const clean = String(draftSymbol ?? "").trim().toUpperCase();
-    if (!clean) return;
-    setPaused(false);
-    setSymbol(clean);
-    setDraftSymbol(clean);
-    setSessionKey((k) => k + 1);
-  };
+    const commitAnalyze = () => {
+        const clean = String(draftSymbol ?? "").trim().toUpperCase();
+        if (!clean) return;
+        setPaused(false);
+        setSymbol(clean);
+        setDraftSymbol(clean);
+        setSessionKey((k) => k + 1);
+    };
 
-  const stopToggle = () => setPaused((p) => !p);
+    const stopToggle = () => setPaused((p) => !p);
 
-  const resetAll = () => {
-    setPaused(false);
-    setDraftSymbol("BTCUSDT");
-    setSymbol("BTCUSDT");
-    setSessionKey((k) => k + 1);
-    inputRef.current?.focus();
-  };
+    const resetAll = () => {
+        setPaused(false);
+        setDraftSymbol("BTCUSDT");
+        setSymbol("BTCUSDT");
+        setSessionKey((k) => k + 1);
+        inputRef.current?.focus();
+    };
 
-  return (
-    <div className="screen">
-      <style>{`
+    return (
+        <div className="screen">
+            <style>{`
         :root{
           --bg: #0b1020;
           --panel: rgba(255,255,255,0.06);
@@ -1727,6 +1745,9 @@ export function DosOpsDashboard() {
           font-weight: 800;
           box-shadow: var(--shadow);
         }
+.tblSignals .tblRow{
+  grid-template-columns: 64px 140px 140px 140px 120px 120px 1fr;
+}
 
         /* Tap */
         .btn, .feedRow, .seg, .sheetScrim{
@@ -1735,47 +1756,47 @@ export function DosOpsDashboard() {
         }
       `}</style>
 
-      <div className="frame">
-        <div className="topbar">
-          <span className="brand">DOS OPS</span>
+            <div className="frame">
+                <div className="topbar">
+                    <span className="brand">DOS OPS</span>
 
-          <input
-            className="input"
-            ref={inputRef}
-            value={draftSymbol}
-            onChange={(e) => setDraftSymbol(String(e.target.value).toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitAnalyze();
-              }
-            }}
-            placeholder="BTCUSDT"
-            spellCheck={false}
-            onFocus={(e) => e.currentTarget.select()}
-          />
+                    <input
+                        className="input"
+                        ref={inputRef}
+                        value={draftSymbol}
+                        onChange={(e) => setDraftSymbol(String(e.target.value).toUpperCase())}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                commitAnalyze();
+                            }
+                        }}
+                        placeholder="BTCUSDT"
+                        spellCheck={false}
+                        onFocus={(e) => e.currentTarget.select()}
+                    />
 
-          <button className="btn" {...tap(commitAnalyze)}>Analyze</button>
+                    <button className="btn" {...tap(commitAnalyze)}>Analyze</button>
 
-          <button className={`btn danger ${paused ? "active" : ""}`} {...tap(stopToggle)}>
-            {paused ? "Resume" : "Stop"}
-          </button>
+                    <button className={`btn danger ${paused ? "active" : ""}`} {...tap(stopToggle)}>
+                        {paused ? "Resume" : "Stop"}
+                    </button>
 
-          <button className="btn ghost" {...tap(resetAll)}>Reset</button>
+                    <button className="btn ghost" {...tap(resetAll)}>Reset</button>
 
-          <span className="chip dim">
-            <span>Session</span>
-            <span className="monoStrong">#{sessionKey}</span>
-          </span>
+                    <span className="chip dim">
+                        <span>Session</span>
+                        <span className="monoStrong">#{sessionKey}</span>
+                    </span>
 
-          <span className="chip dim">
-            <span>Mode</span>
-            <span className="monoStrong">{paused ? "FROZEN" : "LIVE"}</span>
-          </span>
+                    <span className="chip dim">
+                        <span>Mode</span>
+                        <span className="monoStrong">{paused ? "FROZEN" : "LIVE"}</span>
+                    </span>
+                </div>
+
+                <AnalysisSession key={`${symbol}:${sessionKey}`} symbol={symbol} paused={paused} />
+            </div>
         </div>
-
-        <AnalysisSession key={`${symbol}:${sessionKey}`} symbol={symbol} paused={paused} />
-      </div>
-    </div>
-  );
+    );
 }
