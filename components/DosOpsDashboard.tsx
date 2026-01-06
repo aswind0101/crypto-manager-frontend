@@ -502,7 +502,13 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const [statusFilter, setStatusFilter] = useState<"ALL" | "FORMING" | "READY" | "TRIGGERED" | "DEAD">("ALL");
     const [showPinnedOnly, setShowPinnedOnly] = useState(false);
     const [pinned, setPinned] = useState<Record<string, boolean>>({});
+    // NOTE: do NOT setState on every realtime tick; use ref + UI clock instead
     const [pulse, setPulse] = useState(0);
+    const pulseRef = useRef<number>(0);
+
+    // UI-clocked staleness label (reduces re-render frequency on iOS)
+    const [uiStaleSec, setUiStaleSec] = useState<number | undefined>(undefined);
+
 
     const rows = useMemo(() => {
         let r = allRows;
@@ -560,14 +566,39 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         : lastActivityMsRef.current != null
             ? (now - lastActivityMsRef.current) / 1000
             : undefined;
+    // UI clock (6Hz): publish scan/status updates at a human-friendly rate
+    useEffect(() => {
+        if (paused) return;
+
+        const id = window.setInterval(() => {
+            // publish pulse for ScanPulse bump
+            setPulse(pulseRef.current);
+
+            // publish staleSec for header/scan (human-rate)
+            const n = Date.now();
+            const ts = Number(vSnap?.price?.ts);
+            const sec = Number.isFinite(ts)
+                ? (n - ts) / 1000
+                : lastActivityMsRef.current != null
+                    ? (n - lastActivityMsRef.current) / 1000
+                    : undefined;
+
+            setUiStaleSec(sec);
+        }, 166); // ~6Hz
+
+        return () => window.clearInterval(id);
+    }, [paused, vSnap?.price?.ts]);
 
     useEffect(() => {
         if (paused) return;
         const px = Number(vSnap?.price?.mid);
         if (!Number.isFinite(px) && !tickKey) return;
+
+        // realtime tick: update refs only (NO setState)
         lastActivityMsRef.current = Date.now();
-        setPulse((p) => p + 1);
+        pulseRef.current += 1;
     }, [paused, tickKey, vSnap]);
+
 
     // Selected row from current rows
     const selected = useMemo(() => {
@@ -889,7 +920,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                 mid={mid}
                 dev={dev}
                 lastTs={vSnap?.price?.ts ?? null}
-                staleSec={staleSec}
+                staleSec={uiStaleSec}
+
                 setupsCount={rows.length}
                 preferredId={preferredId}
             />
@@ -900,7 +932,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                 dq={dq}
                 bybitOk={bybitOk}
                 binanceOk={binanceOk}
-                staleSec={staleSec}
+                staleSec={uiStaleSec}
+
                 pulse={pulse}
             />
 
@@ -1339,7 +1372,6 @@ export function DosOpsDashboard() {
   transition: transform 180ms linear;
   will-change: transform;
 }
-
 
         /* Layout */
         .layout{
