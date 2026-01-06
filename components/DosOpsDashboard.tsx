@@ -769,10 +769,35 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
             </div>
         );
     };
-    const f15 = showFlags(scan15.fl);
-    const f1h = showFlags(scan1h.fl);
-    const f4h = showFlags(scan4h.fl);
-    const f1d = showFlags(scan1d.fl);
+    function htfBiasLabel(features: AnyObj) {
+        const htf = features?.htf;
+        if (!htf) return "—";
+
+        const bias = String(htf.bias ?? "").toUpperCase();
+        const regime = String(htf.regime ?? "").toUpperCase();
+
+        if (!bias) return "—";
+        return regime ? `${bias} (${regime})` : bias;
+    }
+
+    function invalidationLabel(ms: AnyObj) {
+        if (!ms) return "—";
+        if (ms.trend === "UP") return fmt(ms.lastSwingLow?.price, 2);
+        if (ms.trend === "DOWN") return fmt(ms.lastSwingHigh?.price, 2);
+        return "—";
+    }
+
+    function eventsLabel(ms: AnyObj) {
+        if (!ms) return "—";
+        const ev: string[] = [];
+
+        if (ms.lastBOS) ev.push(`BOS${ms.lastBOS.dir === "UP" ? "↑" : "↓"}`);
+        if (ms.lastCHOCH) ev.push(`CHOCH${ms.lastCHOCH.dir === "UP" ? "↑" : "↓"}`);
+        if (ms.lastSweep) ev.push(`SWP${ms.lastSweep.dir === "UP" ? "↑" : "↓"}`);
+
+        return ev.length ? ev.slice(0, 2).join(" ") : "—";
+    }
+
 
     return (
         <>
@@ -807,27 +832,36 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                         <div className="dos-small">
                             <div className="dos-mo-grid" role="table" aria-label="market outlook">
                                 <div className="dos-mo-row dos-mo-head" role="row">
-                                    <div className="dos-mo-cell" role="columnheader">TF</div>
-                                    <div className="dos-mo-cell" role="columnheader">TREND</div>
-                                    <div className="dos-mo-cell" role="columnheader">SWING H</div>
-                                    <div className="dos-mo-cell" role="columnheader">SWING L</div>
-                                    <div className="dos-mo-cell" role="columnheader">FLAGS</div>
+                                    <div className="dos-mo-row dos-mo-head" role="row">
+                                        <div className="dos-mo-cell" role="columnheader">TF</div>
+                                        <div className="dos-mo-cell" role="columnheader">TREND</div>
+                                        <div className="dos-mo-cell" role="columnheader">HTF BIAS</div>
+                                        <div className="dos-mo-cell" role="columnheader">INVALID</div>
+                                        <div className="dos-mo-cell" role="columnheader">EVENTS</div>
+                                    </div>
                                 </div>
 
                                 {[
-                                    ["15m", scan15],
-                                    ["1h", scan1h],
-                                    ["4h", scan4h],
-                                    ["1d", scan1d],
-                                ].map(([tf, s]: any) => (
-                                    <div className="dos-mo-row" role="row" key={tf}>
-                                        <div className="dos-mo-cell dos-mo-tf" role="cell">{tf}</div>
-                                        <div className="dos-mo-cell" role="cell">{String(s?.trend ?? "—")}</div>
-                                        <div className="dos-mo-cell" role="cell">{fmt(s?.sH, 2)}</div>
-                                        <div className="dos-mo-cell" role="cell">{fmt(s?.sL, 2)}</div>
-                                        <div className="dos-mo-cell" role="cell">{String(s?.fl ?? "—")}</div>
-                                    </div>
-                                ))}
+                                    "15m",
+                                    "1h",
+                                    "4h",
+                                    "1d",
+                                ].map((tf) => {
+                                    const ms = resolveMS(vFeat, tf);
+                                    const htfBias = htfBiasLabel(vFeat);
+                                    const inval = invalidationLabel(ms);
+                                    const events = eventsLabel(ms);
+
+                                    return (
+                                        <div className="dos-mo-row" role="row" key={tf}>
+                                            <div className="dos-mo-cell dos-mo-tf" role="cell">{tf}</div>
+                                            <div className="dos-mo-cell" role="cell">{String(ms?.trend ?? "—")}</div>
+                                            <div className="dos-mo-cell" role="cell">{htfBias}</div>
+                                            <div className="dos-mo-cell" role="cell">{inval}</div>
+                                            <div className="dos-mo-cell" role="cell">{events}</div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                         <div className="dos-hr" />
@@ -1375,10 +1409,9 @@ export function DosOpsDashboard() {
   overflow:hidden;
   background:#040604;
 }
-
 .dos-mo-row{
   display:grid;
-  grid-template-columns: 52px 92px 1fr 1fr 110px;
+  grid-template-columns: 52px 90px 140px 110px 1fr;
   gap:10px;
   padding:8px 10px;
   border-top:1px solid #0d1f0d;
