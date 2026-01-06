@@ -637,13 +637,13 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                             SETUP: <span className="dos-strong">{String(selected?.status ?? "—")}</span>
                         </span>
 
-                        <span className="dos-pill dos-dim">
+                        <span className="dos-pill dos-dim dos-pill-wrap">
                             EXEC: <span className="dos-strong">{action}</span>
                             {selected?.execution?.reason ? (
                                 <span className="dos-dim"> • {String(selected.execution.reason)}</span>
                             ) : null}
                             {Array.isArray(selected?.execution?.blockers) && selected.execution.blockers.length ? (
-                                <span className="dos-warn"> • blockers={selected.execution.blockers.join(",")}</span>
+                                <span className="dos-warn dos-break"> • blockers={selected.execution.blockers.join(",")}</span>
                             ) : null}
                         </span>
 
@@ -1247,6 +1247,18 @@ export function DosOpsDashboard() {
           background:#070a07;
           box-shadow: 0 0 0 1px #0a140a inset;
         }
+/* Allow EXEC pill to wrap on iPad (avoid clipping) */
+.dos-pill-wrap {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  line-height: 1.25;
+}
+
+.dos-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
         /* Toast */
         .dos-toast{
@@ -1285,6 +1297,20 @@ export function DosOpsDashboard() {
                             spellCheck={false}
                             onFocus={(e) => e.currentTarget.select()}
                         />
+                        <button className="dos-btn" {...tap(commitAnalyze)}>
+                            ANALYZE
+                        </button>
+
+                        <button
+                            className={`dos-btn dos-btn-danger ${paused ? "dos-btn-active" : ""}`}
+                            {...tap(stopToggle)}
+                        >
+                            {paused ? "RESUME" : "STOP"}
+                        </button>
+
+                        <button className="dos-btn" {...tap(resetAll)}>
+                            RESET
+                        </button>
                         <span className="dos-chip dos-dim">
                             <span>SESSION</span>
                             <span className="dos-mono">#{sessionKey}</span>
