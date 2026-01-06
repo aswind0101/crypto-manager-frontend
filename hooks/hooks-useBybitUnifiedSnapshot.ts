@@ -74,9 +74,9 @@ export function useBybitUnifiedSnapshot(symbol: string) {
       tf: Tf;
       limit: number;
       signal: AbortSignal;
-      end?: number; // optional: fetch klines ending before this timestamp (ms)
+      endTime?: number; // optional: fetch klines ending before this timestamp (ms)
     }): Promise<Candle[]> {
-      const { symbol, tf, limit, signal, end } = args;
+      const { symbol, tf, limit, signal, endTime } = args;
       const interval = tfToBybitInterval(tf);
       if (!interval) return [];
 
@@ -86,8 +86,8 @@ export function useBybitUnifiedSnapshot(symbol: string) {
         `&interval=${encodeURIComponent(interval)}` +
         `&limit=${encodeURIComponent(String(limit))}`;
 
-      if (Number.isFinite(end)) {
-        url += `&endTime=${encodeURIComponent(String(end))}`;
+      if (Number.isFinite(endTime)) {
+        url += `&endTime=${encodeURIComponent(String(endTime))}`;
       }
 
       const res = await fetch(url, { method: "GET", cache: "no-store", signal });
@@ -133,39 +133,49 @@ export function useBybitUnifiedSnapshot(symbol: string) {
       const { symbol, tf, need, signal } = args;
 
       const PAGE = 200; // Bybit cap
-      let end: number | undefined = undefined;
-      let acc: Candle[] = [];
+      let endTime: number | undefined = undefined;
 
-      while (acc.length < need) {
+      // Use a map to de-dup incrementally (prevents overlap issues)
+      const map = new Map<number, Candle>();
+
+      // Safety: detect no-progress to avoid infinite loops if endTime is ignored
+      let lastEnd: number | undefined = undefined;
+
+      while (map.size < need) {
+        const remaining = need - map.size;
+        const limit = Math.min(PAGE, remaining);
+
         const batch = await fetchBybitKlines({
           symbol,
           tf,
-          limit: Math.min(PAGE, need), // still capped by 200
-          end,
+          limit,
+          endTime, // NOTE: your fetchBybitKlines must use &endTime=
           signal,
         });
 
         if (!batch.length) break;
 
-        // batch is oldest-first
-        // We are paging backwards, so prepend older batch
-        acc = [...batch, ...acc];
+        for (const c of batch) map.set(c.ts, c);
 
-        // next page should end before the oldest candle we just got
-        end = batch[0].ts - 1;
+        // batch is oldest-first (you sort in fetchBybitKlines)
+        const oldest = batch[0]?.ts;
+        if (!Number.isFinite(oldest)) break;
 
-        // if API returned fewer than cap, no more history
-        if (batch.length < PAGE) break;
+        endTime = oldest - 1;
+
+        // no-progress guard: if endTime doesn't move back, stop
+        if (lastEnd != null && endTime >= lastEnd) break;
+        lastEnd = endTime;
+
+        // If API returns fewer than requested, we reached the end of history
+        if (batch.length < limit) break;
       }
-
-      // De-dup by ts just in case
-      const map = new Map<number, Candle>();
-      for (const c of acc) map.set(c.ts, c);
 
       return Array.from(map.values())
         .sort((a, b) => a.ts - b.ts)
         .slice(-need);
     }
+
 
     async function backfillWarmup() {
       // Minimum set needed for your engine/features path:
