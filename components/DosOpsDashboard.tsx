@@ -440,6 +440,14 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const vFeat = paused ? frozen.features : features;
     const vSet = paused ? frozen.setups : setups;
 
+    useEffect(() => {
+        // One-time-ish debug: log HTF shape when it changes
+        // (Remove after fixing HTF display)
+        // eslint-disable-next-line no-console
+        console.log("[HTF]", vFeat?.htf);
+    }, [vFeat?.htf]);
+
+
     const dq = String(vFeat?.quality?.dq_grade ?? "—");
     const dqOk = Boolean(vSet?.dq_ok ?? vFeat?.quality?.dq_ok);
     const bybitOk = Boolean(vFeat?.quality?.bybit_ok);
