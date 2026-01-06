@@ -77,6 +77,18 @@ function biasByTfLabel(features: AnyObj, tf: string) {
 
     return `${core}${vol}`;
 }
+function setupSig(s: AnyObj) {
+    // Chỉ dùng các field mang tính “định danh” tương đối ổn định theo setup logic,
+    // tuyệt đối KHÔNG dùng status, zone, stop, rr, priority_score... vì các field này có thể đổi theo tick.
+    return [
+        String(s?.canon ?? ""),
+        String(s?.side ?? ""),
+        String(s?.type ?? ""),
+        String(s?.bias_tf ?? ""),
+        String(s?.entry_tf ?? ""),
+        String(s?.trigger_tf ?? ""),
+    ].join("|");
+}
 
 function typeShort(t: string) {
     if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
@@ -527,6 +539,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
     // UX state
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedSig, setSelectedSig] = useState<string | null>(null);
+
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [expandedChecklist, setExpandedChecklist] = useState(true);
     const [expandedReasons, setExpandedReasons] = useState(false);
@@ -655,10 +669,22 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     useEffect(() => {
         if (!rows.length) return;
 
+        // 1) If selectedId still exists, keep it.
         if (selectedId && rows.some((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId)) return;
 
+        // 2) If selectedId is missing BUT we have a stable signature, try to re-bind to the “same” setup.
+        if (selectedSig) {
+            const hit = rows.find((x: AnyObj) => setupSig(x) === selectedSig);
+            if (hit) {
+                setSelectedId(String(hit?.__uiKey ?? ""));
+                return;
+            }
+        }
+
+        // 3) Otherwise (first load / selection truly gone), pick the first row.
         setSelectedId(String((rows[0] as AnyObj)?.__uiKey ?? ""));
-    }, [rows, selectedId]);
+    }, [rows, selectedId, selectedSig]);
+
 
 
     // Toast
@@ -701,6 +727,7 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const pick = (s: AnyObj) => {
         const key = String(s?.__uiKey ?? s?.id ?? "");
         setSelectedId(key);
+        setSelectedSig(setupSig(s));
         if (isNarrow) setDrawerOpen(true);
     };
 
