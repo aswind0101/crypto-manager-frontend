@@ -87,7 +87,7 @@ export function useBybitUnifiedSnapshot(symbol: string) {
         `&limit=${encodeURIComponent(String(limit))}`;
 
       if (Number.isFinite(end)) {
-        url += `&end=${encodeURIComponent(String(end))}`;
+        url += `&endTime=${encodeURIComponent(String(end))}`;
       }
 
       const res = await fetch(url, { method: "GET", cache: "no-store", signal });
