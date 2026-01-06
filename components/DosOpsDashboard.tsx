@@ -805,39 +805,31 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                     <div className="dos-panel-head">MARKET OUTLOOK (SCAN)</div>
                     <div className="dos-panel-body">
                         <div className="dos-small">
-                            <div className="dos-line">
-                                <span className="dos-k">15m</span>
-                                <span className="dos-v">
-                                    {scan15.trend} | H {fmt(scan15.sH, 2)} L {fmt(scan15.sL, 2)}
-                                    {f15 ? ` • ${f15}` : ""}
-                                </span>
-                            </div>
+                            <div className="dos-mo-grid" role="table" aria-label="market outlook">
+                                <div className="dos-mo-row dos-mo-head" role="row">
+                                    <div className="dos-mo-cell" role="columnheader">TF</div>
+                                    <div className="dos-mo-cell" role="columnheader">TREND</div>
+                                    <div className="dos-mo-cell" role="columnheader">SWING H</div>
+                                    <div className="dos-mo-cell" role="columnheader">SWING L</div>
+                                    <div className="dos-mo-cell" role="columnheader">FLAGS</div>
+                                </div>
 
-                            <div className="dos-line">
-                                <span className="dos-k">1h</span>
-                                <span className="dos-v">
-                                    {scan1h.trend} | H {fmt(scan1h.sH, 2)} L {fmt(scan1h.sL, 2)}
-                                    {f1h ? ` • ${f1h}` : ""}
-                                </span>
-                            </div>
-
-                            <div className="dos-line">
-                                <span className="dos-k">4h</span>
-                                <span className="dos-v">
-                                    {scan4h.trend} | H {fmt(scan4h.sH, 2)} L {fmt(scan4h.sL, 2)}
-                                    {f4h ? ` • ${f4h}` : ""}
-                                </span>
-                            </div>
-
-                            <div className="dos-line">
-                                <span className="dos-k">1d</span>
-                                <span className="dos-v">
-                                    {scan1d.trend} | H {fmt(scan1d.sH, 2)} L {fmt(scan1d.sL, 2)}
-                                    {f1d ? ` • ${f1d}` : ""}
-                                </span>
+                                {[
+                                    ["15m", scan15],
+                                    ["1h", scan1h],
+                                    ["4h", scan4h],
+                                    ["1d", scan1d],
+                                ].map(([tf, s]: any) => (
+                                    <div className="dos-mo-row" role="row" key={tf}>
+                                        <div className="dos-mo-cell dos-mo-tf" role="cell">{tf}</div>
+                                        <div className="dos-mo-cell" role="cell">{String(s?.trend ?? "—")}</div>
+                                        <div className="dos-mo-cell" role="cell">{fmt(s?.sH, 2)}</div>
+                                        <div className="dos-mo-cell" role="cell">{fmt(s?.sL, 2)}</div>
+                                        <div className="dos-mo-cell" role="cell">{String(s?.fl ?? "—")}</div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
-
                         <div className="dos-hr" />
 
                         <div className="dos-small">
@@ -1374,6 +1366,43 @@ export function DosOpsDashboard() {
 }
 
 .dos-ks-tf{
+  color:#b7f3c1;
+  font-weight:700;
+}
+.dos-mo-grid{
+  border:1px solid #133013;
+  border-radius:12px;
+  overflow:hidden;
+  background:#040604;
+}
+
+.dos-mo-row{
+  display:grid;
+  grid-template-columns: 52px 92px 1fr 1fr 110px;
+  gap:10px;
+  padding:8px 10px;
+  border-top:1px solid #0d1f0d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:12px;
+  line-height:1.2;
+}
+
+.dos-mo-row:first-child{ border-top:none; }
+
+.dos-mo-head{
+  background:#050a05;
+  color:#8fdc99;
+  font-weight:700;
+}
+
+.dos-mo-cell{
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.dos-mo-tf{
   color:#b7f3c1;
   font-weight:700;
 }
