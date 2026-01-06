@@ -432,6 +432,130 @@ function SectionCard({
         </div>
     );
 }
+function LiveHudCanvas({
+    mid,
+    dq,
+    dqOk,
+    bybitOk,
+    binanceOk,
+    staleSec,
+    pulse,
+    paused,
+}: {
+    mid: number;
+    dq: string;
+    dqOk: boolean;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    staleSec?: number;
+    pulse: number;
+    paused: boolean;
+}) {
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (!el) return;
+
+        const ctx = el.getContext("2d");
+        if (!ctx) return;
+
+        // Resize to device pixels for crisp text on iOS
+        const resize = () => {
+            const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+            const rect = el.getBoundingClientRect();
+            const w = Math.max(1, Math.floor(rect.width));
+            const h = Math.max(1, Math.floor(rect.height));
+            el.width = Math.floor(w * dpr);
+            el.height = Math.floor(h * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+
+        resize();
+
+        const ro = new ResizeObserver(() => resize());
+        ro.observe(el);
+
+        return () => ro.disconnect();
+    }, []);
+
+    // Draw only when props change (NOT per frame)
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (!el) return;
+        const ctx = el.getContext("2d");
+        if (!ctx) return;
+
+        const w = el.getBoundingClientRect().width;
+        const h = el.getBoundingClientRect().height;
+
+        // Background (solid-ish, no blur)
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "rgba(10,12,18,0.92)";
+        ctx.fillRect(0, 0, w, h);
+
+        // Header line
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.font = "700 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
+        ctx.textBaseline = "middle";
+
+        const health =
+            !bybitOk ? "BYBIT DOWN" :
+                !binanceOk ? "BINANCE DEGRADED" :
+                    !dqOk ? "DQ GATED" :
+                        !Number.isFinite(mid) ? "WARMING UP" :
+                            "OK";
+
+        const staleLabel = staleSec == null || !Number.isFinite(staleSec) ? "—" : `${staleSec.toFixed(1)}s`;
+        const midLabel = Number.isFinite(mid) ? mid.toFixed(2) : "—";
+
+        const left = 12;
+        const topY = 14;
+
+        ctx.fillText(`MODE: ${paused ? "FROZEN" : "LIVE"}   HEALTH: ${health}`, left, topY);
+        ctx.fillText(`DQ: ${dq}   MID: ${midLabel}   STALE: ${staleLabel}`, left, topY + 16);
+
+        // Meter (transform-free; canvas draw)
+        const pct = staleSec == null || !Number.isFinite(staleSec) ? 0 : Math.max(0, Math.min(1, 1 - staleSec / 5));
+        const meterX = 12;
+        const meterY = 44;
+        const meterW = Math.max(10, w - 24);
+        const meterH = 10;
+
+        // rail
+        ctx.fillStyle = "rgba(255,255,255,0.10)";
+        roundRect(ctx, meterX, meterY, meterW, meterH, 999);
+        ctx.fill();
+
+        // fill
+        ctx.fillStyle = "rgba(134,239,172,0.85)";
+        roundRect(ctx, meterX, meterY, meterW * pct, meterH, 999);
+        ctx.fill();
+
+        // tiny pulse indicator (no layout)
+        ctx.fillStyle = "rgba(96,165,250,0.85)";
+        const dot = 6;
+        const dx = meterX + meterW - 10;
+        const dy = meterY + meterH / 2;
+        ctx.beginPath();
+        ctx.arc(dx, dy, dot / 2 + (pulse % 2 === 0 ? 0.5 : 0), 0, Math.PI * 2);
+        ctx.fill();
+    }, [mid, dq, dqOk, bybitOk, binanceOk, staleSec, pulse, paused]);
+
+    return <canvas ref={canvasRef} className="hudCanvas" />;
+}
+
+// helper: rounded rect for canvas
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+    const rr = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+}
 
 function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }) {
     const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
@@ -503,8 +627,10 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const [showPinnedOnly, setShowPinnedOnly] = useState(false);
     const [pinned, setPinned] = useState<Record<string, boolean>>({});
     // NOTE: do NOT setState on every realtime tick; use ref + UI clock instead
+    // pulse is used only for Canvas HUD; never drive DOM re-render per tick
     const [pulse, setPulse] = useState(0);
     const pulseRef = useRef<number>(0);
+
 
     // UI-clocked staleness label (reduces re-render frequency on iOS)
     const [uiStaleSec, setUiStaleSec] = useState<number | undefined>(undefined);
@@ -566,6 +692,17 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         : lastActivityMsRef.current != null
             ? (now - lastActivityMsRef.current) / 1000
             : undefined;
+    useEffect(() => {
+        if (paused) return;
+
+        const id = window.setInterval(() => {
+            // publish pulse at 6Hz (canvas redraw)
+            setPulse(pulseRef.current);
+        }, 166);
+
+        return () => window.clearInterval(id);
+    }, [paused]);
+
     // UI clock (6Hz): publish scan/status updates at a human-friendly rate
     useEffect(() => {
         if (paused) return;
@@ -591,13 +728,15 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
     useEffect(() => {
         if (paused) return;
+
         const px = Number(vSnap?.price?.mid);
         if (!Number.isFinite(px) && !tickKey) return;
 
-        // realtime tick: update refs only (NO setState)
+        // realtime tick: refs only, no React state updates
         lastActivityMsRef.current = Date.now();
         pulseRef.current += 1;
-    }, [paused, tickKey, vSnap]);
+    }, [paused, tickKey]);
+
 
 
     // Selected row from current rows
@@ -911,29 +1050,14 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
     return (
         <>
-            <SystemRibbon
+            <LiveHudCanvas
                 paused={paused}
                 dq={dq}
                 dqOk={dqOk}
                 bybitOk={bybitOk}
                 binanceOk={binanceOk}
                 mid={mid}
-                dev={dev}
-                lastTs={vSnap?.price?.ts ?? null}
-                staleSec={uiStaleSec}
-
-                setupsCount={rows.length}
-                preferredId={preferredId}
-            />
-
-            <ScanPulse
-                title={scan.title}
-                tone={scan.tone}
-                dq={dq}
-                bybitOk={bybitOk}
-                binanceOk={binanceOk}
-                staleSec={uiStaleSec}
-
+                staleSec={staleSec}
                 pulse={pulse}
             />
 
@@ -1779,6 +1903,15 @@ export function DosOpsDashboard() {
           backdrop-filter: blur(10px);
           box-shadow: var(--shadow);
         }
+.hudCanvas{
+  width: 100%;
+  height: 64px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(10,12,18,0.92);
+  box-shadow: none;
+  display: block;
+}
 
         /* Toast */
         .toast{
