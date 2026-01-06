@@ -3,7 +3,6 @@ import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
 import type { ExecutionDecision } from "../lib/feeds/setups/types";
 
-
 type Candle = {
   ts: number;
   o: number;
@@ -128,10 +127,7 @@ function applyPriorityScore(out: any, snap: any, features: any): any {
 
     const distScore = clamp(55 - distBps * 2.0, 0, 55);
 
-    const statusScore =
-      status === "READY" ? 18 :
-      status === "FORMING" ? 8 :
-      0;
+    const statusScore = status === "READY" ? 18 : status === "FORMING" ? 8 : 0;
 
     const preOk = getChecklistOk(s, "pre_trigger");
     const preScore = preOk ? 15 : 0;
@@ -144,7 +140,7 @@ function applyPriorityScore(out: any, snap: any, features: any): any {
       else if (minsLeft < 20) expiryPenalty = 10;
     }
 
-    const confScore = clamp(conf * 0.20, 0, 20);
+    const confScore = clamp(conf * 0.2, 0, 20);
 
     let score = distScore + statusScore + preScore + dqBoost + confScore - expiryPenalty;
     score = clamp(Math.round(score), 0, 100);
@@ -211,7 +207,9 @@ function applyPreTrigger(out: any, snap: any): any {
         checklist = upsertChecklist(checklist, {
           key: "retest",
           ok: inZone,
-          note: `mid=${mid.toFixed(2)} | zone=[${z.lo.toFixed(2)}, ${z.hi.toFixed(2)}]` + (brk ? ` | lvl=${brk.toFixed(2)}` : ""),
+          note:
+            `mid=${mid.toFixed(2)} | zone=[${z.lo.toFixed(2)}, ${z.hi.toFixed(2)}]` +
+            (brk ? ` | lvl=${brk.toFixed(2)}` : ""),
         });
 
         checklist = upsertChecklist(checklist, {
@@ -318,7 +316,7 @@ function applyCloseConfirm(out: any, snap: any): any {
         const passStrength = strength >= 0.7;
 
         if (s.side === "LONG") {
-          const touched = last.l <= z.hi;          // retest touch
+          const touched = last.l <= z.hi; // retest touch
           const passPrice = last.c > brk + buffer; // close beyond level
           if (touched && passPrice && passStrength) {
             return {
@@ -422,6 +420,7 @@ function applyCloseConfirm(out: any, snap: any): any {
 
   return { ...out, setups: updated };
 }
+
 function deriveExecutionDecision(
   setup: any,
   ctx: {
@@ -489,8 +488,7 @@ function deriveExecutionDecision(
 
     if (mode === "LIMIT") {
       const z = setup?.entry?.zone;
-      const inZone =
-        z && ctx.mid >= z.lo && ctx.mid <= z.hi;
+      const inZone = z && ctx.mid >= z.lo && ctx.mid <= z.hi;
 
       if (!inZone) {
         return {
@@ -552,7 +550,13 @@ function deriveExecutionDecision(
   };
 }
 
-export function useSetupsSnapshot(symbol: string) {
+/**
+ * Snapshot builder (client-side):
+ * - buildSetups() returns canonical setup lifecycle status (FORMING/READY/TRIGGERED/...)
+ * - this hook enriches each setup with an **execution decision** that is explicitly
+ *   separate from setup.status, so UI can communicate "ready" vs "enter now / place limit / wait".
+ */
+export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   const { snap, features } = useFeaturesSnapshot(symbol);
 
   const setups = useMemo(() => {
@@ -562,8 +566,52 @@ export function useSetupsSnapshot(symbol: string) {
 
     const withPre = applyPreTrigger(base, snap);
     const withConfirm = applyCloseConfirm(withPre, snap);
-    return applyPriorityScore(withConfirm, snap, features);
-  }, [snap, features]);
+    const scored = applyPriorityScore(withConfirm, snap, features);
+
+    // Attach execution decision per setup (UI-facing)
+    const mid = Number.isFinite(Number(snap?.price?.mid))
+      ? Number(snap.price.mid)
+      : (Number.isFinite(Number(snap?.price?.bid)) && Number.isFinite(Number(snap?.price?.ask)))
+        ? (Number(snap.price.bid) + Number(snap.price.ask)) / 2
+        : NaN;
+
+    const dqOk = Boolean(
+      scored?.dq_ok ?? (features?.quality?.dq_grade === "A" || features?.quality?.dq_grade === "B")
+    );
+    const bybitOk = Boolean(features?.quality?.bybit_ok);
+    // --- staleness: based on price feed timestamp or activity clock ---
+    let staleSec: number | undefined = undefined;
+
+    const priceTs = Number(snap?.price?.ts);
+    if (Number.isFinite(priceTs)) {
+      staleSec = (Date.now() - priceTs) / 1000;
+    } else {
+      // fallback: activity clock (price changes)
+      // NOTE: do NOT invent timestamps
+      staleSec = undefined;
+    }
+
+
+    const ctx = {
+      mid,
+      dqOk,
+      bybitOk,
+      staleSec,
+      paused,
+    };
+
+    const enriched = Array.isArray(scored?.setups)
+      ? scored.setups.map((s: any) => ({
+        ...s,
+        execution: deriveExecutionDecision(s, ctx),
+      }))
+      : scored?.setups;
+
+    return {
+      ...scored,
+      setups: enriched,
+    };
+  }, [snap, features, paused]);
 
   return { snap, features, setups };
 }

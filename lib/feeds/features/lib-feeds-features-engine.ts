@@ -1,5 +1,6 @@
 import type { Candle } from "../core/types";
-import type { FeatureEngineInput, FeaturesSnapshot, TrendDir, VolRegime } from "./types";
+import type { FeatureEngineInput, FeaturesSnapshot, TrendDir, VolRegime, BiasTfSnapshot } from "./types";
+
 import { closes, highs, lows, last } from "./series";
 import { clamp, safeDiv } from "./math";
 
@@ -71,6 +72,56 @@ function volRegimeFromAtr(candles: Candle[]) {
   else if (atrp > 0.010) reg = "high";
 
   return { reg, atrp };
+}
+function computeBiasForTf(tf: "15m" | "1h" | "4h" | "1d", candles?: Candle[]): BiasTfSnapshot {
+  const have = candles?.length ?? 0;
+  const need = 210;
+  const complete = have >= need;
+
+  // thiếu data => pending (đúng yêu cầu UI)
+  if (!candles || !complete) {
+    return { tf, complete: false, have, need };
+  }
+
+  // ADX (nếu đủ bars)
+  let adxVal: number | undefined = undefined;
+  if (candles.length >= 60) {
+    const cls = closes(candles);
+    const hi = highs(candles);
+    const lo = lows(candles);
+    const a = adx(hi, lo, cls, 14);
+    adxVal = last(a.adx);
+  }
+
+  // Trend (EMA200 + ADX) – dùng đúng helper hiện tại
+  let trend_dir: TrendDir = "sideways";
+  let trend_strength = 0;
+  let ema200: number | undefined = undefined;
+
+  if (candles.length >= 220) {
+    const t = trendFromEmaAdx({ candles, adx14: adxVal });
+    trend_dir = t.dir;
+    trend_strength = t.strength;
+    ema200 = t.ema200;
+  } else {
+    // vẫn complete theo gate 210, nhưng không đủ 220 cho EMA200 slope => giữ sideways/0
+    // không set partial/notes vì bias_by_tf chỉ phục vụ UI.
+  }
+
+  // Vol regime – dùng đúng helper hiện tại (ATR%)
+  const vr = volRegimeFromAtr(candles);
+
+  return {
+    tf,
+    trend_dir,
+    trend_strength,
+    vol_regime: vr.reg,
+    adx14: adxVal,
+    ema200,
+    complete: true,
+    have,
+    need,
+  };
 }
 
 export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
@@ -211,6 +262,12 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
       vol_regime,
       adx14: adxVal,
       ema200,
+    },
+    bias_by_tf: {
+      "15m": computeBiasForTf("15m", c15),
+      "1h": computeBiasForTf("1h", c1h),
+      "4h": computeBiasForTf("4h", c4h),
+      "1d": computeBiasForTf("1d", c1d),
     },
     entry: {
       tfs: ["5m", "15m"],

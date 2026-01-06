@@ -14,10 +14,16 @@ function lastClose(candles?: Candle[]) {
 }
 
 function atrProxyFromFeatures(f: FeaturesSnapshot) {
-  // atrp_15m is in %
-  const atrp = f.entry.volatility.atrp_15m;
-  return typeof atrp === "number" ? atrp / 100 : 0.007; // fallback 0.7%
+  // atrp_* are in %
+  const v = f.entry.volatility;
+  const xs: number[] = [];
+  if (typeof v.atrp_15m === "number") xs.push(v.atrp_15m / 100);
+  if (typeof v.atrp_1h === "number") xs.push(v.atrp_1h / 100);
+  if (typeof v.atrp_4h === "number") xs.push(v.atrp_4h / 100);
+  if (!xs.length) return 0.007; // fallback 0.7%
+  return Math.max(...xs); // conservative sizing
 }
+
 
 function makeEntryZone(price: number, atrp: number, side: SetupSide) {
   // Zone width ~ 0.35 * ATR% intraday
@@ -64,6 +70,60 @@ function getBiasCompleteness(snap: UnifiedSnapshot, f: FeaturesSnapshot) {
   const need = 210;
   const complete = tfCandles.length >= need;
   return { tf: String(tf), count: tfCandles.length, need, complete };
+}
+function htfConfirm(f: FeaturesSnapshot, side: SetupSide) {
+  const ms1h = (f as any).market_structure?.["1h"];
+  const ms4h = (f as any).market_structure?.["4h"];
+
+  const want = side === "LONG" ? "UP" : "DOWN";
+  const block = side === "LONG" ? "DOWN" : "UP";
+
+  const tfs: Array<{ tf: string; ms: any }> = [
+    { tf: "1h", ms: ms1h },
+    { tf: "4h", ms: ms4h },
+  ].filter(x => x.ms);
+
+  if (!tfs.length) return { ok: true, note: "HTF MS n/a" };
+
+  // Any opposite CHOCH blocks
+  for (const x of tfs) {
+    const choch = x.ms?.lastCHOCH;
+    if (choch?.dir === block) return { ok: false, note: `${x.tf} CHOCH ${choch.dir}` };
+  }
+
+  // Any BOS in desired direction confirms
+  for (const x of tfs) {
+    const bos = x.ms?.lastBOS;
+    if (bos?.dir === want) return { ok: true, note: `${x.tf} BOS ${bos.dir}` };
+  }
+
+  return { ok: false, note: "No HTF BOS confirm" };
+}
+
+function deltaOk(f: FeaturesSnapshot, side: SetupSide) {
+  const d = f.orderflow.delta;
+  if (!d) return { ok: true, note: "delta n/a" };
+
+  // If strong opposite divergence, treat as not ok
+  if (d.divergence_score >= 0.65) {
+    if (side === "LONG" && d.divergence_dir === "bear") return { ok: false, note: "bear divergence" };
+    if (side === "SHORT" && d.divergence_dir === "bull") return { ok: false, note: "bull divergence" };
+  }
+
+  // Absorption supporting same direction is a plus; opposite is mild negative but not hard block
+  return { ok: true, note: `div=${d.divergence_score.toFixed(2)} abs=${d.absorption_score.toFixed(2)}` };
+}
+
+function biasStrengthOk(f: FeaturesSnapshot) {
+  const s = f.bias.trend_strength;
+  const adx = f.bias.adx14;
+  const slope = f.bias.ema200_slope_bps;
+
+  const okStrength = typeof s !== "number" ? true : s >= 0.55;
+  const okAdx = typeof adx !== "number" ? true : adx >= 18;
+  const okSlope = typeof slope !== "number" ? true : Math.abs(slope) >= 1.0;
+
+  return { ok: okStrength && okAdx && okSlope, note: `s=${s.toFixed(2)} adx=${adx ?? "n/a"} slope=${slope ?? "n/a"}` };
 }
 
 export function buildSetups(args: {
@@ -115,6 +175,8 @@ export function buildSetups(args: {
 
     const checklist = [
       { key: "bias", ok: true, note: `Bias ${f.bias.trend_dir} (${f.bias.tf})` },
+      { key: "bias_strength", ok: biasStrengthOk(f).ok, note: `Bias strength: ${biasStrengthOk(f).note}` },
+
       {
         key: "orderflow",
         ok: biasSide === "LONG" ? (f.orderflow.imbalance.top200 > -0.35) : (f.orderflow.imbalance.top200 < 0.35),
@@ -125,10 +187,22 @@ export function buildSetups(args: {
         ok: typeof f.cross.consensus_score !== "number" ? true : f.cross.consensus_score >= 0.5,
         note: f.cross.consensus_score != null ? `cons=${f.cross.consensus_score.toFixed(2)}` : "n/a",
       },
+      { key: "delta", ok: deltaOk(f, biasSide).ok, note: `Delta: ${deltaOk(f, biasSide).note}` },
+      { key: "htf_ms", ok: htfConfirm(f, biasSide).ok, note: `HTF MS: ${htfConfirm(f, biasSide).note}` },
+
     ];
 
-    const ready = rr1 >= 1.5 && common.grade !== "D";
-    const confScore = Math.min(100, common.score + (rr1 >= 2 ? 6 : 0) + 4);
+    const bs = biasStrengthOk(f);
+    const ht = htfConfirm(f, biasSide);
+    const dOk = deltaOk(f, biasSide);
+
+    const rrNeed = (!bs.ok || !ht.ok || !dOk.ok) ? 1.8 : 1.5;
+    const ready = rr1 >= rrNeed && common.grade !== "D";
+
+    let confScore = Math.min(100, common.score + (rr1 >= 2 ? 6 : 0) + 4);
+    if (!bs.ok) confScore = Math.max(0, confScore - 8);
+    if (!ht.ok) confScore = Math.max(0, confScore - 10);
+    if (!dOk.ok) confScore = Math.max(0, confScore - 6);
 
     setups.push({
       id: uid("tpb"),
@@ -219,14 +293,22 @@ export function buildSetups(args: {
     const entryMid = (zone.lo + zone.hi) / 2;
     const rr1 = rr(entryMid, sl, tp1, dir);
 
-    let confScore = Math.min(100, common.score + 7); // BOS event adds confidence slightly
+    const ht = htfConfirm(f, dir);
+    const dOk = deltaOk(f, dir);
+
+    let confScore = Math.min(100, common.score + 7);
+    if (!ht.ok) confScore = Math.max(0, confScore - 12);
+    if (!dOk.ok) confScore = Math.max(0, confScore - 6);
+
     if (bias_incomplete) {
       confScore = Math.floor(confScore * 0.70);
       confScore = Math.min(confScore, 84);
     }
 
-    const rrNeed = bias_incomplete ? 1.8 : 1.5;
+    const rrNeedBase = bias_incomplete ? 1.8 : 1.5;
+    const rrNeed = (!ht.ok || !dOk.ok) ? (rrNeedBase + 0.2) : rrNeedBase;
     const ready = rr1 >= rrNeed && common.grade !== "D";
+
 
     setups.push({
       id: uid("brt"),
@@ -255,6 +337,8 @@ export function buildSetups(args: {
                 : `Bias ${f.bias.trend_dir} (${f.bias.tf})`,
             },
             { key: "bos", ok: true, note: `BOS ${bos.dir} @ ${level.toFixed(2)} (15m)` },
+            { key: "delta", ok: deltaOk(f, dir).ok, note: `Delta: ${deltaOk(f, dir).note}` },
+            { key: "htf_ms", ok: htfConfirm(f, dir).ok, note: `HTF MS: ${htfConfirm(f, dir).note}` },
             // Keep a “level” item with "@ <number>" so existing parsing logic works without assumptions
             { key: "level", ok: true, note: `Break ${dir === "LONG" ? "R" : "S"} @ ${level.toFixed(2)}` },
             { key: "retest", ok: false, note: `Wait retest zone [${zone.lo.toFixed(2)}–${zone.hi.toFixed(2)}]` },

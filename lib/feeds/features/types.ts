@@ -11,7 +11,8 @@ export type BiasTfSnapshot = {
   vol_regime?: VolRegime;
   adx14?: number;
   ema200?: number;
-
+  ema200_slope_bps?: number;   // NEW
+  trend_angle_deg?: number;    // NEW
   complete: boolean;
   have: number;
   need: number;
@@ -34,6 +35,7 @@ export type FeaturesSnapshot = {
     vol_regime: VolRegime;
     adx14?: number;
     ema200?: number;
+    ema200_slope_bps?: number; // EMA200 slope in bps per bar
   };
   bias_by_tf?: Record<"15m" | "1h" | "4h" | "1d", BiasTfSnapshot>;
   entry: {
@@ -45,15 +47,37 @@ export type FeaturesSnapshot = {
       macdHist_15m?: number;
     };
     volatility: {
-      atrp_15m?: number;  // ATR/price (%)
+      atrp_15m?: number;  // ATR/price (%) 15m
+      atrp_1h?: number;   // NEW: ATR/price (%) 1h
+      atrp_4h?: number;   // NEW: ATR/price (%) 4h
+
       bbWidth_15m?: number;
+      bbWidth_1h?: number; // NEW
+      bbWidth_4h?: number; // NEW
     };
+
   };
 
   orderflow: {
     imbalance: { top10: number; top50: number; top200: number }; // [-1..1]
     aggression_ratio: number; // buy/(buy+sell) 0..1
+
+    // NEW: trade-delta derived signals (optional)
+    delta?: {
+      buy_qty: number;
+      sell_qty: number;
+      delta_qty: number;        // buy - sell
+      delta_norm: number;       // (buy-sell)/(buy+sell) in [-1..1]
+      cvd: number;              // for now: window CVD proxy (same units as qty)
+
+      divergence_score: number; // 0..1 (price vs delta disagreement)
+      divergence_dir: "bull" | "bear" | "none";
+
+      absorption_score: number; // 0..1 (high aggressive qty + small price movement)
+      absorption_dir: "bull" | "bear" | "none";
+    };
   };
+
 
   cross: {
     dev_bps?: number;

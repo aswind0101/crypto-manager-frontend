@@ -3,6 +3,20 @@ import type { Tf } from "../core/types";
 export type TrendDir = "bull" | "bear" | "sideways";
 export type VolRegime = "low" | "normal" | "high";
 
+export type BiasTfSnapshot = {
+  tf: string;
+
+  trend_dir?: TrendDir;
+  trend_strength?: number; // 0..1
+  vol_regime?: VolRegime;
+  adx14?: number;
+  ema200?: number;
+
+  complete: boolean;
+  have: number;
+  need: number;
+};
+
 export type FeaturesSnapshot = {
   canon: string;
   ts: number;
@@ -21,7 +35,7 @@ export type FeaturesSnapshot = {
     adx14?: number;
     ema200?: number;
   };
-
+  bias_by_tf?: Record<"15m" | "1h" | "4h" | "1d", BiasTfSnapshot>;
   entry: {
     tfs: Array<"5m" | "15m">;
     momentum: {
@@ -112,7 +126,7 @@ export type MarketStructureTF = {
   tf: string;
   trend: MarketTrend;
   confirmed_count: number;
-  
+
   lastSwingHigh?: SwingPoint;
   lastSwingLow?: SwingPoint;
   recentSwings: SwingPoint[];
