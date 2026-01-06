@@ -18,6 +18,12 @@ function bar(pct01: number, width = 10) {
     const filled = clamp(Math.round(pct01 * width), 0, width);
     return "█".repeat(filled) + "░".repeat(width - filled);
 }
+function showFlags(fl?: string) {
+    const s = String(fl ?? "").trim();
+    if (!s || s === "—" || s === "-") return "";
+    return s;
+}
+
 function typeShort(t: string) {
     if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
     if (t === "RANGE_MEAN_REVERT") return "RMR";
@@ -763,6 +769,10 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
             </div>
         );
     };
+    const f15 = showFlags(scan15.fl);
+    const f1h = showFlags(scan1h.fl);
+    const f4h = showFlags(scan4h.fl);
+    const f1d = showFlags(scan1d.fl);
 
     return (
         <>
@@ -799,24 +809,31 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                 <span className="dos-k">15m</span>
                                 <span className="dos-v">
                                     {scan15.trend} | H {fmt(scan15.sH, 2)} L {fmt(scan15.sL, 2)}
+                                    {f15 ? ` • ${f15}` : ""}
                                 </span>
                             </div>
+
                             <div className="dos-line">
                                 <span className="dos-k">1h</span>
                                 <span className="dos-v">
-                                    {scan1h.trend} | H {fmt(scan1h.sH, 2)} L {fmt(scan1h.sL, 2)} • {scan1h.fl}
+                                    {scan1h.trend} | H {fmt(scan1h.sH, 2)} L {fmt(scan1h.sL, 2)}
+                                    {f1h ? ` • ${f1h}` : ""}
                                 </span>
                             </div>
+
                             <div className="dos-line">
                                 <span className="dos-k">4h</span>
                                 <span className="dos-v">
-                                    {scan4h.trend} | H {fmt(scan4h.sH, 2)} L {fmt(scan4h.sL, 2)} • {scan4h.fl}
+                                    {scan4h.trend} | H {fmt(scan4h.sH, 2)} L {fmt(scan4h.sL, 2)}
+                                    {f4h ? ` • ${f4h}` : ""}
                                 </span>
                             </div>
+
                             <div className="dos-line">
                                 <span className="dos-k">1d</span>
                                 <span className="dos-v">
-                                    {scan1d.trend} | H {fmt(scan1d.sH, 2)} L {fmt(scan1d.sL, 2)} • {scan1d.fl}
+                                    {scan1d.trend} | H {fmt(scan1d.sH, 2)} L {fmt(scan1d.sL, 2)}
+                                    {f1d ? ` • ${f1d}` : ""}
                                 </span>
                             </div>
                         </div>
@@ -824,25 +841,29 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                         <div className="dos-hr" />
 
                         <div className="dos-small">
-                            <div className="dos-strong" style={{ marginBottom: 6 }}>
-                                Key Signals
+                            <div className="dos-subhead">Key Signals</div>
+                            <div className="dos-ks-grid" role="table" aria-label="key signals">
+                                <div className="dos-ks-row dos-ks-head" role="row">
+                                    <div className="dos-ks-cell" role="columnheader">TF</div>
+                                    <div className="dos-ks-cell" role="columnheader">BOS</div>
+                                    <div className="dos-ks-cell" role="columnheader">CHOCH</div>
+                                    <div className="dos-ks-cell" role="columnheader">SWEEP</div>
+                                </div>
+
+                                {[
+                                    ["15m", scan15],
+                                    ["1h", scan1h],
+                                    ["4h", scan4h],
+                                    ["1d", scan1d],
+                                ].map(([tf, s]: any) => (
+                                    <div className="dos-ks-row" role="row" key={tf}>
+                                        <div className="dos-ks-cell dos-ks-tf" role="cell">{tf}</div>
+                                        <div className="dos-ks-cell" role="cell">{s?.bos ?? "—"}</div>
+                                        <div className="dos-ks-cell" role="cell">{s?.choch ?? "—"}</div>
+                                        <div className="dos-ks-cell" role="cell">{s?.sweep ?? "—"}</div>
+                                    </div>
+                                ))}
                             </div>
-                            <pre className="dos-pre">{`15m BOS:   ${scan15.bos}
-                                    15m CHOCH: ${scan15.choch}
-                                    15m SWEEP: ${scan15.sweep}
-
-                                    1h  BOS:   ${scan1h.bos}
-                                    1h  CHOCH: ${scan1h.choch}
-                                    1h  SWEEP: ${scan1h.sweep}
-
-                                    4h  BOS:   ${scan4h.bos}
-                                    4h  CHOCH: ${scan4h.choch}
-                                    4h  SWEEP: ${scan4h.sweep}
-
-                                    1d  BOS:   ${scan1d.bos}
-                                    1d  CHOCH: ${scan1d.choch}
-                                    1d  SWEEP: ${scan1d.sweep}`}
-                            </pre>
 
                         </div>
                     </div>
@@ -1311,6 +1332,50 @@ export function DosOpsDashboard() {
 .dos-break {
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+.dos-subhead{
+  margin-top:10px;
+  margin-bottom:6px;
+  font-weight:700;
+  color:#9fe3a8;
+}
+
+.dos-ks-grid{
+  border:1px solid #133013;
+  border-radius:12px;
+  overflow:hidden;
+  background:#040604;
+}
+
+.dos-ks-row{
+  display:grid;
+  grid-template-columns: 52px 1.2fr 1fr 1fr;
+  gap:10px;
+  padding:8px 10px;
+  border-top:1px solid #0d1f0d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:12px;
+  line-height:1.2;
+}
+
+.dos-ks-row:first-child{ border-top:none; }
+
+.dos-ks-head{
+  background:#050a05;
+  color:#8fdc99;
+  font-weight:700;
+}
+
+.dos-ks-cell{
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.dos-ks-tf{
+  color:#b7f3c1;
+  font-weight:700;
 }
 
         /* Toast */
