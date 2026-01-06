@@ -677,12 +677,16 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
             const hit = rows.find((x: AnyObj) => setupSig(x) === selectedSig);
             if (hit) {
                 setSelectedId(String(hit?.__uiKey ?? ""));
+                setSelectedSig(setupSig(hit));
                 return;
             }
         }
 
         // 3) Otherwise (first load / selection truly gone), pick the first row.
-        setSelectedId(String((rows[0] as AnyObj)?.__uiKey ?? ""));
+        const first = rows[0] as AnyObj;
+        setSelectedId(String(first?.__uiKey ?? ""));
+        setSelectedSig(setupSig(first));
+
     }, [rows, selectedId, selectedSig]);
 
 
