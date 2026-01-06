@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
+import type { ExecutionDecision } from "../lib/feeds/setups/types";
+
 
 type Candle = {
   ts: number;
@@ -419,6 +421,135 @@ function applyCloseConfirm(out: any, snap: any): any {
   });
 
   return { ...out, setups: updated };
+}
+function deriveExecutionDecision(
+  setup: any,
+  ctx: {
+    mid: number;
+    dqOk: boolean;
+    bybitOk: boolean;
+    staleSec?: number;
+    paused: boolean;
+  }
+): ExecutionDecision {
+  const blockers: string[] = [];
+  const checklist = setup?.entry?.trigger?.checklist ?? [];
+  const status = setup?.status;
+  const mode = setup?.entry?.mode;
+
+  // --- Global execution gates ---
+  if (!ctx.dqOk || !ctx.bybitOk || ctx.paused || (ctx.staleSec != null && ctx.staleSec > 5)) {
+    return {
+      state: "BLOCKED",
+      canEnterMarket: false,
+      canPlaceLimit: false,
+      blockers: [],
+      reason: "Execution gated (DQ / feed / stale / paused)",
+    };
+  }
+
+  // --- Dead setups ---
+  if (status === "INVALIDATED" || status === "EXPIRED") {
+    return {
+      state: "NO_TRADE",
+      canEnterMarket: false,
+      canPlaceLimit: false,
+      blockers: [],
+      reason: "Setup no longer valid",
+    };
+  }
+
+  // --- Collect checklist blockers ---
+  for (const item of checklist) {
+    if (item?.ok === false) blockers.push(item.key);
+  }
+
+  // --- FORMING ---
+  if (status === "FORMING") {
+    return {
+      state: blockers.includes("retest") ? "WAIT_RETEST" : "NO_TRADE",
+      canEnterMarket: false,
+      canPlaceLimit: false,
+      blockers,
+      reason: "Setup forming",
+    };
+  }
+
+  // --- READY ---
+  if (status === "READY") {
+    if (blockers.includes("close_confirm")) {
+      return {
+        state: "WAIT_CLOSE",
+        canEnterMarket: false,
+        canPlaceLimit: false,
+        blockers,
+        reason: "Waiting candle close-confirm",
+      };
+    }
+
+    if (mode === "LIMIT") {
+      const z = setup?.entry?.zone;
+      const inZone =
+        z && ctx.mid >= z.lo && ctx.mid <= z.hi;
+
+      if (!inZone) {
+        return {
+          state: "WAIT_ZONE",
+          canEnterMarket: false,
+          canPlaceLimit: false,
+          blockers,
+          reason: "Price not in entry zone",
+        };
+      }
+
+      return {
+        state: "PLACE_LIMIT",
+        canEnterMarket: false,
+        canPlaceLimit: true,
+        blockers,
+        reason: "Limit entry available",
+      };
+    }
+
+    // MARKET
+    return {
+      state: "ENTER_MARKET",
+      canEnterMarket: true,
+      canPlaceLimit: false,
+      blockers,
+      reason: "Market entry allowed",
+    };
+  }
+
+  // --- TRIGGERED ---
+  if (status === "TRIGGERED") {
+    if (mode === "LIMIT") {
+      return {
+        state: "WAIT_FILL",
+        canEnterMarket: false,
+        canPlaceLimit: false,
+        blockers,
+        reason: "Triggered, waiting limit fill",
+      };
+    }
+
+    return {
+      state: "ENTER_MARKET",
+      canEnterMarket: true,
+      canPlaceLimit: false,
+      blockers,
+      reason: "Trigger confirmed",
+    };
+  }
+
+  // --- Fallback ---
+  return {
+    state: "NO_TRADE",
+    canEnterMarket: false,
+    canPlaceLimit: false,
+    blockers,
+    reason: "No execution action",
+  };
 }
 
 export function useSetupsSnapshot(symbol: string) {

@@ -378,7 +378,7 @@ function ScanPulse({
 }
 
 function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }) {
-    const { snap, features, setups } = useSetupsSnapshot(symbol);
+    const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
     const isNarrow = useIsNarrow(980);
 
     // Freeze when paused
@@ -564,32 +564,6 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         if (isNarrow) setDrawerOpen(true);
     };
 
-    // Keyboard: keep minimal, iPad keyboard users benefit
-    useEffect(() => {
-        function onKey(e: KeyboardEvent) {
-            const ae = document.activeElement as HTMLElement | null;
-            if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
-
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                next();
-            } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                prev();
-            } else if (e.key === "p" || e.key === "P") {
-                e.preventDefault();
-                togglePin();
-            } else if (e.key === "c" || e.key === "C") {
-                e.preventDefault();
-                copyTicket();
-            } else if (e.key === "Escape") {
-                if (isNarrow) setDrawerOpen(false);
-            }
-        }
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [rows.length, selectedIndex, selected, isNarrow]);
-
     const action = selected ? actionLabel(selected) : "—";
     const z = selected?.entry?.zone;
     const distLabel = distLabelFor(mid, z, String(selected?.entry?.mode ?? ""));
@@ -657,10 +631,22 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                     </div>
 
                     {/* Primary action */}
+                    {/* Setup lifecycle vs execution intent (separate states) */}
                     <div className="dos-actionline">
                         <span className="dos-pill dos-dim">
-                            ACTION: <span className="dos-strong">{action}</span>
+                            SETUP: <span className="dos-strong">{String(selected?.status ?? "—")}</span>
                         </span>
+
+                        <span className="dos-pill dos-dim">
+                            EXEC: <span className="dos-strong">{action}</span>
+                            {selected?.execution?.reason ? (
+                                <span className="dos-dim"> • {String(selected.execution.reason)}</span>
+                            ) : null}
+                            {Array.isArray(selected?.execution?.blockers) && selected.execution.blockers.length ? (
+                                <span className="dos-warn"> • blockers={selected.execution.blockers.join(",")}</span>
+                            ) : null}
+                        </span>
+
                         <span className="dos-pill dos-dim">
                             TRIGGER: {prog.ok}/{prog.total} <span className="dos-mono">{bar(prog.pct, 10)}</span>
                             {prog.next?.key ? <span className="dos-warn"> next={String(prog.next.key)}</span> : null}
@@ -913,8 +899,11 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                                     <span className="dos-dim dos-mono">
                                                         T {prog.ok}/{prog.total} {bar(prog.pct, 10)}
                                                     </span>
-                                                    <span className="dos-strong">{act}</span>
+                                                    <span className="dos-dim dos-mono">
+                                                        S:{String(s?.status ?? "—")} | E:{act}
+                                                    </span>
                                                 </div>
+
                                             </div>
                                         </div>
                                     );
@@ -1018,28 +1007,6 @@ export function DosOpsDashboard() {
         setSessionKey((k) => k + 1);
         inputRef.current?.focus();
     };
-
-    useEffect(() => {
-        function onKey(e: KeyboardEvent) {
-            const ae = document.activeElement as HTMLElement | null;
-            const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA");
-
-            if (!typing && (e.key === "a" || e.key === "A")) {
-                e.preventDefault();
-                commitAnalyze();
-            }
-            if (!typing && (e.key === "s" || e.key === "S")) {
-                e.preventDefault();
-                stopToggle();
-            }
-            if (!typing && (e.key === "r" || e.key === "R")) {
-                e.preventDefault();
-                resetAll();
-            }
-        }
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [draftSymbol]);
 
     return (
         <div className="dos-screen">
@@ -1318,24 +1285,6 @@ export function DosOpsDashboard() {
                             spellCheck={false}
                             onFocus={(e) => e.currentTarget.select()}
                         />
-
-                        <button className="dos-btn" {...tap(commitAnalyze)} title="Analyze (A / Enter)">
-                            ANALYZE
-                        </button>
-
-                        <button
-                            className={`dos-btn dos-btn-danger ${paused ? "dos-btn-active" : ""}`}
-                            {...tap(stopToggle)}
-                            title="Stop/Resume (S)"
-                        >
-                            {paused ? "RESUME" : "STOP"}
-                        </button>
-
-                        <button className="dos-btn" {...tap(resetAll)} title="Reset (R)">
-                            RESET
-                        </button>
-
-
                         <span className="dos-chip dos-dim">
                             <span>SESSION</span>
                             <span className="dos-mono">#{sessionKey}</span>

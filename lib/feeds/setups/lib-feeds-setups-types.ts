@@ -1,6 +1,11 @@
 export type SetupSide = "LONG" | "SHORT";
 export type SetupStatus = "FORMING" | "READY" | "TRIGGERED" | "INVALIDATED" | "EXPIRED";
-export type SetupType = "TREND_PULLBACK" | "BREAKOUT" | "RANGE_MEAN_REVERT";
+export type SetupType =
+  | "TREND_PULLBACK"
+  | "BREAKOUT"
+  | "RANGE_MEAN_REVERT"
+  | "LIQUIDITY_SWEEP_REVERSAL"
+  | "FAILED_SWEEP_CONTINUATION";
 
 export type EntryPlan = {
   mode: "LIMIT" | "MARKET";
@@ -40,6 +45,7 @@ export type TradeSetup = {
 
   entry_tf: "5m" | "15m";
   bias_tf: "1h" | "4h";
+  trigger_tf: "5m" | "15m";
 
   status: SetupStatus;
   created_ts: number;
@@ -62,3 +68,21 @@ export type SetupEngineOutput = {
   preferred_id?: string;
   setups: TradeSetup[];
 };
+// Execution / Operator readiness (derived, not engine state)
+export type ExecutionState =
+  | "BLOCKED"        // dq / feed / stale / paused
+  | "NO_TRADE"       // setup dead / invalid
+  | "WAIT_CLOSE"     // waiting close-confirm
+  | "WAIT_RETEST"    // waiting retest condition
+  | "WAIT_ZONE"      // limit mode, price not in entry zone
+  | "PLACE_LIMIT"    // can place limit order
+  | "ENTER_MARKET"   // can enter market now
+  | "WAIT_FILL";     // triggered + limit, waiting fill
+
+export interface ExecutionDecision {
+  state: ExecutionState;
+  canEnterMarket: boolean;
+  canPlaceLimit: boolean;
+  blockers: string[];     // checklist keys blocking execution
+  reason: string;         // one-line operator reason
+}

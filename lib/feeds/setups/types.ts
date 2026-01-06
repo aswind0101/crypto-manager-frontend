@@ -68,3 +68,21 @@ export type SetupEngineOutput = {
   preferred_id?: string;
   setups: TradeSetup[];
 };
+// Execution / Operator readiness (derived, not engine state)
+export type ExecutionState =
+  | "BLOCKED"        // dq / feed / stale / paused
+  | "NO_TRADE"       // setup dead / invalid
+  | "WAIT_CLOSE"     // waiting close-confirm
+  | "WAIT_RETEST"    // waiting retest condition
+  | "WAIT_ZONE"      // limit mode, price not in entry zone
+  | "PLACE_LIMIT"    // can place limit order
+  | "ENTER_MARKET"   // can enter market now
+  | "WAIT_FILL";     // triggered + limit, waiting fill
+
+export interface ExecutionDecision {
+  state: ExecutionState;
+  canEnterMarket: boolean;
+  canPlaceLimit: boolean;
+  blockers: string[];     // checklist keys blocking execution
+  reason: string;         // one-line operator reason
+}
