@@ -794,17 +794,6 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
             </div>
         );
     };
-    function htfBiasLabel(features: AnyObj) {
-        const htf = features?.htf;
-        if (!htf) return "—";
-
-        const bias = String(htf.bias ?? "").toUpperCase();
-        const regime = String(htf.regime ?? "").toUpperCase();
-
-        if (!bias) return "—";
-        return regime ? `${bias} (${regime})` : bias;
-    }
-
     function invalidationLabel(ms: AnyObj) {
         if (!ms) return "—";
 
