@@ -51,6 +51,32 @@ function htfBiasLabel(features: AnyObj) {
     return `${core}${tail}${vol}`;
 }
 
+function biasByTfLabel(features: AnyObj, tf: string) {
+    const b = features?.bias_by_tf?.[tf];
+    if (!b) return "—";
+
+    const complete = Boolean(b.complete);
+    const have = Number(b.have ?? 0);
+    const need = Number(b.need ?? 210);
+
+    if (!complete) return `PENDING (${have}/${need})`;
+
+    const dir = String(b.trend_dir ?? "").trim();
+    const str = Number(b.trend_strength);
+    const vr = String(b.vol_regime ?? "").trim();
+
+    const DIR =
+        dir === "bull" ? "BULL" :
+            dir === "bear" ? "BEAR" :
+                dir === "sideways" ? "SIDE" :
+                    dir ? dir.toUpperCase() : "—";
+
+    const sPct = Number.isFinite(str) ? Math.round(str * 100) : null;
+    const core = sPct != null ? `${DIR} ${sPct}%` : DIR;
+    const vol = vr ? ` • ${vr.toUpperCase()}` : "";
+
+    return `${core}${vol}`;
+}
 
 function typeShort(t: string) {
     if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
@@ -877,7 +903,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                     <div className="dos-mo-row dos-mo-head" role="row">
                                         <div className="dos-mo-cell" role="columnheader">TF</div>
                                         <div className="dos-mo-cell" role="columnheader">TREND</div>
-                                        <div className="dos-mo-cell" role="columnheader">HTF BIAS</div>
+                                        <div className="dos-mo-cell" role="columnheader">BIAS</div>
                                         <div className="dos-mo-cell" role="columnheader">INVALID</div>
                                         <div className="dos-mo-cell" role="columnheader">EVENTS</div>
                                     </div>
@@ -890,7 +916,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                     "1d",
                                 ].map((tf) => {
                                     const ms = resolveMS(vFeat, tf);
-                                    const htfBias = htfBiasLabel(vFeat);
+                                    const htfBias = biasByTfLabel(vFeat, tf);
                                     const inval = invalidationLabel(ms);
                                     const events = eventsLabel(ms);
 

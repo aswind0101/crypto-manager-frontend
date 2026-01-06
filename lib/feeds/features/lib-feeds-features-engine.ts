@@ -81,6 +81,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
   const c15 = pickCandles(input, "15m");
   const c1h = pickCandles(input, "1h");
   const c4h = pickCandles(input, "4h");
+  const c1d = pickCandles(input, "1d");
 
   const b5 = pickBinanceCandles(input, "5m");
   const b15 = pickBinanceCandles(input, "15m");
@@ -211,7 +212,6 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
       adx14: adxVal,
       ema200,
     },
-
     entry: {
       tfs: ["5m", "15m"],
       momentum: {
