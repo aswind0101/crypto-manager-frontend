@@ -74,16 +74,21 @@ export function useBybitUnifiedSnapshot(symbol: string) {
       tf: Tf;
       limit: number;
       signal: AbortSignal;
+      endTime?: number; // optional: fetch klines ending before this timestamp (ms)
     }): Promise<Candle[]> {
-      const { symbol, tf, limit, signal } = args;
+      const { symbol, tf, limit, signal, endTime } = args;
       const interval = tfToBybitInterval(tf);
       if (!interval) return [];
 
-      const url =
+      let url =
         `https://api.bybit.com/v5/market/kline` +
         `?category=linear&symbol=${encodeURIComponent(symbol)}` +
         `&interval=${encodeURIComponent(interval)}` +
         `&limit=${encodeURIComponent(String(limit))}`;
+
+      if (Number.isFinite(endTime)) {
+        url += `&endTime=${encodeURIComponent(String(endTime))}`;
+      }
 
       const res = await fetch(url, { method: "GET", cache: "no-store", signal });
       if (!res.ok) return [];
@@ -119,24 +124,79 @@ export function useBybitUnifiedSnapshot(symbol: string) {
     }
 
     const backfillAbort = new AbortController();
+    async function fetchBybitKlinesPaged(args: {
+      symbol: string;
+      tf: Tf;
+      need: number;
+      signal: AbortSignal;
+    }): Promise<Candle[]> {
+      const { symbol, tf, need, signal } = args;
+
+      const PAGE = 200; // Bybit cap
+      let endTime: number | undefined = undefined;
+
+      // Use a map to de-dup incrementally (prevents overlap issues)
+      const map = new Map<number, Candle>();
+
+      // Safety: detect no-progress to avoid infinite loops if endTime is ignored
+      let lastEnd: number | undefined = undefined;
+
+      while (map.size < need) {
+        const remaining = need - map.size;
+        const limit = Math.min(PAGE, remaining);
+
+        const batch = await fetchBybitKlines({
+          symbol,
+          tf,
+          limit,
+          endTime, // NOTE: your fetchBybitKlines must use &endTime=
+          signal,
+        });
+
+        if (!batch.length) break;
+
+        for (const c of batch) map.set(c.ts, c);
+
+        // batch is oldest-first (you sort in fetchBybitKlines)
+        const oldest = batch[0]?.ts;
+        if (!Number.isFinite(oldest)) break;
+
+        endTime = oldest - 1;
+
+        // no-progress guard: if endTime doesn't move back, stop
+        if (lastEnd != null && endTime >= lastEnd) break;
+        lastEnd = endTime;
+
+        // If API returns fewer than requested, we reached the end of history
+        if (batch.length < limit) break;
+      }
+
+      return Array.from(map.values())
+        .sort((a, b) => a.ts - b.ts)
+        .slice(-need);
+    }
+
 
     async function backfillWarmup() {
       // Minimum set needed for your engine/features path:
       // - engine derives px from 15m/1h
       // - HTF bias commonly uses 1h/4h
-      const plan: Array<{ tf: Tf; limit: number }> = [
-        { tf: "5m", limit: 300 },
-        { tf: "15m", limit: 300 },
-        { tf: "1h", limit: 200 },
-        { tf: "4h", limit: 200 },
+      const plan: Array<{ tf: Tf; need: number }> = [
+        { tf: "5m", need: 300 },
+        { tf: "15m", need: 300 },
+        { tf: "1h", need: 300 },
+        { tf: "4h", need: 300 },
+        // optional (khuyến nghị nếu bạn hiển thị 1d outlook / bias sau này):
+        // { tf: "1d", need: 300 },
       ];
+
 
       const results = await Promise.allSettled(
         plan.map(async (p) => {
-          const candles = await fetchBybitKlines({
+          const candles = await fetchBybitKlinesPaged({
             symbol,
             tf: p.tf,
-            limit: p.limit,
+            need: p.need,
             signal: backfillAbort.signal,
           });
           return { tf: p.tf, candles };
