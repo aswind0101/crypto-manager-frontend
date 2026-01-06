@@ -74,16 +74,21 @@ export function useBybitUnifiedSnapshot(symbol: string) {
       tf: Tf;
       limit: number;
       signal: AbortSignal;
+      end?: number; // optional: fetch klines ending before this timestamp (ms)
     }): Promise<Candle[]> {
-      const { symbol, tf, limit, signal } = args;
+      const { symbol, tf, limit, signal, end } = args;
       const interval = tfToBybitInterval(tf);
       if (!interval) return [];
 
-      const url =
+      let url =
         `https://api.bybit.com/v5/market/kline` +
         `?category=linear&symbol=${encodeURIComponent(symbol)}` +
         `&interval=${encodeURIComponent(interval)}` +
         `&limit=${encodeURIComponent(String(limit))}`;
+
+      if (Number.isFinite(end)) {
+        url += `&end=${encodeURIComponent(String(end))}`;
+      }
 
       const res = await fetch(url, { method: "GET", cache: "no-store", signal });
       if (!res.ok) return [];
@@ -119,24 +124,69 @@ export function useBybitUnifiedSnapshot(symbol: string) {
     }
 
     const backfillAbort = new AbortController();
+    async function fetchBybitKlinesPaged(args: {
+      symbol: string;
+      tf: Tf;
+      need: number;
+      signal: AbortSignal;
+    }): Promise<Candle[]> {
+      const { symbol, tf, need, signal } = args;
+
+      const PAGE = 200; // Bybit cap
+      let end: number | undefined = undefined;
+      let acc: Candle[] = [];
+
+      while (acc.length < need) {
+        const batch = await fetchBybitKlines({
+          symbol,
+          tf,
+          limit: Math.min(PAGE, need), // still capped by 200
+          end,
+          signal,
+        });
+
+        if (!batch.length) break;
+
+        // batch is oldest-first
+        // We are paging backwards, so prepend older batch
+        acc = [...batch, ...acc];
+
+        // next page should end before the oldest candle we just got
+        end = batch[0].ts - 1;
+
+        // if API returned fewer than cap, no more history
+        if (batch.length < PAGE) break;
+      }
+
+      // De-dup by ts just in case
+      const map = new Map<number, Candle>();
+      for (const c of acc) map.set(c.ts, c);
+
+      return Array.from(map.values())
+        .sort((a, b) => a.ts - b.ts)
+        .slice(-need);
+    }
 
     async function backfillWarmup() {
       // Minimum set needed for your engine/features path:
       // - engine derives px from 15m/1h
       // - HTF bias commonly uses 1h/4h
-      const plan: Array<{ tf: Tf; limit: number }> = [
-        { tf: "5m", limit: 300 },
-        { tf: "15m", limit: 300 },
-        { tf: "1h", limit: 200 },
-        { tf: "4h", limit: 200 },
+      const plan: Array<{ tf: Tf; need: number }> = [
+        { tf: "5m", need: 300 },
+        { tf: "15m", need: 300 },
+        { tf: "1h", need: 300 },
+        { tf: "4h", need: 300 },
+        // optional (khuyến nghị nếu bạn hiển thị 1d outlook / bias sau này):
+        // { tf: "1d", need: 300 },
       ];
+
 
       const results = await Promise.allSettled(
         plan.map(async (p) => {
-          const candles = await fetchBybitKlines({
+          const candles = await fetchBybitKlinesPaged({
             symbol,
             tf: p.tf,
-            limit: p.limit,
+            need: p.need,
             signal: backfillAbort.signal,
           });
           return { tf: p.tf, candles };
