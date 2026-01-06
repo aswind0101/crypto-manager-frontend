@@ -23,16 +23,34 @@ function showFlags(fl?: string) {
     if (!s || s === "—" || s === "-") return "";
     return s;
 }
-function htfBiasLabel(features: any) {
-    const dir = String(features?.bias?.trend_dir ?? "").trim();
-    const tf = String(features?.bias?.tf ?? "").trim();
+function htfBiasLabel(features: AnyObj) {
+    const b = features?.bias;
+    if (!b) return "—";
 
-    if (!dir && !tf) return "—";
-    if (!dir) return `— (${tf || "?"})`;
-    if (!tf) return `${dir.toUpperCase()} (?)`;
+    const tf = String(b.tf ?? "").trim();                 // "1h" | "4h"
+    const dir = String(b.trend_dir ?? "").trim();         // bull/bear/sideways
+    const str = Number(b.trend_strength);                 // 0..1
+    const vr = String(b.vol_regime ?? "").trim();         // normal/high/low (tuỳ engine)
 
-    return `${dir.toUpperCase()} (${tf})`;
+    if (!dir) return "—";
+
+    const DIR =
+        dir === "bull" ? "BULL" :
+            dir === "bear" ? "BEAR" :
+                dir === "sideways" ? "SIDE" :
+                    dir.toUpperCase();
+
+    const sPct = Number.isFinite(str) ? Math.round(str * 100) : null;
+
+    // Format gọn để scan nhanh:
+    // ví dụ: "BEAR 62% (1h)" hoặc "SIDE (4h)"
+    const core = sPct != null ? `${DIR} ${sPct}%` : DIR;
+    const tail = tf ? ` (${tf})` : "";
+    const vol = vr ? ` • ${vr.toUpperCase()}` : "";
+
+    return `${core}${tail}${vol}`;
 }
+
 
 function typeShort(t: string) {
     if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
