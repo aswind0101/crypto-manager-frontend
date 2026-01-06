@@ -618,9 +618,13 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     }, [rows, selectedId]);
 
     useEffect(() => {
-        if (!selected) return;
-        setSelectedId(String(selected.id ?? ""));
-    }, [rows.length]); // keep selection stable-ish
+        if (!rows.length) return;
+
+        // Chỉ auto-pick lần đầu (hoặc khi selection hiện tại biến mất)
+        if (selectedId && rows.some((x) => String(x?.id ?? "") === selectedId)) return;
+
+        setSelectedId(String(rows[0]?.id ?? ""));
+    }, [rows, selectedId]);
 
     // Toast
     const [toast, setToast] = useState<string | null>(null);
@@ -1017,7 +1021,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                 rows.map((s, i) => {
                                     const id = String(s?.id ?? "");
                                     const isPreferred = preferredId && id === preferredId;
-                                    const isSelected = selectedId ? id === selectedId : i === 0;
+                                    const isSelected = selectedId ? id === selectedId : false;
                                     const dead = s?.status === "INVALIDATED" || s?.status === "EXPIRED";
                                     const p = Number(s?.priority_score ?? 0);
                                     const c = Number(s?.confidence?.score ?? 0);
@@ -1044,7 +1048,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                             tabIndex={0}
                                         >
 
-                                            <div className="dos-marker">{isPreferred ? ">" : pin ? "★" : " "}</div>
+                                            <div className="dos-marker">{isSelected ? ">" : pin ? "★" : isPreferred ? "✓" : " "}</div>
                                             <div className="dos-rowline">
                                                 <div className="dos-rowtop">
                                                     <div className="dos-mono">
