@@ -542,7 +542,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         let r = allRows;
 
         if (showPinnedOnly) {
-            r = r.filter((x) => pinned[String(x?.id ?? "")]);
+            // pinned sẽ dùng uiKey, nên lọc sau khi build uiKey (bên dưới)
+            // tạm thời chưa lọc ở đây
         }
 
         if (statusFilter !== "ALL") {
@@ -553,18 +554,44 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
             });
         }
 
-        // Pinned bubble up
-        r = [...r].sort((a, b) => {
-            const ida = String(a?.id ?? "");
-            const idb = String(b?.id ?? "");
-            const pa = pinned[ida] ? 1 : 0;
-            const pb = pinned[idb] ? 1 : 0;
+        // Pinned bubble up (sẽ sort sau khi build uiKey)
+        // giữ nguyên logic sort priority ở allRows, ở đây chỉ bubble pin
+
+        // Build stable UI key for each row
+        const withKey = r.map((x, i) => {
+            const rawId = String(x?.id ?? "").trim();
+            const fp = [
+                String(x?.canon ?? ""),
+                String(x?.side ?? ""),
+                String(x?.type ?? ""),
+                String(x?.bias_tf ?? ""),
+                String(x?.entry_tf ?? ""),
+                String(x?.trigger_tf ?? ""),
+                String(x?.status ?? ""),
+            ].join("|");
+
+            // uiKey: prefer engine id, else fingerprint + index (index is stable AFTER sorting)
+            const uiKey = rawId ? rawId : `${fp}#${i}`;
+            return { ...x, __uiKey: uiKey };
+        });
+
+        // Now apply pinned-only filter using uiKey
+        let out = withKey;
+        if (showPinnedOnly) {
+            out = out.filter((x) => pinned[String(x.__uiKey)]);
+        }
+
+        // Bubble pinned up using uiKey
+        out = [...out].sort((a, b) => {
+            const pa = pinned[String(a.__uiKey)] ? 1 : 0;
+            const pb = pinned[String(b.__uiKey)] ? 1 : 0;
             if (pb !== pa) return pb - pa;
             return 0;
         });
 
-        return r;
+        return out;
     }, [allRows, pinned, statusFilter, showPinnedOnly]);
+
     const now = Date.now();
 
     // Prefer feed timestamp if present, otherwise use an internal activity clock.
@@ -613,18 +640,19 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
     const selected = useMemo(() => {
         if (!rows.length) return null;
-        if (selectedId) return rows.find((x) => String(x?.id ?? "") === selectedId) ?? rows[0];
+        if (selectedId) return rows.find((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId) ?? rows[0];
         return rows[0];
     }, [rows, selectedId]);
+
 
     useEffect(() => {
         if (!rows.length) return;
 
-        // Chỉ auto-pick lần đầu (hoặc khi selection hiện tại biến mất)
-        if (selectedId && rows.some((x) => String(x?.id ?? "") === selectedId)) return;
+        if (selectedId && rows.some((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId)) return;
 
-        setSelectedId(String(rows[0]?.id ?? ""));
+        setSelectedId(String((rows[0] as AnyObj)?.__uiKey ?? ""));
     }, [rows, selectedId]);
+
 
     // Toast
     const [toast, setToast] = useState<string | null>(null);
@@ -663,10 +691,11 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     };
 
     const pick = (s: AnyObj) => {
-        const id = String(s?.id ?? "");
-        setSelectedId(id);
+        const key = String(s?.__uiKey ?? s?.id ?? "");
+        setSelectedId(key);
         if (isNarrow) setDrawerOpen(true);
     };
+
 
     const action = selected ? actionLabel(selected) : "—";
     const z = selected?.entry?.zone;
@@ -1019,7 +1048,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                 </div>
                             ) : (
                                 rows.map((s, i) => {
-                                    const id = String(s?.id ?? "");
+                                    const id = String((s as AnyObj)?.__uiKey ?? s?.id ?? "");
                                     const isPreferred = preferredId && id === preferredId;
                                     const isSelected = selectedId ? id === selectedId : false;
                                     const dead = s?.status === "INVALIDATED" || s?.status === "EXPIRED";
@@ -1036,7 +1065,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
 
                                     return (
                                         <div
-                                            key={id || i}
+                                            key={id}
                                             className={[
                                                 "dos-rowitem",
                                                 isPreferred ? "dos-preferred" : "",
