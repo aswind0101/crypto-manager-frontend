@@ -637,13 +637,13 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                             SETUP: <span className="dos-strong">{String(selected?.status ?? "—")}</span>
                         </span>
 
-                        <span className="dos-pill dos-dim">
+                        <span className="dos-pill dos-dim dos-pill-wrap">
                             EXEC: <span className="dos-strong">{action}</span>
                             {selected?.execution?.reason ? (
                                 <span className="dos-dim"> • {String(selected.execution.reason)}</span>
                             ) : null}
                             {Array.isArray(selected?.execution?.blockers) && selected.execution.blockers.length ? (
-                                <span className="dos-warn"> • blockers={selected.execution.blockers.join(",")}</span>
+                                <span className="dos-warn dos-break"> • blockers={selected.execution.blockers.join(",")}</span>
                             ) : null}
                         </span>
 
@@ -1034,6 +1034,18 @@ export function DosOpsDashboard() {
           border:1px solid #2a532a; background:#020302; color:#cfe9cf; outline:none;
           font-family:${mono}; font-size:16px;
         }
+/* Allow EXEC pill to wrap on iPad (avoid clipping) */
+.dos-pill-wrap {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  line-height: 1.25;
+}
+
+.dos-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
         .dos-btn{
           min-height:44px; padding:10px 12px; border-radius:10px;
