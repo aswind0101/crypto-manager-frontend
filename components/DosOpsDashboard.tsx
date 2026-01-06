@@ -644,6 +644,8 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         return rows[0];
     }, [rows, selectedId]);
 
+    const selectedKey = selected ? String((selected as AnyObj)?.__uiKey ?? selected?.id ?? "") : "";
+
 
     useEffect(() => {
         if (!rows.length) return;
@@ -659,30 +661,31 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
 
     // Navigation helpers
     const selectedIndex = useMemo(() => {
-        if (!selected) return 0;
-        const id = String(selected.id ?? "");
-        const i = rows.findIndex((x) => String(x?.id ?? "") === id);
+        if (!rows.length) return 0;
+        if (!selectedKey) return 0;
+        const i = rows.findIndex((x: AnyObj) => String(x?.__uiKey ?? x?.id ?? "") === selectedKey);
         return i >= 0 ? i : 0;
-    }, [rows, selected]);
+    }, [rows, selectedKey]);
 
     const prev = () => {
         if (!rows.length) return;
         const i = clamp(selectedIndex - 1, 0, rows.length - 1);
-        setSelectedId(String(rows[i]?.id ?? ""));
+        setSelectedId(String((rows[i] as AnyObj)?.__uiKey ?? (rows[i] as AnyObj)?.id ?? ""));
         if (isNarrow) setDrawerOpen(true);
     };
     const next = () => {
         if (!rows.length) return;
         const i = clamp(selectedIndex + 1, 0, rows.length - 1);
-        setSelectedId(String(rows[i]?.id ?? ""));
+        setSelectedId(String((rows[i] as AnyObj)?.__uiKey ?? (rows[i] as AnyObj)?.id ?? ""));
         if (isNarrow) setDrawerOpen(true);
     };
 
+
     const togglePin = () => {
-        if (!selected) return;
-        const id = String(selected.id ?? "");
-        setPinned((p) => ({ ...p, [id]: !p[id] }));
+        if (!selectedKey) return;
+        setPinned((p) => ({ ...p, [selectedKey]: !p[selectedKey] }));
     };
+
 
     const copyTicket = async () => {
         if (!selected) return;
@@ -713,8 +716,7 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
             );
         }
 
-        const id = String(selected?.id ?? "");
-        const isPinned = Boolean(pinned[id]);
+        const isPinned = Boolean(selectedKey && pinned[selectedKey]);
 
         const mode = String(selected?.entry?.mode ?? "—");
         const entry =
@@ -1049,7 +1051,8 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                             ) : (
                                 rows.map((s, i) => {
                                     const id = String((s as AnyObj)?.__uiKey ?? s?.id ?? "");
-                                    const isPreferred = preferredId && id === preferredId;
+                                    const engineId = String(s?.id ?? "").trim();
+                                    const isPreferred = preferredId && engineId === preferredId;
                                     const isSelected = selectedId ? id === selectedId : false;
                                     const dead = s?.status === "INVALIDATED" || s?.status === "EXPIRED";
                                     const p = Number(s?.priority_score ?? 0);
@@ -1137,8 +1140,7 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                 </button>
 
                 <button
-                    className={`dos-btn dos-btn-sm ${selected && pinned[String(selected?.id ?? "")] ? "dos-btn-active" : ""
-                        }`}
+                    className={`dos-btn dos-btn-sm ${selectedKey && pinned[selectedKey] ? "dos-btn-active" : ""}`}
                     {...tap(togglePin)}
                     disabled={!selected}
                 >
