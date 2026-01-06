@@ -560,6 +560,7 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         // Build stable UI key for each row
         const withKey = r.map((x, i) => {
             const rawId = String(x?.id ?? "").trim();
+            const z = x?.entry?.zone;
             const fp = [
                 String(x?.canon ?? ""),
                 String(x?.side ?? ""),
@@ -567,12 +568,16 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                 String(x?.bias_tf ?? ""),
                 String(x?.entry_tf ?? ""),
                 String(x?.trigger_tf ?? ""),
-                String(x?.status ?? ""),
+                // thêm các field “định danh” tương đối ổn định để giảm collision khi không có id
+                z ? `${Number(z.lo)}-${Number(z.hi)}` : "",
+                String(x?.stop?.price ?? ""),
+                String(x?.rr_min ?? ""),
             ].join("|");
 
-            // uiKey: prefer engine id, else fingerprint + index (index is stable AFTER sorting)
-            const uiKey = rawId ? rawId : `${fp}#${i}`;
+            // uiKey: prefer engine id, else use stable fingerprint (NO index, NO status)
+            const uiKey = rawId ? rawId : fp;
             return { ...x, __uiKey: uiKey };
+
         });
 
         // Now apply pinned-only filter using uiKey
@@ -644,7 +649,7 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         return rows[0];
     }, [rows, selectedId]);
 
-    const selectedKey = selected ? String((selected as AnyObj)?.__uiKey ?? selected?.id ?? "") : "";
+    const selectedKey = selected ? String((selected as AnyObj)?.__uiKey ?? "") : "";
 
 
     useEffect(() => {
