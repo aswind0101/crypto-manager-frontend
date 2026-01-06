@@ -305,13 +305,13 @@ function ScanPulse({
 
             <div className="scanMeter" aria-label="scan activity">
                 <div
-                    className={`scanFill ${bump ? "scanBump" : ""}`}
+                    className="scanFill"
                     style={{
-                        width: `${Math.round(pct * 100)}%`,
-                        animation: bump ? "scanPulse 320ms ease-out" : undefined,
+                        transform: `scaleX(${clamp(pct, 0, 1)})`,
                     }}
                 />
             </div>
+
         </div>
     );
 }
@@ -1171,6 +1171,10 @@ export function DosOpsDashboard() {
 
         .mono{ font-family: ${uiMono}; }
         .monoStrong{ font-family: ${uiMono}; font-weight: 700; }
+        .mono, .monoStrong{
+  font-variant-numeric: tabular-nums;
+}
+
         .muted{ color: var(--muted); }
         .dim{ opacity: 0.86; }
 
@@ -1256,13 +1260,17 @@ export function DosOpsDashboard() {
         }
 
         .ribbon{
-          max-width: 1400px;
-          margin: 12px auto 0;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          align-items: center;
-        }
+  max-width: 1400px;
+  margin: 12px auto 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
         .pill{
           display:inline-flex;
           gap:8px;
@@ -1274,6 +1282,9 @@ export function DosOpsDashboard() {
           font-size: 12px;
           white-space: nowrap;
         }
+.scan, .ribbon{
+  contain: layout paint;
+}
 
         /* Scan */
         .scan{
@@ -1286,12 +1297,22 @@ export function DosOpsDashboard() {
           padding: 10px 12px;
         }
         .scanTop{
-          display:flex;
-          justify-content: space-between;
-          gap: 10px;
-          align-items: flex-end;
-          flex-wrap: wrap;
-        }
+  display:flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+}
+.scanMeta{
+  display:flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
         .scanTitle{
           font-weight: 800;
           letter-spacing: 0.2px;
@@ -1311,16 +1332,14 @@ export function DosOpsDashboard() {
           background: rgba(0,0,0,0.25);
         }
         .scanFill{
-          height: 100%;
-          background: linear-gradient(90deg, rgba(134,239,172,0.9), rgba(96,165,250,0.75));
-          transition: width 220ms ease;
-        }
-        .scanBump{ filter: brightness(1.2); }
-        @keyframes scanPulse {
-          0% { box-shadow: 0 0 0 rgba(134,239,172,0); }
-          40%{ box-shadow: 0 0 10px rgba(134,239,172,0.6); }
-          100%{ box-shadow: 0 0 0 rgba(134,239,172,0); }
-        }
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(134,239,172,0.9), rgba(96,165,250,0.75));
+  transition: transform 180ms linear;
+  will-change: transform;
+}
+
 
         /* Layout */
         .layout{
