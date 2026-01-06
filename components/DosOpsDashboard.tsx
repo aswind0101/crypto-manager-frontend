@@ -3,64 +3,62 @@ import { useSetupsSnapshot } from "../hooks/useSetupsSnapshot";
 
 type AnyObj = any;
 
-const UI_MONO =
+const mono =
     "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
-const UI_SANS =
-    "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
 
-function clamp(n: number, lo: number, hi: number) {
-    return Math.max(lo, Math.min(hi, n));
-}
 function fmt(n: any, dp = 2) {
     const x = Number(n);
     if (!Number.isFinite(x)) return "—";
     return x.toFixed(dp);
 }
-function safeStr(x: any, fallback = "—") {
-    const s = String(x ?? "").trim();
-    return s ? s : fallback;
+function clamp(n: number, lo: number, hi: number) {
+    return Math.max(lo, Math.min(hi, n));
 }
-function tap(fn: () => void) {
-    return {
-        onPointerUp: (e: React.PointerEvent) => {
-            e.preventDefault();
-            e.stopPropagation();
-            fn();
-        },
-        onClick: (e: React.MouseEvent) => {
-            e.preventDefault();
-            e.stopPropagation();
-            fn();
-        },
-    };
+function bar(pct01: number, width = 10) {
+    const filled = clamp(Math.round(pct01 * width), 0, width);
+    return "█".repeat(filled) + "░".repeat(width - filled);
 }
+function showFlags(fl?: string) {
+    const s = String(fl ?? "").trim();
+    if (!s || s === "—" || s === "-") return "";
+    return s;
+}
+function htfBiasLabel(features: AnyObj) {
+    const b = features?.bias;
+    if (!b) return "—";
 
-function setupSig(s: AnyObj) {
-    return [
-        String(s?.canon ?? ""),
-        String(s?.side ?? ""),
-        String(s?.type ?? ""),
-        String(s?.bias_tf ?? ""),
-        String(s?.entry_tf ?? ""),
-        String(s?.trigger_tf ?? ""),
-    ].join("|");
-}
+    const tf = String(b.tf ?? "").trim();                 // "1h" | "4h"
+    const dir = String(b.trend_dir ?? "").trim();         // bull/bear/sideways
+    const str = Number(b.trend_strength);                 // 0..1
+    const vr = String(b.vol_regime ?? "").trim();         // normal/high/low (tuỳ engine)
 
-function triggerProgress(s: AnyObj) {
-    const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
-    const total = checklist.length || 0;
-    const ok = checklist.filter((x: AnyObj) => x?.ok === true).length;
-    const pct = total ? ok / total : 0;
-    const next = checklist.find((x: AnyObj) => x && x.ok === false) ?? null;
-    return { ok, total, pct, checklist, next };
+    if (!dir) return "—";
+
+    const DIR =
+        dir === "bull" ? "BULL" :
+            dir === "bear" ? "BEAR" :
+                dir === "sideways" ? "SIDE" :
+                    dir.toUpperCase();
+
+    const sPct = Number.isFinite(str) ? Math.round(str * 100) : null;
+
+    // Format gọn để scan nhanh:
+    // ví dụ: "BEAR 62% (1h)" hoặc "SIDE (4h)"
+    const core = sPct != null ? `${DIR} ${sPct}%` : DIR;
+    const tail = tf ? ` (${tf})` : "";
+    const vol = vr ? ` • ${vr.toUpperCase()}` : "";
+
+    return `${core}${tail}${vol}`;
 }
 
 function biasByTfLabel(features: AnyObj, tf: string) {
     const b = features?.bias_by_tf?.[tf];
     if (!b) return "—";
+
     const complete = Boolean(b.complete);
     const have = Number(b.have ?? 0);
     const need = Number(b.need ?? 210);
+
     if (!complete) return `PENDING (${have}/${need})`;
 
     const dir = String(b.trend_dir ?? "").trim();
@@ -76,19 +74,106 @@ function biasByTfLabel(features: AnyObj, tf: string) {
     const sPct = Number.isFinite(str) ? Math.round(str * 100) : null;
     const core = sPct != null ? `${DIR} ${sPct}%` : DIR;
     const vol = vr ? ` • ${vr.toUpperCase()}` : "";
+
     return `${core}${vol}`;
+}
+function setupSig(s: AnyObj) {
+    // Chỉ dùng các field mang tính “định danh” tương đối ổn định theo setup logic,
+    // tuyệt đối KHÔNG dùng status, zone, stop, rr, priority_score... vì các field này có thể đổi theo tick.
+    return [
+        String(s?.canon ?? ""),
+        String(s?.side ?? ""),
+        String(s?.type ?? ""),
+        String(s?.bias_tf ?? ""),
+        String(s?.entry_tf ?? ""),
+        String(s?.trigger_tf ?? ""),
+    ].join("|");
+}
+
+function typeShort(t: string) {
+    if (t === "LIQUIDITY_SWEEP_REVERSAL") return "LSR";
+    if (t === "RANGE_MEAN_REVERT") return "RMR";
+    if (t === "TREND_PULLBACK") return "TPB";
+    if (t === "BREAKOUT") return "BRK";
+    if (t === "FAILED_SWEEP_CONTINUATION") return "FSC";
+    return (t || "—").slice(0, 6).toUpperCase();
+}
+function triggerProgress(s: AnyObj) {
+    const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
+    const total = checklist.length || 0;
+    const ok = checklist.filter((x: AnyObj) => x?.ok === true).length;
+    const pct = total ? ok / total : 0;
+    const next = checklist.find((x: AnyObj) => x && x.ok === false) ?? null;
+    return { ok, total, pct, checklist, next };
+}
+function actionLabel(s: AnyObj) {
+    const status = String(s?.status ?? "");
+    const mode = String(s?.entry?.mode ?? "");
+    const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
+
+    const closeItem = checklist.find((x: AnyObj) => String(x?.key ?? "") === "close_confirm");
+    const hasClose = Boolean(closeItem);
+    const closeOk = closeItem?.ok === true;
+
+    // Terminal states
+    if (status === "INVALIDATED") return "INVALIDATED";
+    if (status === "EXPIRED") return "EXPIRED";
+
+    // Triggered state (close-confirm already satisfied)
+    if (status === "TRIGGERED") {
+        // Clarify execution intent
+        return mode === "MARKET" ? "ENTER MARKET (CONFIRMED)" : "TRIGGERED (WAIT EXEC)";
+    }
+
+    // Ready state: eligible but may require close_confirm depending on trigger checklist
+    if (status === "READY") {
+        if (hasClose && !closeOk) return "WAIT CLOSE (CONFIRM)";
+        return mode === "LIMIT" ? "PLACE LIMIT (ARMED)" : "READY (ARMED)";
+    }
+
+    // Forming / other states: show next required condition if available
+    const next = checklist.find((x: AnyObj) => x && x.ok === false);
+    if (next?.key) {
+        const k = String(next.key);
+        if (k === "retest") return "WAIT RETEST";
+        if (k === "close_confirm") return "WAIT CLOSE (CONFIRM)";
+        return `WAIT ${k.toUpperCase()}`;
+    }
+
+    return "NO ACTION";
+}
+
+function distanceBps(px: number, z: AnyObj) {
+    if (!Number.isFinite(px) || !z) return NaN;
+    const lo = Number(z.lo);
+    const hi = Number(z.hi);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return NaN;
+    if (px >= lo && px <= hi) return 0;
+    const dist = px > hi ? px - hi : lo - px;
+    const ref = px || hi || lo;
+    return (dist / ref) * 10000;
+}
+function distLabelFor(mid: number, z: AnyObj, mode?: string) {
+    const dist = Number.isFinite(mid) ? distanceBps(mid, z) : NaN;
+    if (!Number.isFinite(dist)) return "—";
+    if (dist === 0) return String(mode ?? "") === "LIMIT" ? "IN (MID)" : "IN";
+    return `${dist.toFixed(0)}bps`;
 }
 
 function resolveMS(features: AnyObj, tf: string) {
     const msRoot = features?.market_structure;
     if (!msRoot) return null;
 
+    // Case 1: object keyed by tf (ideal)
     if (typeof msRoot === "object" && !Array.isArray(msRoot) && msRoot[tf]) return msRoot[tf];
+
+    // Case 2: array of { tf, ... }
     if (Array.isArray(msRoot)) {
         const hit = msRoot.find((x: AnyObj) => String(x?.tf ?? "") === tf);
         if (hit) return hit;
     }
 
+    // Case 3: alternative keys (common mismatches)
     const aliases: Record<string, string[]> = {
         "15m": ["15m", "15", "M15", "15min"],
         "1h": ["1h", "60m", "60", "H1", "1H", "1hr", "1hour"],
@@ -104,18 +189,20 @@ function resolveMS(features: AnyObj, tf: string) {
             if (hit) return hit;
         }
     }
+
     return null;
 }
 
 function marketScan(features: AnyObj, tf: string) {
     const ms = resolveMS(features, tf);
-    const trend = String(ms?.trend ?? "—");
-    const bos = ms?.lastBOS ? `${ms.lastBOS.dir} @ ${fmt(ms.lastBOS.price ?? ms.lastBOS.level, 0)}` : "—";
-    const choch = ms?.lastCHOCH ? `${ms.lastCHOCH.dir} @ ${fmt(ms.lastCHOCH.price ?? ms.lastCHOCH.level, 0)}` : "—";
-    const sweep = ms?.lastSweep ? `${ms.lastSweep.dir} @ ${fmt(ms.lastSweep.price ?? ms.lastSweep.level, 0)}` : "—";
 
+    const trend = String(ms?.trend ?? "—");
     const sH = ms?.lastSwingHigh?.price ?? ms?.lastSwingHigh;
     const sL = ms?.lastSwingLow?.price ?? ms?.lastSwingLow;
+
+    const bos = ms?.lastBOS ? `${ms.lastBOS.dir} @ ${fmt(ms.lastBOS.price ?? ms.lastBOS.level, 2)}` : "—";
+    const choch = ms?.lastCHOCH ? `${ms.lastCHOCH.dir} @ ${fmt(ms.lastCHOCH.price ?? ms.lastCHOCH.level, 2)}` : "—";
+    const sweep = ms?.lastSweep ? `${ms.lastSweep.dir} @ ${fmt(ms.lastSweep.price ?? ms.lastSweep.level, 2)}` : "—";
 
     const flags = ms?.flags ?? {};
     const fl: string[] = [];
@@ -124,29 +211,9 @@ function marketScan(features: AnyObj, tf: string) {
     if (flags.sweepUp) fl.push("SWP↑");
     if (flags.sweepDown) fl.push("SWP↓");
 
-    return { trend, bos, choch, sweep, sH, sL, fl: fl.length ? fl.join(" ") : "—" };
+    return { trend, sH, sL, bos, choch, sweep, fl: fl.length ? fl.join(" ") : "—" };
 }
 
-function actionLabel(s: AnyObj) {
-    const status = String(s?.status ?? "");
-    const mode = String(s?.entry?.mode ?? "");
-    const checklist = Array.isArray(s?.entry?.trigger?.checklist) ? s.entry.trigger.checklist : [];
-    const closeItem = checklist.find((x: AnyObj) => String(x?.key ?? "") === "close_confirm");
-    const hasClose = Boolean(closeItem);
-    const closeOk = closeItem?.ok === true;
-
-    if (status === "INVALIDATED") return "INVALIDATED";
-    if (status === "EXPIRED") return "EXPIRED";
-    if (status === "TRIGGERED") return mode === "MARKET" ? "ENTER MARKET (CONFIRMED)" : "TRIGGERED (WAIT EXEC)";
-    if (status === "READY") {
-        if (hasClose && !closeOk) return "WAIT CLOSE (CONFIRM)";
-        return mode === "LIMIT" ? "PLACE LIMIT (ARMED)" : "READY (ARMED)";
-    }
-
-    const next = checklist.find((x: AnyObj) => x && x.ok === false);
-    if (next?.key) return `WAIT ${String(next.key).toUpperCase()}`;
-    return "NO ACTION";
-}
 
 async function copyText(text: string) {
     try {
@@ -173,21 +240,22 @@ async function copyText(text: string) {
 }
 
 function buildTicketText(s: AnyObj) {
-    const side = safeStr(s?.side);
-    const type = safeStr(s?.type);
-    const status = safeStr(s?.status);
-    const tf = `${safeStr(s?.bias_tf)}→${safeStr(s?.entry_tf)}→${safeStr(s?.trigger_tf)}`;
-    const mode = safeStr(s?.entry?.mode);
+    const side = String(s?.side ?? "—");
+    const type = String(s?.type ?? "—");
+    const status = String(s?.status ?? "—");
+    const tf = `${String(s?.bias_tf ?? "—")}→${String(s?.entry_tf ?? "—")}→${String(s?.trigger_tf ?? "—")}`;
+    const mode = String(s?.entry?.mode ?? "—");
     const z = s?.entry?.zone;
     const entry =
         mode === "LIMIT" && z ? `[${fmt(z.lo, 2)}–${fmt(z.hi, 2)}]` : mode === "MARKET" ? "MARKET" : "—";
-    const sl = `${fmt(s?.stop?.price, 2)} (${safeStr(s?.stop?.basis)})`;
-    const tps = Array.isArray(s?.tp) && s.tp.length ? s.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—";
+    const sl = `${fmt(s?.stop?.price, 2)} (${String(s?.stop?.basis ?? "—")})`;
+    const tps =
+        Array.isArray(s?.tp) && s.tp.length ? s.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—";
     const rr = `RRmin ${fmt(s?.rr_min, 2)}  RRest ${fmt(s?.rr_est, 2)}`;
     const act = actionLabel(s);
 
     return [
-        `SYMBOL: ${safeStr(s?.canon, "")}`,
+        `SYMBOL: ${String(s?.canon ?? "")}`,
         `SIDE: ${side}  TYPE: ${type}  STATUS: ${status}`,
         `TF: ${tf}`,
         `ENTRY (${mode}): ${entry}`,
@@ -195,7 +263,7 @@ function buildTicketText(s: AnyObj) {
         `TP: ${tps}`,
         rr,
         `ACTION: ${act}`,
-        `ID: ${safeStr(s?.id, "")}`,
+        `ID: ${String(s?.id ?? "")}`,
     ].join("\n");
 }
 
@@ -211,52 +279,209 @@ function useIsNarrow(breakpoint = 980) {
     return narrow;
 }
 
-/**
- * Virtual list (no libraries):
- * - renders only visible rows + overscan
- * - fixed row height for stable performance (no layout thrash)
- */
-function VirtualList({
-    items,
-    rowHeight,
-    height,
-    overscan = 6,
-    renderRow,
-    getKey,
+function Toast({ msg, onDone }: { msg: string; onDone: () => void }) {
+    useEffect(() => {
+        const t = setTimeout(onDone, 1300);
+        return () => clearTimeout(t);
+    }, [onDone]);
+    return <div className="dos-toast">{msg}</div>;
+}
+function tap(fn: () => void) {
+    return {
+        onPointerUp: (e: React.PointerEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fn();
+        },
+        onClick: (e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fn();
+        },
+    };
+}
+
+function SystemStatusBar({
+    paused,
+    dq,
+    dqOk,
+    bybitOk,
+    binanceOk,
+    mid,
+    dev,
+    lastTs,
+    staleSec,
+    setupsCount,
+    preferredId,
 }: {
-    items: AnyObj[];
-    rowHeight: number;
-    height: number;
-    overscan?: number;
-    getKey: (x: AnyObj, idx: number) => string;
-    renderRow: (x: AnyObj, idx: number) => React.ReactNode;
+    paused: boolean;
+    dq: string;
+    dqOk: boolean;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    mid: number;
+    dev: any;
+    lastTs?: number;
+    staleSec?: number;
+    setupsCount: number;
+    preferredId?: string;
 }) {
-    const [scrollTop, setScrollTop] = useState(0);
+    const now = Date.now();
+    const staleMs =
+        staleSec != null && Number.isFinite(staleSec)
+            ? Math.max(0, staleSec * 1000)
+            : lastTs
+                ? Math.max(0, now - lastTs)
+                : NaN;
+    const warm = !Number.isFinite(mid);
+    const health =
+        !bybitOk ? "BYBIT DOWN" : !binanceOk ? "BINANCE DEGRADED" : !dqOk ? "DQ GATED" : warm ? "WARMING UP" : "OK";
+    const healthCls = health === "OK" ? "dos-ok" : health.includes("WARM") || health.includes("DEGRADED") ? "dos-warn" : "dos-bad";
 
-    const totalH = items.length * rowHeight;
-    const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
-    const end = Math.min(items.length, Math.ceil((scrollTop + height) / rowHeight) + overscan);
-
-    const topPad = start * rowHeight;
-    const slice = items.slice(start, end);
+    const staleCls =
+        !Number.isFinite(staleMs) ? "dos-warn" : staleMs < 1500 ? "dos-ok" : staleMs < 5000 ? "dos-warn" : "dos-bad";
 
     return (
-        <div
-            className="vlist"
-            style={{ height }}
-            onScroll={(e) => setScrollTop((e.target as HTMLDivElement).scrollTop)}
-        >
-            <div style={{ height: totalH, position: "relative" }}>
-                <div style={{ position: "absolute", top: topPad, left: 0, right: 0 }}>
-                    {slice.map((it, i) => {
-                        const idx = start + i;
-                        return (
-                            <div key={getKey(it, idx)} style={{ height: rowHeight }}>
-                                {renderRow(it, idx)}
-                            </div>
-                        );
-                    })}
-                </div>
+        <div className="dos-sysbar">
+            <span className={`dos-pill ${paused ? "dos-pill-warn" : "dos-pill-ok"}`}>{paused ? "FROZEN" : "LIVE"}</span>
+            <span className={`dos-pill ${healthCls}`}>HEALTH: {health}</span>
+
+            <span className="dos-pill dos-dim">
+                DQ: <span className="dos-strong">{dq}</span> {dqOk ? "" : "(GATED)"}
+            </span>
+
+            <span className="dos-pill dos-dim">
+                MID: <span className="dos-strong">{Number.isFinite(mid) ? fmt(mid, 2) : "—"}</span>
+                {warm ? <span className="dos-warn"> (warm)</span> : null}
+            </span>
+
+            <span className="dos-pill dos-dim">
+                DEV: <span className="dos-strong">{Number.isFinite(Number(dev)) ? `${Number(dev).toFixed(1)}bps` : "—"}</span>
+            </span>
+
+            <span className="dos-pill dos-dim">
+                FEEDS: <span className={bybitOk ? "dos-ok" : "dos-bad"}>BYBIT</span>{" "}
+                <span className={binanceOk ? "dos-ok" : "dos-warn"}>BINANCE</span>
+            </span>
+
+            <span className="dos-pill dos-dim">
+                SETUPS: <span className="dos-strong">{setupsCount}</span>
+                {preferredId ? <span className="dos-dim"> pref</span> : null}
+            </span>
+
+            <span className="dos-pill dos-dim">
+                STALE: <span className={staleCls}>{Number.isFinite(staleMs) ? `${(staleMs / 1000).toFixed(1)}s` : "—"}</span>
+            </span>
+        </div>
+    );
+}
+function scanStatusModel(opts: {
+    mid: number;
+    dqOk: boolean;
+    dq: string;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    rowsCount: number;
+    staleSec?: number;
+}) {
+    const { mid, dqOk, dq, bybitOk, binanceOk, rowsCount, staleSec } = opts;
+
+    if (!Number.isFinite(mid)) {
+        return {
+            title: "SCAN: CONNECTING",
+            cls: "dos-warn",
+            detail: "Connecting feeds / warming up market data.",
+            evidence: [],
+        };
+    }
+
+    if (!dqOk) {
+        return {
+            title: "SCAN: PAUSED (DQ GATED)",
+            cls: "dos-bad",
+            detail: "Analysis suppressed due to insufficient data quality.",
+            evidence: [
+                `DQ=${dq}`,
+                `BYBIT=${bybitOk ? "OK" : "DOWN"}`,
+                `BINANCE=${binanceOk ? "OK" : "DEGRADED"}`,
+            ],
+        };
+    }
+
+    if (rowsCount === 0) {
+        return {
+            title: "SCAN: LIVE",
+            cls: "dos-ok",
+            detail: "Scanning market structure & waiting for close-confirm triggers.",
+            evidence: [
+                `DQ=${dq}`,
+                staleSec != null ? `STALE=${staleSec.toFixed(1)}s` : null,
+                `SETUPS=0 (valid)`,
+            ].filter(Boolean) as string[],
+        };
+    }
+
+    return {
+        title: "SCAN: LIVE",
+        cls: "dos-ok",
+        detail: "Active setups detected and ranked by priority.",
+        evidence: [`SETUPS=${rowsCount}`],
+    };
+}
+function stalePct(staleSec?: number) {
+    if (staleSec == null || !Number.isFinite(staleSec)) return 0;
+    // map 0..5s to 1..0 (fresh -> full bar)
+    const x = clamp(1 - staleSec / 5, 0, 1);
+    return x;
+}
+
+function ScanPulse({
+    title,
+    cls,
+    dq,
+    bybitOk,
+    binanceOk,
+    staleSec,
+    pulse,
+}: {
+    title: string;
+    cls: string; // dos-ok / dos-warn / dos-bad
+    dq: string;
+    bybitOk: boolean;
+    binanceOk: boolean;
+    staleSec?: number;
+    pulse: number; // increments on new data tick
+}) {
+    const pct = stalePct(staleSec);
+    const staleLabel = staleSec == null || !Number.isFinite(staleSec) ? "—" : `${staleSec.toFixed(1)}s`;
+
+    // "pulse" creates a brief visual bump without fake progress
+    const bump = pulse % 2 === 0;
+
+    const staleCls = pct > 0.7 ? "dos-ok" : pct > 0.3 ? "dos-warn" : "dos-bad";
+
+    return (
+        <div className="dos-scanbar">
+            <div className="dos-scanbar-top">
+                <span className={`dos-strong ${cls}`}>{title}</span>
+
+                <span className="dos-dim dos-small">
+                    DQ <span className="dos-strong">{dq}</span> • FEEDS{" "}
+                    <span className={bybitOk ? "dos-ok" : "dos-bad"}>BYBIT</span>{" "}
+                    <span className={binanceOk ? "dos-ok" : "dos-warn"}>BINANCE</span> • STALE{" "}
+                    <span className={staleCls}>{staleLabel}</span>
+                </span>
+            </div>
+
+            <div className="dos-scanbar-meter" aria-label="scan activity">
+                <div
+                    className={`dos-scanbar-fill ${bump ? "dos-scanbar-bump" : ""}`}
+                    style={{
+                        width: `${Math.round(pct * 100)}%`,
+                        animation: bump ? "scan-pulse 320ms ease-out" : undefined,
+                    }}
+                />
+
             </div>
         </div>
     );
@@ -281,78 +506,25 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const vFeat = paused ? frozen.features : features;
     const vSet = paused ? frozen.setups : setups;
 
-    // LIVE DATA (but we will only repaint header at low Hz)
-    const mid = Number.isFinite(Number(vSnap?.price?.mid))
-        ? Number(vSnap.price.mid)
-        : (Number.isFinite(Number(vSnap?.price?.bid)) && Number.isFinite(Number(vSnap?.price?.ask)))
-            ? (Number(vSnap.price.bid) + Number(vSnap.price.ask)) / 2
-            : NaN;
-
-    const dq = safeStr(vFeat?.quality?.dq_grade);
+    const dq = String(vFeat?.quality?.dq_grade ?? "—");
     const dqOk = Boolean(vSet?.dq_ok ?? vFeat?.quality?.dq_ok);
     const bybitOk = Boolean(vFeat?.quality?.bybit_ok);
     const binanceOk = Boolean(vFeat?.quality?.binance_ok);
+
+    const mid = Number.isFinite(Number(vSnap?.price?.mid))
+        ? Number(vSnap.price.mid)
+        : (Number.isFinite(Number(vSnap?.price?.bid)) &&
+            Number.isFinite(Number(vSnap?.price?.ask)))
+            ? (Number(vSnap.price.bid) + Number(vSnap.price.ask)) / 2
+            : NaN;
+    const dev = vFeat?.cross?.deviation_bps ?? vFeat?.cross?.dev_bps;
     const preferredId = vSet?.preferred_id;
-
-    // Realtime tick key (do not setState on it)
-    const tickKey = String(vSnap?.price?.ts ?? vSnap?.price?.mid ?? "");
-
-    // refs to avoid React thrash
-    const lastActivityMsRef = useRef<number | null>(null);
-    const pulseRef = useRef<number>(0);
-
-    useEffect(() => {
-        if (paused) return;
-        if (!tickKey) return;
-        lastActivityMsRef.current = Date.now();
-        pulseRef.current += 1;
-    }, [paused, tickKey]);
-
-    // UI header clock (2Hz by default) — human-friendly, reduces iOS jitter
-    const [uiHeader, setUiHeader] = useState({
-        mid: NaN as number,
-        staleSec: undefined as number | undefined,
-        pulse: 0 as number,
-        health: "CONNECTING" as string,
-    });
-
-    useEffect(() => {
-        if (paused) {
-            // keep last header when frozen
-            return;
-        }
-        const id = window.setInterval(() => {
-            const now = Date.now();
-            const ts = Number(vSnap?.price?.ts);
-            const staleSec = Number.isFinite(ts)
-                ? (now - ts) / 1000
-                : lastActivityMsRef.current != null
-                    ? (now - lastActivityMsRef.current) / 1000
-                    : undefined;
-
-            const health =
-                !bybitOk ? "BYBIT DOWN" :
-                    !binanceOk ? "BINANCE DEGRADED" :
-                        !dqOk ? "DQ GATED" :
-                            !Number.isFinite(mid) ? "WARMING" :
-                                "OK";
-
-            setUiHeader({
-                mid,
-                staleSec,
-                pulse: pulseRef.current,
-                health,
-            });
-        }, 500); // 2Hz: near-zero jitter on iOS
-        return () => window.clearInterval(id);
-    }, [paused, vSnap?.price?.ts, bybitOk, binanceOk, dqOk, mid]);
 
     const scan15 = marketScan(vFeat, "15m");
     const scan1h = marketScan(vFeat, "1h");
     const scan4h = marketScan(vFeat, "4h");
     const scan1d = marketScan(vFeat, "1d");
 
-    // rows
     const allRows: AnyObj[] = useMemo(() => {
         const arr = (vSet?.setups ?? []) as AnyObj[];
         return [...arr].sort((a, b) => {
@@ -365,18 +537,30 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         });
     }, [vSet]);
 
-    // UX selection
+    // UX state
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedSig, setSelectedSig] = useState<string | null>(null);
+    // Freeze DETAILS model to avoid jitter on tick updates
     const [detailModel, setDetailModel] = useState<AnyObj | null>(null);
 
-    // filters/pin
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [expandedChecklist, setExpandedChecklist] = useState(true);
+    const [expandedReasons, setExpandedReasons] = useState(false);
+
+    // Filters / pinned
     const [statusFilter, setStatusFilter] = useState<"ALL" | "FORMING" | "READY" | "TRIGGERED" | "DEAD">("ALL");
     const [showPinnedOnly, setShowPinnedOnly] = useState(false);
     const [pinned, setPinned] = useState<Record<string, boolean>>({});
+    const [pulse, setPulse] = useState(0);
+    const lastTickRef = useRef<number | null>(null);
 
     const rows = useMemo(() => {
         let r = allRows;
+
+        if (showPinnedOnly) {
+            // pinned sẽ dùng uiKey, nên lọc sau khi build uiKey (bên dưới)
+            // tạm thời chưa lọc ở đây
+        }
 
         if (statusFilter !== "ALL") {
             r = r.filter((x) => {
@@ -386,7 +570,11 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
             });
         }
 
-        const withKey = r.map((x) => {
+        // Pinned bubble up (sẽ sort sau khi build uiKey)
+        // giữ nguyên logic sort priority ở allRows, ở đây chỉ bubble pin
+
+        // Build stable UI key for each row
+        const withKey = r.map((x, i) => {
             const rawId = String(x?.id ?? "").trim();
             const z = x?.entry?.zone;
             const fp = [
@@ -396,21 +584,25 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                 String(x?.bias_tf ?? ""),
                 String(x?.entry_tf ?? ""),
                 String(x?.trigger_tf ?? ""),
+                // thêm các field “định danh” tương đối ổn định để giảm collision khi không có id
                 z ? `${Number(z.lo)}-${Number(z.hi)}` : "",
                 String(x?.stop?.price ?? ""),
                 String(x?.rr_min ?? ""),
             ].join("|");
+
+            // uiKey: prefer engine id, else use stable fingerprint (NO index, NO status)
             const uiKey = rawId ? rawId : fp;
             return { ...x, __uiKey: uiKey };
+
         });
 
+        // Now apply pinned-only filter using uiKey
         let out = withKey;
-
         if (showPinnedOnly) {
             out = out.filter((x) => pinned[String(x.__uiKey)]);
         }
 
-        // pinned first
+        // Bubble pinned up using uiKey
         out = [...out].sort((a, b) => {
             const pa = pinned[String(a.__uiKey)] ? 1 : 0;
             const pb = pinned[String(b.__uiKey)] ? 1 : 0;
@@ -421,20 +613,76 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
         return out;
     }, [allRows, pinned, statusFilter, showPinnedOnly]);
 
+    const now = Date.now();
+
+    // Prefer feed timestamp if present, otherwise use an internal activity clock.
+    // Tick detection: any meaningful mid/last change (or ts change if available).
+    const tickKey = String(
+        vSnap?.price?.ts ??
+        vSnap?.price?.mid ??
+        ""
+    );
+
+    // Activity clock: last time we observed a tick (ms)
+    const lastActivityMsRef = useRef<number | null>(null);
+
+    // Derive staleSec
+    const priceTs = Number(vSnap?.price?.ts);
+    const staleSec = Number.isFinite(priceTs)
+        ? (now - priceTs) / 1000
+        : lastActivityMsRef.current != null
+            ? (now - lastActivityMsRef.current) / 1000
+            : undefined;
+
+    // Pulse on tick
+    useEffect(() => {
+        if (paused) return;
+
+        // If we don't even have a mid/last yet, don't start pulsing.
+        const px = Number(vSnap?.price?.mid);
+        if (!Number.isFinite(px) && !tickKey) return;
+
+        // Update internal activity clock and pulse
+        lastActivityMsRef.current = Date.now();
+        setPulse((p) => p + 1);
+    }, [paused, tickKey]);
+
+
+
+    const scanStatus = scanStatusModel({
+        mid,
+        dqOk,
+        dq,
+        bybitOk,
+        binanceOk,
+        rowsCount: rows.length,
+        staleSec,
+    });
+
     const selected = useMemo(() => {
         if (!rows.length) return null;
         if (selectedId) return rows.find((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId) ?? rows[0];
         return rows[0];
     }, [rows, selectedId]);
 
-    const selectedKey = selected ? String(selected.__uiKey ?? "") : "";
+    const selectedKey = selected ? String((selected as AnyObj)?.__uiKey ?? "") : "";
+    // Update frozen detail model ONLY when selection changes
+    useEffect(() => {
+        if (!selected) {
+            setDetailModel(null);
+            return;
+        }
+        setDetailModel(selected);
+    }, [selectedKey]);
 
-    // rebind selection by sig if key changes across ticks
+
     useEffect(() => {
         if (!rows.length) return;
 
+        // 1) If selectedId still exists, keep it.
         if (selectedId && rows.some((x: AnyObj) => String(x?.__uiKey ?? "") === selectedId)) return;
 
+        // 2) If selectedId is missing BUT we have a stable signature, try to re-bind to the “same” setup.
         if (selectedSig) {
             const hit = rows.find((x: AnyObj) => setupSig(x) === selectedSig);
             if (hit) {
@@ -444,161 +692,342 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
             }
         }
 
+        // 3) Otherwise (first load / selection truly gone), pick the first row.
         const first = rows[0] as AnyObj;
         setSelectedId(String(first?.__uiKey ?? ""));
         setSelectedSig(setupSig(first));
+
     }, [rows, selectedId, selectedSig]);
 
-    // freeze details only when selection changes
-    useEffect(() => {
-        if (!selected) {
-            setDetailModel(null);
-            return;
-        }
-        setDetailModel(selected);
-    }, [selectedKey]);
 
-    const s = detailModel;
-    const prog = s ? triggerProgress(s) : { ok: 0, total: 0, pct: 0, checklist: [], next: null };
 
+    // Toast
+    const [toast, setToast] = useState<string | null>(null);
+
+    // Navigation helpers
     const selectedIndex = useMemo(() => {
         if (!rows.length) return 0;
         if (!selectedKey) return 0;
-        const i = rows.findIndex((x: AnyObj) => String(x?.__uiKey ?? "") === selectedKey);
+        const i = rows.findIndex((x: AnyObj) => String(x?.__uiKey ?? x?.id ?? "") === selectedKey);
         return i >= 0 ? i : 0;
     }, [rows, selectedKey]);
-
-    const pick = (row: AnyObj) => {
-        const key = String(row?.__uiKey ?? row?.id ?? "");
-        setSelectedId(key);
-        setSelectedSig(setupSig(row));
-    };
 
     const prev = () => {
         if (!rows.length) return;
         const i = clamp(selectedIndex - 1, 0, rows.length - 1);
-        const hit = rows[i] as AnyObj;
-        setSelectedId(String(hit?.__uiKey ?? ""));
-        setSelectedSig(setupSig(hit));
+        setSelectedId(String((rows[i] as AnyObj)?.__uiKey ?? (rows[i] as AnyObj)?.id ?? ""));
+        if (isNarrow) setDrawerOpen(true);
     };
     const next = () => {
         if (!rows.length) return;
         const i = clamp(selectedIndex + 1, 0, rows.length - 1);
-        const hit = rows[i] as AnyObj;
-        setSelectedId(String(hit?.__uiKey ?? ""));
-        setSelectedSig(setupSig(hit));
+        setSelectedId(String((rows[i] as AnyObj)?.__uiKey ?? (rows[i] as AnyObj)?.id ?? ""));
+        if (isNarrow) setDrawerOpen(true);
     };
+
 
     const togglePin = () => {
         if (!selectedKey) return;
         setPinned((p) => ({ ...p, [selectedKey]: !p[selectedKey] }));
     };
 
+
     const copyTicket = async () => {
-        if (!s) return;
-        await copyText(buildTicketText(s));
+        if (!detailModel) return;
+        const ok = await copyText(buildTicketText(detailModel));
+        setToast(ok ? "COPIED TICKET" : "COPY FAILED");
     };
 
-    // market tables (full info)
-    const tfs = ["15m", "1h", "4h", "1d"] as const;
 
-    const headerStale = uiHeader.staleSec == null || !Number.isFinite(uiHeader.staleSec)
-        ? "—"
-        : `${uiHeader.staleSec.toFixed(1)}s`;
+    const pick = (s: AnyObj) => {
+        const key = String(s?.__uiKey ?? s?.id ?? "");
+        setSelectedId(key);
+        setSelectedSig(setupSig(s));
+        if (isNarrow) setDrawerOpen(true);
+    };
 
-    return (
-        <div className="perfRoot">
-            {/* Header: pure DOM but low Hz updates only (2Hz). No wrap, no blur. */}
-            <div className="hdr">
-                <div className="hdrLeft">
-                    <div className="hdrTitle">
-                        <span className="hdrBrand">DOS OPS</span>
-                        <span className={`hdrPill ${paused ? "warn" : "ok"}`}>{paused ? "FROZEN" : "LIVE"}</span>
-                        <span className={`hdrPill ${uiHeader.health === "OK" ? "ok" : uiHeader.health.includes("DEGRADED") || uiHeader.health.includes("WARM") ? "warn" : "bad"}`}>
-                            {uiHeader.health}
+
+    const action = selected ? actionLabel(selected) : "—";
+    const z = selected?.entry?.zone;
+    const distLabel = distLabelFor(mid, z, String(selected?.entry?.mode ?? ""));
+
+    const prog = detailModel
+        ? triggerProgress(detailModel)
+        : { ok: 0, total: 0, pct: 0, checklist: [], next: null };
+
+
+    const renderDetails = (inDrawer: boolean) => {
+        const s = detailModel;
+        if (!s) {
+            return (
+                <div className="dos-panel">
+                    <div className="dos-panel-head">DETAILS</div>
+                    <div className="dos-panel-body dos-dim">No setup selected.</div>
+                </div>
+            );
+        }
+
+        const isPinned = Boolean(selectedKey && pinned[selectedKey]);
+
+        const mode = String(s?.entry?.mode ?? "—");
+        const entry =
+            mode === "LIMIT" && selected?.entry?.zone
+                ? `[${fmt(selected.entry.zone.lo, 2)}–${fmt(selected.entry.zone.hi, 2)}]`
+                : mode === "MARKET"
+                    ? "MARKET"
+                    : "—";
+
+        return (
+            <div className={`dos-panel ${inDrawer ? "dos-drawer-panel" : ""}`}>
+                <div className="dos-panel-head dos-panel-head-row">
+                    <div className="dos-strong">DETAILS</div>
+                    {inDrawer ? (
+                        <button className="dos-btn dos-btn-sm" {...tap(() => setDrawerOpen(false))}>
+                            CLOSE
+                        </button>
+                    ) : null}
+                </div>
+
+                <div className="dos-panel-body">
+                    {/* Primary summary */}
+                    <div className="dos-summary">
+                        <div className="dos-summary-left">
+                            <div className="dos-summary-title">
+                                <span className={selected?.side === "LONG" ? "dos-ok" : "dos-bad"}>
+                                    {String(selected?.side ?? "—")}
+                                </span>{" "}
+                                <span className="dos-strong">{typeShort(String(selected?.type ?? ""))}</span>{" "}
+                                <span className="dos-reverse">{String(selected?.status ?? "—")}</span>
+                            </div>
+                            <div className="dos-small dos-dim">
+                                TF {String(selected?.bias_tf ?? "—")}→{String(selected?.entry_tf ?? "—")}→{String(selected?.trigger_tf ?? "—")} •
+                                Δ {distLabel} • RR {fmt(selected?.rr_min, 2)} • P {Math.round(Number(selected?.priority_score ?? 0))} •
+                                C {Math.round(Number(selected?.confidence?.score ?? 0))}({String(selected?.confidence?.grade ?? "—")})
+                            </div>
+                        </div>
+
+                        <div className="dos-summary-right">
+                            <button className={`dos-btn dos-btn-sm ${isPinned ? "dos-btn-active" : ""}`} {...tap(togglePin)}>
+                                {isPinned ? "PINNED" : "PIN"}
+                            </button>
+                            <button className="dos-btn dos-btn-sm" {...tap(copyTicket)}>
+                                COPY
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Primary action */}
+                    {/* Setup lifecycle vs execution intent (separate states) */}
+                    <div className="dos-actionline">
+                        <span className="dos-pill dos-dim">
+                            SETUP: <span className="dos-strong">{String(selected?.status ?? "—")}</span>
+                        </span>
+
+                        <span className="dos-pill dos-dim dos-pill-wrap">
+                            EXEC: <span className="dos-strong">{action}</span>
+                            {selected?.execution?.reason ? (
+                                <span className="dos-dim"> • {String(selected.execution.reason)}</span>
+                            ) : null}
+                            {Array.isArray(selected?.execution?.blockers) && selected.execution.blockers.length ? (
+                                <span className="dos-warn dos-break"> • blockers={selected.execution.blockers.join(",")}</span>
+                            ) : null}
+                        </span>
+
+                        <span className="dos-pill dos-dim">
+                            TRIGGER: {prog.ok}/{prog.total} <span className="dos-mono">{bar(prog.pct, 10)}</span>
+                            {prog.next?.key ? <span className="dos-warn"> next={String(prog.next.key)}</span> : null}
                         </span>
                     </div>
-                    <div className="hdrLine mono">
-                        <span>DQ {dq}</span>
-                        <span className="sep">|</span>
-                        <span>MID {Number.isFinite(uiHeader.mid) ? uiHeader.mid.toFixed(2) : "—"}</span>
-                        <span className="sep">|</span>
-                        <span>STALE {headerStale}</span>
-                        <span className="sep">|</span>
-                        <span>FEEDS {bybitOk ? "BYBIT" : "BYBIT!"} {binanceOk ? "BINANCE" : "BINANCE!"}</span>
-                        <span className="sep">|</span>
-                        <span>SETUPS {rows.length}</span>
-                    </div>
-                    <div className="meter" aria-label="stale meter">
-                        <div
-                            className="meterFill"
-                            style={{
-                                transform: `scaleX(${uiHeader.staleSec == null || !Number.isFinite(uiHeader.staleSec)
-                                    ? 0
-                                    : clamp(1 - uiHeader.staleSec / 5, 0, 1)
-                                    })`,
-                            }}
-                        />
-                    </div>
-                </div>
 
-                <div className="hdrRight">
-                    <button className="btn" {...tap(prev)} disabled={!rows.length}>Prev</button>
-                    <button className="btn" {...tap(next)} disabled={!rows.length}>Next</button>
-                    <button className={`btn ${selectedKey && pinned[selectedKey] ? "btnOn" : ""}`} {...tap(togglePin)} disabled={!s}>
-                        Pin
-                    </button>
-                    <button className="btn" {...tap(copyTicket)} disabled={!s}>Copy</button>
+                    <div className="dos-hr" />
+
+                    {/* Ticket */}
+                    <div className="dos-blockhead">EXECUTION</div>
+                    <pre className="dos-pre">{`ENTRY (${mode}): ${entry}
+SL: ${fmt(selected?.stop?.price, 2)} (${String(selected?.stop?.basis ?? "—")})
+TP: ${(Array.isArray(selected?.tp) && selected.tp.length) ? selected.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—"}
+RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</pre>
+
+                    <div className="dos-hr" />
+
+                    {/* Checklist */}
+                    <div className="dos-blockhead-row">
+                        <div className="dos-blockhead">CHECKLIST</div>
+                        <button className="dos-btn dos-btn-sm" {...tap(() => setExpandedChecklist((x) => !x))}>
+                            {expandedChecklist ? "HIDE" : "SHOW"}
+                        </button>
+                    </div>
+
+                    {expandedChecklist ? (
+                        <div className="dos-stack">
+                            {prog.checklist.length ? (
+                                prog.checklist.map((it: AnyObj, i: number) => {
+                                    const key = String(it?.key ?? i);
+                                    const ok = Boolean(it?.ok);
+                                    const isNext = prog.next && String(prog.next?.key ?? "") === key;
+                                    return (
+                                        <div key={key} className={`dos-itemline ${isNext ? "dos-next" : ""}`}>
+                                            <span className={ok ? "dos-ok" : "dos-warn"}>[{ok ? "OK" : "WAIT"}]</span>
+                                            <span className="dos-key">{key}</span>
+                                            <span className="dos-note">{String(it?.note ?? "")}</span>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="dos-dim">No checklist.</div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="dos-dim">Hidden.</div>
+                    )}
+
+                    <div className="dos-hr" />
+
+                    {/* Reasons */}
+                    <div className="dos-blockhead-row">
+                        <div className="dos-blockhead">CONFLUENCE</div>
+                        <button className="dos-btn dos-btn-sm" {...tap(() => setExpandedReasons((x) => !x))}>
+                            {expandedReasons ? "HIDE" : "SHOW"}
+                        </button>
+                    </div>
+
+                    {expandedReasons ? (
+                        (selected?.confidence?.reasons ?? []).length ? (
+                            <pre className="dos-pre">
+                                {(selected.confidence.reasons as AnyObj[]).slice(0, 14).map((r: AnyObj) => `• ${String(r)}`).join("\n")}
+                            </pre>
+                        ) : (
+                            <div className="dos-dim">No reasons provided.</div>
+                        )
+                    ) : (
+                        <div className="dos-dim">Hidden.</div>
+                    )}
                 </div>
             </div>
+        );
+    };
+    function invalidationLabel(ms: AnyObj) {
+        if (!ms) return "—";
 
-            {/* Main layout: no fixed bars, no blur, stable scroll containers */}
-            <div className="grid">
-                <div className="col">
-                    <div className="card">
-                        <div className="cardHead">Market Outlook</div>
-                        <div className="tableWrap">
-                            <div className="table tableMarket">
-                                <div className="tr th">
-                                    <div>TF</div>
-                                    <div>Trend</div>
-                                    <div>Bias</div>
-                                    <div>Events</div>
+        const trend = String(ms.trend ?? "");
+        if (!trend || trend === "—") return "—";
+
+        if (trend === "RANGE") return "n/a";
+
+        if (trend === "UP") {
+            const x = ms.lastSwingLow?.price;
+            return Number.isFinite(Number(x)) ? fmt(x, 2) : "pending";
+        }
+
+        if (trend === "DOWN") {
+            const x = ms.lastSwingHigh?.price;
+            return Number.isFinite(Number(x)) ? fmt(x, 2) : "pending";
+        }
+
+        return "—";
+    }
+
+
+    function eventsLabel(ms: AnyObj) {
+        if (!ms) return "—";
+        const ev: string[] = [];
+
+        if (ms.lastBOS) {
+            const d = ms.lastBOS.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastBOS.price ?? ms.lastBOS.level;
+            ev.push(`BOS${d} ${fmt(p, 0)}`);
+        }
+
+        if (ms.lastCHOCH) {
+            const d = ms.lastCHOCH.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastCHOCH.price ?? ms.lastCHOCH.level;
+            ev.push(`CHOCH${d} ${fmt(p, 0)}`);
+        }
+
+        if (ms.lastSweep) {
+            const d = ms.lastSweep.dir === "UP" ? "↑" : "↓";
+            const p = ms.lastSweep.price ?? ms.lastSweep.level;
+            ev.push(`SWP${d} ${fmt(p, 0)}`);
+        }
+
+        return ev.length ? ev.slice(0, 2).join(" ") : "—";
+    }
+
+    return (
+        <>
+            <SystemStatusBar
+                paused={paused}
+                dq={dq}
+                dqOk={dqOk}
+                bybitOk={bybitOk}
+                binanceOk={binanceOk}
+                mid={mid}
+                dev={dev}
+                lastTs={vSnap?.price?.ts ?? null}
+                staleSec={staleSec}
+                setupsCount={rows.length}
+                preferredId={preferredId}
+            />
+
+            <ScanPulse
+                title={scanStatus.title}
+                cls={scanStatus.cls}
+                dq={dq}
+                bybitOk={bybitOk}
+                binanceOk={binanceOk}
+                staleSec={staleSec}
+                pulse={pulse}
+            />
+            <div className="dos-grid">
+                {/* LEFT */}
+                <div className="dos-panel">
+                    <div className="dos-panel-head">MARKET OUTLOOK (SCAN)</div>
+                    <div className="dos-panel-body">
+                        <div className="dos-small">
+                            <div className="dos-mo-grid" role="table" aria-label="market outlook">
+                                <div className="dos-mo-row dos-mo-head" role="row">
+                                    <div className="dos-mo-row dos-mo-head" role="row">
+                                        <div className="dos-mo-cell" role="columnheader">TF</div>
+                                        <div className="dos-mo-cell" role="columnheader">TREND</div>
+                                        <div className="dos-mo-cell" role="columnheader">BIAS</div>
+                                        <div className="dos-mo-cell" role="columnheader">INVALID</div>
+                                        <div className="dos-mo-cell" role="columnheader">EVENTS</div>
+                                    </div>
                                 </div>
-                                {tfs.map((tf) => {
+
+                                {[
+                                    "15m",
+                                    "1h",
+                                    "4h",
+                                    "1d",
+                                ].map((tf) => {
                                     const ms = resolveMS(vFeat, tf);
-                                    const bias = biasByTfLabel(vFeat, tf);
-                                    const ev: string[] = [];
-                                    if (ms?.lastBOS) ev.push(`BOS${ms.lastBOS.dir === "UP" ? "↑" : "↓"} ${fmt(ms.lastBOS.price ?? ms.lastBOS.level, 0)}`);
-                                    if (ms?.lastCHOCH) ev.push(`CHOCH${ms.lastCHOCH.dir === "UP" ? "↑" : "↓"} ${fmt(ms.lastCHOCH.price ?? ms.lastCHOCH.level, 0)}`);
-                                    if (ms?.lastSweep) ev.push(`SWP${ms.lastSweep.dir === "UP" ? "↑" : "↓"} ${fmt(ms.lastSweep.price ?? ms.lastSweep.level, 0)}`);
+                                    const htfBias = biasByTfLabel(vFeat, tf);
+                                    const inval = invalidationLabel(ms);
+                                    const events = eventsLabel(ms);
 
                                     return (
-                                        <div className="tr" key={tf}>
-                                            <div className="mono b">{tf}</div>
-                                            <div>{safeStr(ms?.trend)}</div>
-                                            <div className="mono">{bias}</div>
-                                            <div className="mono">{ev.length ? ev.join(" ") : "—"}</div>
+                                        <div className="dos-mo-row" role="row" key={tf}>
+                                            <div className="dos-mo-cell dos-mo-tf" role="cell">{tf}</div>
+                                            <div className="dos-mo-cell" role="cell">{String(ms?.trend ?? "—")}</div>
+                                            <div className="dos-mo-cell" role="cell">{htfBias}</div>
+                                            <div className="dos-mo-cell" role="cell">{inval}</div>
+                                            <div className="dos-mo-cell" role="cell">{events}</div>
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
+                        <div className="dos-hr" />
 
-                    </div>
-
-                    <div className="card">
-                        <div className="cardHead">Key Signals</div>
-                        <div className="tableWrap">
-                            <div className="table tableSignals">
-                                <div className="tr th">
-                                    <div>TF</div>
-                                    <div>BOS</div>
-                                    <div>CHOCH</div>
-                                    <div>SWEEP</div>
-                                    <div>SH</div>
-                                    <div>SL</div>
-                                    <div>Flags</div>
+                        <div className="dos-small">
+                            <div className="dos-subhead">Key Signals</div>
+                            <div className="dos-ks-grid" role="table" aria-label="key signals">
+                                <div className="dos-ks-row dos-ks-head" role="row">
+                                    <div className="dos-ks-cell" role="columnheader">TF</div>
+                                    <div className="dos-ks-cell" role="columnheader">BOS</div>
+                                    <div className="dos-ks-cell" role="columnheader">CHOCH</div>
+                                    <div className="dos-ks-cell" role="columnheader">SWEEP</div>
                                 </div>
 
                                 {[
@@ -606,175 +1035,203 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
                                     ["1h", scan1h],
                                     ["4h", scan4h],
                                     ["1d", scan1d],
-                                ].map(([tf, ss]: any) => (
-                                    <div className="tr" key={tf}>
-                                        <div className="mono b">{tf}</div>
-                                        <div className="mono">{ss?.bos ?? "—"}</div>
-                                        <div className="mono">{ss?.choch ?? "—"}</div>
-                                        <div className="mono">{ss?.sweep ?? "—"}</div>
-                                        <div className="mono">{Number.isFinite(Number(ss?.sH)) ? fmt(ss?.sH, 2) : "—"}</div>
-                                        <div className="mono">{Number.isFinite(Number(ss?.sL)) ? fmt(ss?.sL, 2) : "—"}</div>
-                                        <div className="mono">{ss?.fl ?? "—"}</div>
+                                ].map(([tf, s]: any) => (
+                                    <div className="dos-ks-row" role="row" key={tf}>
+                                        <div className="dos-ks-cell dos-ks-tf" role="cell">{tf}</div>
+                                        <div className="dos-ks-cell" role="cell">{s?.bos ?? "—"}</div>
+                                        <div className="dos-ks-cell" role="cell">{s?.choch ?? "—"}</div>
+                                        <div className="dos-ks-cell" role="cell">{s?.sweep ?? "—"}</div>
                                     </div>
                                 ))}
                             </div>
-                        </div>
 
+                        </div>
                     </div>
                 </div>
 
-                <div className="col">
-                    <div className="card">
-                        <div className="cardHead row">
-                            <div>Setups</div>
-                            <div className="row">
-                                <select
-                                    className="select"
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value as any)}
-                                >
-                                    <option value="ALL">ALL</option>
-                                    <option value="FORMING">FORMING</option>
-                                    <option value="READY">READY</option>
-                                    <option value="TRIGGERED">TRIGGERED</option>
-                                    <option value="DEAD">DEAD</option>
-                                </select>
-                                <button className={`btn ${showPinnedOnly ? "btnOn" : ""}`} onClick={() => setShowPinnedOnly((x) => !x)}>
-                                    Pinned
-                                </button>
-                            </div>
-                        </div>
+                {/* RIGHT */}
+                <div className="dos-right">
+                    <div className="dos-rightgrid">
+                        {/* Feed */}
+                        <div className="dos-list">
+                            <div className="dos-list-head dos-list-head-row">
+                                <div className="dos-strong">SETUP FEED</div>
 
-                        {rows.length === 0 ? (
-                            <div className="pad muted">
-                                {dqOk ? "No setups (valid)" : "DQ gated"}
+                                <div className="dos-filters">
+                                    <button className={`dos-tab ${statusFilter === "ALL" ? "dos-tab-on" : ""}`} onClick={() => setStatusFilter("ALL")}>
+                                        ALL
+                                    </button>
+                                    <button className={`dos-tab ${statusFilter === "FORMING" ? "dos-tab-on" : ""}`} onClick={() => setStatusFilter("FORMING")}>
+                                        FORMING
+                                    </button>
+                                    <button className={`dos-tab ${statusFilter === "READY" ? "dos-tab-on" : ""}`} onClick={() => setStatusFilter("READY")}>
+                                        READY
+                                    </button>
+                                    <button className={`dos-tab ${statusFilter === "TRIGGERED" ? "dos-tab-on" : ""}`} onClick={() => setStatusFilter("TRIGGERED")}>
+                                        TRIGGERED
+                                    </button>
+                                    <button className={`dos-tab ${statusFilter === "DEAD" ? "dos-tab-on" : ""}`} onClick={() => setStatusFilter("DEAD")}>
+                                        DEAD
+                                    </button>
+
+                                    <button className={`dos-tab ${showPinnedOnly ? "dos-tab-on" : ""}`} onClick={() => setShowPinnedOnly((x) => !x)}>
+                                        PINNED
+                                    </button>
+                                </div>
                             </div>
-                        ) : (
-                            <VirtualList
-                                items={rows}
-                                rowHeight={74}
-                                height={isNarrow ? 320 : 420}
-                                getKey={(it) => String(it?.__uiKey ?? it?.id ?? "")}
-                                renderRow={(row) => {
-                                    const id = String(row?.__uiKey ?? "");
-                                    const isSel = selectedId ? id === selectedId : false;
+
+
+                            {rows.length === 0 ? (
+                                <div className="dos-pad">
+                                    {dqOk ? (
+                                        <>
+                                            <div className="dos-strong">NO SETUPS (valid)</div>
+                                            <div className="dos-dim" style={{ marginTop: 6 }}>
+                                                Filters blocked candidates due to RR / structure / retest requirements.
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="dos-strong dos-bad">DQ GATED</div>
+                                            <div className="dos-dim" style={{ marginTop: 6 }}>
+                                                Fix feeds/liveness before trusting setups.
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                rows.map((s, i) => {
+                                    const id = String((s as AnyObj)?.__uiKey ?? s?.id ?? "");
+                                    const engineId = String(s?.id ?? "").trim();
+                                    const isPreferred = preferredId && engineId === preferredId;
+                                    const isSelected = selectedId ? id === selectedId : false;
+                                    const dead = s?.status === "INVALIDATED" || s?.status === "EXPIRED";
+                                    const p = Number(s?.priority_score ?? 0);
+                                    const c = Number(s?.confidence?.score ?? 0);
+                                    const g = String(s?.confidence?.grade ?? "—");
+                                    const prog = triggerProgress(s);
+
+                                    const z = s?.entry?.zone;
+                                    const distLabel = distLabelFor(mid, z, String(s?.entry?.mode ?? ""));
+
+                                    const act = actionLabel(s);
                                     const pin = Boolean(pinned[id]);
-                                    const dead = row?.status === "INVALIDATED" || row?.status === "EXPIRED";
-                                    const pr = triggerProgress(row);
-                                    const act = actionLabel(row);
 
                                     return (
-                                        <div className={`feedRow ${isSel ? "sel" : ""} ${dead ? "dead" : ""}`} {...tap(() => pick(row))}>
-                                            <div className="feedTop">
-                                                <div className="row">
-                                                    <span className={`tag ${row?.side === "LONG" ? "ok" : "bad"}`}>{safeStr(row?.side)}</span>
-                                                    <span className="tag">{safeStr(row?.type)}</span>
-                                                    <span className="tag">{safeStr(row?.status)}</span>
-                                                    {pin ? <span className="tag">PIN</span> : null}
-                                                    {preferredId && String(row?.id ?? "") === String(preferredId) ? <span className="tag">PREF</span> : null}
+                                        <div
+                                            key={id}
+                                            className={[
+                                                "dos-rowitem",
+                                                isPreferred ? "dos-preferred" : "",
+                                                isSelected ? "dos-selected" : "",
+                                                dead ? "dos-dimrow" : "",
+                                            ].join(" ")}
+                                            {...tap(() => pick(s))}
+                                            role="button"
+                                            tabIndex={0}
+                                        >
+
+                                            <div className="dos-marker">{isSelected ? ">" : pin ? "★" : isPreferred ? "✓" : " "}</div>
+                                            <div className="dos-rowline">
+                                                <div className="dos-rowtop">
+                                                    <div className="dos-mono">
+                                                        <span className={s?.side === "LONG" ? "dos-ok" : "dos-bad"}>
+                                                            {String(s?.side ?? "").padEnd(5, " ")}
+                                                        </span>{" "}
+                                                        <span className="dos-strong">{typeShort(String(s?.type ?? ""))}</span>{" "}
+                                                        <span className="dos-reverse">{String(s?.status ?? "").padEnd(9, " ")}</span>{" "}
+                                                        <span className="dos-dim">Δ{distLabel}</span>{" "}
+                                                        <span className="dos-dim">RR{fmt(s?.rr_min, 2)}</span>
+                                                    </div>
+
+                                                    <div className="dos-badges">
+                                                        <span className="dos-mini">P{String(Math.round(p)).padStart(2, "0")}</span>
+                                                        <span className="dos-mini">C{String(Math.round(c)).padStart(2, "0")}({g})</span>
+                                                    </div>
                                                 </div>
-                                                <div className="mono small">
-                                                    P {Math.round(Number(row?.priority_score ?? 0))} • C {Math.round(Number(row?.confidence?.score ?? 0))} ({safeStr(row?.confidence?.grade)})
+
+                                                <div className="dos-rowbot">
+                                                    <span className="dos-dim dos-mono">
+                                                        T {prog.ok}/{prog.total} {bar(prog.pct, 10)}
+                                                    </span>
+                                                    <span className="dos-dim dos-mono">
+                                                        S:{String(s?.status ?? "—")} | E:{act}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                            <div className="feedBottom mono small">
-                                                T {pr.ok}/{pr.total} • next={pr.next?.key ? String(pr.next.key) : "—"} • E:{act}
+
                                             </div>
                                         </div>
                                     );
-                                }}
-                            />
-                        )}
-                    </div>
-
-                    <div className="card">
-                        <div className="cardHead row">
-                            <div>Details</div>
-                            <div className="row">
-                                <button className={`btn ${selectedKey && pinned[selectedKey] ? "btnOn" : ""}`} {...tap(togglePin)} disabled={!s}>
-                                    Pin
-                                </button>
-                                <button className="btn" {...tap(copyTicket)} disabled={!s}>Copy</button>
-                            </div>
+                                })
+                            )}
                         </div>
 
-                        {!s ? (
-                            <div className="pad muted">No selection.</div>
-                        ) : (
-                            <div className="pad">
-                                <div className="sec">
-                                    <div className="secTitle">Summary</div>
-                                    <div className="mono small">
-                                        {safeStr(s?.canon)} • {safeStr(s?.side)} • {safeStr(s?.type)} • {safeStr(s?.status)} • TF {safeStr(s?.bias_tf)}→{safeStr(s?.entry_tf)}→{safeStr(s?.trigger_tf)}
-                                    </div>
-                                    <div className="mono small">
-                                        Priority {Math.round(Number(s?.priority_score ?? 0))} • Confidence {Math.round(Number(s?.confidence?.score ?? 0))} ({safeStr(s?.confidence?.grade)})
-                                    </div>
-                                </div>
-
-                                <div className="sec">
-                                    <div className="secTitle">Execution</div>
-                                    <div className="mono small">
-                                        Entry ({safeStr(s?.entry?.mode)}):{" "}
-                                        {safeStr(s?.entry?.mode) === "LIMIT" && s?.entry?.zone
-                                            ? `[${fmt(s.entry.zone.lo, 2)}–${fmt(s.entry.zone.hi, 2)}]`
-                                            : safeStr(s?.entry?.mode) === "MARKET"
-                                                ? "MARKET"
-                                                : "—"}
-                                    </div>
-                                    <div className="mono small">SL: {fmt(s?.stop?.price, 2)} ({safeStr(s?.stop?.basis)})</div>
-                                    <div className="mono small">
-                                        TP: {Array.isArray(s?.tp) && s.tp.length ? s.tp.map((x: AnyObj) => fmt(x.price, 2)).join(" | ") : "—"}
-                                    </div>
-                                    <div className="mono small">RR: min {fmt(s?.rr_min, 2)} • est {fmt(s?.rr_est, 2)}</div>
-                                    <div className="mono small">ACTION: {actionLabel(s)}</div>
-                                    {Array.isArray(s?.execution?.blockers) && s.execution.blockers.length ? (
-                                        <div className="mono small bad">blockers: {s.execution.blockers.join(", ")}</div>
-                                    ) : null}
-                                </div>
-
-                                <div className="sec">
-                                    <div className="secTitle">Checklist</div>
-                                    <div className="mono small">
-                                        {prog.ok}/{prog.total} • next={prog.next?.key ? String(prog.next.key) : "—"}
-                                    </div>
-                                    <div className="list">
-                                        {prog.checklist.length ? (
-                                            prog.checklist.map((it: AnyObj, i: number) => (
-                                                <div key={String(it?.key ?? i)} className="li">
-                                                    <span className={`dot ${it?.ok ? "ok" : "warn"}`}>{it?.ok ? "OK" : "WAIT"}</span>
-                                                    <span className="mono b">{safeStr(it?.key)}</span>
-                                                    <span className="muted">{safeStr(it?.note, "")}</span>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="muted small">No checklist.</div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="sec">
-                                    <div className="secTitle">Confluence</div>
-                                    <div className="list">
-                                        {Array.isArray(s?.confidence?.reasons) && s.confidence.reasons.length ? (
-                                            s.confidence.reasons.map((r: AnyObj, i: number) => (
-                                                <div key={i} className="li">
-                                                    <span className="dot">•</span>
-                                                    <span className="muted">{String(r)}</span>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="muted small">No reasons.</div>
-                                        )}
-                                    </div>
-                                </div>
-
-                            </div>
-                        )}
+                        {/* Details (always visible on iPad landscape) */}
+                        <div className="dos-details-wrap">{renderDetails(false)}</div>
                     </div>
                 </div>
             </div>
-        </div>
+
+            {/* Drawer for narrow screens */}
+            {isNarrow ? (
+                <div className={`dos-drawer ${drawerOpen ? "dos-drawer-on" : ""}`}>
+                    <div className="dos-drawer-scrim" {...tap(() => setDrawerOpen(false))} />
+                    <div className="dos-drawer-sheet">{renderDetails(true)}</div>
+                </div>
+            ) : null}
+
+            {/* Bottom command bar: always reachable */}
+            <div className="dos-commandbar">
+                <button className="dos-btn dos-btn-sm" {...tap(prev)} disabled={!rows.length}>
+                    Prev
+                </button>
+
+                <button className="dos-btn dos-btn-sm" {...tap(next)} disabled={!rows.length}>
+                    Next
+                </button>
+
+                <button
+                    className={`dos-btn dos-btn-sm ${selectedKey && pinned[selectedKey] ? "dos-btn-active" : ""}`}
+                    {...tap(togglePin)}
+                    disabled={!selected}
+                >
+                    Pin
+                </button>
+
+                <button className="dos-btn dos-btn-sm" {...tap(copyTicket)} disabled={!selected}>
+                    Copy
+                </button>
+
+                <button
+                    className="dos-btn dos-btn-sm"
+                    {...tap(() => setExpandedChecklist((x) => !x))}
+                    disabled={!selected}
+                >
+                    Checklist
+                </button>
+
+                <button
+                    className="dos-btn dos-btn-sm"
+                    {...tap(() => setExpandedReasons((x) => !x))}
+                    disabled={!selected}
+                >
+                    Reasons
+                </button>
+
+                {isNarrow ? (
+                    <button
+                        className="dos-btn dos-btn-sm"
+                        {...tap(() => setDrawerOpen(true))}
+                        disabled={!selected}
+                    >
+                        Details
+                    </button>
+                ) : null}
+            </div>
+
+
+            {toast ? <Toast msg={toast} onDone={() => setToast(null)} /> : null}
+        </>
     );
 }
 
@@ -783,6 +1240,8 @@ export function DosOpsDashboard() {
     const [symbol, setSymbol] = useState("BTCUSDT");
     const [sessionKey, setSessionKey] = useState(1);
     const [paused, setPaused] = useState(false);
+
+    const inputRef = useRef<HTMLInputElement | null>(null);
 
     const commitAnalyze = () => {
         const clean = String(draftSymbol ?? "").trim().toUpperCase();
@@ -793,294 +1252,373 @@ export function DosOpsDashboard() {
         setSessionKey((k) => k + 1);
     };
 
+    const stopToggle = () => setPaused((p) => !p);
+
+    const resetAll = () => {
+        setPaused(false);
+        setDraftSymbol("BTCUSDT");
+        setSymbol("BTCUSDT");
+        setSessionKey((k) => k + 1);
+        inputRef.current?.focus();
+    };
+
     return (
-        <div className="screen">
+        <div className="dos-screen">
             <style>{`
-        :root{
-          --bg:#0b0f16;
-          --fg:#e6e8ee;
-          --muted:#a7adbb;
-          --line:#2a3342;
-          --card:#121826;
-          --card2:#0f1522;
-          --ok:#20c997;
-          --warn:#ffdd57;
-          --bad:#ff6b6b;
-        }
-
-        *{ box-sizing:border-box; }
-        body{ margin:0; }
-
-        .screen{
-          font-family:${UI_SANS};
-          background:var(--bg);
-          color:var(--fg);
+        .dos-screen{
+          background:#050505; color:#cfe9cf; font-family:${mono};
           min-height:100dvh;
-          padding:12px;
+          padding: calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 86px) calc(env(safe-area-inset-left) + 12px);
         }
-        .mono{
-          font-family:${UI_MONO};
-          font-variant-numeric: tabular-nums;
+        .dos-frame{
+          border:1px solid #1f3b1f; border-radius:12px; overflow:hidden;
+          box-shadow: 0 0 0 1px #0a140a inset;
+          background:#050705;
         }
-        .b{ font-weight:800; }
-        .muted{ color:var(--muted); }
-        .small{ font-size:12px; }
-        .ok{ color:var(--ok); }
-        .warn{ color:var(--warn); }
-        .bad{ color:var(--bad); }
+        .dos-header{
+          position: sticky; top: 0; z-index: 10;
+          padding:10px 12px; border-bottom:1px solid #1f3b1f; background:#070a07;
+          display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;
+        }
+        .dos-title{ font-weight:900; letter-spacing:0.6px; }
+        .dos-left,.dos-right{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 
-        /* Performance-first: no blur, no big shadows, no fixed */
-        .perfRoot{
-          max-width:1400px;
-          margin:0 auto;
+        .dos-input{
+          width:170px; padding:10px 10px; border-radius:10px;
+          border:1px solid #2a532a; background:#020302; color:#cfe9cf; outline:none;
+          font-family:${mono}; font-size:16px;
         }
 
-        .hdr{
-          border:1px solid var(--line);
-          background:var(--card2);
+        .dos-btn{
+          min-height:44px; padding:10px 12px; border-radius:10px;
+          border:1px solid #2a532a; background:#081008; color:#cfe9cf; cursor:pointer;
+          font-family:${mono}; font-weight:900;
+        }
+        .dos-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+        .dos-btn-danger{ border-color:#6b2b2b; background:#140808; }
+        .dos-btn-active{ background:#0c1b0c; box-shadow:0 0 0 1px #2a532a inset; }
+        .dos-btn-sm{ min-height:38px; padding:8px 10px; border-radius:10px; }
+
+        .dos-chip{
+          padding:4px 10px; border:1px solid #2a532a; border-radius:999px;
+          background:#020302; font-size:12px; display:inline-flex; gap:8px; align-items:center; white-space:nowrap;
+          min-height:30px;
+        }
+        .dos-mono{ font-family:${mono}; }
+        .dos-strong{ font-weight:900; }
+        .dos-dim{ opacity:0.8; }
+        .dos-ok{ color:#86efac; }
+        .dos-warn{ color:#fde68a; }
+        .dos-bad{ color:#fca5a5; }
+
+        .dos-sysbar{
+          margin: 12px;
+          border:1px solid #1f3b1f;
+          border-radius:12px;
           padding:10px;
-          display:grid;
-          grid-template-columns: 1fr auto;
-          gap:10px;
-          align-items:center;
-        }
-        @media (max-width:980px){
-          .hdr{ grid-template-columns:1fr; }
-        }
-        .hdrTitle{
-          display:flex;
-          gap:8px;
-          align-items:center;
-          flex-wrap:nowrap;
-          overflow:auto;
-        }
-        .hdrBrand{
-          font-weight:900;
-          letter-spacing:0.4px;
-        }
-        .hdrPill{
-          border:1px solid var(--line);
-          padding:4px 8px;
-          font-size:12px;
-          border-radius:999px;
-          white-space:nowrap;
-        }
-        .hdrLine{
-          margin-top:6px;
-          white-space:nowrap;
-          overflow:auto;
-        }
-        .sep{ margin:0 8px; color:var(--muted); }
-
-        .hdrRight{
+          background:#050705;
           display:flex;
           gap:8px;
           flex-wrap:wrap;
-          justify-content:flex-end;
+          align-items:center;
         }
+        .dos-pill{
+          border:1px solid #2a532a;
+          background:#020302;
+          border-radius:999px;
+          padding:6px 10px;
+          font-size:12px;
+          display:inline-flex;
+          gap:6px;
+          align-items:center;
+          min-height:32px;
+          white-space:nowrap;
+        }
+        .dos-pill-ok{ border-color:#2a532a; }
+        .dos-pill-warn{ border-color:#7a6a2a; }
+.dos-btn, .dos-rowitem, .dos-tab, .dos-drawer-scrim{
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.dos-scanbar{
+  padding:10px 12px;
+  border-bottom:1px solid #0d170d;
+  background:#050705;
+}
+.dos-scanbar-top{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-end;
+  flex-wrap:wrap;
+}
+.dos-scanbar-meter{
+  margin-top:8px;
+  height:8px;
+  border-radius:999px;
+  overflow:hidden;
+  background:#020302;
+  border:1px solid #1f3b1f;
+}
+.dos-scanbar-fill{
+  height:100%;
+  background:#2a532a;
+  transition: width 220ms ease;
+}
+.dos-scanbar-bump{
+  filter: brightness(1.35);
+}
+@keyframes scan-pulse {
+  0%   { box-shadow: 0 0 0 rgba(134,239,172,0); }
+  40%  { box-shadow: 0 0 6px rgba(134,239,172,0.65); }
+  100% { box-shadow: 0 0 0 rgba(134,239,172,0); }
+}
 
-        .btn{
-          border:1px solid var(--line);
-          background:var(--card);
-          color:var(--fg);
-          padding:8px 10px;
-          border-radius:10px;
-          font-weight:800;
-          cursor:pointer;
-        }
-        .btn:disabled{ opacity:0.5; cursor:not-allowed; }
-        .btnOn{
-          border-color: rgba(32,201,151,0.6);
-          outline:1px solid rgba(32,201,151,0.25);
-        }
-        .select{
-          border:1px solid var(--line);
-          background:var(--card);
-          color:var(--fg);
-          padding:8px 10px;
-          border-radius:10px;
-          font-weight:800;
-        }
-
-        .meter{
-          margin-top:8px;
-          height:10px;
-          background:#0b0f16;
-          border:1px solid var(--line);
-          overflow:hidden;
-        }
-        .meterFill{
-          height:100%;
-          width:100%;
-          background: var(--ok);
-          transform-origin:left center;
-          transition: transform 120ms linear;
-          will-change: transform;
-        }
-
-        .grid{
-          margin-top:12px;
-          display:grid;
-          grid-template-columns: 1fr 1fr;
-          gap:12px;
+        .dos-grid{
+          display:grid; gap:10px; padding:12px;
+          grid-template-columns: 420px 1fr;
           align-items:start;
         }
-        @media (max-width:980px){
-          .grid{ grid-template-columns:1fr; }
+        @media (max-width: 980px){
+          .dos-grid{ grid-template-columns: 1fr; }
         }
 
-        .col{
+        .dos-panel{ border:1px solid #1f3b1f; border-radius:12px; overflow:hidden; background:#050705; }
+        .dos-panel-head{ padding:9px 10px; border-bottom:1px solid #1f3b1f; background:#070a07; font-weight:900; }
+        .dos-panel-head-row{ display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; }
+        .dos-panel-body{ padding:10px; }
+        .dos-hr{ border-top:1px dashed #1f3b1f; margin:10px 0; }
+        .dos-small{ font-size:12px; opacity:0.95; }
+        .dos-line{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+        .dos-k{ opacity:0.85; }
+        .dos-v{ font-weight:900; }
+        .dos-pre{ margin:0; white-space:pre-wrap; word-break:break-word; font-family:${mono}; font-size:12px; line-height:1.45; }
+
+        .dos-right{ min-width:0; }
+
+        .dos-rightgrid{
           display:grid;
-          gap:12px;
-        }
-
-        .card{
-  border:1px solid var(--line);
-  background:var(--card);
-  contain: layout paint;
-  overflow: hidden;
-}
-
-        .cardHead{
-          border-bottom:1px solid var(--line);
-          padding:10px;
-          font-weight:900;
-        }
-        .pad{
-          padding:10px;
-        }
-        .row{
-          display:flex;
-          gap:8px;
-          align-items:center;
-          flex-wrap:wrap;
-          justify-content:space-between;
-        }
-.tableWrap{
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  max-width: 100%;
-  border-top: 1px solid var(--line);
-}
-
-        .table{
-  display: grid;
-  min-width: 100%;
-}
-.tr{
-  display: grid;
-  gap: 10px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-}
-
-/* Market table (4 cols) */
-.tableMarket .tr{
-  grid-template-columns: 54px 88px 220px minmax(240px, 1fr);
-  min-width: 760px; /* allow horizontal scroll inside tableWrap on mobile */
-}
-
-/* Signals table (7 cols) */
-.tableSignals .tr{
-  grid-template-columns: 54px 140px 140px 140px 90px 90px minmax(120px, 1fr);
-  min-width: 980px;
-}
-
-.tr.th{
-  background: var(--card2);
-  font-weight: 900;
-  border-top: none;
-}
-
-        /* Key Signals has 7 cols; keep it in scroll on mobile */
-        .card .table .tr:nth-child(1).th + .tr{ } /* noop */
-
-        .vlist{
-          overflow:auto;
-          border-top:1px solid var(--line);
-          background:var(--card2);
-        }
-
-        .feedRow{
-          padding:10px;
-          border-bottom:1px solid var(--line);
-          display:flex;
-          flex-direction:column;
-          justify-content:center;
-          gap:6px;
-        }
-        .feedRow.sel{
-          outline:2px solid rgba(32,201,151,0.25);
-          background: rgba(32,201,151,0.06);
-        }
-        .feedRow.dead{
-          opacity:0.65;
-        }
-        .feedTop{
-          display:flex;
-          justify-content:space-between;
+          grid-template-columns: 1.1fr 0.9fr;
           gap:10px;
-          flex-wrap:wrap;
+          align-items:start;
+          min-width:0;
         }
-        .feedBottom{
-          white-space:nowrap;
-          overflow:hidden;
-          text-overflow:ellipsis;
-        }
-
-        .tag{
-          border:1px solid var(--line);
-          padding:3px 8px;
-          border-radius:999px;
-          font-size:12px;
-          white-space:nowrap;
+        .dos-rightgrid > *{ min-width:0; }
+        @media (max-width: 980px){
+          .dos-rightgrid{ grid-template-columns: 1fr; }
+          .dos-details-wrap{ display:none; } /* details move to drawer */
         }
 
-        .sec{
-          margin-top:10px;
-          padding-top:10px;
-          border-top:1px solid var(--line);
+        .dos-list{ border:1px solid #1f3b1f; border-radius:12px; overflow:hidden; background:#040604; }
+        .dos-list-head{
+          padding:9px 10px; border-bottom:1px solid #1f3b1f; background:#070a07;
+          display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
         }
-        .secTitle{
+        .dos-list-head-row{ align-items:flex-start; }
+        .dos-filters{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+        .dos-tab{
+          min-height:34px; padding:6px 10px; border-radius:10px;
+          border:1px solid #2a532a; background:#020302; color:#cfe9cf; cursor:pointer;
+          font-family:${mono}; font-weight:900; font-size:12px;
+        }
+        .dos-tab-on{ background:#0c1b0c; box-shadow:0 0 0 1px #2a532a inset; }
+
+        .dos-pad{ padding:12px; opacity:0.92; }
+
+        .dos-rowitem{
+          padding:12px 10px; border-bottom:1px solid #0d170d;
+          display:grid; grid-template-columns: 24px 1fr; gap:8px;
+          cursor:pointer;
+        }
+        .dos-rowitem:last-child{ border-bottom:none; }
+        .dos-marker{ font-weight:900; width:24px; }
+        .dos-selected{ background:#0b170b; }
+        .dos-preferred{ background:#102010; }
+        .dos-dimrow{ opacity:0.6; }
+        .dos-reverse{ background:#cfe9cf; color:#061006; padding:0 6px; border-radius:6px; font-weight:900; }
+
+        .dos-rowline{ display:flex; flex-direction:column; gap:6px; }
+        .dos-rowtop{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap; }
+        .dos-rowbot{ display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; }
+        .dos-badges{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+        .dos-mini{
+          border:1px solid #1f3b1f; background:#020302;
+          border-radius:10px; padding:4px 8px; font-size:12px; opacity:0.95;
+        }
+
+        .dos-summary{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap; }
+        .dos-summary-title{ font-size:14px; }
+        .dos-actionline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+
+        .dos-blockhead{ font-weight:900; margin-bottom:6px; }
+        .dos-blockhead-row{ display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; }
+        .dos-stack{ display:grid; gap:6px; }
+        .dos-itemline{ display:flex; gap:10px; flex-wrap:wrap; }
+        .dos-key{ min-width:120px; }
+        .dos-note{ opacity:0.9; }
+        .dos-next{ outline: 1px dashed #7a6a2a; border-radius:10px; padding:6px 8px; }
+
+        /* Drawer (mobile) */
+       /* Drawer — HARD disable when closed (fix iOS double-tap) */
+.dos-drawer{
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: none;              /* key: remove from hit-testing */
+}
+.dos-drawer-on{
+  display: block;
+}
+
+.dos-drawer-scrim{
+  position:absolute;
+  inset:0;
+  background: rgba(0,0,0,0.55);
+}
+
+.dos-drawer-sheet{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  padding: 10px 10px calc(env(safe-area-inset-bottom) + 90px) 10px;
+}
+.dos-drawer-panel{
+  max-height: 70dvh;
+  overflow:auto;
+}
+
+
+        /* Bottom command bar */
+        .dos-commandbar{
+          position: fixed;
+          left: calc(env(safe-area-inset-left) + 12px);
+          right: calc(env(safe-area-inset-right) + 12px);
+          bottom: calc(env(safe-area-inset-bottom) + 12px);
+          z-index: 30;
+          display:flex; gap:8px; flex-wrap:wrap;
+          padding:10px;
+          border:1px solid #1f3b1f;
+          border-radius:12px;
+          background:#070a07;
+          box-shadow: 0 0 0 1px #0a140a inset;
+        }
+/* Allow EXEC pill to wrap on iPad (avoid clipping) */
+.dos-pill-wrap {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  line-height: 1.25;
+}
+
+.dos-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.dos-subhead{
+  margin-top:10px;
+  margin-bottom:6px;
+  font-weight:700;
+  color:#9fe3a8;
+}
+
+.dos-ks-grid{
+  border:1px solid #133013;
+  border-radius:12px;
+  overflow:hidden;
+  background:#040604;
+}
+
+.dos-ks-row{
+  display:grid;
+  grid-template-columns: 52px 1.2fr 1fr 1fr;
+  gap:10px;
+  padding:8px 10px;
+  border-top:1px solid #0d1f0d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:12px;
+  line-height:1.2;
+}
+
+.dos-ks-row:first-child{ border-top:none; }
+
+.dos-ks-head{
+  background:#050a05;
+  color:#8fdc99;
+  font-weight:700;
+}
+
+.dos-ks-cell{
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.dos-ks-tf{
+  color:#b7f3c1;
+  font-weight:700;
+}
+.dos-mo-grid{
+  border:1px solid #133013;
+  border-radius:12px;
+  overflow:hidden;
+  background:#040604;
+}
+.dos-mo-row{
+  display:grid;
+  grid-template-columns: 52px 76px 132px 84px minmax(120px, 1fr);
+  gap:8px;
+  padding:8px 10px;
+  border-top:1px solid #0d1f0d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:12px;
+  line-height:1.2;
+}
+
+.dos-mo-row:first-child{ border-top:none; }
+
+.dos-mo-head{
+  background:#050a05;
+  color:#8fdc99;
+  font-weight:700;
+}
+
+.dos-mo-cell{
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.dos-mo-tf{
+  color:#b7f3c1;
+  font-weight:700;
+}
+
+        /* Toast */
+        .dos-toast{
+          position: fixed;
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: calc(env(safe-area-inset-bottom) + 90px);
+          z-index: 50;
+          border:1px solid #2a532a;
+          background:#020302;
+          color:#cfe9cf;
+          padding:10px 12px;
+          border-radius:12px;
           font-weight:900;
-          margin-bottom:6px;
-        }
-        .list{
-          max-height:220px;
-          overflow:auto;
-          border:1px solid var(--line);
-          background:var(--card2);
-          padding:6px 8px;
-        }
-        .li{
-          display:flex;
-          gap:8px;
-          align-items:flex-start;
-          padding:6px 0;
-          border-top:1px solid rgba(42,51,66,0.6);
-          font-size:12px;
-        }
-        .li:first-child{ border-top:none; }
-        .dot{
-          width:48px;
-          text-align:center;
-          border:1px solid var(--line);
-          border-radius:999px;
-          padding:2px 6px;
-          font-weight:900;
+          box-shadow: 0 0 0 1px #0a140a inset;
         }
       `}</style>
 
-            {/* Top controls (simple, no sticky/fixed, no blur) */}
-            <div className="card" style={{ marginBottom: 12 }}>
-                <div className="cardHead row">
-                    <div>Session</div>
-                    <div className="row">
+            <div className="dos-frame">
+                <div className="dos-header">
+                    <div className="dos-left">
+                        <span className="dos-title">DOS OPS</span>
+
                         <input
-                            className="select mono"
-                            style={{ width: 140 }}
+                            ref={inputRef}
+                            className="dos-input"
                             value={draftSymbol}
                             onChange={(e) => setDraftSymbol(String(e.target.value).toUpperCase())}
                             onKeyDown={(e) => {
@@ -1089,32 +1627,40 @@ export function DosOpsDashboard() {
                                     commitAnalyze();
                                 }
                             }}
+                            placeholder="BTCUSDT"
                             spellCheck={false}
+                            onFocus={(e) => e.currentTarget.select()}
                         />
-                        <button className="btn" onClick={commitAnalyze}>Analyze</button>
-                        <button className={`btn ${paused ? "btnOn" : ""}`} onClick={() => setPaused((p) => !p)}>
-                            {paused ? "Resume" : "Stop"}
+                        <button className="dos-btn" {...tap(commitAnalyze)}>
+                            ANALYZE
                         </button>
+
                         <button
-                            className="btn"
-                            onClick={() => {
-                                setPaused(false);
-                                setDraftSymbol("BTCUSDT");
-                                setSymbol("BTCUSDT");
-                                setSessionKey((k) => k + 1);
-                            }}
+                            className={`dos-btn dos-btn-danger ${paused ? "dos-btn-active" : ""}`}
+                            {...tap(stopToggle)}
                         >
-                            Reset
+                            {paused ? "RESUME" : "STOP"}
                         </button>
-                        <span className="mono small muted">#{sessionKey}</span>
+
+                        <button className="dos-btn" {...tap(resetAll)}>
+                            RESET
+                        </button>
+                        <span className="dos-chip dos-dim">
+                            <span>SESSION</span>
+                            <span className="dos-mono">#{sessionKey}</span>
+                        </span>
+                    </div>
+
+                    <div className="dos-right">
+                        <span className="dos-chip dos-dim">
+                            <span>MODE</span>
+                            <span className="dos-mono">{paused ? "FROZEN" : "LIVE"}</span>
+                        </span>
                     </div>
                 </div>
-                <div className="pad mono small muted">
-                    Symbol: <span className="b">{symbol}</span>
-                </div>
-            </div>
 
-            <AnalysisSession key={`${symbol}:${sessionKey}`} symbol={symbol} paused={paused} />
+                <AnalysisSession key={`${symbol}:${sessionKey}`} symbol={symbol} paused={paused} />
+            </div>
         </div>
     );
 }
