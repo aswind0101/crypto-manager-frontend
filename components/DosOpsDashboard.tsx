@@ -88,22 +88,60 @@ function distLabelFor(mid: number, z: AnyObj, mode?: string) {
     return `${dist.toFixed(0)}bps`;
 }
 
+function resolveMS(features: AnyObj, tf: string) {
+    const msRoot = features?.market_structure;
+    if (!msRoot) return null;
+
+    // Case 1: object keyed by tf (ideal)
+    if (typeof msRoot === "object" && !Array.isArray(msRoot) && msRoot[tf]) return msRoot[tf];
+
+    // Case 2: array of { tf, ... }
+    if (Array.isArray(msRoot)) {
+        const hit = msRoot.find((x: AnyObj) => String(x?.tf ?? "") === tf);
+        if (hit) return hit;
+    }
+
+    // Case 3: alternative keys (common mismatches)
+    const aliases: Record<string, string[]> = {
+        "15m": ["15m", "15", "M15", "15min"],
+        "1h": ["1h", "60m", "60", "H1", "1H", "1hr", "1hour"],
+        "4h": ["4h", "240m", "240", "H4", "4H"],
+        "1d": ["1d", "D1", "1D", "24h", "1440m", "1440"],
+    };
+
+    const keys = aliases[tf] ?? [tf];
+    for (const k of keys) {
+        if (typeof msRoot === "object" && !Array.isArray(msRoot) && msRoot[k]) return msRoot[k];
+        if (Array.isArray(msRoot)) {
+            const hit = msRoot.find((x: AnyObj) => String(x?.tf ?? "") === k);
+            if (hit) return hit;
+        }
+    }
+
+    return null;
+}
+
 function marketScan(features: AnyObj, tf: string) {
-    const ms = features?.market_structure?.[tf];
+    const ms = resolveMS(features, tf);
+
     const trend = String(ms?.trend ?? "—");
     const sH = ms?.lastSwingHigh?.price ?? ms?.lastSwingHigh;
     const sL = ms?.lastSwingLow?.price ?? ms?.lastSwingLow;
+
     const bos = ms?.lastBOS ? `${ms.lastBOS.dir} @ ${fmt(ms.lastBOS.price ?? ms.lastBOS.level, 2)}` : "—";
     const choch = ms?.lastCHOCH ? `${ms.lastCHOCH.dir} @ ${fmt(ms.lastCHOCH.price ?? ms.lastCHOCH.level, 2)}` : "—";
     const sweep = ms?.lastSweep ? `${ms.lastSweep.dir} @ ${fmt(ms.lastSweep.price ?? ms.lastSweep.level, 2)}` : "—";
+
     const flags = ms?.flags ?? {};
     const fl: string[] = [];
     if (flags.bosUp) fl.push("BOS↑");
     if (flags.bosDown) fl.push("BOS↓");
     if (flags.sweepUp) fl.push("SWP↑");
     if (flags.sweepDown) fl.push("SWP↓");
+
     return { trend, sH, sL, bos, choch, sweep, fl: fl.length ? fl.join(" ") : "—" };
 }
+
 
 async function copyText(text: string) {
     try {
@@ -401,7 +439,12 @@ function AnalysisSession({ symbol, paused }: { symbol: string; paused: boolean }
     const bybitOk = Boolean(vFeat?.quality?.bybit_ok);
     const binanceOk = Boolean(vFeat?.quality?.binance_ok);
 
-    const mid = Number(vSnap?.price?.mid ?? vSnap?.price?.last);
+    const mid = Number.isFinite(Number(vSnap?.price?.mid))
+        ? Number(vSnap.price.mid)
+        : (Number.isFinite(Number(vSnap?.price?.bid)) &&
+            Number.isFinite(Number(vSnap?.price?.ask)))
+            ? (Number(vSnap.price.bid) + Number(vSnap.price.ask)) / 2
+            : NaN;
     const dev = vFeat?.cross?.deviation_bps ?? vFeat?.cross?.dev_bps;
     const preferredId = vSet?.preferred_id;
 
@@ -761,19 +804,19 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                             <div className="dos-line">
                                 <span className="dos-k">1h</span>
                                 <span className="dos-v">
-                                    {scan1h.trend} | {scan1h.fl}
+                                    {scan1h.trend} | H {fmt(scan1h.sH, 2)} L {fmt(scan1h.sL, 2)} • {scan1h.fl}
                                 </span>
                             </div>
                             <div className="dos-line">
                                 <span className="dos-k">4h</span>
                                 <span className="dos-v">
-                                    {scan4h.trend} | {scan4h.fl}
+                                    {scan4h.trend} | H {fmt(scan4h.sH, 2)} L {fmt(scan4h.sL, 2)} • {scan4h.fl}
                                 </span>
                             </div>
                             <div className="dos-line">
                                 <span className="dos-k">1d</span>
                                 <span className="dos-v">
-                                    {scan1d.trend} | {scan1d.fl}
+                                    {scan1d.trend} | H {fmt(scan1d.sH, 2)} L {fmt(scan1d.sL, 2)} • {scan1d.fl}
                                 </span>
                             </div>
                         </div>
@@ -785,12 +828,22 @@ RR(min): ${fmt(selected?.rr_min, 2)}   RR(est): ${fmt(selected?.rr_est, 2)}`}</p
                                 Key Signals
                             </div>
                             <pre className="dos-pre">{`15m BOS:   ${scan15.bos}
-15m CHOCH: ${scan15.choch}
-15m SWEEP: ${scan15.sweep}
+                                    15m CHOCH: ${scan15.choch}
+                                    15m SWEEP: ${scan15.sweep}
 
-1h  BOS:   ${scan1h.bos}
-1h  CHOCH: ${scan1h.choch}
-1h  SWEEP: ${scan1h.sweep}`}</pre>
+                                    1h  BOS:   ${scan1h.bos}
+                                    1h  CHOCH: ${scan1h.choch}
+                                    1h  SWEEP: ${scan1h.sweep}
+
+                                    4h  BOS:   ${scan4h.bos}
+                                    4h  CHOCH: ${scan4h.choch}
+                                    4h  SWEEP: ${scan4h.sweep}
+
+                                    1d  BOS:   ${scan1d.bos}
+                                    1d  CHOCH: ${scan1d.choch}
+                                    1d  SWEEP: ${scan1d.sweep}`}
+                            </pre>
+
                         </div>
                     </div>
                 </div>
