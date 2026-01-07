@@ -808,22 +808,23 @@ export default function SetupsRadarScreen() {
         });
     }, [out?.setups, dqGrade]);
 
-    const preferred = useMemo(() => {
-        const byId = new Map<string, TradeSetup>();
-        for (const s of ranked) byId.set(s.id, s);
-        const p = out?.preferred_id ? byId.get(out.preferred_id) : undefined;
-        return p || ranked[0] || null;
-    }, [ranked, out?.preferred_id]);
-
+    // User-selected setup (source of truth)
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    useEffect(() => {
-        if (!selectedId && preferred?.id) setSelectedId(preferred.id);
-    }, [preferred?.id, selectedId]);
 
+    // Auto-select ONCE when list appears (no preferred, no override)
+    useEffect(() => {
+        if (!selectedId && ranked.length > 0) {
+            setSelectedId(ranked[0].id);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ranked.length]);
+
+    // Resolve selected setup
     const selected = useMemo(() => {
-        if (!selectedId) return preferred;
-        return ranked.find((x) => x.id === selectedId) || preferred;
-    }, [ranked, selectedId, preferred]);
+        if (!selectedId) return null;
+        return ranked.find((x) => x.id === selectedId) || null;
+    }, [ranked, selectedId]);
+
 
     // Strong alert: detect new READY setup ids
     const readyIds = useMemo(() => {
@@ -841,7 +842,7 @@ export default function SetupsRadarScreen() {
         // new ready detected
         const newOnes = now.filter((id) => !prev.includes(id));
         if (newOnes.length > 0) {
-            const s = (out?.setups || []).find((x) => x.id === newOnes[0]);
+            const s = ranked.find((x) => x.id === newOnes[0]);
             const text = s
                 ? `READY: ${symbol} • ${humanizeType(String(s.type))} • ${s.side} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}`
                 : `READY setup detected`;
@@ -855,17 +856,28 @@ export default function SetupsRadarScreen() {
                 // ignore
             }
         } else {
-            // If still have ready setups, keep a calm banner on (optional)
-            if (now.length > 0 && !banner.active) {
-                const s = preferred;
-                if (s && s.status === "READY") {
+            // If still has READY setups, keep banner (but do NOT override user selection)
+            if (now.length > 0) {
+                // Prefer showing the currently selected setup if it is READY; otherwise show top READY by sort
+                const topReady =
+                    (selected && String(selected.status) === "READY" ? selected : null) ||
+                    ranked.find((x) => String(x.status) === "READY") ||
+                    null;
+
+                if (topReady) {
                     setBanner({
                         active: true,
-                        text: `READY: ${symbol} • ${humanizeType(String(s.type))} • ${s.side} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}`,
+                        text:
+                            `READY: ${symbol} • ${humanizeType(String(topReady.type))} • ${topReady.side}` +
+                            ` • Conf ${Number.isFinite(topReady.confidence?.score)
+                                ? Math.round(topReady.confidence.score) + "%"
+                                : "—"
+                            }`,
                     });
                 }
             }
         }
+
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [readyIds.join("|")]);
 
@@ -905,9 +917,10 @@ export default function SetupsRadarScreen() {
                 active={banner.active}
                 text={banner.text}
                 onOpen={() => {
-                    if (preferred?.id) setSelectedId(preferred.id);
+                    // Do NOT override user choice
                     setBanner((b) => ({ ...b, active: false }));
                 }}
+
                 onDismiss={() => setBanner((b) => ({ ...b, active: false }))}
             />
 
