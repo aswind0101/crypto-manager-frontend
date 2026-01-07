@@ -170,6 +170,28 @@ function relTime(ts?: number) {
 }
 
 /** ---------- Domain helpers (best-effort, no guessing) ---------- */
+function decisionSummary(s: TradeSetup): string {
+  const ex = s.execution;
+  if (!ex) return "Monitor setup – no execution signal yet";
+
+  switch (ex.state) {
+    case "ENTER_MARKET":
+      return "Action now: enter market";
+    case "PLACE_LIMIT":
+      return "Action now: place limit order";
+    case "WAIT_ZONE":
+      return "Wait: price must enter the zone";
+    case "WAIT_CLOSE":
+      return "Wait: candle close required";
+    case "BLOCKED":
+      return "No trade: setup is blocked";
+    case "NO_TRADE":
+      return "No trade: conditions not met";
+    default:
+      return "Monitor setup";
+  }
+}
+
 function sideTone(side: SetupSide) {
   return side === "LONG" ? "text-emerald-400" : "text-rose-400";
 }
@@ -406,19 +428,19 @@ export default function Page() {
   useEffect(() => {
     try {
       window.localStorage.setItem("ct_symbol_input", inputSymbol);
-    } catch {}
+    } catch { }
   }, [inputSymbol]);
 
   useEffect(() => {
     try {
       window.localStorage.setItem("ct_symbol_active", symbol);
-    } catch {}
+    } catch { }
   }, [symbol]);
 
   useEffect(() => {
     try {
       window.localStorage.setItem("ct_paused", paused ? "1" : "0");
-    } catch {}
+    } catch { }
   }, [paused]);
 
   const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
@@ -503,7 +525,7 @@ export default function Page() {
       setBanner({ active: true, text });
       try {
         if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
-      } catch {}
+      } catch { }
     } else {
       if (now.length === 0 && banner.active) setBanner({ active: false, text: "" });
       if (now.length > 0 && !banner.active) setBanner({ active: true, text: "READY setup available" });
@@ -1186,6 +1208,10 @@ function SetupDetail({
   setup: TradeSetup;
 }) {
   const action = actionChip(setup);
+  const [showGuidanceDetails, setShowGuidanceDetails] = useState(false);
+  useEffect(() => {
+    setShowGuidanceDetails(false);
+  }, [setup.id]);
 
   const entry = setup.entry;
   const zone = entry?.zone;
@@ -1360,9 +1386,15 @@ function SetupDetail({
             </div>
           </div>
         </div>
+        <div className="mb-3 rounded-xl border border-white/10 bg-zinc-950/40 px-4 py-3">
+          <div className="text-sm font-extrabold text-zinc-50">
+            {decisionSummary(setup)}
+          </div>
+        </div>
 
         <Divider />
 
+        {/* Guidance */}
         {/* Guidance */}
         <div className={["rounded-2xl p-4", guidance.tone].join(" ")}>
           <div className="flex items-start gap-3">
@@ -1375,22 +1407,44 @@ function SetupDetail({
                 <Clock className="h-5 w-5" />
               )}
             </div>
+
             <div className="min-w-0">
-              <div className="text-sm font-extrabold">{guidance.headline}</div>
-              <div className="mt-2 space-y-1.5 text-xs text-zinc-100/90">
-                {guidance.bullets.map((b, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
-                    <span className="min-w-0">{b}</span>
-                  </div>
-                ))}
+              {/* HEADLINE – LUÔN HIỆN */}
+              <div className="text-sm font-extrabold">
+                {guidance.headline}
               </div>
+
+              {/* DETAILS – COLLAPSED */}
+              {showGuidanceDetails ? (
+                <div className="mt-2 space-y-1.5 text-xs text-zinc-100/90">
+                  {guidance.bullets.map((b, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+                      <span className="min-w-0">{b}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* TOGGLE */}
+              <button
+                type="button"
+                onClick={() => setShowGuidanceDetails((v) => !v)}
+                className="mt-2 text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+              >
+                {showGuidanceDetails ? "Hide details" : "Why?"}
+              </button>
+
+              {/* ENGINE NOTE */}
               {setup.execution?.reason ? (
-                <div className="mt-3 text-[11px] text-zinc-100/80">Engine note: {setup.execution.reason}</div>
+                <div className="mt-3 text-[11px] text-zinc-100/80">
+                  Engine note: {setup.execution.reason}
+                </div>
               ) : null}
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Plan */}
