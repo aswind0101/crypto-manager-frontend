@@ -1693,15 +1693,6 @@ function SetupDetail({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold text-zinc-100">TP ladder</div>
-              {tps.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowRiskMore((v) => !v)}
-                  className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
-                >
-                  {showRiskMore ? "Show less" : "Show more"}
-                </button>
-              ) : null}
             </div>
 
             {tps.length === 0 ? (
