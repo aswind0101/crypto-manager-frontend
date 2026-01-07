@@ -1568,7 +1568,7 @@ function SetupDetail({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full ring-1 bg-emerald-500/15 ring-emerald-500/25 text-emerald-100">
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/25 text-emerald-100">
                                 <CheckCircle2 className="h-4 w-4" />
                               </span>
                               <div className="text-xs font-extrabold text-zinc-100">{c.key}</div>
