@@ -371,6 +371,27 @@ function computePriorityScore(s: TradeSetup, dqGrade?: string) {
 function uniq<T>(arr: T[]) {
     return Array.from(new Set(arr));
 }
+function round1(x: any) {
+    const n = Number(x);
+    if (!Number.isFinite(n)) return "na";
+    return (Math.round(n * 10) / 10).toFixed(1);
+}
+
+function setupStableKey(s: TradeSetup): string {
+    // 1) Prefer canon if engine provides it (best case)
+    if (s?.canon) return String(s.canon);
+
+    // 2) Fallback: structural fingerprint (stable enough for UI identity)
+    const type = String(s?.type ?? "");
+    const side = String(s?.side ?? "");
+    const tf = String(s?.entry_tf ?? "");
+    const mode = String(s?.entry?.mode ?? "");
+    const zlo = round1(s?.entry?.zone?.lo);
+    const zhi = round1(s?.entry?.zone?.hi);
+    const sl = round1(s?.stop?.price);
+
+    return `${type}|${side}|${tf}|${mode}|z:${zlo}-${zhi}|sl:${sl}`;
+}
 
 function SafeBadge({ tone, children }: { tone: string; children: React.ReactNode }) {
     return <span className={`badge ${tone}`}>{children}</span>;
@@ -809,40 +830,42 @@ export default function SetupsRadarScreen() {
     }, [out?.setups, dqGrade]);
 
     // User-selected setup (source of truth)
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-    // Auto-select ONCE when list appears (no preferred, no override)
+    // Auto-select ONCE when list appears (default = first row by sort)
     useEffect(() => {
-        if (!selectedId && ranked.length > 0) {
-            setSelectedId(ranked[0].id);
+        if (!selectedKey && ranked.length > 0) {
+            setSelectedKey(setupStableKey(ranked[0]));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ranked.length]);
 
-    // Resolve selected setup
     const selected = useMemo(() => {
-        if (!selectedId) return null;
-        return ranked.find((x) => x.id === selectedId) || null;
-    }, [ranked, selectedId]);
+        if (!selectedKey) return null;
+        return ranked.find((x) => setupStableKey(x) === selectedKey) || null;
+    }, [ranked, selectedKey]);
+
 
 
     // Strong alert: detect new READY setup ids
-    const readyIds = useMemo(() => {
-        return uniq((out?.setups || []).filter((s) => s.status === "READY").map((s) => s.id));
+    const readyKeys = useMemo(() => {
+        return uniq((out?.setups || []).filter((s) => s.status === "READY").map((s) => setupStableKey(s)));
     }, [out?.setups]);
+
 
     const prevReadyRef = useRef<string[]>([]);
     const [banner, setBanner] = useState<{ active: boolean; text: string }>({ active: false, text: "" });
 
     useEffect(() => {
         const prev = prevReadyRef.current;
-        const now = readyIds;
+        const now = readyKeys;
+
         prevReadyRef.current = now;
 
         // new ready detected
         const newOnes = now.filter((id) => !prev.includes(id));
         if (newOnes.length > 0) {
-            const s = ranked.find((x) => x.id === newOnes[0]);
+            const s = ranked.find((x) => setupStableKey(x) === newOnes[0]);
             const text = s
                 ? `READY: ${symbol} • ${humanizeType(String(s.type))} • ${s.side} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}`
                 : `READY setup detected`;
@@ -879,7 +902,8 @@ export default function SetupsRadarScreen() {
         }
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [readyIds.join("|")]);
+    }, [readyKeys.join("|"), ranked, selectedKey, symbol]);
+
 
     useEffect(() => {
         if (typeof window !== "undefined") window.localStorage.setItem("su2_symbol", symbol);
@@ -950,17 +974,20 @@ export default function SetupsRadarScreen() {
                                 <div className="rows">
                                     {ranked.map((s) => {
                                         const uiStatus = computeUiStatus(s, features);
+                                        const k = setupStableKey(s);
+
                                         return (
                                             <SetupRow
-                                                key={s.id}
+                                                key={k}
                                                 s={s}
                                                 dqGrade={dqGrade}
                                                 uiStatus={uiStatus}
-                                                isSelected={selected?.id === s.id}
-                                                onSelect={() => setSelectedId(s.id)}
+                                                isSelected={setupStableKey(selected as any) === k}
+                                                onSelect={() => setSelectedKey(k)}
                                             />
                                         );
                                     })}
+
                                 </div>
                             )}
                         </div>
