@@ -244,8 +244,11 @@ function actionChip(s: TradeSetup): { label: string; tone: string; icon: React.R
 }
 
 function stableSetupKey(s: TradeSetup): string {
-  if (s?.canon) return String(s.canon);
+  // 1) Unique thật sự (ưu tiên backend)
   if (s?.id) return String(s.id);
+  if (s?.canon) return String(s.canon);
+
+  // 2) Fallback cuối (chỉ để không crash; không đảm bảo unique)
   const type = String(s?.type ?? "");
   const side = String(s?.side ?? "");
   const tf = String(s?.entry_tf ?? "");
@@ -255,6 +258,7 @@ function stableSetupKey(s: TradeSetup): string {
   const sl = Number.isFinite(s?.stop?.price) ? (s.stop.price as number).toFixed(2) : "na";
   return `${type}|${side}|${tf}|${mode}|z:${zlo}-${zhi}|sl:${sl}`;
 }
+
 
 function humanizeType(x: string) {
   return (x || "").replace(/_/g, " ");
@@ -483,7 +487,8 @@ export default function Page() {
     });
   }, [out?.setups]);
 
-  const [expandedKey, setExpandedKey] = useState<number | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
   const [showLevelsMore, setShowLevelsMore] = useState(false);
   const [showDataCompleteness, setShowDataCompleteness] = useState(false);
   const [showKeyLevels, setShowKeyLevels] = useState(false);
@@ -497,9 +502,15 @@ export default function Page() {
     }
   }, [symbol]);
 
-  const toggleExpanded = (key: number) => {
+  const toggleExpanded = (key: string) => {
     setExpandedKey((prev) => (prev === key ? null : key));
   };
+
+  useEffect(() => {
+    const keys = ranked.map(stableSetupKey);
+    const dup = keys.filter((k, i) => keys.indexOf(k) !== i);
+    if (dup.length) console.warn("Duplicate setup keys:", dup);
+  }, [ranked]);
 
 
   // Banner for READY (non-intrusive)
@@ -934,10 +945,8 @@ export default function Page() {
                   </div>
                 ) : (
                   ranked.map((s, idx) => {
-                    const keyStr = stableSetupKey(s);          // key string (có thể trùng)
-                    const reactKey = `${keyStr}::${idx}`;      // React key luôn unique
-                    const accordionKey = idx;                  // Accordion key = index
-                    const isOpen = expandedKey === accordionKey;
+                    const key = stableSetupKey(s);        // giờ phải unique thật
+                    const isOpen = expandedKey === key;
 
                     const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
                     const pri01 = clamp01(pri / 100);
@@ -946,7 +955,7 @@ export default function Page() {
 
                     return (
                       <div
-                        key={reactKey}
+                        key={key}
                         className={[
                           "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
                           isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
@@ -986,7 +995,7 @@ export default function Page() {
 
                             <button
                               type="button"
-                              onClick={() => toggleExpanded(accordionKey)}
+                              onClick={() => toggleExpanded(key)}
                               className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-white/10"
                             >
                               {isOpen ? "Hide details" : "View details"}
