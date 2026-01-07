@@ -170,6 +170,28 @@ function relTime(ts?: number) {
 }
 
 /** ---------- Domain helpers (best-effort, no guessing) ---------- */
+function decisionSummary(s: TradeSetup): string {
+  const ex = s.execution;
+  if (!ex) return "Monitor setup – no execution signal yet";
+
+  switch (ex.state) {
+    case "ENTER_MARKET":
+      return "Action now: enter market";
+    case "PLACE_LIMIT":
+      return "Action now: place limit order";
+    case "WAIT_ZONE":
+      return "Wait: price must enter the zone";
+    case "WAIT_CLOSE":
+      return "Wait: candle close required";
+    case "BLOCKED":
+      return "No trade: setup is blocked";
+    case "NO_TRADE":
+      return "No trade: conditions not met";
+    default:
+      return "Monitor setup";
+  }
+}
+
 function sideTone(side: SetupSide) {
   return side === "LONG" ? "text-emerald-400" : "text-rose-400";
 }
@@ -223,6 +245,8 @@ function actionChip(s: TradeSetup): { label: string; tone: string; icon: React.R
 
 function stableSetupKey(s: TradeSetup): string {
   if (s?.canon) return String(s.canon);
+  if (s?.id) return String(s.id);
+  // fallback cuối cùng (giữ lại để tránh crash nếu data thiếu id)
   const type = String(s?.type ?? "");
   const side = String(s?.side ?? "");
   const tf = String(s?.entry_tf ?? "");
@@ -232,6 +256,7 @@ function stableSetupKey(s: TradeSetup): string {
   const sl = Number.isFinite(s?.stop?.price) ? (s.stop.price as number).toFixed(2) : "na";
   return `${type}|${side}|${tf}|${mode}|z:${zlo}-${zhi}|sl:${sl}`;
 }
+
 
 function humanizeType(x: string) {
   return (x || "").replace(/_/g, " ");
@@ -406,19 +431,19 @@ export default function Page() {
   useEffect(() => {
     try {
       window.localStorage.setItem("ct_symbol_input", inputSymbol);
-    } catch {}
+    } catch { }
   }, [inputSymbol]);
 
   useEffect(() => {
     try {
       window.localStorage.setItem("ct_symbol_active", symbol);
-    } catch {}
+    } catch { }
   }, [symbol]);
 
   useEffect(() => {
     try {
       window.localStorage.setItem("ct_paused", paused ? "1" : "0");
-    } catch {}
+    } catch { }
   }, [paused]);
 
   const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
@@ -461,6 +486,9 @@ export default function Page() {
   }, [out?.setups]);
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [showLevelsMore, setShowLevelsMore] = useState(false);
+  const [showDataCompleteness, setShowDataCompleteness] = useState(false);
+  const [showKeyLevels, setShowKeyLevels] = useState(false);
 
   // Auto-select once when setups appear or symbol changes
   const lastSymbolRef = useRef(symbol);
@@ -473,8 +501,8 @@ export default function Page() {
 
   useEffect(() => {
     if (!selectedKey && ranked.length > 0) setSelectedKey(stableSetupKey(ranked[0]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ranked.length]);
+  }, [ranked, selectedKey]);
+
 
   const selected = useMemo(() => {
     if (!selectedKey) return null;
@@ -503,7 +531,7 @@ export default function Page() {
       setBanner({ active: true, text });
       try {
         if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
-      } catch {}
+      } catch { }
     } else {
       if (now.length === 0 && banner.active) setBanner({ active: false, text: "" });
       if (now.length > 0 && !banner.active) setBanner({ active: true, text: "READY setup available" });
@@ -568,6 +596,7 @@ export default function Page() {
 
     return uniq.slice(0, 12);
   }, [features?.market_structure]);
+  const keyLevelsView = showLevelsMore ? keyLevels : keyLevels.slice(0, 6);
 
   // A compact health summary for each TF from snap (stale/partial/availability)
   const tfHealth = useMemo(() => {
@@ -582,6 +611,16 @@ export default function Page() {
     }));
     return tfs.sort((a, b) => a.tf.localeCompare(b.tf));
   }, [snap?.timeframes]);
+  const [showTfHealthMore, setShowTfHealthMore] = useState(false);
+
+  const tfHealthPrimary = useMemo(() => {
+    const priority = ["1h", "15m", "5m", "4h"];
+    return priority
+      .map((tf) => tfHealth.find((t) => t.tf === tf))
+      .filter(Boolean) as typeof tfHealth;
+  }, [tfHealth]);
+
+  const tfHealthView = showTfHealthMore ? tfHealth : tfHealthPrimary;
 
   const appBlocked = useMemo(() => {
     // hard block: DQ not ok, or feeds not ok, or stale too large
@@ -602,6 +641,32 @@ export default function Page() {
   const onEnterInput: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === "Enter") onAnalyze();
   };
+
+  const SelectedSetupCard = (
+    <Card
+      title="Selected Setup"
+      icon={<Crosshair className="h-5 w-5" />}
+      right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}
+    >
+      {!selected ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-sm font-bold text-zinc-100">No selection</div>
+          <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
+        </div>
+      ) : (
+        <SetupDetail
+          symbol={symbol}
+          mid={mid}
+          dqOk={dqOk}
+          bybitOk={bybitOk}
+          staleSec={staleSec}
+          paused={paused}
+          features={features}
+          setup={selected}
+        />
+      )}
+    </Card>
+  );
 
   return (
     <div className="min-h-screen bg-[#070A12] text-zinc-100">
@@ -818,7 +883,54 @@ export default function Page() {
                 </div>
               </div>
             </Card>
+            {/* Trend by timeframe (Structure) */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                <LineChart className="h-4 w-4 text-zinc-300" />
+                Trend by timeframe (Structure)
+              </div>
 
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {["4h", "1h", "15m", "5m"].map((tf) => {
+                  const node = (features?.market_structure as any)?.[tf];
+                  const badge = structureTrendBadge(node?.trend);
+                  const e = pickLatestStructureEvent(node);
+
+                  return (
+                    <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-extrabold text-zinc-100">{tf}</div>
+                        <span
+                          className={[
+                            "inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold",
+                            badge.cls,
+                          ].join(" ")}
+                        >
+                          {badge.icon}
+                          {badge.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 space-y-1.5 text-xs">
+                        <KV
+                          k="Confirmed"
+                          v={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"}
+                        />
+                        <KV
+                          k="Latest event"
+                          v={
+                            e.kind && e.dir
+                              ? `${e.kind} ${e.dir}${Number.isFinite(e.level) ? ` @ ${fmtPx(e.level)}` : ""}${Number.isFinite(e.ts) ? ` • ${relTime(e.ts)}` : ""
+                              }`
+                              : "—"
+                          }
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
               {appBlocked ? (
                 <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
@@ -869,224 +981,212 @@ export default function Page() {
                         onClick={() => setSelectedKey(key)}
                         className={[
                           "w-full text-left",
-                          "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
+                          "rounded-2xl border border-white/10 bg-white/5 p-3 ring-1 ring-white/10",
                           "transition hover:bg-white/7 active:bg-white/10",
                           sel ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
                         ].join(" ")}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-baseline gap-2">
-                              <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
-                              <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
-                            </div>
-
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <Pill tone={statusTone(s.status)}>{String(s.status)}</Pill>
-                              <Pill tone={gradeTone(s.confidence?.grade)}>Grade {String(s.confidence?.grade || "—").toUpperCase()}</Pill>
-                              <Pill tone={chip.tone} icon={chip.icon}>
-                                {chip.label}
-                              </Pill>
-                            </div>
-
-                            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                              <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                <div className="text-[11px] text-zinc-400">Conf</div>
-                                <div className="mt-0.5 font-extrabold text-zinc-100">{fmtScore100(s.confidence?.score)}</div>
+                        <div className="flex items-center gap-3">
+                          {/* LEFT: main info */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="truncate text-sm font-extrabold text-zinc-50">
+                                {humanizeType(String(s.type))}
                               </div>
-                              <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                <div className="text-[11px] text-zinc-400">RR min</div>
-                                <div className="mt-0.5 font-extrabold text-zinc-100">{Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</div>
-                              </div>
-                              <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                <div className="text-[11px] text-zinc-400">Priority</div>
-                                <div className="mt-0.5 font-extrabold text-zinc-100">{pri}</div>
+                              <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>
+                                {s.side}
                               </div>
                             </div>
 
-                            <div className="mt-2">
-                              <div className="h-2.5 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                                <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
-                              </div>
-                              {Array.isArray(s.priority_reasons) && s.priority_reasons.length > 0 ? (
-                                <div className="mt-1 text-[11px] text-zinc-400">Why: {s.priority_reasons.join(" • ")}</div>
-                              ) : null}
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                              <span>Conf {fmtScore100(s.confidence?.score)}</span>
+                              <span>•</span>
+                              <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
+                              <span>•</span>
+                              <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                            </div>
+
+                            <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                              <div
+                                className="h-full rounded-full bg-sky-500/70"
+                                style={{ width: `${pri01 * 100}%` }}
+                              />
                             </div>
                           </div>
 
-                          <div className="mt-1 shrink-0 text-zinc-400">
-                            <ChevronRight className="h-5 w-5" />
+                          {/* RIGHT: pills */}
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <Pill tone={statusTone(s.status)}>{s.status}</Pill>
+                            <Pill tone={chip.tone} icon={chip.icon}>
+                              {chip.label}
+                            </Pill>
                           </div>
                         </div>
+
                       </button>
                     );
                   })
                 )}
               </div>
             </Card>
+            <div className="md:hidden">
+              {SelectedSetupCard}
+            </div>
           </div>
 
           {/* RIGHT: details */}
           <div className="space-y-4">
+            <div className="hidden md:block">
+              {SelectedSetupCard}
+            </div>
+
             <Card
               title="Data Completeness"
               icon={<Database className="h-5 w-5" />}
               right={
-                <Pill
-                  tone={snap?.availability?.bybit?.ok ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
-                  icon={snap?.availability?.bybit?.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-                >
-                  Snapshot {snap ? "OK" : "—"}
-                </Pill>
-              }
-            >
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                    <Clock className="h-4 w-4 text-zinc-300" />
-                    Realtime availability
-                  </div>
-                  <div className="mt-3 space-y-2 text-xs">
-                    <KV
-                      k="Bybit availability"
-                      v={
-                        snap?.availability?.bybit
-                          ? snap.availability.bybit.ok
-                            ? "OK"
-                            : `NOT OK${Array.isArray(snap.availability.bybit.notes) && snap.availability.bybit.notes.length ? ` • ${snap.availability.bybit.notes.join(", ")}` : ""}`
-                          : "—"
-                      }
-                    />
-                    <KV
-                      k="Binance availability"
-                      v={
-                        snap?.availability?.binance
-                          ? snap.availability.binance.ok
-                            ? "OK"
-                            : `NOT OK${Array.isArray(snap.availability.binance.notes) && snap.availability.binance.notes.length ? ` • ${snap.availability.binance.notes.join(", ")}` : ""}`
-                          : "—"
-                      }
-                    />
-                    <KV k="Quality grade (raw snapshot)" v={snap?.data_quality?.grade ? String(snap.data_quality.grade) : "—"} />
-                    <KV k="Quality score (raw snapshot)" v={Number.isFinite(Number(snap?.data_quality?.score)) ? fmtNum(Number(snap?.data_quality?.score), 0) : "—"} />
-                  </div>
-                  {Array.isArray(snap?.data_quality?.reasons) && snap!.data_quality!.reasons.length > 0 ? (
-                    <div className="mt-3">
-                      <div className="text-[11px] font-bold text-zinc-200">Quality notes</div>
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {snap!.data_quality!.reasons.slice(0, 8).map((r, i) => (
-                          <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
-                            {r}
-                          </Pill>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+                <div className="flex items-center gap-2">
+                  <Pill
+                    tone={
+                      snap?.availability?.bybit?.ok
+                        ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                        : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                    }
+                    icon={snap?.availability?.bybit?.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                  >
+                    Snapshot {snap ? "OK" : "—"}
+                  </Pill>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowDataCompleteness((v) => !v)}
+                    className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+                    title={showDataCompleteness ? "Hide Data Completeness details" : "Show Data Completeness details"}
+                  >
+                    {showDataCompleteness ? "Hide" : "Show"}
+                  </button>
                 </div>
+              }
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                    <Layers className="h-4 w-4 text-zinc-300" />
-                    Timeframe health (stale/partial)
+            >
+              {showDataCompleteness ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                      <Clock className="h-4 w-4 text-zinc-300" />
+                      Realtime availability
+                    </div>
+                    <div className="mt-3 space-y-2 text-xs">
+                      <KV
+                        k="Bybit availability"
+                        v={
+                          snap?.availability?.bybit
+                            ? snap.availability.bybit.ok
+                              ? "OK"
+                              : `NOT OK${Array.isArray(snap.availability.bybit.notes) && snap.availability.bybit.notes.length ? ` • ${snap.availability.bybit.notes.join(", ")}` : ""}`
+                            : "—"
+                        }
+                      />
+                      <KV
+                        k="Binance availability"
+                        v={
+                          snap?.availability?.binance
+                            ? snap.availability.binance.ok
+                              ? "OK"
+                              : `NOT OK${Array.isArray(snap.availability.binance.notes) && snap.availability.binance.notes.length ? ` • ${snap.availability.binance.notes.join(", ")}` : ""}`
+                            : "—"
+                        }
+                      />
+                      <KV k="Quality grade (raw snapshot)" v={snap?.data_quality?.grade ? String(snap.data_quality.grade) : "—"} />
+                      <KV k="Quality score (raw snapshot)" v={Number.isFinite(Number(snap?.data_quality?.score)) ? fmtNum(Number(snap?.data_quality?.score), 0) : "—"} />
+                    </div>
+                    {Array.isArray(snap?.data_quality?.reasons) && snap!.data_quality!.reasons.length > 0 ? (
+                      <div className="mt-3">
+                        <div className="text-[11px] font-bold text-zinc-200">Quality notes</div>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {snap!.data_quality!.reasons.slice(0, 8).map((r, i) => (
+                            <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                              {r}
+                            </Pill>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="mt-3 space-y-2">
-                    {tfHealth.length === 0 ? (
-                      <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
-                    ) : (
-                      tfHealth.map((t) => {
-                        const staleMs = Number.isFinite(t.stale_ms) ? t.stale_ms : NaN;
-                        const staleTone =
-                          Number.isFinite(staleMs) && staleMs <= 1500
-                            ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                            : Number.isFinite(staleMs) && staleMs <= 5000
-                              ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                              : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                      <Layers className="h-4 w-4 text-zinc-300" />
+                      Timeframe health (stale/partial)
+                    </div>
 
-                        return (
-                          <div key={t.tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                            <div className="flex items-center justify-between gap-2">
+                    <div className="mt-3 space-y-2">
+                      {tfHealthView.length === 0 ? (
+                        <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
+                      ) : (
+                        tfHealthView.map((t) => {
+                          const staleMs = Number.isFinite(t.stale_ms) ? t.stale_ms : NaN;
+                          const staleTone =
+                            Number.isFinite(staleMs) && staleMs <= 1500
+                              ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                              : Number.isFinite(staleMs) && staleMs <= 5000
+                                ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                                : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
+
+                          return (
+                            <div key={t.tf} className="flex items-center justify-between rounded-xl border border-white/10 bg-zinc-950/30 px-3 py-2">
                               <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
-                              <div className="flex flex-wrap items-center gap-2">
+                              <div className="flex items-center gap-2">
                                 <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />}>
                                   {Number.isFinite(staleMs) ? `${fmtNum(staleMs / 1000, 1)}s` : "—"}
                                 </Pill>
                                 <Pill
                                   tone={
-                                    t.partial ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                                    t.partial
+                                      ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                                      : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
                                   }
                                 >
                                   {t.partial ? "PARTIAL" : "OK"}
                                 </Pill>
                               </div>
                             </div>
-                            <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-zinc-300">
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                                <div className="text-zinc-400">Bybit</div>
-                                <div className="font-bold text-zinc-100">{t.haveCandlesBybit}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                                <div className="text-zinc-400">Binance</div>
-                                <div className="font-bold text-zinc-100">{t.haveCandlesBinance}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                                <div className="text-zinc-400">Trades</div>
-                                <div className="font-bold text-zinc-100">{t.haveTrades}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                                <div className="text-zinc-400">OB</div>
-                                <div className="font-bold text-zinc-100">{t.haveOrderbook ? "YES" : "NO"}</div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
+                          );
+                        })
+                      )}
+
+                      {tfHealth.length > tfHealthPrimary.length ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowTfHealthMore((v) => !v)}
+                          className="pt-1 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
+                        >
+                          {showTfHealthMore ? "Show less" : `Show more (${tfHealth.length - tfHealthPrimary.length})`}
+                        </button>
+                      ) : null}
+                    </div>
+
                   </div>
                 </div>
-              </div>
+              ) : null}
+
+
             </Card>
 
-            <Card title="Market Trend & Key Levels" icon={<Layers className="h-5 w-5" />}>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                    <LineChart className="h-4 w-4 text-zinc-300" />
-                    Trend by timeframe (structure)
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    {["4h", "1h", "15m", "5m"].map((tf) => {
-                      const node = (features?.market_structure as any)?.[tf];
-                      const badge = structureTrendBadge(node?.trend);
-                      const e = pickLatestStructureEvent(node);
-
-                      return (
-                        <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs font-extrabold text-zinc-100">{tf}</div>
-                            <span className={["inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold", badge.cls].join(" ")}>
-                              {badge.icon}
-                              {badge.label}
-                            </span>
-                          </div>
-                          <div className="mt-2 space-y-1.5 text-xs">
-                            <KV k="Confirmed" v={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"} />
-                            <KV
-                              k="Latest event"
-                              v={
-                                e.kind && e.dir
-                                  ? `${e.kind} ${e.dir}${Number.isFinite(e.level) ? ` @ ${fmtPx(e.level)}` : ""}${Number.isFinite(e.ts) ? ` • ${relTime(e.ts)}` : ""}`
-                                  : "—"
-                              }
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
+            <Card
+              title="Key Levels"
+              icon={<Target className="h-5 w-5" />}
+              right={
+                <button
+                  type="button"
+                  onClick={() => setShowKeyLevels((v) => !v)}
+                  className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+                  title={showKeyLevels ? "Hide Key Levels" : "Show Key Levels"}
+                >
+                  {showKeyLevels ? "Hide" : "Show"}
+                </button>
+              }
+            >
+              {showKeyLevels ? (
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
                     <Target className="h-4 w-4 text-zinc-300" />
@@ -1094,10 +1194,10 @@ export default function Page() {
                   </div>
 
                   <div className="mt-3 space-y-2">
-                    {keyLevels.length === 0 ? (
+                    {keyLevelsView.length === 0 ? (
                       <div className="text-xs text-zinc-400">No market structure levels yet.</div>
                     ) : (
-                      keyLevels.map((l, i) => (
+                      keyLevelsView.map((l, i) => (
                         <div key={`${l.tf}-${l.kind}-${i}`} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -1116,11 +1216,17 @@ export default function Page() {
                                 >
                                   {l.kind}
                                 </Pill>
-                                {l.dir && l.dir !== "—" ? <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill> : null}
+
+                                {l.dir && l.dir !== "—" ? (
+                                  <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill>
+                                ) : null}
                               </div>
-                              <div className="mt-2 text-sm font-extrabold text-zinc-50">{Number.isFinite(l.level) ? fmtPx(l.level) : "—"}</div>
-                              <div className="mt-1 text-xs text-zinc-400">{Number.isFinite(l.ts) ? `Seen ${relTime(l.ts)}` : ""}</div>
+
+                              <div className="mt-2 text-sm font-extrabold text-zinc-50">
+                                {Number.isFinite(l.level) ? fmtPx(l.level) : "—"}
+                              </div>
                             </div>
+
                             {Number.isFinite(mid) && Number.isFinite(l.level) ? (
                               <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" title="Distance from mid (absolute)">
                                 Δ {fmtPx(Math.abs(mid - (l.level as number)))}
@@ -1131,28 +1237,20 @@ export default function Page() {
                       ))
                     )}
                   </div>
-                </div>
-              </div>
-            </Card>
 
-            <Card title="Selected Setup" icon={<Crosshair className="h-5 w-5" />} right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}>
-              {!selected ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-sm font-bold text-zinc-100">No selection</div>
-                  <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
+                  {keyLevels.length > 6 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowLevelsMore((v) => !v)}
+                      className="mt-2 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
+                    >
+                      {showLevelsMore ? "Show less" : `Show more (${keyLevels.length - 6})`}
+                    </button>
+                  ) : null}
                 </div>
-              ) : (
-                <SetupDetail
-                  symbol={symbol}
-                  mid={mid}
-                  dqOk={dqOk}
-                  bybitOk={bybitOk}
-                  staleSec={staleSec}
-                  paused={paused}
-                  features={features}
-                  setup={selected}
-                />
-              )}
+              ) : null}
+
+
             </Card>
           </div>
         </div>
@@ -1186,6 +1284,13 @@ function SetupDetail({
   setup: TradeSetup;
 }) {
   const action = actionChip(setup);
+  const [showGuidanceDetails, setShowGuidanceDetails] = useState(false);
+  const [showRiskMore, setShowRiskMore] = useState(false);
+  useEffect(() => {
+    setShowGuidanceDetails(false);
+    setShowReasons(false);
+
+  }, [setup.id]);
 
   const entry = setup.entry;
   const zone = entry?.zone;
@@ -1207,6 +1312,19 @@ function SetupDetail({
   const crossConsensus01 = Number.isFinite(Number(features?.cross?.consensus_score)) ? clamp01(Number(features.cross.consensus_score)) : undefined;
 
   const checklist = Array.isArray(entry?.trigger?.checklist) ? entry.trigger.checklist : [];
+  const [showChecklistPassed, setShowChecklistPassed] = useState(false);
+  const [showReasons, setShowReasons] = useState(false);
+
+
+  const checklistBad = useMemo(() => {
+    // show only BLOCK + PENDING
+    return checklist.filter((c) => c.ok !== true);
+  }, [checklist]);
+
+  const checklistOk = useMemo(() => {
+    return checklist.filter((c) => c.ok === true);
+  }, [checklist]);
+
   const blockers = Array.isArray(setup.execution?.blockers) ? setup.execution!.blockers : [];
 
   const isInZone =
@@ -1360,9 +1478,17 @@ function SetupDetail({
             </div>
           </div>
         </div>
+        <div className="sticky top-2 z-20 space-y-3">
+          <div className="rounded-xl border border-white/10 bg-zinc-950/80 backdrop-blur px-4 py-3">
+            <div className="text-sm font-extrabold text-zinc-50">
+              {decisionSummary(setup)}
+            </div>
+          </div>
 
-        <Divider />
+          <Divider />
+        </div>
 
+        {/* Guidance */}
         {/* Guidance */}
         <div className={["rounded-2xl p-4", guidance.tone].join(" ")}>
           <div className="flex items-start gap-3">
@@ -1375,22 +1501,44 @@ function SetupDetail({
                 <Clock className="h-5 w-5" />
               )}
             </div>
+
             <div className="min-w-0">
-              <div className="text-sm font-extrabold">{guidance.headline}</div>
-              <div className="mt-2 space-y-1.5 text-xs text-zinc-100/90">
-                {guidance.bullets.map((b, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
-                    <span className="min-w-0">{b}</span>
-                  </div>
-                ))}
+              {/* HEADLINE – LUÔN HIỆN */}
+              <div className="text-sm font-extrabold">
+                {guidance.headline}
               </div>
+
+              {/* DETAILS – COLLAPSED */}
+              {showGuidanceDetails ? (
+                <div className="mt-2 space-y-1.5 text-xs text-zinc-100/90">
+                  {guidance.bullets.map((b, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+                      <span className="min-w-0">{b}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* TOGGLE */}
+              <button
+                type="button"
+                onClick={() => setShowGuidanceDetails((v) => !v)}
+                className="mt-2 text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+              >
+                {showGuidanceDetails ? "Hide details" : "Why?"}
+              </button>
+
+              {/* ENGINE NOTE */}
               {setup.execution?.reason ? (
-                <div className="mt-3 text-[11px] text-zinc-100/80">Engine note: {setup.execution.reason}</div>
+                <div className="mt-3 text-[11px] text-zinc-100/80">
+                  Engine note: {setup.execution.reason}
+                </div>
               ) : null}
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Plan */}
@@ -1437,9 +1585,11 @@ function SetupDetail({
               <div className="text-xs text-zinc-400">—</div>
             ) : (
               <div className="space-y-2">
-                {checklist.map((c) => {
+                {/* BLOCK + PENDING (default) */}
+                {checklistBad.map((c) => {
                   const ok = c.ok === true;
                   const pending = c.ok !== true && c.ok !== false;
+
                   return (
                     <div key={c.key} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
                       <div className="flex items-start justify-between gap-3">
@@ -1455,7 +1605,13 @@ function SetupDetail({
                                     : "bg-rose-500/15 ring-rose-500/25 text-rose-100",
                               ].join(" ")}
                             >
-                              {ok ? <CheckCircle2 className="h-4 w-4" /> : pending ? <CircleDashed className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                              {ok ? (
+                                <CheckCircle2 className="h-4 w-4" />
+                              ) : pending ? (
+                                <CircleDashed className="h-4 w-4" />
+                              ) : (
+                                <AlertTriangle className="h-4 w-4" />
+                              )}
                             </span>
                             <div className="text-xs font-extrabold text-zinc-100">{c.key}</div>
                           </div>
@@ -1477,8 +1633,45 @@ function SetupDetail({
                     </div>
                   );
                 })}
+
+                {/* Passed (OK) toggle */}
+                {checklistOk.length > 0 ? (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowChecklistPassed((v) => !v)}
+                      className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+                    >
+                      {showChecklistPassed ? "Hide passed" : `Show passed (${checklistOk.length})`}
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* Passed (OK) list */}
+                {showChecklistPassed ? (
+                  <div className="space-y-2">
+                    {checklistOk.map((c) => (
+                      <div key={c.key} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/25 text-emerald-100">
+                                <CheckCircle2 className="h-4 w-4" />
+                              </span>
+                              <div className="text-xs font-extrabold text-zinc-100">{c.key}</div>
+                            </div>
+                            {c.note ? <div className="mt-2 text-[11px] text-zinc-400">{c.note}</div> : null}
+                          </div>
+
+                          <Pill tone="bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30">OK</Pill>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
+
 
             {blockers.length > 0 ? (
               <div className="mt-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3">
@@ -1515,7 +1708,10 @@ function SetupDetail({
           <Divider />
 
           <div className="space-y-2">
-            <div className="text-xs font-bold text-zinc-100">TP ladder</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold text-zinc-100">TP ladder</div>
+            </div>
+
             {tps.length === 0 ? (
               <div className="text-xs text-zinc-400">—</div>
             ) : (
@@ -1542,6 +1738,7 @@ function SetupDetail({
                 ))}
               </div>
             )}
+
           </div>
 
           <Divider />
@@ -1560,6 +1757,7 @@ function SetupDetail({
               right={Number.isFinite(setup.rr_min) ? setup.rr_min.toFixed(2) : "—"}
               intent={rr01 != null && rr01 >= 0.5 ? "good" : "warn"}
             />
+
             <Meter
               label="Bias strength"
               value01={biasStrength01}
@@ -1587,7 +1785,13 @@ function SetupDetail({
               label="Cross consensus"
               value01={crossConsensus01}
               right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
-              intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : crossConsensus01 != null && crossConsensus01 <= 0.35 ? "warn" : "neutral"}
+              intent={
+                crossConsensus01 != null && crossConsensus01 >= 0.65
+                  ? "good"
+                  : crossConsensus01 != null && crossConsensus01 <= 0.35
+                    ? "warn"
+                    : "neutral"
+              }
             />
           </div>
         </div>
@@ -1601,114 +1805,134 @@ function SetupDetail({
             Explanation (why this setup)
           </div>
 
-          <Pill
-            tone={globalGateOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
-            icon={globalGateOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
-            title="Global execution gate status"
-          >
-            Gate {globalGateOk ? "OK" : "BLOCKED"}
-          </Pill>
-        </div>
+          <div className="flex items-center gap-2">
+            <Pill
+              tone={
+                globalGateOk
+                  ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                  : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+              }
+              icon={globalGateOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+              title="Global execution gate status"
+            >
+              Gate {globalGateOk ? "OK" : "BLOCKED"}
+            </Pill>
 
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-            <div className="text-xs font-extrabold text-zinc-100">Reasons</div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(setup.confidence?.reasons || []).slice(0, 16).map((r, i) => (
-                <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
-                  {r}
-                </Pill>
-              ))}
-              {(setup.confidence?.reasons || []).length === 0 ? <div className="text-xs text-zinc-400">—</div> : null}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-            <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
-            <div className="mt-2 space-y-2 text-xs">
-              <KV
-                k="Imbalance top10/top50/top200"
-                v={
-                  features?.orderflow?.imbalance
-                    ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top200), 2)}`
-                    : "—"
-                }
-              />
-              <KV
-                k="Aggression ratio"
-                v={Number.isFinite(Number(features?.orderflow?.aggression_ratio)) ? fmtPct01(Number(features.orderflow.aggression_ratio)) : "—"}
-              />
-              <KV
-                k="Delta dir"
-                v={
-                  features?.orderflow?.delta?.delta_norm != null
-                    ? Number(features.orderflow.delta.delta_norm) > 0
-                      ? "BULL"
-                      : Number(features.orderflow.delta.delta_norm) < 0
-                        ? "BEAR"
-                        : "NEUTRAL"
-                    : "—"
-                }
-              />
-              <KV
-                k="Divergence"
-                v={
-                  features?.orderflow?.delta
-                    ? `${String(features.orderflow.delta.divergence_dir)} • ${fmtPct01(Number(features.orderflow.delta.divergence_score))}`
-                    : "—"
-                }
-              />
-              <KV
-                k="Absorption"
-                v={
-                  features?.orderflow?.delta
-                    ? `${String(features.orderflow.delta.absorption_dir)} • ${fmtPct01(Number(features.orderflow.delta.absorption_score))}`
-                    : "—"
-                }
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowReasons((v) => !v)}
+              className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+              title={showReasons ? "Hide explanation" : "Show explanation"}
+            >
+              {showReasons ? "Hide" : "Show"}
+            </button>
           </div>
         </div>
 
-        <Divider />
+        {showReasons ? (
+          <>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+                <div className="text-xs font-extrabold text-zinc-100">Reasons</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(setup.confidence?.reasons || []).slice(0, 16).map((r, i) => (
+                    <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                      {r}
+                    </Pill>
+                  ))}
+                  {(setup.confidence?.reasons || []).length === 0 ? <div className="text-xs text-zinc-400">—</div> : null}
+                </div>
+              </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-extrabold text-zinc-100">Entry zone check</div>
-              <Pill
-                tone={isInZone ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"}
-              >
-                {isInZone ? "IN ZONE" : "OUTSIDE"}
-              </Pill>
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+                <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
+                <div className="mt-2 space-y-2 text-xs">
+                  <KV
+                    k="Imbalance"
+                    v={
+                      features?.orderflow?.imbalance
+                        ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top200), 2)}`
+                        : "—"
+                    }
+                  />
+                  <KV
+                    k="Aggression ratio"
+                    v={Number.isFinite(Number(features?.orderflow?.aggression_ratio)) ? fmtPct01(Number(features.orderflow.aggression_ratio)) : "—"}
+                  />
+                  <KV
+                    k="Delta dir"
+                    v={
+                      features?.orderflow?.delta?.delta_norm != null
+                        ? Number(features.orderflow.delta.delta_norm) > 0
+                          ? "BULL"
+                          : Number(features.orderflow.delta.delta_norm) < 0
+                            ? "BEAR"
+                            : "NEUTRAL"
+                        : "—"
+                    }
+                  />
+                  <KV
+                    k="Divergence"
+                    v={
+                      features?.orderflow?.delta
+                        ? `${String(features.orderflow.delta.divergence_dir)} • ${fmtPct01(Number(features.orderflow.delta.divergence_score))}`
+                        : "—"
+                    }
+                  />
+                  <KV
+                    k="Absorption"
+                    v={
+                      features?.orderflow?.delta
+                        ? `${String(features.orderflow.delta.absorption_dir)} • ${fmtPct01(Number(features.orderflow.delta.absorption_score))}`
+                        : "—"
+                    }
+                  />
+                </div>
+              </div>
             </div>
-            <div className="mt-2 space-y-2 text-xs">
-              <KV k="Mid" v={Number.isFinite(mid) ? fmtPx(mid) : "—"} />
-              <KV k="Zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
-            </div>
-          </div>
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-            <div className="text-xs font-extrabold text-zinc-100">Stop check</div>
-            <div className="mt-2 space-y-2 text-xs">
-              <KV k="Stop" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
-              <KV
-                k="Distance to stop"
-                v={Number.isFinite(mid) && Number.isFinite(stop) ? fmtPx(Math.abs(mid - (stop as number))) : "—"}
-              />
-            </div>
-          </div>
+            <Divider />
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-            <div className="text-xs font-extrabold text-zinc-100">Execution gate snapshot</div>
-            <div className="mt-2 space-y-2 text-xs">
-              <KV k="DQ ok" v={dqOk ? "YES" : "NO"} />
-              <KV k="Bybit ok" v={bybitOk ? "YES" : "NO"} />
-              <KV k="Paused" v={paused ? "YES" : "NO"} />
-              <KV k="Stale" v={staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`} />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-extrabold text-zinc-100">Entry zone check</div>
+                  <Pill
+                    tone={isInZone ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"}
+                  >
+                    {isInZone ? "IN ZONE" : "OUTSIDE"}
+                  </Pill>
+                </div>
+                <div className="mt-2 space-y-2 text-xs">
+                  <KV k="Mid" v={Number.isFinite(mid) ? fmtPx(mid) : "—"} />
+                  <KV k="Zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+                <div className="text-xs font-extrabold text-zinc-100">Stop check</div>
+                <div className="mt-2 space-y-2 text-xs">
+                  <KV k="Stop" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
+                  <KV
+                    k="Distance to stop"
+                    v={Number.isFinite(mid) && Number.isFinite(stop) ? fmtPx(Math.abs(mid - (stop as number))) : "—"}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+                <div className="text-xs font-extrabold text-zinc-100">Execution gate snapshot</div>
+                <div className="mt-2 space-y-2 text-xs">
+                  <KV k="DQ ok" v={dqOk ? "YES" : "NO"} />
+                  <KV k="Bybit ok" v={bybitOk ? "YES" : "NO"} />
+                  <KV k="Paused" v={paused ? "YES" : "NO"} />
+                  <KV k="Stale" v={staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`} />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        ) : null}
+
       </div>
     </div>
   );
