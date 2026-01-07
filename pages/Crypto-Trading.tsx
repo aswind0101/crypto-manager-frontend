@@ -1697,7 +1697,7 @@ function SetupDetail({
 
             {tps.length === 0 ? (
               <div className="text-xs text-zinc-400">—</div>
-              ) : (
+            ) : (
               <div className="space-y-2">
                 {tps.map((tp, i) => (
                   <div key={i} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
@@ -1779,6 +1779,7 @@ function SetupDetail({
                   }
                 />
               </>
+
             ) : null}
 
           </div>
