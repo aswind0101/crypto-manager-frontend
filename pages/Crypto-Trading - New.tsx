@@ -852,53 +852,9 @@ export default function Page() {
                 </div>
               </div>
             </Card>
-            {/* Trend by timeframe (Structure) */}
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                <LineChart className="h-4 w-4 text-zinc-300" />
-                Trend by timeframe (Structure)
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {["4h", "1h", "15m", "5m"].map((tf) => {
-                  const node = (features?.market_structure as any)?.[tf];
-                  const badge = structureTrendBadge(node?.trend);
-                  const e = pickLatestStructureEvent(node);
-
-                  return (
-                    <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs font-extrabold text-zinc-100">{tf}</div>
-                        <span
-                          className={[
-                            "inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold",
-                            badge.cls,
-                          ].join(" ")}
-                        >
-                          {badge.icon}
-                          {badge.label}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 space-y-1.5 text-xs">
-                        <KV
-                          k="Confirmed"
-                          v={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"}
-                        />
-                        <KV
-                          k="Latest event"
-                          v={
-                            e.kind && e.dir
-                              ? `${e.kind} ${e.dir}${Number.isFinite(e.level) ? ` @ ${fmtPx(e.level)}` : ""}${Number.isFinite(e.ts) ? ` • ${relTime(e.ts)}` : ""
-                              }`
-                              : "—"
-                          }
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+              <LineChart className="h-4 w-4 text-zinc-300" />
+              Trend by timeframe (structure)
             </div>
             <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
               {appBlocked ? (
@@ -1133,69 +1089,103 @@ export default function Page() {
               </div>
             </Card>
 
-            <Card title="Key Levels" icon={<Target className="h-5 w-5" />}>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                  <Target className="h-4 w-4 text-zinc-300" />
-                  Key levels (events & swings)
-                </div>
+            <Card title="Market Trend & Key Levels" icon={<Layers className="h-5 w-5" />}>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
 
-                <div className="mt-3 space-y-2">
-                  {keyLevelsView.length === 0 ? (
-                    <div className="text-xs text-zinc-400">No market structure levels yet.</div>
-                  ) : (
-                    keyLevelsView.map((l, i) => (
-                      <div key={`${l.tf}-${l.kind}-${i}`} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.tf}</Pill>
-                              <Pill
-                                tone={
-                                  l.kind === "BOS"
-                                    ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
-                                    : l.kind === "CHOCH"
-                                      ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                                      : l.kind === "SWING_HIGH"
-                                        ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                                        : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                                }
-                              >
-                                {l.kind}
-                              </Pill>
 
-                              {l.dir && l.dir !== "—" ? (
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill>
-                              ) : null}
-                            </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {["4h", "1h", "15m", "5m"].map((tf) => {
+                      const node = (features?.market_structure as any)?.[tf];
+                      const badge = structureTrendBadge(node?.trend);
+                      const e = pickLatestStructureEvent(node);
 
-                            <div className="mt-2 text-sm font-extrabold text-zinc-50">
-                              {Number.isFinite(l.level) ? fmtPx(l.level) : "—"}
-                            </div>
+
+                      return (
+                        <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs font-extrabold text-zinc-100">{tf}</div>
+                            <span className={["inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold", badge.cls].join(" ")}>
+                              {badge.icon}
+                              {badge.label}
+                            </span>
                           </div>
-
-                          {Number.isFinite(mid) && Number.isFinite(l.level) ? (
-                            <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" title="Distance from mid (absolute)">
-                              Δ {fmtPx(Math.abs(mid - (l.level as number)))}
-                            </Pill>
-                          ) : null}
+                          <div className="mt-2 space-y-1.5 text-xs">
+                            <KV k="Confirmed" v={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"} />
+                            <KV
+                              k="Latest event"
+                              v={
+                                e.kind && e.dir
+                                  ? `${e.kind} ${e.dir}${Number.isFinite(e.level) ? ` @ ${fmtPx(e.level)}` : ""}${Number.isFinite(e.ts) ? ` • ${relTime(e.ts)}` : ""}`
+                                  : "—"
+                              }
+                            />
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {keyLevels.length > 6 ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowLevelsMore((v) => !v)}
-                    className="mt-2 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
-                  >
-                    {showLevelsMore ? "Show less" : `Show more (${keyLevels.length - 6})`}
-                  </button>
-                ) : null}
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                    <Target className="h-4 w-4 text-zinc-300" />
+                    Key levels (events & swings)
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {keyLevels.length === 0 ? (
+                      <div className="text-xs text-zinc-400">No market structure levels yet.</div>
+                    ) : (
+
+                      keyLevelsView.map((l, i) => (
+                        <div key={`${l.tf}-${l.kind}-${i}`} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.tf}</Pill>
+                                <Pill
+                                  tone={
+                                    l.kind === "BOS"
+                                      ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
+                                      : l.kind === "CHOCH"
+                                        ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                                        : l.kind === "SWING_HIGH"
+                                          ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                                          : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                                  }
+                                >
+                                  {l.kind}
+                                </Pill>
+                                {l.dir && l.dir !== "—" ? <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill> : null}
+                              </div>
+                              <div className="mt-2 text-sm font-extrabold text-zinc-50">{Number.isFinite(l.level) ? fmtPx(l.level) : "—"}</div>
+                            </div>
+                            {Number.isFinite(mid) && Number.isFinite(l.level) ? (
+                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" title="Distance from mid (absolute)">
+                                Δ {fmtPx(Math.abs(mid - (l.level as number)))}
+                              </Pill>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
+              {keyLevels.length > 6 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLevelsMore((v) => !v)}
+                  className="mt-2 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
+                >
+                  {showLevelsMore ? "Show less" : `Show more (${keyLevels.length - 6})`}
+                </button>
+              ) : null}
+
             </Card>
+
+
           </div>
         </div>
 
