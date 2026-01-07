@@ -24,17 +24,21 @@ import {
   TrendingDown,
   TrendingUp,
   Waves,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 
 /**
- * Crypto-Trading.tsx (Pages Router) — Compact, iPhone/iPad friendly.
- * Key improvements vs previous:
- * - Sticky top bar
- * - Two-column layout on lg+ with internal scroll (no long page)
- * - Selected Setup uses Tabs (Plan / Meters / Explain / Levels / Health)
- * - Collapsible long sections + "Show more" for lists
+ * Crypto-Trading.tsx (Pages Router)
+ * Frontend-only UI for snapshot → features → setups.
+ *
+ * Goals (per request):
+ * - Avoid “very long” vertical layout: use viewport-based panes with internal scrolling.
+ * - Put SETUP + Market Trend in convenient, always-visible positions.
+ * - Fix selection: clicking a setup must reliably show detail.
+ *
+ * Implementation:
+ * - Desktop (lg+): 3-column layout with sticky/scrollable panes (Queue | Selected Setup | Market/Health).
+ * - Mobile: segmented views (Queue / Setup / Market) to prevent endless scrolling.
+ * - Selection uses setup.id (stable) instead of derived key (fixes “can’t select” / unstable keys).
  */
 
 /** ---------- Minimal UI types (best-effort) ---------- */
@@ -109,10 +113,12 @@ function clamp01(x: number) {
   if (!Number.isFinite(x)) return 0;
   return Math.max(0, Math.min(1, x));
 }
+
 function fmtNum(x?: number, maxFrac = 2) {
   if (!Number.isFinite(x as number)) return "—";
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: maxFrac }).format(x as number);
 }
+
 function fmtPx(x?: number) {
   if (!Number.isFinite(x as number)) return "—";
   const v = x as number;
@@ -122,22 +128,28 @@ function fmtPx(x?: number) {
   if (v >= 1) return v.toFixed(4);
   return v.toFixed(6);
 }
+
 function fmtPct01(x?: number) {
   if (!Number.isFinite(x as number)) return "—";
   return `${Math.round(clamp01(x as number) * 100)}%`;
 }
+
 function fmtScore100(x?: number) {
   if (!Number.isFinite(x as number)) return "—";
   return `${Math.round(Math.max(0, Math.min(100, x as number)))}%`;
 }
+
 function relTime(ts?: number) {
   if (!Number.isFinite(ts as number)) return "—";
   const t = ts as number;
+  if (t <= 0) return "—";
+
   const now = Date.now();
   const diffSec = (t - now) / 1000;
   const abs = Math.abs(diffSec);
 
   if (abs < 2) return "just now";
+
   const fmt = (n: number, u: string) => `${n}${u}`;
   if (abs < 60) {
     const v = Math.round(abs);
@@ -158,10 +170,11 @@ function relTime(ts?: number) {
   return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
 }
 
-/** ---------- Domain helpers ---------- */
+/** ---------- Domain helpers (best-effort, no guessing) ---------- */
 function sideTone(side: SetupSide) {
   return side === "LONG" ? "text-emerald-400" : "text-rose-400";
 }
+
 function dqTone(dq?: string) {
   const g = String(dq || "").toUpperCase();
   if (g === "A") return "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
@@ -170,6 +183,7 @@ function dqTone(dq?: string) {
   if (g === "D") return "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
   return "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
 }
+
 function gradeTone(grade?: string) {
   const g = String(grade || "").toUpperCase();
   if (g === "A") return "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
@@ -177,37 +191,59 @@ function gradeTone(grade?: string) {
   if (g === "C") return "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30";
   return "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
 }
+
 function statusTone(status?: string) {
   const s = String(status || "").toUpperCase();
   if (s === "READY") return "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
   if (s === "FORMING") return "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30";
   if (s === "TRIGGERED") return "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30";
-  if (s === "INVALIDATED" || s === "EXPIRED")
-    return "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
+  if (s === "INVALIDATED" || s === "EXPIRED") return "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
   return "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
 }
+
 function actionChip(s: TradeSetup): { label: string; tone: string; icon: React.ReactNode } {
   const ex = s.execution;
-  if (!ex) return { label: "MONITOR", tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30", icon: <CircleDashed className="h-4 w-4" /> };
-  if (ex.state === "BLOCKED") return { label: "BLOCKED", tone: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30", icon: <Lock className="h-4 w-4" /> };
-  if (ex.canEnterMarket || ex.state === "ENTER_MARKET") return { label: "ENTER NOW", tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30", icon: <Crosshair className="h-4 w-4" /> };
-  if (ex.canPlaceLimit || ex.state === "PLACE_LIMIT") return { label: "PLACE LIMIT", tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30", icon: <Target className="h-4 w-4" /> };
-  return { label: "MONITOR", tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30", icon: <Clock className="h-4 w-4" /> };
+  if (!ex) {
+    return {
+      label: "MONITOR",
+      tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+      icon: <CircleDashed className="h-4 w-4" />,
+    };
+  }
+
+  if (ex.state === "BLOCKED") {
+    return {
+      label: "BLOCKED",
+      tone: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30",
+      icon: <Lock className="h-4 w-4" />,
+    };
+  }
+  if (ex.canEnterMarket || ex.state === "ENTER_MARKET") {
+    return {
+      label: "ENTER NOW",
+      tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30",
+      icon: <Crosshair className="h-4 w-4" />,
+    };
+  }
+  if (ex.canPlaceLimit || ex.state === "PLACE_LIMIT") {
+    return {
+      label: "PLACE LIMIT",
+      tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30",
+      icon: <Target className="h-4 w-4" />,
+    };
+  }
+
+  return {
+    label: "MONITOR",
+    tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+    icon: <Clock className="h-4 w-4" />,
+  };
 }
-function stableSetupKey(s: TradeSetup): string {
-  if (s?.canon) return String(s.canon);
-  const type = String(s?.type ?? "");
-  const side = String(s?.side ?? "");
-  const tf = String(s?.entry_tf ?? "");
-  const mode = String(s?.entry?.mode ?? "");
-  const zlo = Number.isFinite(s?.entry?.zone?.lo) ? (s.entry.zone.lo as number).toFixed(2) : "na";
-  const zhi = Number.isFinite(s?.entry?.zone?.hi) ? (s.entry.zone.hi as number).toFixed(2) : "na";
-  const sl = Number.isFinite(s?.stop?.price) ? (s.stop.price as number).toFixed(2) : "na";
-  return `${type}|${side}|${tf}|${mode}|z:${zlo}-${zhi}|sl:${sl}`;
-}
+
 function humanizeType(x: string) {
   return (x || "").replace(/_/g, " ");
 }
+
 function normDir(x: any): "bull" | "bear" | "sideways" | null {
   const s = String(x ?? "").toLowerCase();
   if (!s) return null;
@@ -216,12 +252,21 @@ function normDir(x: any): "bull" | "bear" | "sideways" | null {
   if (s.includes("side") || s.includes("range")) return "sideways";
   return null;
 }
-function pickLatestStructureEvent(msNode: any): { kind: "BOS" | "CHOCH" | null; dir: "UP" | "DOWN" | null; level?: number; ts?: number } {
+
+/** Market structure helpers */
+function pickLatestStructureEvent(msNode: any): {
+  kind: "BOS" | "CHOCH" | null;
+  dir: "UP" | "DOWN" | null;
+  level?: number;
+  ts?: number;
+} {
   if (!msNode) return { kind: null, dir: null };
   const bos = msNode.lastBOS;
   const choch = msNode.lastCHOCH;
+
   const bosTs = Number.isFinite(bos?.ts) ? (bos.ts as number) : -Infinity;
   const chochTs = Number.isFinite(choch?.ts) ? (choch.ts as number) : -Infinity;
+
   const pick = bosTs >= chochTs ? bos : choch;
   const kind = pick?.kind === "BOS" || pick?.kind === "CHOCH" ? (pick.kind as "BOS" | "CHOCH") : null;
   const dir = pick?.dir === "UP" || pick?.dir === "DOWN" ? (pick.dir as "UP" | "DOWN") : null;
@@ -229,16 +274,46 @@ function pickLatestStructureEvent(msNode: any): { kind: "BOS" | "CHOCH" | null; 
   const ts = Number.isFinite(pick?.ts) ? (pick.ts as number) : undefined;
   return { kind, dir, level, ts };
 }
+
 function structureTrendBadge(trend?: string) {
   const t = String(trend || "").toUpperCase();
-  if (t === "BULL") return { label: "BULL", icon: <TrendingUp className="h-4 w-4" />, cls: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" };
-  if (t === "BEAR") return { label: "BEAR", icon: <TrendingDown className="h-4 w-4" />, cls: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30" };
-  if (t === "RANGE") return { label: "RANGE", icon: <Waves className="h-4 w-4" />, cls: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" };
-  return { label: "UNKNOWN", icon: <Minus className="h-4 w-4" />, cls: "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30" };
+  if (t === "BULL")
+    return {
+      label: "BULL",
+      icon: <TrendingUp className="h-4 w-4" />,
+      cls: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30",
+    };
+  if (t === "BEAR")
+    return {
+      label: "BEAR",
+      icon: <TrendingDown className="h-4 w-4" />,
+      cls: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30",
+    };
+  if (t === "RANGE")
+    return {
+      label: "RANGE",
+      icon: <Waves className="h-4 w-4" />,
+      cls: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+    };
+  return {
+    label: "UNKNOWN",
+    icon: <Minus className="h-4 w-4" />,
+    cls: "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30",
+  };
 }
 
 /** ---------- UI atoms ---------- */
-function Pill({ children, tone, icon, title }: { children: React.ReactNode; tone?: string; icon?: React.ReactNode; title?: string }) {
+function Pill({
+  children,
+  tone,
+  icon,
+  title,
+}: {
+  children: React.ReactNode;
+  tone?: string;
+  icon?: React.ReactNode;
+  title?: string;
+}) {
   return (
     <span
       title={title}
@@ -253,20 +328,19 @@ function Pill({ children, tone, icon, title }: { children: React.ReactNode; tone
     </span>
   );
 }
+
 function Card({
   title,
   icon,
   right,
   children,
   className,
-  bodyClassName,
 }: {
   title: string;
   icon?: React.ReactNode;
   right?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-  bodyClassName?: string;
 }) {
   return (
     <section
@@ -283,10 +357,11 @@ function Card({
         </div>
         {right ? <div className="pt-1">{right}</div> : null}
       </header>
-      <div className={["px-4 pb-4 pt-3", bodyClassName || ""].join(" ")}>{children}</div>
+      <div className="px-4 pb-4 pt-3">{children}</div>
     </section>
   );
 }
+
 function Meter({
   label,
   value01,
@@ -300,7 +375,14 @@ function Meter({
 }) {
   const v = Number.isFinite(value01 as number) ? clamp01(value01 as number) : undefined;
   const cls =
-    intent === "good" ? "bg-emerald-500/70" : intent === "warn" ? "bg-amber-500/70" : intent === "bad" ? "bg-rose-500/70" : "bg-sky-500/70";
+    intent === "good"
+      ? "bg-emerald-500/70"
+      : intent === "warn"
+        ? "bg-amber-500/70"
+        : intent === "bad"
+          ? "bg-rose-500/70"
+          : "bg-sky-500/70";
+
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
@@ -313,6 +395,7 @@ function Meter({
     </div>
   );
 }
+
 function KV({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3">
@@ -321,31 +404,31 @@ function KV({ k, v }: { k: string; v: React.ReactNode }) {
     </div>
   );
 }
+
 function Divider() {
   return <div className="my-3 h-px w-full bg-white/10" />;
 }
-function Tabs<T extends string>({
+
+function Segmented({
   value,
   onChange,
   items,
-  className,
 }: {
-  value: T;
-  onChange: (v: T) => void;
-  items: Array<{ value: T; label: string; icon?: React.ReactNode }>;
-  className?: string;
+  value: string;
+  onChange: (v: string) => void;
+  items: Array<{ key: string; label: string; icon?: React.ReactNode }>;
 }) {
   return (
-    <div className={["flex flex-wrap gap-2", className || ""].join(" ")}>
+    <div className="inline-flex w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 p-1">
       {items.map((it) => {
-        const active = it.value === value;
+        const active = value === it.key;
         return (
           <button
-            key={it.value}
-            onClick={() => onChange(it.value)}
+            key={it.key}
+            onClick={() => onChange(it.key)}
             className={[
-              "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold ring-1 transition",
-              active ? "bg-sky-500/20 text-sky-100 ring-sky-500/30" : "bg-white/5 text-zinc-200 ring-white/10 hover:bg-white/10",
+              "flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-extrabold",
+              active ? "bg-sky-500/20 text-sky-100 ring-1 ring-sky-500/30" : "text-zinc-300 hover:bg-white/5",
             ].join(" ")}
           >
             {it.icon ? <span className="opacity-90">{it.icon}</span> : null}
@@ -356,51 +439,41 @@ function Tabs<T extends string>({
     </div>
   );
 }
-function Collapsible({
-  title,
-  icon,
-  defaultOpen = true,
-  children,
-  right,
-}: {
-  title: string;
-  icon?: React.ReactNode;
-  right?: React.ReactNode;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5">
-      <button
-        onClick={() => setOpen((x) => !x)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-      >
-        <div className="flex items-center gap-2">
-          <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">{icon}</div>
-          <div className="text-xs font-extrabold text-zinc-100">{title}</div>
-        </div>
-        <div className="flex items-center gap-2">
-          {right ? <div>{right}</div> : null}
-          <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
-            {open ? <ChevronUp className="h-4 w-4 text-zinc-200" /> : <ChevronDown className="h-4 w-4 text-zinc-200" />}
-          </div>
-        </div>
-      </button>
-      {open ? <div className="px-4 pb-4">{children}</div> : null}
-    </div>
-  );
-}
 
 /** ---------- Main Page ---------- */
 export default function Page() {
-  const [inputSymbol, setInputSymbol] = useState<string>(() => (typeof window === "undefined" ? "BTCUSDT" : window.localStorage.getItem("ct_symbol_input") || "BTCUSDT"));
-  const [symbol, setSymbol] = useState<string>(() => (typeof window === "undefined" ? "BTCUSDT" : window.localStorage.getItem("ct_symbol_active") || "BTCUSDT"));
-  const [paused, setPaused] = useState<boolean>(() => (typeof window === "undefined" ? false : window.localStorage.getItem("ct_paused") === "1"));
+  const [inputSymbol, setInputSymbol] = useState<string>(() => {
+    if (typeof window === "undefined") return "BTCUSDT";
+    return window.localStorage.getItem("ct_symbol_input") || "BTCUSDT";
+  });
 
-  useEffect(() => { try { window.localStorage.setItem("ct_symbol_input", inputSymbol); } catch {} }, [inputSymbol]);
-  useEffect(() => { try { window.localStorage.setItem("ct_symbol_active", symbol); } catch {} }, [symbol]);
-  useEffect(() => { try { window.localStorage.setItem("ct_paused", paused ? "1" : "0"); } catch {} }, [paused]);
+  const [symbol, setSymbol] = useState<string>(() => {
+    if (typeof window === "undefined") return "BTCUSDT";
+    return window.localStorage.getItem("ct_symbol_active") || "BTCUSDT";
+  });
+
+  const [paused, setPaused] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("ct_paused") === "1";
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ct_symbol_input", inputSymbol);
+    } catch {}
+  }, [inputSymbol]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ct_symbol_active", symbol);
+    } catch {}
+  }, [symbol]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ct_paused", paused ? "1" : "0");
+    } catch {}
+  }, [paused]);
 
   const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
   const out = (setups as unknown as SetupsOutput | null) ?? null;
@@ -438,35 +511,73 @@ export default function Page() {
     });
   }, [out?.setups]);
 
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  /** Selection (FIX): use stable setup.id */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const lastSymbolRef = useRef(symbol);
-  useEffect(() => { if (lastSymbolRef.current !== symbol) { lastSymbolRef.current = symbol; setSelectedKey(null); } }, [symbol]);
-  useEffect(() => { if (!selectedKey && ranked.length > 0) setSelectedKey(stableSetupKey(ranked[0])); }, [ranked.length, selectedKey]);
+  useEffect(() => {
+    if (lastSymbolRef.current !== symbol) {
+      lastSymbolRef.current = symbol;
+      setSelectedId(null);
+    }
+  }, [symbol]);
 
-  const selected = useMemo(() => (!selectedKey ? null : ranked.find((s) => stableSetupKey(s) === selectedKey) || null), [ranked, selectedKey]);
+  useEffect(() => {
+    if (!ranked.length) {
+      setSelectedId(null);
+      return;
+    }
 
-  // READY banner
-  const readyKeys = useMemo(() => (out?.setups || []).filter((s) => String(s.status) === "READY").map((s) => stableSetupKey(s)), [out?.setups]);
+    // If current selection still exists, keep it
+    if (selectedId && ranked.some((s) => s.id === selectedId)) return;
+
+    // Prefer engine preference if present
+    const preferred = out?.preferred_id;
+    if (preferred && ranked.some((s) => s.id === preferred)) {
+      setSelectedId(preferred);
+      return;
+    }
+
+    // Otherwise select top-ranked
+    setSelectedId(ranked[0].id);
+  }, [ranked, out?.preferred_id, selectedId]);
+
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    return ranked.find((s) => s.id === selectedId) || null;
+  }, [ranked, selectedId]);
+
+  /** READY banner */
+  const readyIds = useMemo(() => {
+    return (out?.setups || []).filter((s) => String(s.status) === "READY").map((s) => s.id);
+  }, [out?.setups]);
+
   const prevReadyRef = useRef<string[]>([]);
   const [banner, setBanner] = useState<{ active: boolean; text: string }>({ active: false, text: "" });
+
   useEffect(() => {
     const prev = prevReadyRef.current;
-    const now = readyKeys;
+    const now = readyIds;
     prevReadyRef.current = now;
-    const newOnes = now.filter((k) => !prev.includes(k));
+
+    const newOnes = now.filter((id) => !prev.includes(id));
     if (newOnes.length > 0) {
-      const s = ranked.find((x) => stableSetupKey(x) === newOnes[0]);
-      const text = s ? `READY: ${symbol} • ${humanizeType(s.type)} • ${s.side} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}` : `READY setup detected`;
+      const s = ranked.find((x) => x.id === newOnes[0]);
+      const text = s
+        ? `READY: ${symbol} • ${humanizeType(s.type)} • ${s.side} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}`
+        : `READY setup detected`;
       setBanner({ active: true, text });
-      try { if (navigator.vibrate) navigator.vibrate([60, 40, 60]); } catch {}
+      try {
+        if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+      } catch {}
     } else {
       if (now.length === 0 && banner.active) setBanner({ active: false, text: "" });
       if (now.length > 0 && !banner.active) setBanner({ active: true, text: "READY setup available" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readyKeys.join("|")]);
+  }, [readyIds.join("|")]);
 
-  // Market context (compact)
+  /** Market context compact */
   const biasDir = useMemo(() => {
     const d = normDir(features?.bias?.trend_dir);
     if (d === "bull") return "BULL";
@@ -480,10 +591,46 @@ export default function Page() {
     return Number.isFinite(v) ? clamp01(v) : undefined;
   }, [features?.bias?.trend_strength]);
 
+  const volRegime = useMemo(() => {
+    const v = String(features?.bias?.vol_regime || "").toUpperCase();
+    return v || "—";
+  }, [features?.bias?.vol_regime]);
+
   const crossConsensus01 = useMemo(() => {
     const v = Number(features?.cross?.consensus_score);
     return Number.isFinite(v) ? clamp01(v) : undefined;
   }, [features?.cross?.consensus_score]);
+
+  const keyLevels = useMemo(() => {
+    const ms = features?.market_structure;
+    if (!ms) return [];
+    const tfs = ["4h", "1h", "15m", "5m"];
+    const outLevels: Array<{ tf: string; kind: string; dir: string; level?: number; ts?: number }> = [];
+
+    for (const tf of tfs) {
+      const node = (ms as any)[tf];
+      if (!node) continue;
+
+      const e = pickLatestStructureEvent(node);
+      if (e.kind && e.dir && Number.isFinite(e.level)) {
+        outLevels.push({ tf, kind: e.kind, dir: e.dir, level: e.level, ts: e.ts });
+      }
+      if (Number.isFinite(node?.lastSwingHigh?.price)) {
+        outLevels.push({ tf, kind: "SWING_HIGH", dir: "—", level: node.lastSwingHigh.price, ts: node.lastSwingHigh.ts });
+      }
+      if (Number.isFinite(node?.lastSwingLow?.price)) {
+        outLevels.push({ tf, kind: "SWING_LOW", dir: "—", level: node.lastSwingLow.price, ts: node.lastSwingLow.ts });
+      }
+    }
+
+    const uniq: typeof outLevels = [];
+    for (const l of outLevels) {
+      const exists = uniq.find((x) => x.tf === l.tf && x.kind === l.kind && Math.abs((x.level ?? 0) - (l.level ?? 0)) < 1e-9);
+      if (!exists) uniq.push(l);
+    }
+
+    return uniq.slice(0, 10);
+  }, [features?.market_structure]);
 
   const tfHealth = useMemo(() => {
     const tfs = (snap?.timeframes || []).map((x: any) => ({
@@ -497,28 +644,6 @@ export default function Page() {
     }));
     return tfs.sort((a, b) => a.tf.localeCompare(b.tf));
   }, [snap?.timeframes]);
-
-  const keyLevels = useMemo(() => {
-    const ms = features?.market_structure;
-    if (!ms) return [];
-    const tfs = ["4h", "1h", "15m", "5m"];
-    const outLevels: Array<{ tf: string; kind: string; dir: string; level?: number; ts?: number }> = [];
-    for (const tf of tfs) {
-      const node = (ms as any)[tf];
-      if (!node) continue;
-      const e = pickLatestStructureEvent(node);
-      if (e.kind && e.dir && Number.isFinite(e.level)) outLevels.push({ tf, kind: e.kind, dir: e.dir, level: e.level, ts: e.ts });
-      if (Number.isFinite(node?.lastSwingHigh?.price)) outLevels.push({ tf, kind: "SWING_HIGH", dir: "—", level: node.lastSwingHigh.price, ts: node.lastSwingHigh.ts });
-      if (Number.isFinite(node?.lastSwingLow?.price)) outLevels.push({ tf, kind: "SWING_LOW", dir: "—", level: node.lastSwingLow.price, ts: node.lastSwingLow.ts });
-    }
-    // de-dup
-    const uniq: typeof outLevels = [];
-    for (const l of outLevels) {
-      const exists = uniq.find((x) => x.tf === l.tf && x.kind === l.kind && Math.abs((x.level ?? 0) - (l.level ?? 0)) < 1e-9);
-      if (!exists) uniq.push(l);
-    }
-    return uniq.slice(0, 16);
-  }, [features?.market_structure]);
 
   const appBlocked = useMemo(() => {
     if (!features) return false;
@@ -534,9 +659,21 @@ export default function Page() {
     if (!cleaned) return;
     setSymbol(cleaned);
   };
-  const onEnterInput: React.KeyboardEventHandler<HTMLInputElement> = (e) => { if (e.key === "Enter") onAnalyze(); };
 
-  // IMPORTANT: Keep page compact: only body area scrolls (on lg+), not whole page.
+  const onEnterInput: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    if (e.key === "Enter") onAnalyze();
+  };
+
+  /** Mobile view switch to avoid long scroll */
+  const [mobileView, setMobileView] = useState<"queue" | "setup" | "market">("setup");
+  useEffect(() => {
+    // If no selection, prefer queue; else setup
+    if (!ranked.length) setMobileView("market");
+    else if (!selected) setMobileView("queue");
+    else setMobileView("setup");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol]);
+
   return (
     <div className="min-h-screen bg-[#070A12] text-zinc-100">
       {/* subtle background */}
@@ -546,10 +683,10 @@ export default function Page() {
         <div className="absolute -bottom-52 right-1/4 h-[520px] w-[520px] translate-x-1/2 rounded-full bg-rose-500/10 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto w-full max-w-6xl px-4">
-        {/* Sticky top bar */}
-        <div className="sticky top-0 z-20 pt-5">
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4 backdrop-blur shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+      <div className="relative mx-auto w-full max-w-7xl px-4 pb-8 pt-5">
+        {/* Top bar (sticky on large screens) */}
+        <div className="sticky top-3 z-20">
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-zinc-950/60 p-4 backdrop-blur shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -558,10 +695,10 @@ export default function Page() {
                   </div>
                   <div className="text-base font-extrabold tracking-tight">Crypto Setup Analyzer</div>
                 </div>
-                <div className="text-xs text-zinc-400">Realtime snapshot → features → setups • Built for iPhone/iPad clarity</div>
+                <div className="text-xs text-zinc-400">Frontend-only • Realtime snapshot → features → setups • Compact viewport layout</div>
               </div>
 
-              <div className="grid w-full grid-cols-1 gap-2 md:w-[520px] md:grid-cols-[1fr_auto_auto]">
+              <div className="grid w-full grid-cols-1 gap-2 md:w-[560px] md:grid-cols-[1fr_auto_auto]">
                 <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <Database className="h-4 w-4 text-zinc-300" />
                   <input
@@ -599,39 +736,63 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Pill tone={dqTone(dq)} icon={dqOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}>DQ {String(dq || "—")}</Pill>
+            {/* status row */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Pill tone={dqTone(dq)} icon={dqOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}>
+                DQ {String(dq || "—")}
+              </Pill>
               <Pill
                 tone={bybitOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
                 icon={bybitOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                title="Bybit feed health (execution venue)"
               >
                 Bybit {bybitOk ? "OK" : "NOT OK"}
               </Pill>
               <Pill
                 tone={binanceOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
                 icon={binanceOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                title="Binance feed health (cross exchange context)"
               >
                 Binance {binanceOk ? "OK" : "NOT OK"}
               </Pill>
               <Pill
                 tone={
-                  staleSec == null ? "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
-                  : staleSec <= 1.5 ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                  : staleSec <= 5 ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                  : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                  staleSec == null
+                    ? "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
+                    : staleSec <= 1.5
+                      ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                      : staleSec <= 5
+                        ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                        : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
                 }
                 icon={<Clock className="h-4 w-4" />}
+                title="Staleness based on snap.price.ts"
               >
                 Stale {staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`}
               </Pill>
-              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Gauge className="h-4 w-4" />}>
+              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Gauge className="h-4 w-4" />} title="Realtime mid price derived from orderbook">
                 Mid {Number.isFinite(mid) ? fmtPx(mid) : "—"}
               </Pill>
+
               <div className="ml-auto text-xs text-zinc-400">Updated {lastUpdated}</div>
             </div>
 
+            {/* Mobile segment control */}
+            <div className="lg:hidden">
+              <Segmented
+                value={mobileView}
+                onChange={(v) => setMobileView(v as any)}
+                items={[
+                  { key: "queue", label: `Queue (${ranked.length})`, icon: <Target className="h-4 w-4" /> },
+                  { key: "setup", label: "Setup", icon: <Crosshair className="h-4 w-4" /> },
+                  { key: "market", label: "Market", icon: <LineChart className="h-4 w-4" /> },
+                ]}
+              />
+            </div>
+
+            {/* banner */}
             {banner.active ? (
-              <div className="mt-3 flex items-start justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+              <div className="mt-1 flex items-start justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 rounded-xl bg-emerald-500/15 p-2 ring-1 ring-emerald-500/25">
                     <Flame className="h-4 w-4 text-emerald-200" />
@@ -652,15 +813,315 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Body: compact, internal scrolling on lg+ */}
-        <div className="relative pb-10 pt-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr] lg:items-start">
-            {/* LEFT: sticky rail on lg+ */}
-            <div className="space-y-4 lg:sticky lg:top-[220px]">
+        {/* Main viewport panes */}
+        <div className="mt-4">
+          {/* Desktop: 3 columns with internal scroll; Mobile: render one view at a time */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr_360px] lg:gap-4">
+            {/* LEFT: Setup Queue */}
+            <div
+              className={[
+                "lg:block",
+                mobileView === "queue" ? "block" : "hidden",
+              ].join(" ")}
+            >
               <Card
-                title="Market Context"
-                icon={<LineChart className="h-5 w-5" />}
+                title="Setup Queue"
+                icon={<Target className="h-5 w-5" />}
+                right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}
+                className="lg:sticky lg:top-[148px]"
+              >
+                <div className="space-y-3">
+                  {appBlocked ? (
+                    <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="rounded-xl bg-rose-500/15 p-2 ring-1 ring-rose-500/25">
+                          <ShieldAlert className="h-5 w-5 text-rose-200" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-extrabold text-rose-100">Execution gated</div>
+                          <div className="mt-1 text-xs text-rose-100/90">
+                            DQ / Bybit feed / staleness / paused is blocking actionable execution signals.
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                            <Pill tone={dqTone(dq)} icon={<Database className="h-4 w-4" />}>
+                              DQ {String(dq || "—")}
+                            </Pill>
+                            <Pill
+                              tone={bybitOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
+                              icon={bybitOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                            >
+                              Bybit {bybitOk ? "OK" : "NOT OK"}
+                            </Pill>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="max-h-[62vh] space-y-2 overflow-auto pr-1 lg:max-h-[calc(100vh-330px)]">
+                    {ranked.length === 0 ? (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="text-sm font-bold text-zinc-100">No setups</div>
+                        <div className="mt-1 text-xs text-zinc-400">Either the market has no valid patterns, or data is still filling.</div>
+                      </div>
+                    ) : (
+                      ranked.map((s) => {
+                        const sel = selectedId === s.id;
+                        const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
+                        const pri01 = clamp01(pri / 100);
+                        const chip = actionChip(s);
+
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => {
+                              setSelectedId(s.id);
+                              setMobileView("setup");
+                            }}
+                            className={[
+                              "w-full text-left",
+                              "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
+                              "transition hover:bg-white/7 active:bg-white/10",
+                              sel ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-baseline gap-2">
+                                  <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
+                                  <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <Pill tone={statusTone(s.status)}>{String(s.status)}</Pill>
+                                  <Pill tone={gradeTone(s.confidence?.grade)}>Grade {String(s.confidence?.grade || "—").toUpperCase()}</Pill>
+                                  <Pill tone={chip.tone} icon={chip.icon}>
+                                    {chip.label}
+                                  </Pill>
+                                </div>
+
+                                <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                                  <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
+                                    <div className="text-[11px] text-zinc-400">Conf</div>
+                                    <div className="mt-0.5 font-extrabold text-zinc-100">{fmtScore100(s.confidence?.score)}</div>
+                                  </div>
+                                  <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
+                                    <div className="text-[11px] text-zinc-400">RR min</div>
+                                    <div className="mt-0.5 font-extrabold text-zinc-100">{Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</div>
+                                  </div>
+                                  <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
+                                    <div className="text-[11px] text-zinc-400">Priority</div>
+                                    <div className="mt-0.5 font-extrabold text-zinc-100">{pri}</div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-2">
+                                  <div className="h-2.5 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                                    <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
+                                  </div>
+                                  {Array.isArray(s.priority_reasons) && s.priority_reasons.length > 0 ? (
+                                    <div className="mt-1 text-[11px] text-zinc-400">Why: {s.priority_reasons.join(" • ")}</div>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              <div className="mt-1 shrink-0 text-zinc-400">
+                                <ChevronRight className="h-5 w-5" />
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* CENTER: Selected Setup (primary) */}
+            <div className={[mobileView === "setup" ? "block" : "hidden", "lg:block"].join(" ")}>
+              <Card
+                title="Selected Setup"
+                icon={<Crosshair className="h-5 w-5" />}
                 right={
+                  selected ? (
+                    <div className="flex items-center gap-2">
+                      <Pill tone={statusTone(selected.status)}>{selected.status}</Pill>
+                      <button
+                        onClick={() => setMobileView("queue")}
+                        className="lg:hidden rounded-xl bg-white/5 px-3 py-2 text-xs font-bold text-zinc-100 ring-1 ring-white/10 hover:bg-white/10"
+                      >
+                        Queue
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setMobileView("queue")}
+                      className="lg:hidden rounded-xl bg-white/5 px-3 py-2 text-xs font-bold text-zinc-100 ring-1 ring-white/10 hover:bg-white/10"
+                    >
+                      Queue
+                    </button>
+                  )
+                }
+                className="lg:sticky lg:top-[148px]"
+              >
+                <div className="max-h-[68vh] overflow-auto pr-1 lg:max-h-[calc(100vh-220px)]">
+                  {!selected ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-sm font-bold text-zinc-100">No selection</div>
+                      <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
+                    </div>
+                  ) : (
+                    <SetupDetail
+                      symbol={symbol}
+                      mid={mid}
+                      dqOk={dqOk}
+                      bybitOk={bybitOk}
+                      staleSec={staleSec}
+                      paused={paused}
+                      features={features}
+                      setup={selected}
+                      onGoMarket={() => setMobileView("market")}
+                    />
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* RIGHT: Market + Health (compact & always easy to find) */}
+            <div className={[mobileView === "market" ? "block" : "hidden", "lg:block"].join(" ")}>
+              <RightRail
+                biasDir={biasDir}
+                biasTf={String(features?.bias?.tf || "—")}
+                biasStrength01={biasStrength01}
+                volRegime={volRegime}
+                crossConsensus01={crossConsensus01}
+                features={features}
+                mid={mid}
+                keyLevels={keyLevels}
+                tfHealth={tfHealth}
+                snap={snap}
+                dq={dq}
+                dqOk={dqOk}
+                bybitOk={bybitOk}
+                binanceOk={binanceOk}
+                staleSec={staleSec}
+                lastUpdated={lastUpdated}
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 text-center text-[11px] text-zinc-500">
+            This UI does not place trades. It explains signals, risk, and conditions so the user can execute confidently.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** ---------- Right Rail ---------- */
+function RightRail({
+  biasDir,
+  biasTf,
+  biasStrength01,
+  volRegime,
+  crossConsensus01,
+  features,
+  mid,
+  keyLevels,
+  tfHealth,
+  snap,
+  dq,
+  dqOk,
+  bybitOk,
+  binanceOk,
+  staleSec,
+  lastUpdated,
+}: {
+  biasDir: string;
+  biasTf: string;
+  biasStrength01?: number;
+  volRegime: string;
+  crossConsensus01?: number;
+  features: any;
+  mid: number;
+  keyLevels: Array<{ tf: string; kind: string; dir: string; level?: number; ts?: number }>;
+  tfHealth: Array<{
+    tf: string;
+    stale_ms: number;
+    partial: boolean;
+    haveCandlesBybit: number;
+    haveCandlesBinance: number;
+    haveTrades: number;
+    haveOrderbook: boolean;
+  }>;
+  snap: any;
+  dq?: string;
+  dqOk: boolean;
+  bybitOk: boolean;
+  binanceOk: boolean;
+  staleSec?: number;
+  lastUpdated: string;
+}) {
+  const [tab, setTab] = useState<"trend" | "levels" | "health">("trend");
+
+  return (
+    <Card
+      title="Market & Health"
+      icon={<LineChart className="h-5 w-5" />}
+      right={
+        <Pill
+          tone={
+            dqOk && bybitOk && (staleSec == null || staleSec <= 5)
+              ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+              : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+          }
+          icon={dqOk && bybitOk && (staleSec == null || staleSec <= 5) ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+        >
+          {dqOk && bybitOk && (staleSec == null || staleSec <= 5) ? "Snapshot OK" : "Gated"}
+        </Pill>
+      }
+      className="lg:sticky lg:top-[148px]"
+    >
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs text-zinc-400">Updated {lastUpdated}</div>
+          <div className="flex flex-wrap gap-2">
+            <Pill tone={dqTone(dq)} icon={dqOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}>
+              DQ {String(dq || "—")}
+            </Pill>
+            <Pill
+              tone={bybitOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
+              icon={bybitOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+            >
+              Bybit {bybitOk ? "OK" : "NOT OK"}
+            </Pill>
+            <Pill
+              tone={binanceOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
+              icon={binanceOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+            >
+              Binance {binanceOk ? "OK" : "NOT OK"}
+            </Pill>
+          </div>
+        </div>
+
+        <Segmented
+          value={tab}
+          onChange={(v) => setTab(v as any)}
+          items={[
+            { key: "trend", label: "Trend", icon: <TrendingUp className="h-4 w-4" /> },
+            { key: "levels", label: "Levels", icon: <Target className="h-4 w-4" /> },
+            { key: "health", label: "Health", icon: <Database className="h-4 w-4" /> },
+          ]}
+        />
+
+        <div className="max-h-[62vh] overflow-auto pr-1 lg:max-h-[calc(100vh-310px)]">
+          {tab === "trend" ? (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-bold text-zinc-100">Bias</div>
                   <Pill
                     tone={
                       biasDir === "BULL"
@@ -671,163 +1132,235 @@ export default function Page() {
                     }
                     icon={biasDir === "BULL" ? <TrendingUp className="h-4 w-4" /> : biasDir === "BEAR" ? <TrendingDown className="h-4 w-4" /> : <Waves className="h-4 w-4" />}
                   >
-                    {biasDir} • {String(features?.bias?.tf || "—")}
+                    {biasDir} • {biasTf}
                   </Pill>
-                }
-              >
-                <div className="space-y-3">
+                </div>
+                <div className="mt-3 space-y-3">
                   <Meter label="Bias strength" value01={biasStrength01} intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"} />
-                  <Meter
-                    label="Cross consensus"
-                    value01={crossConsensus01}
-                    right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
-                    intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : "neutral"}
-                  />
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[11px] text-zinc-400">ADX14</div>
-                      <div className="mt-0.5 text-sm font-extrabold text-zinc-100">
-                        {Number.isFinite(Number(features?.bias?.adx14)) ? fmtNum(Number(features?.bias?.adx14), 1) : "—"}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                      <div className="text-[11px] font-bold text-zinc-200">Volatility</div>
+                      <div className="mt-2">
+                        <Pill
+                          tone={
+                            volRegime === "HIGH"
+                              ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                              : volRegime === "LOW"
+                                ? "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
+                                : "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
+                          }
+                        >
+                          {volRegime}
+                        </Pill>
+                      </div>
+                      <div className="mt-3 space-y-1.5">
+                        <KV k="ADX14" v={Number.isFinite(Number(features?.bias?.adx14)) ? fmtNum(Number(features?.bias?.adx14), 1) : "—"} />
+                        <KV k="EMA200" v={Number.isFinite(Number(features?.bias?.ema200)) ? fmtPx(Number(features?.bias?.ema200)) : "—"} />
                       </div>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[11px] text-zinc-400">EMA200</div>
-                      <div className="mt-0.5 text-sm font-extrabold text-zinc-100">
-                        {Number.isFinite(Number(features?.bias?.ema200)) ? fmtPx(Number(features?.bias?.ema200)) : "—"}
+
+                    <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                      <div className="text-[11px] font-bold text-zinc-200">Cross</div>
+                      <div className="mt-2">
+                        <Meter
+                          label="Consensus"
+                          value01={crossConsensus01}
+                          right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
+                          intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : crossConsensus01 != null && crossConsensus01 <= 0.35 ? "warn" : "neutral"}
+                        />
+                      </div>
+                      <div className="mt-3 space-y-1.5">
+                        <KV k="dev_bps" v={Number.isFinite(Number(features?.cross?.dev_bps)) ? `${fmtNum(Number(features?.cross?.dev_bps), 1)} bps` : "—"} />
+                        <KV k="dev_z" v={Number.isFinite(Number(features?.cross?.dev_z)) ? fmtNum(Number(features?.cross?.dev_z), 2) : "—"} />
                       </div>
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
 
-              <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
-                {appBlocked ? (
-                  <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-xl bg-rose-500/15 p-2 ring-1 ring-rose-500/25">
-                        <ShieldAlert className="h-5 w-5 text-rose-200" />
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                  <Layers className="h-4 w-4 text-zinc-300" />
+                  Structure trend by TF
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {["4h", "1h", "15m", "5m"].map((tf) => {
+                    const node = (features?.market_structure as any)?.[tf];
+                    const badge = structureTrendBadge(node?.trend);
+                    const e = pickLatestStructureEvent(node);
+
+                    return (
+                      <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-extrabold text-zinc-100">{tf}</div>
+                          <span className={["inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold", badge.cls].join(" ")}>
+                            {badge.icon}
+                            {badge.label}
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-1.5 text-xs">
+                          <KV k="Confirmed" v={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"} />
+                          <KV
+                            k="Latest event"
+                            v={
+                              e.kind && e.dir
+                                ? `${e.kind} ${e.dir}${Number.isFinite(e.level) ? ` @ ${fmtPx(e.level)}` : ""}${Number.isFinite(e.ts) ? ` • ${relTime(e.ts)}` : ""}`
+                                : "—"
+                            }
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-sm font-extrabold text-rose-100">Execution gated</div>
-                        <div className="mt-1 text-xs text-rose-100/90">Review context only. Do not execute trades until health returns.</div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : tab === "levels" ? (
+            <div className="space-y-2">
+              {keyLevels.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-sm font-bold text-zinc-100">No key levels</div>
+                  <div className="mt-1 text-xs text-zinc-400">Market structure levels are not available yet.</div>
+                </div>
+              ) : (
+                keyLevels.map((l, i) => (
+                  <div key={`${l.tf}-${l.kind}-${i}`} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.tf}</Pill>
+                          <Pill
+                            tone={
+                              l.kind === "BOS"
+                                ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
+                                : l.kind === "CHOCH"
+                                  ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                                  : l.kind === "SWING_HIGH"
+                                    ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                                    : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                            }
+                          >
+                            {l.kind}
+                          </Pill>
+                          {l.dir && l.dir !== "—" ? <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill> : null}
+                        </div>
+                        <div className="mt-2 text-sm font-extrabold text-zinc-50">{Number.isFinite(l.level) ? fmtPx(l.level) : "—"}</div>
+                        <div className="mt-1 text-xs text-zinc-400">{Number.isFinite(l.ts) ? `Seen ${relTime(l.ts)}` : ""}</div>
                       </div>
+                      {Number.isFinite(mid) && Number.isFinite(l.level) ? (
+                        <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" title="Distance from mid (absolute)">
+                          Δ {fmtPx(Math.abs(mid - (l.level as number)))}
+                        </Pill>
+                      ) : null}
                     </div>
                   </div>
-                ) : null}
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                  <Clock className="h-4 w-4 text-zinc-300" />
+                  Realtime availability
+                </div>
+                <div className="mt-3 space-y-2 text-xs">
+                  <KV
+                    k="Bybit availability"
+                    v={
+                      snap?.availability?.bybit
+                        ? snap.availability.bybit.ok
+                          ? "OK"
+                          : `NOT OK${
+                              Array.isArray(snap.availability.bybit.notes) && snap.availability.bybit.notes.length ? ` • ${snap.availability.bybit.notes.join(", ")}` : ""
+                            }`
+                        : "—"
+                    }
+                  />
+                  <KV
+                    k="Binance availability"
+                    v={
+                      snap?.availability?.binance
+                        ? snap.availability.binance.ok
+                          ? "OK"
+                          : `NOT OK${
+                              Array.isArray(snap.availability.binance.notes) && snap.availability.binance.notes.length ? ` • ${snap.availability.binance.notes.join(", ")}` : ""
+                            }`
+                        : "—"
+                    }
+                  />
+                  <KV k="Quality grade (raw snapshot)" v={snap?.data_quality?.grade ? String(snap.data_quality.grade) : "—"} />
+                  <KV k="Quality score (raw snapshot)" v={Number.isFinite(Number(snap?.data_quality?.score)) ? fmtNum(Number(snap?.data_quality?.score), 0) : "—"} />
+                </div>
+              </div>
 
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                  <Layers className="h-4 w-4 text-zinc-300" />
+                  Timeframe diagnostics
+                </div>
                 <div className="mt-3 space-y-2">
-                  {ranked.length === 0 ? (
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <div className="text-sm font-bold text-zinc-100">No setups</div>
-                      <div className="mt-1 text-xs text-zinc-400">Either no valid patterns or data is still filling.</div>
-                    </div>
+                  {tfHealth.length === 0 ? (
+                    <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
                   ) : (
-                    ranked.map((s) => {
-                      const key = stableSetupKey(s);
-                      const sel = selectedKey === key;
-                      const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
-                      const pri01 = clamp01(pri / 100);
-                      const chip = actionChip(s);
+                    tfHealth.map((t) => {
+                      const staleMs = Number.isFinite(t.stale_ms) ? t.stale_ms : NaN;
+                      const staleTone =
+                        Number.isFinite(staleMs) && staleMs <= 1500
+                          ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                          : Number.isFinite(staleMs) && staleMs <= 5000
+                            ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                            : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
 
                       return (
-                        <button
-                          key={key}
-                          onClick={() => setSelectedKey(key)}
-                          className={[
-                            "w-full text-left",
-                            "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
-                            "transition hover:bg-white/7 active:bg-white/10",
-                            sel ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-baseline gap-2">
-                                <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
-                                <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
-                              </div>
-
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <Pill tone={statusTone(s.status)}>{String(s.status)}</Pill>
-                                <Pill tone={gradeTone(s.confidence?.grade)}>Grade {String(s.confidence?.grade || "—").toUpperCase()}</Pill>
-                                <Pill tone={chip.tone} icon={chip.icon}>{chip.label}</Pill>
-                              </div>
-
-                              <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                                <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                  <div className="text-[11px] text-zinc-400">Conf</div>
-                                  <div className="mt-0.5 font-extrabold text-zinc-100">{fmtScore100(s.confidence?.score)}</div>
-                                </div>
-                                <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                  <div className="text-[11px] text-zinc-400">RR min</div>
-                                  <div className="mt-0.5 font-extrabold text-zinc-100">{Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</div>
-                                </div>
-                                <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                  <div className="text-[11px] text-zinc-400">Priority</div>
-                                  <div className="mt-0.5 font-extrabold text-zinc-100">{pri}</div>
-                                </div>
-                              </div>
-
-                              <div className="mt-2">
-                                <div className="h-2.5 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                                  <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
-                                </div>
-                                {Array.isArray(s.priority_reasons) && s.priority_reasons.length > 0 ? (
-                                  <div className="mt-1 text-[11px] text-zinc-400">Why: {s.priority_reasons.join(" • ")}</div>
-                                ) : null}
-                              </div>
-                            </div>
-
-                            <div className="mt-1 shrink-0 text-zinc-400">
-                              <ChevronRight className="h-5 w-5" />
+                        <div key={t.tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />}>
+                                {Number.isFinite(staleMs) ? `${fmtNum(staleMs / 1000, 1)}s` : "—"}
+                              </Pill>
+                              <Pill
+                                tone={t.partial ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"}
+                              >
+                                {t.partial ? "PARTIAL" : "OK"}
+                              </Pill>
                             </div>
                           </div>
-                        </button>
+                          <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-zinc-300">
+                            <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+                              <div className="text-zinc-400">Bybit</div>
+                              <div className="font-bold text-zinc-100">{t.haveCandlesBybit}</div>
+                            </div>
+                            <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+                              <div className="text-zinc-400">Binance</div>
+                              <div className="font-bold text-zinc-100">{t.haveCandlesBinance}</div>
+                            </div>
+                            <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+                              <div className="text-zinc-400">Trades</div>
+                              <div className="font-bold text-zinc-100">{t.haveTrades}</div>
+                            </div>
+                            <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+                              <div className="text-zinc-400">OB</div>
+                              <div className="font-bold text-zinc-100">{t.haveOrderbook ? "YES" : "NO"}</div>
+                            </div>
+                          </div>
+                        </div>
                       );
                     })
                   )}
                 </div>
-              </Card>
-            </div>
-
-            {/* RIGHT: Selected setup as compact tabs */}
-            <div className="space-y-4">
-              <Card title="Selected Setup" icon={<Crosshair className="h-5 w-5" />} right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}>
-                {!selected ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="text-sm font-bold text-zinc-100">No selection</div>
-                    <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
-                  </div>
-                ) : (
-                  <SetupDetailCompact
-                    symbol={symbol}
-                    mid={mid}
-                    dqOk={dqOk}
-                    bybitOk={bybitOk}
-                    staleSec={staleSec}
-                    paused={paused}
-                    features={features}
-                    setup={selected}
-                    keyLevels={keyLevels}
-                    tfHealth={tfHealth}
-                    dq={dq}
-                  />
-                )}
-              </Card>
-
-              <div className="text-center text-[11px] text-zinc-500 pb-6">
-                This UI does not place trades. It explains signals, risk, and conditions so the user can execute confidently.
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
-/** ---------- Compact Detail with Tabs + Collapsible ---------- */
-function SetupDetailCompact({
+/** ---------- Detail component ---------- */
+function SetupDetail({
   symbol,
   mid,
   dqOk,
@@ -836,9 +1369,7 @@ function SetupDetailCompact({
   paused,
   features,
   setup,
-  keyLevels,
-  tfHealth,
-  dq,
+  onGoMarket,
 }: {
   symbol: string;
   mid: number;
@@ -848,18 +1379,29 @@ function SetupDetailCompact({
   paused: boolean;
   features: any;
   setup: TradeSetup;
-  keyLevels: Array<{ tf: string; kind: string; dir: string; level?: number; ts?: number }>;
-  tfHealth: Array<any>;
-  dq?: string;
+  onGoMarket?: () => void;
 }) {
+  const action = actionChip(setup);
+
   const entry = setup.entry;
   const zone = entry?.zone;
   const stop = setup.stop?.price;
   const tps = Array.isArray(setup.tp) ? setup.tp : [];
+
+  const conf01 = Number.isFinite(Number(setup.confidence?.score)) ? clamp01(Number(setup.confidence.score) / 100) : undefined;
+  const rr01 = Number.isFinite(Number(setup.rr_min)) ? clamp01(Math.min(3, Math.max(0, Number(setup.rr_min))) / 3) : undefined;
+
+  const biasStrength01 = Number.isFinite(Number(features?.bias?.trend_strength)) ? clamp01(Number(features.bias.trend_strength)) : undefined;
+
+  const of = features?.orderflow;
+  const deltaNorm01 = Number.isFinite(Number(of?.delta?.delta_norm)) ? clamp01((Number(of.delta.delta_norm) + 1) / 2) : undefined;
+  const divScore01 = Number.isFinite(Number(of?.delta?.divergence_score)) ? clamp01(Number(of.delta.divergence_score)) : undefined;
+  const absScore01 = Number.isFinite(Number(of?.delta?.absorption_score)) ? clamp01(Number(of.delta.absorption_score)) : undefined;
+
+  const crossConsensus01 = Number.isFinite(Number(features?.cross?.consensus_score)) ? clamp01(Number(features.cross.consensus_score)) : undefined;
+
   const checklist = Array.isArray(entry?.trigger?.checklist) ? entry.trigger.checklist : [];
   const blockers = Array.isArray(setup.execution?.blockers) ? setup.execution!.blockers : [];
-
-  const action = actionChip(setup);
 
   const isInZone =
     Number.isFinite(mid) &&
@@ -871,23 +1413,6 @@ function SetupDetailCompact({
 
   const globalGateOk = dqOk && bybitOk && !paused && (staleSec == null || staleSec <= 5);
 
-  const conf01 = Number.isFinite(Number(setup.confidence?.score)) ? clamp01(Number(setup.confidence.score) / 100) : undefined;
-  const rr01 = Number.isFinite(Number(setup.rr_min)) ? clamp01(Math.min(3, Math.max(0, Number(setup.rr_min))) / 3) : undefined;
-  const biasStrength01 = Number.isFinite(Number(features?.bias?.trend_strength)) ? clamp01(Number(features.bias.trend_strength)) : undefined;
-
-  const of = features?.orderflow;
-  const deltaNorm01 = Number.isFinite(Number(of?.delta?.delta_norm)) ? clamp01((Number(of.delta.delta_norm) + 1) / 2) : undefined;
-  const divScore01 = Number.isFinite(Number(of?.delta?.divergence_score)) ? clamp01(Number(of.delta.divergence_score)) : undefined;
-  const absScore01 = Number.isFinite(Number(of?.delta?.absorption_score)) ? clamp01(Number(of.delta.absorption_score)) : undefined;
-  const crossConsensus01 = Number.isFinite(Number(features?.cross?.consensus_score)) ? clamp01(Number(features.cross.consensus_score)) : undefined;
-
-  const [tab, setTab] = useState<"plan" | "meters" | "explain" | "levels" | "health">("plan");
-
-  // show more toggles to prevent long sections
-  const [showAllReasons, setShowAllReasons] = useState(false);
-  const [showAllLevels, setShowAllLevels] = useState(false);
-  const [showAllChecklist, setShowAllChecklist] = useState(false);
-
   const guidance = useMemo(() => {
     const ex = setup.execution;
 
@@ -897,30 +1422,91 @@ function SetupDetailCompact({
       if (!bybitOk) reasons.push("Bybit feed not OK");
       if (paused) reasons.push("Updates paused");
       if (staleSec != null && staleSec > 5) reasons.push(`Price feed stale (${fmtNum(staleSec, 1)}s)`);
-      return { headline: "Do not execute yet", tone: "bg-rose-500/10 text-rose-100 ring-1 ring-rose-500/25", bullets: reasons.length ? reasons : ["Execution gated"] };
+      return {
+        headline: "Do not execute yet",
+        tone: "bg-rose-500/10 text-rose-100 ring-1 ring-rose-500/25",
+        bullets: reasons.length ? reasons : ["Execution gated"],
+      };
     }
 
-    if (!ex) return { headline: "Monitor", tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25", bullets: ["Execution decision not available yet."] };
-    if (ex.state === "BLOCKED") return { headline: "Blocked", tone: "bg-rose-500/10 text-rose-100 ring-1 ring-rose-500/25", bullets: [ex.reason || "Blocked"] };
-    if (ex.canEnterMarket) return { headline: "Enter market now", tone: "bg-emerald-500/10 text-emerald-100 ring-1 ring-emerald-500/25", bullets: ["All required conditions are satisfied for a market entry.", "Double-check stop & position size before executing."] };
-    if (ex.canPlaceLimit) return { headline: "Place limit order", tone: "bg-emerald-500/10 text-emerald-100 ring-1 ring-emerald-500/25", bullets: ["Price is inside the entry zone.", "Place a limit within the zone, with stop and TP ladder configured."] };
-    if (ex.state === "WAIT_ZONE") return { headline: "Wait for zone", tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25", bullets: ["Do not force entry outside the zone.", "Monitor until mid enters zone, then re-check conditions."] };
-    if (ex.state === "WAIT_CLOSE") return { headline: "Wait for close-confirm", tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25", bullets: ["This setup requires a close-confirm trigger before entering."] };
-    if (ex.state === "WAIT_RETEST") return { headline: "Wait for retest", tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25", bullets: ["Breakout setup is forming; wait for retest condition."] };
-    if (ex.state === "WAIT_FILL") return { headline: "Waiting for limit fill", tone: "bg-sky-500/10 text-sky-100 ring-1 ring-sky-500/25", bullets: ["Do not chase. Let the limit fill or invalidate."] };
-    return { headline: "Monitor", tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25", bullets: [ex.reason || "Monitor conditions"] };
+    if (!ex) {
+      return {
+        headline: "Monitor",
+        tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
+        bullets: ["Execution decision not available yet."],
+      };
+    }
+
+    if (ex.state === "BLOCKED") {
+      return {
+        headline: "Blocked",
+        tone: "bg-rose-500/10 text-rose-100 ring-1 ring-rose-500/25",
+        bullets: [ex.reason || "Blocked"],
+      };
+    }
+
+    if (ex.canEnterMarket) {
+      return {
+        headline: "Enter market now",
+        tone: "bg-emerald-500/10 text-emerald-100 ring-1 ring-emerald-500/25",
+        bullets: ["All required conditions are satisfied for a market entry.", "Double-check stop & position size before executing."],
+      };
+    }
+
+    if (ex.canPlaceLimit) {
+      return {
+        headline: "Place limit order",
+        tone: "bg-emerald-500/10 text-emerald-100 ring-1 ring-emerald-500/25",
+        bullets: ["Price is inside the entry zone.", "Place a limit order within the zone, with stop and TP ladder configured."],
+      };
+    }
+
+    if (ex.state === "WAIT_ZONE") {
+      return {
+        headline: "Wait for price to enter the zone",
+        tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
+        bullets: ["Do not force entry outside the zone.", "Monitor until mid price reaches the entry zone, then re-check conditions."],
+      };
+    }
+    if (ex.state === "WAIT_CLOSE") {
+      return {
+        headline: "Wait for candle close-confirm",
+        tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
+        bullets: ["This setup requires a close-confirm trigger before entering."],
+      };
+    }
+    if (ex.state === "WAIT_RETEST") {
+      return {
+        headline: "Wait for retest",
+        tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
+        bullets: ["Breakout setup is forming; wait for retest condition."],
+      };
+    }
+    if (ex.state === "WAIT_FILL") {
+      return {
+        headline: "Triggered; waiting for limit fill",
+        tone: "bg-sky-500/10 text-sky-100 ring-1 ring-sky-500/25",
+        bullets: ["Do not chase. Let the limit fill or invalidate."],
+      };
+    }
+
+    return {
+      headline: "Monitor",
+      tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
+      bullets: [ex.reason || "Monitor conditions"],
+    };
   }, [setup.execution, globalGateOk, dqOk, bybitOk, paused, staleSec]);
 
-  const reasons = Array.isArray(setup.confidence?.reasons) ? setup.confidence.reasons : [];
-  const reasonsShown = showAllReasons ? reasons : reasons.slice(0, 8);
+  const [detailTab, setDetailTab] = useState<"plan" | "risk" | "explain">("plan");
 
-  const levelsShown = showAllLevels ? keyLevels : keyLevels.slice(0, 8);
-
-  const checklistShown = showAllChecklist ? checklist : checklist.slice(0, 5);
+  useEffect(() => {
+    // When selecting a new setup, default user to plan (fast decision)
+    setDetailTab("plan");
+  }, [setup.id]);
 
   return (
     <div className="space-y-4">
-      {/* Header summary */}
+      {/* Header (compact) */}
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
@@ -928,27 +1514,47 @@ function SetupDetailCompact({
               <div className="text-base font-extrabold text-zinc-50">{humanizeType(String(setup.type))}</div>
               <div className={["text-base font-extrabold", sideTone(setup.side)].join(" ")}>{setup.side}</div>
               <Pill tone={gradeTone(setup.confidence?.grade)}>Grade {String(setup.confidence?.grade || "—").toUpperCase()}</Pill>
-              <Pill tone={action.tone} icon={action.icon}>{action.label}</Pill>
+              <Pill tone={action.tone} icon={action.icon}>
+                {action.label}
+              </Pill>
             </div>
 
             <div className="mt-2 flex flex-wrap gap-2">
-              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Clock className="h-4 w-4" />}>Created {relTime(setup.created_ts)}</Pill>
-              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Clock className="h-4 w-4" />}>Expires {relTime(setup.expires_ts)}</Pill>
+              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Clock className="h-4 w-4" />}>
+                Created {relTime(setup.created_ts)}
+              </Pill>
+              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Clock className="h-4 w-4" />}>
+                Expires {relTime(setup.expires_ts)}
+              </Pill>
               <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Layers className="h-4 w-4" />}>
                 TF entry {setup.entry_tf} • trigger {setup.trigger_tf} • bias {setup.bias_tf}
               </Pill>
             </div>
           </div>
 
-          <a
-            href={`https://www.bybit.com/trade/usdt/${encodeURIComponent(symbol)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs font-bold text-zinc-100 ring-1 ring-white/10 hover:bg-white/10"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Open on Bybit
-          </a>
+          <div className="flex flex-col gap-2">
+            <a
+              href={`https://www.bybit.com/trade/usdt/${encodeURIComponent(symbol)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs font-bold text-zinc-100 ring-1 ring-white/10 hover:bg-white/10"
+              title="Open symbol on Bybit"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open on Bybit
+            </a>
+            {onGoMarket ? (
+              <button
+                onClick={onGoMarket}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs font-bold text-zinc-100 ring-1 ring-white/10 hover:bg-white/10"
+                title="Open market panel"
+              >
+                <LineChart className="h-4 w-4" />
+                Market panel
+              </button>
+            ) : null}
+            <div className="text-[11px] text-zinc-400 text-right">This link is optional. The app does not trade automatically.</div>
+          </div>
         </div>
 
         <Divider />
@@ -981,69 +1587,51 @@ function SetupDetailCompact({
         </div>
       </div>
 
-      {/* Tabs to prevent long vertical page */}
-      <Tabs
-        value={tab}
-        onChange={setTab}
+      {/* Compact detail tabs to prevent long scrolling */}
+      <Segmented
+        value={detailTab}
+        onChange={(v) => setDetailTab(v as any)}
         items={[
-          { value: "plan", label: "Plan", icon: <Target className="h-4 w-4" /> },
-          { value: "meters", label: "Meters", icon: <Gauge className="h-4 w-4" /> },
-          { value: "explain", label: "Explain", icon: <LineChart className="h-4 w-4" /> },
-          { value: "levels", label: "Levels", icon: <Layers className="h-4 w-4" /> },
-          { value: "health", label: "Health", icon: <Database className="h-4 w-4" /> },
+          { key: "plan", label: "Entry Plan", icon: <Target className="h-4 w-4" /> },
+          { key: "risk", label: "Risk/Targets", icon: <ShieldCheck className="h-4 w-4" /> },
+          { key: "explain", label: "Explain", icon: <Gauge className="h-4 w-4" /> },
         ]}
       />
 
-      {/* Tab content */}
-      {tab === "plan" ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Collapsible
-            title="Entry Plan"
-            icon={<Target className="h-4 w-4 text-zinc-200" />}
-            defaultOpen
-            right={
-              <Pill tone={isInZone ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"}>
-                {isInZone ? "IN ZONE" : "OUTSIDE"}
-              </Pill>
-            }
-          >
-            <div className="space-y-2">
-              <KV k="Mode" v={entry?.mode ? entry.mode : "—"} />
-              <KV k="Entry zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
-              <KV
-                k="Mid vs zone"
-                v={
-                  Number.isFinite(mid) && zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi)
-                    ? isInZone
-                      ? "INSIDE"
-                      : mid < zone.lo
-                        ? `BELOW (Δ ${fmtPx(zone.lo - mid)})`
-                        : `ABOVE (Δ ${fmtPx(mid - zone.hi)})`
-                    : "—"
-                }
-              />
-              <KV k="Trigger summary" v={entry?.trigger?.summary ? entry.trigger.summary : "—"} />
-            </div>
+      {detailTab === "plan" ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+            <Target className="h-4 w-4 text-zinc-300" />
+            Entry Plan
+          </div>
 
-            <Divider />
+          <div className="mt-3 space-y-2">
+            <KV k="Mode" v={entry?.mode ? entry.mode : "—"} />
+            <KV k="Entry zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
+            <KV
+              k="Mid vs zone"
+              v={
+                Number.isFinite(mid) && zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi)
+                  ? isInZone
+                    ? "INSIDE"
+                    : mid < zone.lo
+                      ? `BELOW (Δ ${fmtPx(zone.lo - mid)})`
+                      : `ABOVE (Δ ${fmtPx(mid - zone.hi)})`
+                  : "—"
+              }
+            />
+            <KV k="Trigger summary" v={entry?.trigger?.summary ? entry.trigger.summary : "—"} />
+          </div>
 
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-extrabold text-zinc-100">Trigger checklist</div>
-              {checklist.length > 5 ? (
-                <button
-                  onClick={() => setShowAllChecklist((x) => !x)}
-                  className="text-xs font-bold text-sky-200 hover:text-sky-100"
-                >
-                  {showAllChecklist ? "Show less" : `Show all (${checklist.length})`}
-                </button>
-              ) : null}
-            </div>
+          <Divider />
 
-            <div className="mt-2 space-y-2">
-              {checklistShown.length === 0 ? (
-                <div className="text-xs text-zinc-400">—</div>
-              ) : (
-                checklistShown.map((c) => {
+          <div className="space-y-2">
+            <div className="text-xs font-bold text-zinc-100">Trigger checklist</div>
+            {checklist.length === 0 ? (
+              <div className="text-xs text-zinc-400">—</div>
+            ) : (
+              <div className="space-y-2">
+                {checklist.map((c) => {
                   const ok = c.ok === true;
                   const pending = c.ok !== true && c.ok !== false;
                   return (
@@ -1054,9 +1642,11 @@ function SetupDetailCompact({
                             <span
                               className={[
                                 "inline-flex h-6 w-6 items-center justify-center rounded-full ring-1",
-                                ok ? "bg-emerald-500/15 ring-emerald-500/25 text-emerald-100"
-                                : pending ? "bg-amber-500/15 ring-amber-500/25 text-amber-100"
-                                : "bg-rose-500/15 ring-rose-500/25 text-rose-100",
+                                ok
+                                  ? "bg-emerald-500/15 ring-emerald-500/25 text-emerald-100"
+                                  : pending
+                                    ? "bg-amber-500/15 ring-amber-500/25 text-amber-100"
+                                    : "bg-rose-500/15 ring-rose-500/25 text-rose-100",
                               ].join(" ")}
                             >
                               {ok ? <CheckCircle2 className="h-4 w-4" /> : pending ? <CircleDashed className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
@@ -1068,9 +1658,11 @@ function SetupDetailCompact({
 
                         <Pill
                           tone={
-                            ok ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                            : pending ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                            : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                            ok
+                              ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                              : pending
+                                ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                                : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
                           }
                         >
                           {ok ? "OK" : pending ? "PENDING" : "BLOCK"}
@@ -1078,48 +1670,60 @@ function SetupDetailCompact({
                       </div>
                     </div>
                   );
-                })
-              )}
+                })}
+              </div>
+            )}
 
-              {blockers.length > 0 ? (
-                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-200" />
-                    <div className="min-w-0">
-                      <div className="text-xs font-extrabold text-amber-100">Current blockers</div>
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {blockers.slice(0, 10).map((b) => (
-                          <Pill key={b} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{b}</Pill>
-                        ))}
-                      </div>
+            {blockers.length > 0 ? (
+              <div className="mt-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-200" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-extrabold text-amber-100">Current blockers</div>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {blockers.slice(0, 10).map((b) => (
+                        <Pill key={b} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                          {b}
+                        </Pill>
+                      ))}
                     </div>
                   </div>
                 </div>
-              ) : null}
-            </div>
-          </Collapsible>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : detailTab === "risk" ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+            <ShieldCheck className="h-4 w-4 text-zinc-300" />
+            Risk & Targets
+          </div>
 
-          <Collapsible title="Risk & Targets" icon={<ShieldCheck className="h-4 w-4 text-zinc-200" />} defaultOpen>
-            <div className="space-y-2">
-              <KV k="Stop loss" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
-              <KV k="Stop basis" v={setup.stop?.basis ? setup.stop.basis : "—"} />
-              <KV k="RR min / est" v={`${Number.isFinite(setup.rr_min) ? setup.rr_min.toFixed(2) : "—"} / ${Number.isFinite(setup.rr_est) ? setup.rr_est.toFixed(2) : "—"}`} />
-            </div>
+          <div className="mt-3 space-y-2">
+            <KV k="Stop loss" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
+            <KV k="Stop basis" v={setup.stop?.basis ? setup.stop.basis : "—"} />
+            <KV k="RR min / est" v={`${Number.isFinite(setup.rr_min) ? setup.rr_min.toFixed(2) : "—"} / ${Number.isFinite(setup.rr_est) ? setup.rr_est.toFixed(2) : "—"}`} />
+          </div>
 
-            <Divider />
+          <Divider />
 
-            <div className="text-xs font-extrabold text-zinc-100">TP ladder</div>
-            <div className="mt-2 space-y-2">
-              {tps.length === 0 ? (
-                <div className="text-xs text-zinc-400">—</div>
-              ) : (
-                tps.map((tp, i) => (
+          <div className="space-y-2">
+            <div className="text-xs font-bold text-zinc-100">TP ladder</div>
+            {tps.length === 0 ? (
+              <div className="text-xs text-zinc-400">—</div>
+            ) : (
+              <div className="space-y-2">
+                {tps.map((tp, i) => (
                   <div key={i} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-xs font-extrabold text-zinc-100">TP{i + 1}</div>
                         <div className="mt-1 text-sm font-extrabold text-zinc-50">{Number.isFinite(tp.price) ? fmtPx(tp.price) : "—"}</div>
-                        <div className="mt-1 text-[11px] text-zinc-400">Size {Number.isFinite(tp.size_pct) ? `${fmtNum(tp.size_pct, 0)}%` : "—"}{tp.basis ? ` • ${tp.basis}` : ""}</div>
+                        <div className="mt-1 text-[11px] text-zinc-400">
+                          Size {Number.isFinite(tp.size_pct) ? `${fmtNum(tp.size_pct, 0)}%` : "—"}
+                          {tp.basis ? ` • ${tp.basis}` : ""}
+                        </div>
                         {tp.note ? <div className="mt-1 text-[11px] text-zinc-400">{tp.note}</div> : null}
                       </div>
                       {Number.isFinite(mid) && Number.isFinite(tp.price) ? (
@@ -1127,230 +1731,133 @@ function SetupDetailCompact({
                       ) : null}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </Collapsible>
-        </div>
-      ) : null}
+                ))}
+              </div>
+            )}
+          </div>
 
-      {tab === "meters" ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="text-xs font-extrabold text-zinc-100">Strength meters</div>
-          <div className="mt-3 space-y-3">
+          <Divider />
+
+          <div className="space-y-3">
+            <div className="text-xs font-bold text-zinc-100">Strength meters</div>
             <Meter label="Confidence" value01={conf01} right={fmtScore100(setup.confidence?.score)} intent={conf01 != null && conf01 >= 0.7 ? "good" : "warn"} />
             <Meter label="RR quality" value01={rr01} right={Number.isFinite(setup.rr_min) ? setup.rr_min.toFixed(2) : "—"} intent={rr01 != null && rr01 >= 0.5 ? "good" : "warn"} />
             <Meter label="Bias strength" value01={biasStrength01} intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"} />
-            <Divider />
             <Meter label="Delta alignment" value01={deltaNorm01} right={Number.isFinite(Number(of?.delta?.delta_norm)) ? fmtNum(Number(of.delta.delta_norm), 2) : "—"} intent="neutral" />
             <Meter label="Divergence signal" value01={divScore01} right={divScore01 != null ? fmtPct01(divScore01) : "—"} intent={divScore01 != null && divScore01 >= 0.65 ? "good" : "neutral"} />
             <Meter label="Absorption signal" value01={absScore01} right={absScore01 != null ? fmtPct01(absScore01) : "—"} intent={absScore01 != null && absScore01 >= 0.65 ? "good" : "neutral"} />
-            <Divider />
-            <Meter label="Cross consensus" value01={crossConsensus01} right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"} intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : "neutral"} />
+            <Meter
+              label="Cross consensus"
+              value01={crossConsensus01}
+              right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
+              intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : crossConsensus01 != null && crossConsensus01 <= 0.35 ? "warn" : "neutral"}
+            />
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+              <Gauge className="h-4 w-4 text-zinc-300" />
+              Explanation
+            </div>
+            <Pill
+              tone={globalGateOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
+              icon={globalGateOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+              title="Global execution gate status"
+            >
+              Gate {globalGateOk ? "OK" : "BLOCKED"}
+            </Pill>
+          </div>
 
-      {tab === "explain" ? (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between">
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
               <div className="text-xs font-extrabold text-zinc-100">Reasons</div>
-              {reasons.length > 8 ? (
-                <button onClick={() => setShowAllReasons((x) => !x)} className="text-xs font-bold text-sky-200 hover:text-sky-100">
-                  {showAllReasons ? "Show less" : `Show all (${reasons.length})`}
-                </button>
-              ) : null}
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(setup.confidence?.reasons || []).slice(0, 18).map((r, i) => (
+                  <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                    {r}
+                  </Pill>
+                ))}
+                {(setup.confidence?.reasons || []).length === 0 ? <div className="text-xs text-zinc-400">—</div> : null}
+              </div>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {reasonsShown.length === 0 ? <div className="text-xs text-zinc-400">—</div> : null}
-              {reasonsShown.map((r, i) => (
-                <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{r}</Pill>
-              ))}
+
+            <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+              <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
+              <div className="mt-2 space-y-2 text-xs">
+                <KV
+                  k="Imbalance top10/top50/top200"
+                  v={
+                    features?.orderflow?.imbalance
+                      ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(
+                          Number(features.orderflow.imbalance.top200),
+                          2
+                        )}`
+                      : "—"
+                  }
+                />
+                <KV k="Aggression ratio" v={Number.isFinite(Number(features?.orderflow?.aggression_ratio)) ? fmtPct01(Number(features.orderflow.aggression_ratio)) : "—"} />
+                <KV
+                  k="Delta dir"
+                  v={
+                    features?.orderflow?.delta?.delta_norm != null
+                      ? Number(features.orderflow.delta.delta_norm) > 0
+                        ? "BULL"
+                        : Number(features.orderflow.delta.delta_norm) < 0
+                          ? "BEAR"
+                          : "NEUTRAL"
+                      : "—"
+                  }
+                />
+                <KV
+                  k="Divergence"
+                  v={features?.orderflow?.delta ? `${String(features.orderflow.delta.divergence_dir)} • ${fmtPct01(Number(features.orderflow.delta.divergence_score))}` : "—"}
+                />
+                <KV
+                  k="Absorption"
+                  v={features?.orderflow?.delta ? `${String(features.orderflow.delta.absorption_dir)} • ${fmtPct01(Number(features.orderflow.delta.absorption_score))}` : "—"}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
-            <div className="mt-3 space-y-2 text-xs">
-              <KV k="Imbalance top10/top50/top200" v={features?.orderflow?.imbalance ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top200), 2)}` : "—"} />
-              <KV k="Aggression ratio" v={Number.isFinite(Number(features?.orderflow?.aggression_ratio)) ? fmtPct01(Number(features.orderflow.aggression_ratio)) : "—"} />
-              <KV k="Delta dir" v={features?.orderflow?.delta?.delta_norm != null ? (Number(features.orderflow.delta.delta_norm) > 0 ? "BULL" : Number(features.orderflow.delta.delta_norm) < 0 ? "BEAR" : "NEUTRAL") : "—"} />
-              <KV k="Divergence" v={features?.orderflow?.delta ? `${String(features.orderflow.delta.divergence_dir)} • ${fmtPct01(Number(features.orderflow.delta.divergence_score))}` : "—"} />
-              <KV k="Absorption" v={features?.orderflow?.delta ? `${String(features.orderflow.delta.absorption_dir)} • ${fmtPct01(Number(features.orderflow.delta.absorption_score))}` : "—"} />
-            </div>
-          </div>
+          <Divider />
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-extrabold text-zinc-100">Entry zone check</div>
+                <Pill tone={isInZone ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"}>
+                  {isInZone ? "IN ZONE" : "OUTSIDE"}
+                </Pill>
+              </div>
+              <div className="mt-2 space-y-2 text-xs">
+                <KV k="Mid" v={Number.isFinite(mid) ? fmtPx(mid) : "—"} />
+                <KV k="Zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+              <div className="text-xs font-extrabold text-zinc-100">Stop check</div>
+              <div className="mt-2 space-y-2 text-xs">
+                <KV k="Stop" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
+                <KV k="Distance to stop" v={Number.isFinite(mid) && Number.isFinite(stop) ? fmtPx(Math.abs(mid - (stop as number))) : "—"} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
               <div className="text-xs font-extrabold text-zinc-100">Execution gate snapshot</div>
-              <Pill
-                tone={globalGateOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
-                icon={globalGateOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
-              >
-                Gate {globalGateOk ? "OK" : "BLOCKED"}
-              </Pill>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3 space-y-2">
-                <KV k="DQ grade" v={String(dq || "—")} />
+              <div className="mt-2 space-y-2 text-xs">
                 <KV k="DQ ok" v={dqOk ? "YES" : "NO"} />
                 <KV k="Bybit ok" v={bybitOk ? "YES" : "NO"} />
-              </div>
-              <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3 space-y-2">
                 <KV k="Paused" v={paused ? "YES" : "NO"} />
                 <KV k="Stale" v={staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`} />
-                <KV k="In zone" v={isInZone ? "YES" : "NO"} />
               </div>
             </div>
           </div>
         </div>
-      ) : null}
-
-      {tab === "levels" ? (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-extrabold text-zinc-100">Trend by timeframe (structure)</div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-              {["4h", "1h", "15m", "5m"].map((tf) => {
-                const node = (features?.market_structure as any)?.[tf];
-                const badge = structureTrendBadge(node?.trend);
-                const e = pickLatestStructureEvent(node);
-                return (
-                  <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs font-extrabold text-zinc-100">{tf}</div>
-                      <span className={["inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold", badge.cls].join(" ")}>
-                        {badge.icon}{badge.label}
-                      </span>
-                    </div>
-                    <div className="mt-2 space-y-1.5 text-xs">
-                      <KV k="Confirmed" v={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"} />
-                      <KV k="Latest event" v={e.kind && e.dir ? `${e.kind} ${e.dir}${Number.isFinite(e.level) ? ` @ ${fmtPx(e.level)}` : ""}` : "—"} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-extrabold text-zinc-100">Key levels (events & swings)</div>
-              {keyLevels.length > 8 ? (
-                <button onClick={() => setShowAllLevels((x) => !x)} className="text-xs font-bold text-sky-200 hover:text-sky-100">
-                  {showAllLevels ? "Show less" : `Show all (${keyLevels.length})`}
-                </button>
-              ) : null}
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {levelsShown.length === 0 ? (
-                <div className="text-xs text-zinc-400">No market structure levels yet.</div>
-              ) : (
-                levelsShown.map((l, i) => (
-                  <div key={`${l.tf}-${l.kind}-${i}`} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.tf}</Pill>
-                          <Pill
-                            tone={
-                              l.kind === "BOS" ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
-                              : l.kind === "CHOCH" ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                              : l.kind === "SWING_HIGH" ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                              : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                            }
-                          >
-                            {l.kind}
-                          </Pill>
-                          {l.dir && l.dir !== "—" ? <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill> : null}
-                        </div>
-                        <div className="mt-2 text-sm font-extrabold text-zinc-50">{Number.isFinite(l.level) ? fmtPx(l.level) : "—"}</div>
-                        <div className="mt-1 text-xs text-zinc-400">{Number.isFinite(l.ts) ? `Seen ${relTime(l.ts)}` : ""}</div>
-                      </div>
-                      {Number.isFinite(mid) && Number.isFinite(l.level) ? (
-                        <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Δ {fmtPx(Math.abs(mid - (l.level as number)))}</Pill>
-                      ) : null}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {tab === "health" ? (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-extrabold text-zinc-100">Realtime availability</div>
-            <div className="mt-3 space-y-2 text-xs">
-              <KV k="Bybit availability" v={features?.quality?.bybit_ok ? "OK" : "NOT OK"} />
-              <KV k="Binance availability" v={features?.quality?.binance_ok ? "OK" : "NOT OK"} />
-              <KV k="DQ grade" v={String(dq || "—")} />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-extrabold text-zinc-100">Timeframe health (stale/partial)</div>
-            <div className="mt-3 space-y-2">
-              {tfHealth.length === 0 ? (
-                <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
-              ) : (
-                tfHealth.map((t) => {
-                  const staleMs = Number.isFinite(t.stale_ms) ? t.stale_ms : NaN;
-                  const staleTone =
-                    Number.isFinite(staleMs) && staleMs <= 1500
-                      ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                      : Number.isFinite(staleMs) && staleMs <= 5000
-                        ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                        : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
-
-                  return (
-                    <div key={t.tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />}>
-                            {Number.isFinite(staleMs) ? `${fmtNum(staleMs / 1000, 1)}s` : "—"}
-                          </Pill>
-                          <Pill
-                            tone={t.partial ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"}
-                          >
-                            {t.partial ? "PARTIAL" : "OK"}
-                          </Pill>
-                        </div>
-                      </div>
-                      <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-zinc-300">
-                        <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                          <div className="text-zinc-400">Bybit</div>
-                          <div className="font-bold text-zinc-100">{t.haveCandlesBybit}</div>
-                        </div>
-                        <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                          <div className="text-zinc-400">Binance</div>
-                          <div className="font-bold text-zinc-100">{t.haveCandlesBinance}</div>
-                        </div>
-                        <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                          <div className="text-zinc-400">Trades</div>
-                          <div className="font-bold text-zinc-100">{t.haveTrades}</div>
-                        </div>
-                        <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                          <div className="text-zinc-400">OB</div>
-                          <div className="font-bold text-zinc-100">{t.haveOrderbook ? "YES" : "NO"}</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      )}
     </div>
   );
 }
