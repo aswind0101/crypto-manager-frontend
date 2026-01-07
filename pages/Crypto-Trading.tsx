@@ -639,6 +639,32 @@ export default function Page() {
     if (e.key === "Enter") onAnalyze();
   };
 
+  const SelectedSetupCard = (
+    <Card
+      title="Selected Setup"
+      icon={<Crosshair className="h-5 w-5" />}
+      right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}
+    >
+      {!selected ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-sm font-bold text-zinc-100">No selection</div>
+          <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
+        </div>
+      ) : (
+        <SetupDetail
+          symbol={symbol}
+          mid={mid}
+          dqOk={dqOk}
+          bybitOk={bybitOk}
+          staleSec={staleSec}
+          paused={paused}
+          features={features}
+          setup={selected}
+        />
+      )}
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-[#070A12] text-zinc-100">
       {/* subtle background */}
@@ -1000,29 +1026,17 @@ export default function Page() {
                 )}
               </div>
             </Card>
-            <Card title="Selected Setup" icon={<Crosshair className="h-5 w-5" />} right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}>
-              {!selected ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-sm font-bold text-zinc-100">No selection</div>
-                  <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
-                </div>
-              ) : (
-                <SetupDetail
-                  symbol={symbol}
-                  mid={mid}
-                  dqOk={dqOk}
-                  bybitOk={bybitOk}
-                  staleSec={staleSec}
-                  paused={paused}
-                  features={features}
-                  setup={selected}
-                />
-              )}
-            </Card>
+            <div className="md:hidden">
+              {SelectedSetupCard}
+            </div>
           </div>
 
           {/* RIGHT: details */}
           <div className="space-y-4">
+            <div className="hidden md:block">
+              {SelectedSetupCard}
+            </div>
+
             <Card
               title="Data Completeness"
               icon={<Database className="h-5 w-5" />}
