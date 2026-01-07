@@ -1775,7 +1775,7 @@ function SetupDetail({
             <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
             <div className="mt-2 space-y-2 text-xs">
               <KV
-                k="Imbalance top10/top50/top200"
+                k="Imbalance"
                 v={
                   features?.orderflow?.imbalance
                     ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top200), 2)}`
