@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
 import type { ExecutionDecision } from "../lib/feeds/setups/types";
@@ -92,6 +92,8 @@ function bpsDistanceToLevel(mid: number, level?: number) {
 
 /**
  * Task 5.2 — Priority Score
+ * - IMPORTANT: This function sorts setups for display.
+ * - We keep preferred_id for backward compatibility, but UI should ignore it.
  */
 function applyPriorityScore(out: any, snap: any, features: any): any {
   if (!out || !Array.isArray(out.setups)) return out;
@@ -112,7 +114,7 @@ function applyPriorityScore(out: any, snap: any, features: any): any {
     let distBps = 9999;
     if (Number.isFinite(mid)) {
       if (s.type === "BREAKOUT") {
-        // Task 3.4b: if breakout has an explicit retest zone, use it
+        // If breakout has explicit retest zone, use it; else fallback to break level parsed from checklist.
         const z = s?.entry?.zone;
         if (z && typeof z.lo === "number" && typeof z.hi === "number") {
           distBps = bpsDistanceToZone(mid, z);
@@ -169,11 +171,12 @@ function applyPriorityScore(out: any, snap: any, features: any): any {
     return cb - ca;
   });
 
-  const preferred = sorted.find((s: any) => s?.status === "READY")?.id ?? sorted[0]?.id;
+  // Keep a value for compatibility, but DO NOT use it to auto-select in UI.
+  const preferredCompat = sorted.find((s: any) => s?.status === "READY")?.id ?? sorted[0]?.id;
 
   return {
     ...out,
-    preferred_id: preferred,
+    preferred_id: preferredCompat,
     setups: sorted,
   };
 }
@@ -200,7 +203,7 @@ function applyPreTrigger(out: any, snap: any): any {
       const z = s?.entry?.zone;
       const brk = parseBreakLevelFromChecklist(s);
 
-      // Task 3.4b: if we have a retest zone, use in-zone as “retest ok”
+      // If we have a retest zone, use in-zone as “retest ok”
       if (z && typeof z.lo === "number" && typeof z.hi === "number") {
         const inZone = mid >= z.lo && mid <= z.hi;
 
@@ -309,7 +312,7 @@ function applyCloseConfirm(out: any, snap: any): any {
 
       const strength = candleCloseStrengthPct(last, s.side);
 
-      // Task 3.4b: if breakout has a retest zone, require “touch retest + close beyond level”
+      // If breakout has a retest zone, require “touch retest + close beyond level”
       const z = s?.entry?.zone;
       if (z && typeof z.lo === "number" && typeof z.hi === "number") {
         const buffer = brk * 0.0008; // 8 bps buffer after reclaim/break
@@ -551,130 +554,16 @@ function deriveExecutionDecision(
 }
 
 /**
- * Sticky + hysteresis preferred selector.
- * - Keeps previous preferred if still valid.
- * - Switches only if new candidate is better by THRESHOLD or previous is invalid/missing.
- */
-function roundPx(x: any, dp: number) {
-  const n = Number(x);
-  if (!Number.isFinite(n)) return "na";
-  const m = Math.pow(10, dp);
-  return String(Math.round(n * m) / m);
-}
-
-function stableKeyForSetup(s: any): string {
-  // Goal: stable across recomputes even if engine regenerates id.
-  // Use only structural fields that define "same idea".
-  const type = String(s?.type ?? "");
-  const side = String(s?.side ?? "");
-  const mode = String(s?.entry?.mode ?? "");
-
-  const z = s?.entry?.zone;
-  const zlo = roundPx(z?.lo, 2);
-  const zhi = roundPx(z?.hi, 2);
-
-  // Breakout: try parse breakout level from checklist (your existing helper)
-  const brk = parseBreakLevelFromChecklist(s);
-  const brkStr = brk != null ? roundPx(brk, 2) : "na";
-
-  // Stop is generally stable for a given setup definition
-  const stop = roundPx(s?.stop?.price, 2);
-
-  return `${type}|${side}|${mode}|z:${zlo}-${zhi}|brk:${brkStr}|sl:${stop}`;
-}
-
-function selectPreferredSticky(
-  scored: any,
-  prev: { id: string | null; key: string | null },
-  nowMs: number,
-  lockedUntilMs: number,
-  opts: { threshold: number; cooldownMs: number }
-): { preferredId: string | undefined; preferredKey: string | null; switched: boolean; newLockedUntil: number } {
-  const setups = Array.isArray(scored?.setups) ? scored.setups : [];
-  if (setups.length === 0) return { preferredId: undefined, preferredKey: null, switched: false, newLockedUntil: 0 };
-
-  const isDead = (s: any) => {
-    const st = String(s?.status ?? "");
-    return st === "INVALIDATED" || st === "EXPIRED";
-  };
-
-  const findById = (id?: string | null) => setups.find((x: any) => x?.id === id);
-  const findByKey = (key?: string | null) => {
-    if (!key) return undefined;
-    return setups.find((x: any) => stableKeyForSetup(x) === key);
-  };
-
-  // Candidate from scoring stage (first READY else first)
-  const candidateId: string | undefined = scored?.preferred_id ?? setups[0]?.id;
-  const candidate = findById(candidateId) ?? setups[0];
-  const candKey = candidate ? stableKeyForSetup(candidate) : null;
-
-  // Resolve previous: prefer id; if id changes each recompute, fall back to stable key
-  const prevById = prev.id ? findById(prev.id) : undefined;
-  const prevByKey = prev.key ? findByKey(prev.key) : undefined;
-  const prevSetup = prevById ?? prevByKey;
-
-  // If no previous resolvable -> accept candidate immediately
-  if (!prevSetup || isDead(prevSetup)) {
-    const lock = opts.cooldownMs > 0 ? nowMs + opts.cooldownMs : 0;
-    return {
-      preferredId: candidate?.id ?? candidateId,
-      preferredKey: candKey,
-      switched: true,
-      newLockedUntil: lock,
-    };
-  }
-
-  const prevKey = stableKeyForSetup(prevSetup);
-
-  // Cooldown lock
-  if (lockedUntilMs > nowMs) {
-    return { preferredId: prevSetup.id, preferredKey: prevKey, switched: false, newLockedUntil: lockedUntilMs };
-  }
-
-  const pPrev = Number(prevSetup?.priority_score ?? 0);
-  const pCand = Number(candidate?.priority_score ?? 0);
-
-  // If candidate is clearly better by hysteresis threshold, switch
-  if (pCand >= pPrev + opts.threshold) {
-    const lock = opts.cooldownMs > 0 ? nowMs + opts.cooldownMs : 0;
-    return {
-      preferredId: candidate?.id ?? candidateId,
-      preferredKey: candKey,
-      switched: true,
-      newLockedUntil: lock,
-    };
-  }
-
-  // Otherwise keep previous (sticky)
-  return { preferredId: prevSetup.id, preferredKey: prevKey, switched: false, newLockedUntil: 0 };
-}
-
-
-/**
  * Snapshot builder (client-side):
  * - buildSetups() returns canonical setup lifecycle status (FORMING/READY/TRIGGERED/...)
- * - this hook enriches each setup with an **execution decision** that is explicitly
- *   separate from setup.status, so UI can communicate "ready" vs "enter now / place limit / wait".
+ * - this hook enriches each setup with an execution decision separate from setup.status
+ * - IMPORTANT: This hook does NOT auto-select. UI must handle user selection.
  */
 export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   const { snap, features } = useFeaturesSnapshot(symbol);
 
-  // Sticky preferred state across recomputes
-  const preferredRef = useRef<{ id: string | null; key: string | null; lockedUntil: number }>({
-    id: null,
-    key: null,
-    lockedUntil: 0,
-  });
-
-  // Tunables (hysteresis + cooldown)
-  // - threshold: how much better a new setup must be to take over preferred (prevents oscillation)
-  // - cooldown: hold preferred for a short time after switching (prevents rapid flip-flops)
-  const HYSTERESIS_THRESHOLD = 9; // recommended 8..12
-  const COOLDOWN_MS = 25_000; // 0 to disable
-
-  const computed = useMemo(() => {
-    if (!snap || !features) return { out: null as any, nextPreferredId: null as string | null, switched: false, nextLockedUntil: 0 };
+  const setups = useMemo(() => {
+    if (!snap || !features) return null;
 
     const base = buildSetups({ snap, features });
 
@@ -692,7 +581,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     const dqOk = Boolean(scored?.dq_ok ?? (features?.quality?.dq_grade === "A" || features?.quality?.dq_grade === "B"));
     const bybitOk = Boolean(features?.quality?.bybit_ok);
 
-    // --- staleness: based on price feed timestamp or activity clock ---
+    // staleness based on price feed timestamp
     let staleSec: number | undefined = undefined;
     const priceTs = Number(snap?.price?.ts);
     if (Number.isFinite(priceTs)) {
@@ -711,83 +600,16 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
     const enriched = Array.isArray(scored?.setups)
       ? scored.setups.map((s: any) => ({
-        ...s,
-        execution: deriveExecutionDecision(s, ctx),
-      }))
+          ...s,
+          execution: deriveExecutionDecision(s, ctx),
+        }))
       : scored?.setups;
 
-    const out = {
+    return {
       ...scored,
       setups: enriched,
     };
-
-    // Sticky + hysteresis preferred selection
-    const nowMs = Date.now();
-    const prevState = { id: preferredRef.current.id, key: preferredRef.current.key };
-    const lockUntil = preferredRef.current.lockedUntil;
-
-    const sel = selectPreferredSticky(out, prevState, nowMs, lockUntil, {
-      threshold: HYSTERESIS_THRESHOLD,
-      cooldownMs: COOLDOWN_MS,
-    });
-
-
-    // Apply preferred_id override deterministically
-    const preferred_id = sel.preferredId ?? out?.preferred_id;
-
-    // Optional: keep list stable by moving preferred near top if it’s close to the top
-    let setupsFinal = out.setups;
-    if (Array.isArray(setupsFinal) && preferred_id) {
-      const idx = setupsFinal.findIndex((x: any) => x?.id === preferred_id);
-      if (idx > 0) {
-        const top = setupsFinal[0];
-        const pref = setupsFinal[idx];
-        const pTop = Number(top?.priority_score ?? 0);
-        const pPref = Number(pref?.priority_score ?? 0);
-
-        // If preferred is within "sticky band" of the top, keep it pinned to top for UX stability
-        const STICKY_BAND = 6;
-        if (pPref >= pTop - STICKY_BAND) {
-          setupsFinal = [pref, ...setupsFinal.slice(0, idx), ...setupsFinal.slice(idx + 1)];
-        }
-      }
-    }
-
-    const outFinal = {
-      ...out,
-      preferred_id,
-      setups: setupsFinal,
-    };
-
-    return {
-      out: outFinal,
-      nextPreferredId: preferred_id ?? null,
-      nextPreferredKey: sel.preferredKey ?? null,
-      switched: sel.switched,
-      nextLockedUntil: sel.newLockedUntil,
-    };
-
   }, [snap, features, paused]);
-
-  useEffect(() => {
-    // Commit sticky preferred after compute
-    if (!computed?.out) return;
-
-    if (computed.nextPreferredId) {
-      preferredRef.current.id = computed.nextPreferredId;
-      preferredRef.current.key = computed.nextPreferredKey ?? preferredRef.current.key;
-
-      if (computed.switched && computed.nextLockedUntil > 0) {
-        preferredRef.current.lockedUntil = computed.nextLockedUntil;
-      } else if (!computed.switched) {
-        if (preferredRef.current.lockedUntil > 0 && preferredRef.current.lockedUntil < Date.now()) {
-          preferredRef.current.lockedUntil = 0;
-        }
-      }
-    }
-  }, [computed?.out, computed?.nextPreferredId, computed?.switched, computed?.nextLockedUntil]);
-
-  const setups = computed?.out ?? null;
 
   return { snap, features, setups };
 }
