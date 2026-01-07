@@ -113,18 +113,117 @@ function fmtScore100(x?: number) {
     if (!Number.isFinite(x as number)) return "—";
     return `${Math.round(Math.max(0, Math.min(100, x as number)))}%`;
 }
+
+type AlignState = "ALIGNED" | "MIXED" | "AGAINST" | "UNKNOWN";
+
+function normDir(x: any): "bull" | "bear" | null {
+    const s = String(x ?? "").toLowerCase();
+    if (!s) return null;
+
+    // handle common variants: bull/bear, up/down, long/short
+    if (s.includes("bull") || s.includes("up") || s.includes("long")) return "bull";
+    if (s.includes("bear") || s.includes("down") || s.includes("short")) return "bear";
+    return null;
+}
+
+function latestEventDir(msNode: any): { dir: "bull" | "bear" | null; ts: number | null } {
+    if (!msNode) return { dir: null, ts: null };
+
+    const bos = msNode.lastBOS;
+    const choch = msNode.lastCHOCH;
+
+    const bosTs = Number.isFinite(bos?.ts) ? (bos.ts as number) : null;
+    const chochTs = Number.isFinite(choch?.ts) ? (choch.ts as number) : null;
+
+    let picked: any = null;
+    if (bosTs !== null && chochTs !== null) {
+        picked = bosTs >= chochTs ? bos : choch;
+    } else if (bosTs !== null) {
+        picked = bos;
+    } else if (chochTs !== null) {
+        picked = choch;
+    }
+
+    const ts = Number.isFinite(picked?.ts) ? (picked.ts as number) : null;
+    const dir = normDir(picked?.dir);
+
+    return { dir, ts };
+}
+
+/**
+ * Alignment between canonical bias direction and recent HTF structure events.
+ * Uses 4h and 1h only (HTF), because those are the most meaningful for conflict warnings.
+ */
+function computeAlignment(features: any): AlignState {
+    const biasDir = normDir(features?.bias?.trend_dir);
+    if (!biasDir) return "UNKNOWN";
+
+    const ms = features?.market_structure;
+    const e4 = latestEventDir(ms?.["4h"]);
+    const e1 = latestEventDir(ms?.["1h"]);
+
+    // If both missing, unknown
+    const dirs: Array<"bull" | "bear"> = [];
+    if (e4.dir) dirs.push(e4.dir);
+    if (e1.dir) dirs.push(e1.dir);
+
+    if (dirs.length === 0) return "UNKNOWN";
+
+    const alignedCount = dirs.filter((d) => d === biasDir).length;
+    const againstCount = dirs.filter((d) => d !== biasDir).length;
+
+    if (againstCount === 0) return "ALIGNED";
+    if (alignedCount === 0) return "AGAINST";
+    return "MIXED";
+}
+
+function alignmentTone(a: AlignState) {
+    if (a === "ALIGNED") return "good";
+    if (a === "AGAINST") return "bad";
+    if (a === "MIXED") return "warn";
+    return "muted";
+}
+
 function humanizeType(x: string) {
     return (x || "").replace(/_/g, " ");
 }
 
-function ago(ts?: number) {
+function relTime(ts?: number) {
     if (!Number.isFinite(ts as number)) return "—";
-    const s = Math.max(0, (Date.now() - (ts as number)) / 1000);
-    if (s < 60) return `${Math.round(s)}s ago`;
-    const m = s / 60;
-    if (m < 60) return `${Math.round(m)}m ago`;
-    const h = m / 60;
-    return `${Math.round(h)}h ago`;
+    const t = ts as number;
+
+    // Guard against 0 / nonsense timestamps
+    if (t <= 0) return "—";
+
+    const now = Date.now();
+    const diffSec = (t - now) / 1000; // future positive, past negative
+    const absSec = Math.abs(diffSec);
+
+    // avoid "0s ago" spam
+    if (absSec < 2) return "just now";
+
+    const fmt = (n: number, unit: string) => `${n}${unit}`;
+
+    if (absSec < 60) {
+        const v = Math.round(absSec);
+        return diffSec > 0 ? `in ${fmt(v, "s")}` : `${fmt(v, "s")} ago`;
+    }
+
+    const absMin = absSec / 60;
+    if (absMin < 60) {
+        const v = Math.round(absMin);
+        return diffSec > 0 ? `in ${fmt(v, "m")}` : `${fmt(v, "m")} ago`;
+    }
+
+    const absHr = absMin / 60;
+    if (absHr < 24) {
+        const v = Math.round(absHr);
+        return diffSec > 0 ? `in ${fmt(v, "h")}` : `${fmt(v, "h")} ago`;
+    }
+
+    const absDay = absHr / 24;
+    const v = Math.round(absDay);
+    return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
 }
 
 function sideColor(side: SetupSide) {
@@ -256,7 +355,7 @@ function ContextStrip({
         return label;
     };
 
-    const updated = setups?.ts ? ago(setups.ts) : "—";
+    const updated = setups?.ts ? relTime(setups.ts) : "—";
 
     return (
         <div className="contextStrip">
@@ -274,6 +373,16 @@ function ContextStrip({
                         <SafeBadge tone={dq === "A" ? "good" : dq === "B" ? "neutral" : dq === "C" ? "warn" : "bad"}>
                             DQ {dq}
                         </SafeBadge>
+                    </div>
+                    <div className="ctxAlign">
+                        {(() => {
+                            const a = computeAlignment(features);
+                            return (
+                                <SafeBadge tone={alignmentTone(a)}>
+                                    ALIGN {a}
+                                </SafeBadge>
+                            );
+                        })()}
                     </div>
                 </div>
 
@@ -412,8 +521,25 @@ function SetupDetail({
                         <span className={`chip ${action.tone}`}>{action.label}</span>
                         <span className={`badge ${gradeTone(s.confidence?.grade)}`}>GRADE {String(s.confidence?.grade || "—").toUpperCase()}</span>
                     </div>
+                    {(() => {
+                        const a = computeAlignment(features);
+                        return (
+                            <SafeBadge tone={alignmentTone(a)}>
+                                ALIGN {a}
+                            </SafeBadge>
+                        );
+                    })()}
                     <div className="detailMeta muted">
-                        Created {ago(s.created_ts)} • Expires {ago(s.expires_ts)}
+                        {(() => {
+                            const created = relTime(s.created_ts);
+                            const expiresOk = Number.isFinite(s.expires_ts) && Number.isFinite(s.created_ts) && s.expires_ts > s.created_ts + 5_000;
+                            const expires = expiresOk ? relTime(s.expires_ts) : "n/a";
+                            return (
+                                <>
+                                    Created {created} • Expires {expires}
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
 
