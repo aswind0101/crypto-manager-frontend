@@ -483,7 +483,7 @@ export default function Page() {
     });
   }, [out?.setups]);
 
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<number | null>(null);
   const [showLevelsMore, setShowLevelsMore] = useState(false);
   const [showDataCompleteness, setShowDataCompleteness] = useState(false);
   const [showKeyLevels, setShowKeyLevels] = useState(false);
@@ -497,9 +497,10 @@ export default function Page() {
     }
   }, [symbol]);
 
-  const toggleExpanded = (key: string) => {
+  const toggleExpanded = (key: number) => {
     setExpandedKey((prev) => (prev === key ? null : key));
   };
+
 
   // Banner for READY (non-intrusive)
   const readyKeys = useMemo(() => {
@@ -932,9 +933,11 @@ export default function Page() {
                     <div className="mt-1 text-xs text-zinc-400">Either the market has no valid patterns, or data is still filling.</div>
                   </div>
                 ) : (
-                  ranked.map((s) => {
-                    const key = stableSetupKey(s);
-                    const isOpen = expandedKey === key;
+                  ranked.map((s, idx) => {
+                    const keyStr = stableSetupKey(s);          // key string (có thể trùng)
+                    const reactKey = `${keyStr}::${idx}`;      // React key luôn unique
+                    const accordionKey = idx;                  // Accordion key = index
+                    const isOpen = expandedKey === accordionKey;
 
                     const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
                     const pri01 = clamp01(pri / 100);
@@ -943,7 +946,7 @@ export default function Page() {
 
                     return (
                       <div
-                        key={key}
+                        key={reactKey}
                         className={[
                           "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
                           isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
@@ -983,7 +986,7 @@ export default function Page() {
 
                             <button
                               type="button"
-                              onClick={() => toggleExpanded(key)}
+                              onClick={() => toggleExpanded(accordionKey)}
                               className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-white/10"
                             >
                               {isOpen ? "Hide details" : "View details"}
