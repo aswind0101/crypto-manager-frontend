@@ -1209,6 +1209,7 @@ function SetupDetail({
 }) {
   const action = actionChip(setup);
   const [showGuidanceDetails, setShowGuidanceDetails] = useState(false);
+  const [showRiskMore, setShowRiskMore] = useState(false);
   useEffect(() => {
     setShowGuidanceDetails(false);
   }, [setup.id]);
@@ -1233,6 +1234,17 @@ function SetupDetail({
   const crossConsensus01 = Number.isFinite(Number(features?.cross?.consensus_score)) ? clamp01(Number(features.cross.consensus_score)) : undefined;
 
   const checklist = Array.isArray(entry?.trigger?.checklist) ? entry.trigger.checklist : [];
+  const [showChecklistPassed, setShowChecklistPassed] = useState(false);
+
+  const checklistBad = useMemo(() => {
+    // show only BLOCK + PENDING
+    return checklist.filter((c) => c.ok !== true);
+  }, [checklist]);
+
+  const checklistOk = useMemo(() => {
+    return checklist.filter((c) => c.ok === true);
+  }, [checklist]);
+
   const blockers = Array.isArray(setup.execution?.blockers) ? setup.execution!.blockers : [];
 
   const isInZone =
@@ -1491,9 +1503,11 @@ function SetupDetail({
               <div className="text-xs text-zinc-400">—</div>
             ) : (
               <div className="space-y-2">
-                {checklist.map((c) => {
+                {/* BLOCK + PENDING (default) */}
+                {checklistBad.map((c) => {
                   const ok = c.ok === true;
                   const pending = c.ok !== true && c.ok !== false;
+
                   return (
                     <div key={c.key} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
                       <div className="flex items-start justify-between gap-3">
@@ -1509,7 +1523,13 @@ function SetupDetail({
                                     : "bg-rose-500/15 ring-rose-500/25 text-rose-100",
                               ].join(" ")}
                             >
-                              {ok ? <CheckCircle2 className="h-4 w-4" /> : pending ? <CircleDashed className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                              {ok ? (
+                                <CheckCircle2 className="h-4 w-4" />
+                              ) : pending ? (
+                                <CircleDashed className="h-4 w-4" />
+                              ) : (
+                                <AlertTriangle className="h-4 w-4" />
+                              )}
                             </span>
                             <div className="text-xs font-extrabold text-zinc-100">{c.key}</div>
                           </div>
@@ -1531,8 +1551,45 @@ function SetupDetail({
                     </div>
                   );
                 })}
+
+                {/* Passed (OK) toggle */}
+                {checklistOk.length > 0 ? (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowChecklistPassed((v) => !v)}
+                      className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+                    >
+                      {showChecklistPassed ? "Hide passed" : `Show passed (${checklistOk.length})`}
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* Passed (OK) list */}
+                {showChecklistPassed ? (
+                  <div className="space-y-2">
+                    {checklistOk.map((c) => (
+                      <div key={c.key} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full ring-1 bg-emerald-500/15 ring-emerald-500/25 text-emerald-100">
+                                <CheckCircle2 className="h-4 w-4" />
+                              </span>
+                              <div className="text-xs font-extrabold text-zinc-100">{c.key}</div>
+                            </div>
+                            {c.note ? <div className="mt-2 text-[11px] text-zinc-400">{c.note}</div> : null}
+                          </div>
+
+                          <Pill tone="bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30">OK</Pill>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
+
 
             {blockers.length > 0 ? (
               <div className="mt-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3">
@@ -1569,12 +1626,24 @@ function SetupDetail({
           <Divider />
 
           <div className="space-y-2">
-            <div className="text-xs font-bold text-zinc-100">TP ladder</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold text-zinc-100">TP ladder</div>
+              {tps.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowRiskMore((v) => !v)}
+                  className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+                >
+                  {showRiskMore ? "Show less" : "Show more"}
+                </button>
+              ) : null}
+            </div>
+
             {tps.length === 0 ? (
               <div className="text-xs text-zinc-400">—</div>
             ) : (
               <div className="space-y-2">
-                {tps.map((tp, i) => (
+                {(showRiskMore ? tps : tps.slice(0, 1)).map((tp, i) => (
                   <div key={i} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -1596,6 +1665,7 @@ function SetupDetail({
                 ))}
               </div>
             )}
+
           </div>
 
           <Divider />
@@ -1614,35 +1684,47 @@ function SetupDetail({
               right={Number.isFinite(setup.rr_min) ? setup.rr_min.toFixed(2) : "—"}
               intent={rr01 != null && rr01 >= 0.5 ? "good" : "warn"}
             />
-            <Meter
-              label="Bias strength"
-              value01={biasStrength01}
-              intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"}
-            />
-            <Meter
-              label="Delta alignment"
-              value01={deltaNorm01}
-              right={Number.isFinite(Number(of?.delta?.delta_norm)) ? fmtNum(Number(of.delta.delta_norm), 2) : "—"}
-              intent="neutral"
-            />
-            <Meter
-              label="Divergence signal"
-              value01={divScore01}
-              right={divScore01 != null ? fmtPct01(divScore01) : "—"}
-              intent={divScore01 != null && divScore01 >= 0.65 ? "good" : "neutral"}
-            />
-            <Meter
-              label="Absorption signal"
-              value01={absScore01}
-              right={absScore01 != null ? fmtPct01(absScore01) : "—"}
-              intent={absScore01 != null && absScore01 >= 0.65 ? "good" : "neutral"}
-            />
-            <Meter
-              label="Cross consensus"
-              value01={crossConsensus01}
-              right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
-              intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : crossConsensus01 != null && crossConsensus01 <= 0.35 ? "warn" : "neutral"}
-            />
+
+            {showRiskMore ? (
+              <>
+                <Meter
+                  label="Bias strength"
+                  value01={biasStrength01}
+                  intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"}
+                />
+                <Meter
+                  label="Delta alignment"
+                  value01={deltaNorm01}
+                  right={Number.isFinite(Number(of?.delta?.delta_norm)) ? fmtNum(Number(of.delta.delta_norm), 2) : "—"}
+                  intent="neutral"
+                />
+                <Meter
+                  label="Divergence signal"
+                  value01={divScore01}
+                  right={divScore01 != null ? fmtPct01(divScore01) : "—"}
+                  intent={divScore01 != null && divScore01 >= 0.65 ? "good" : "neutral"}
+                />
+                <Meter
+                  label="Absorption signal"
+                  value01={absScore01}
+                  right={absScore01 != null ? fmtPct01(absScore01) : "—"}
+                  intent={absScore01 != null && absScore01 >= 0.65 ? "good" : "neutral"}
+                />
+                <Meter
+                  label="Cross consensus"
+                  value01={crossConsensus01}
+                  right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
+                  intent={
+                    crossConsensus01 != null && crossConsensus01 >= 0.65
+                      ? "good"
+                      : crossConsensus01 != null && crossConsensus01 <= 0.35
+                        ? "warn"
+                        : "neutral"
+                  }
+                />
+              </>
+            ) : null}
+
           </div>
         </div>
       </div>
