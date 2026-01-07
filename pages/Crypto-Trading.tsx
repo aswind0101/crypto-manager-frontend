@@ -506,13 +506,6 @@ export default function Page() {
     setExpandedKey((prev) => (prev === key ? null : key));
   };
 
-  useEffect(() => {
-    const keys = ranked.map(stableSetupKey);
-    const dup = keys.filter((k, i) => keys.indexOf(k) !== i);
-    if (dup.length) console.warn("Duplicate setup keys:", dup);
-  }, [ranked]);
-
-
   // Banner for READY (non-intrusive)
   const readyKeys = useMemo(() => {
     return (out?.setups || []).filter((s) => String(s.status) === "READY").map((s) => stableSetupKey(s));
