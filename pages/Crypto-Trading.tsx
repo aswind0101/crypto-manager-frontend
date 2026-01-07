@@ -1741,47 +1741,41 @@ function SetupDetail({
               intent={rr01 != null && rr01 >= 0.5 ? "good" : "warn"}
             />
 
-            {showRiskMore ? (
-              <>
-                <Meter
-                  label="Bias strength"
-                  value01={biasStrength01}
-                  intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"}
-                />
-                <Meter
-                  label="Delta alignment"
-                  value01={deltaNorm01}
-                  right={Number.isFinite(Number(of?.delta?.delta_norm)) ? fmtNum(Number(of.delta.delta_norm), 2) : "—"}
-                  intent="neutral"
-                />
-                <Meter
-                  label="Divergence signal"
-                  value01={divScore01}
-                  right={divScore01 != null ? fmtPct01(divScore01) : "—"}
-                  intent={divScore01 != null && divScore01 >= 0.65 ? "good" : "neutral"}
-                />
-                <Meter
-                  label="Absorption signal"
-                  value01={absScore01}
-                  right={absScore01 != null ? fmtPct01(absScore01) : "—"}
-                  intent={absScore01 != null && absScore01 >= 0.65 ? "good" : "neutral"}
-                />
-                <Meter
-                  label="Cross consensus"
-                  value01={crossConsensus01}
-                  right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
-                  intent={
-                    crossConsensus01 != null && crossConsensus01 >= 0.65
-                      ? "good"
-                      : crossConsensus01 != null && crossConsensus01 <= 0.35
-                        ? "warn"
-                        : "neutral"
-                  }
-                />
-              </>
-
-            ) : null}
-
+            <Meter
+              label="Bias strength"
+              value01={biasStrength01}
+              intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"}
+            />
+            <Meter
+              label="Delta alignment"
+              value01={deltaNorm01}
+              right={Number.isFinite(Number(of?.delta?.delta_norm)) ? fmtNum(Number(of.delta.delta_norm), 2) : "—"}
+              intent="neutral"
+            />
+            <Meter
+              label="Divergence signal"
+              value01={divScore01}
+              right={divScore01 != null ? fmtPct01(divScore01) : "—"}
+              intent={divScore01 != null && divScore01 >= 0.65 ? "good" : "neutral"}
+            />
+            <Meter
+              label="Absorption signal"
+              value01={absScore01}
+              right={absScore01 != null ? fmtPct01(absScore01) : "—"}
+              intent={absScore01 != null && absScore01 >= 0.65 ? "good" : "neutral"}
+            />
+            <Meter
+              label="Cross consensus"
+              value01={crossConsensus01}
+              right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
+              intent={
+                crossConsensus01 != null && crossConsensus01 >= 0.65
+                  ? "good"
+                  : crossConsensus01 != null && crossConsensus01 <= 0.35
+                    ? "warn"
+                    : "neutral"
+              }
+            />
           </div>
         </div>
       </div>
