@@ -244,11 +244,7 @@ function actionChip(s: TradeSetup): { label: string; tone: string; icon: React.R
 }
 
 function stableSetupKey(s: TradeSetup): string {
-  // 1) Unique thật sự (ưu tiên backend)
-  if (s?.id) return String(s.id);
   if (s?.canon) return String(s.canon);
-
-  // 2) Fallback cuối (chỉ để không crash; không đảm bảo unique)
   const type = String(s?.type ?? "");
   const side = String(s?.side ?? "");
   const tf = String(s?.entry_tf ?? "");
@@ -258,7 +254,6 @@ function stableSetupKey(s: TradeSetup): string {
   const sl = Number.isFinite(s?.stop?.price) ? (s.stop.price as number).toFixed(2) : "na";
   return `${type}|${side}|${tf}|${mode}|z:${zlo}-${zhi}|sl:${sl}`;
 }
-
 
 function humanizeType(x: string) {
   return (x || "").replace(/_/g, " ");
@@ -487,8 +482,7 @@ export default function Page() {
     });
   }, [out?.setups]);
 
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
-
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [showLevelsMore, setShowLevelsMore] = useState(false);
   const [showDataCompleteness, setShowDataCompleteness] = useState(false);
   const [showKeyLevels, setShowKeyLevels] = useState(false);
@@ -498,13 +492,19 @@ export default function Page() {
   useEffect(() => {
     if (lastSymbolRef.current !== symbol) {
       lastSymbolRef.current = symbol;
-      setExpandedKey(null);
+      setSelectedKey(null);
     }
   }, [symbol]);
 
-  const toggleExpanded = (key: string) => {
-    setExpandedKey((prev) => (prev === key ? null : key));
-  };
+  useEffect(() => {
+    if (!selectedKey && ranked.length > 0) setSelectedKey(stableSetupKey(ranked[0]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ranked.length]);
+
+  const selected = useMemo(() => {
+    if (!selectedKey) return null;
+    return ranked.find((s) => stableSetupKey(s) === selectedKey) || null;
+  }, [ranked, selectedKey]);
 
   // Banner for READY (non-intrusive)
   const readyKeys = useMemo(() => {
@@ -638,6 +638,32 @@ export default function Page() {
   const onEnterInput: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === "Enter") onAnalyze();
   };
+
+  const SelectedSetupCard = (
+    <Card
+      title="Selected Setup"
+      icon={<Crosshair className="h-5 w-5" />}
+      right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}
+    >
+      {!selected ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-sm font-bold text-zinc-100">No selection</div>
+          <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
+        </div>
+      ) : (
+        <SetupDetail
+          symbol={symbol}
+          mid={mid}
+          dqOk={dqOk}
+          bybitOk={bybitOk}
+          staleSec={staleSec}
+          paused={paused}
+          features={features}
+          setup={selected}
+        />
+      )}
+    </Card>
+  );
 
   return (
     <div className="min-h-screen bg-[#070A12] text-zinc-100">
@@ -938,8 +964,8 @@ export default function Page() {
                   </div>
                 ) : (
                   ranked.map((s) => {
-                    const key = stableSetupKey(s);        // giờ phải unique thật
-                    const isOpen = expandedKey === key;
+                    const key = stableSetupKey(s);
+                    const sel = selectedKey === key;
 
                     const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
                     const pri01 = clamp01(pri / 100);
@@ -947,21 +973,26 @@ export default function Page() {
                     const chip = actionChip(s);
 
                     return (
-                      <div
+                      <button
                         key={key}
+                        onClick={() => setSelectedKey(key)}
                         className={[
-                          "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
-                          isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
+                          "w-full text-left",
+                          "rounded-2xl border border-white/10 bg-white/5 p-3 ring-1 ring-white/10",
+                          "transition hover:bg-white/7 active:bg-white/10",
+                          sel ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
                         ].join(" ")}
                       >
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-center gap-3">
                           {/* LEFT: main info */}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <div className="truncate text-sm font-extrabold text-zinc-50">
                                 {humanizeType(String(s.type))}
                               </div>
-                              <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
+                              <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>
+                                {s.side}
+                              </div>
                             </div>
 
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
@@ -973,53 +1004,39 @@ export default function Page() {
                             </div>
 
                             <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                              <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
+                              <div
+                                className="h-full rounded-full bg-sky-500/70"
+                                style={{ width: `${pri01 * 100}%` }}
+                              />
                             </div>
                           </div>
 
-                          {/* RIGHT: pills + toggle */}
-                          <div className="flex shrink-0 flex-col items-end gap-2">
-                            <div className="flex flex-col items-end gap-1">
-                              <Pill tone={statusTone(s.status)}>{s.status}</Pill>
-                              <Pill tone={chip.tone} icon={chip.icon}>
-                                {chip.label}
-                              </Pill>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => toggleExpanded(key)}
-                              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-white/10"
-                            >
-                              {isOpen ? "Hide details" : "View details"}
-                            </button>
+                          {/* RIGHT: pills */}
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <Pill tone={statusTone(s.status)}>{s.status}</Pill>
+                            <Pill tone={chip.tone} icon={chip.icon}>
+                              {chip.label}
+                            </Pill>
                           </div>
                         </div>
 
-                        {isOpen ? (
-                          <div className="mt-3">
-                            <SetupDetail
-                              symbol={symbol}
-                              mid={mid}
-                              dqOk={dqOk}
-                              bybitOk={bybitOk}
-                              staleSec={staleSec}
-                              paused={paused}
-                              features={features}
-                              setup={s}
-                            />
-                          </div>
-                        ) : null}
-                      </div>
+                      </button>
                     );
                   })
                 )}
               </div>
             </Card>
+            <div className="md:hidden">
+              {SelectedSetupCard}
+            </div>
           </div>
 
           {/* RIGHT: details */}
           <div className="space-y-4">
+            <div className="hidden md:block">
+              {SelectedSetupCard}
+            </div>
+
             <Card
               title="Data Completeness"
               icon={<Database className="h-5 w-5" />}
