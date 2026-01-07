@@ -483,6 +483,7 @@ export default function Page() {
   }, [out?.setups]);
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [showLevelsMore, setShowLevelsMore] = useState(false);
 
   // Auto-select once when setups appear or symbol changes
   const lastSymbolRef = useRef(symbol);
@@ -590,6 +591,7 @@ export default function Page() {
 
     return uniq.slice(0, 12);
   }, [features?.market_structure]);
+  const keyLevelsView = showLevelsMore ? keyLevels : keyLevels.slice(0, 6);
 
   // A compact health summary for each TF from snap (stale/partial/availability)
   const tfHealth = useMemo(() => {
@@ -604,6 +606,16 @@ export default function Page() {
     }));
     return tfs.sort((a, b) => a.tf.localeCompare(b.tf));
   }, [snap?.timeframes]);
+  const [showTfHealthMore, setShowTfHealthMore] = useState(false);
+
+  const tfHealthPrimary = useMemo(() => {
+    const priority = ["1h", "15m", "5m", "4h"];
+    return priority
+      .map((tf) => tfHealth.find((t) => t.tf === tf))
+      .filter(Boolean) as typeof tfHealth;
+  }, [tfHealth]);
+
+  const tfHealthView = showTfHealthMore ? tfHealth : tfHealthPrimary;
 
   const appBlocked = useMemo(() => {
     // hard block: DQ not ok, or feeds not ok, or stale too large
@@ -840,7 +852,10 @@ export default function Page() {
                 </div>
               </div>
             </Card>
-
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+              <LineChart className="h-4 w-4 text-zinc-300" />
+              Trend by timeframe (structure)
+            </div>
             <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
               {appBlocked ? (
                 <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
@@ -939,6 +954,25 @@ export default function Page() {
                 )}
               </div>
             </Card>
+            <Card title="Selected Setup" icon={<Crosshair className="h-5 w-5" />} right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}>
+              {!selected ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-sm font-bold text-zinc-100">No selection</div>
+                  <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
+                </div>
+              ) : (
+                <SetupDetail
+                  symbol={symbol}
+                  mid={mid}
+                  dqOk={dqOk}
+                  bybitOk={bybitOk}
+                  staleSec={staleSec}
+                  paused={paused}
+                  features={features}
+                  setup={selected}
+                />
+              )}
+            </Card>
           </div>
 
           {/* RIGHT: details */}
@@ -1006,10 +1040,10 @@ export default function Page() {
                   </div>
 
                   <div className="mt-3 space-y-2">
-                    {tfHealth.length === 0 ? (
+                    {tfHealthView.length === 0 ? (
                       <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
                     ) : (
-                      tfHealth.map((t) => {
+                      tfHealthView.map((t) => {
                         const staleMs = Number.isFinite(t.stale_ms) ? t.stale_ms : NaN;
                         const staleTone =
                           Number.isFinite(staleMs) && staleMs <= 1500
@@ -1019,45 +1053,38 @@ export default function Page() {
                               : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
 
                         return (
-                          <div key={t.tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />}>
-                                  {Number.isFinite(staleMs) ? `${fmtNum(staleMs / 1000, 1)}s` : "—"}
-                                </Pill>
-                                <Pill
-                                  tone={
-                                    t.partial ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                                  }
-                                >
-                                  {t.partial ? "PARTIAL" : "OK"}
-                                </Pill>
-                              </div>
-                            </div>
-                            <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-zinc-300">
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                                <div className="text-zinc-400">Bybit</div>
-                                <div className="font-bold text-zinc-100">{t.haveCandlesBybit}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                                <div className="text-zinc-400">Binance</div>
-                                <div className="font-bold text-zinc-100">{t.haveCandlesBinance}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                                <div className="text-zinc-400">Trades</div>
-                                <div className="font-bold text-zinc-100">{t.haveTrades}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-2">
-                                <div className="text-zinc-400">OB</div>
-                                <div className="font-bold text-zinc-100">{t.haveOrderbook ? "YES" : "NO"}</div>
-                              </div>
+                          <div key={t.tf} className="flex items-center justify-between rounded-xl border border-white/10 bg-zinc-950/30 px-3 py-2">
+                            <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
+                            <div className="flex items-center gap-2">
+                              <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />}>
+                                {Number.isFinite(staleMs) ? `${fmtNum(staleMs / 1000, 1)}s` : "—"}
+                              </Pill>
+                              <Pill
+                                tone={
+                                  t.partial
+                                    ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                                    : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                                }
+                              >
+                                {t.partial ? "PARTIAL" : "OK"}
+                              </Pill>
                             </div>
                           </div>
                         );
                       })
                     )}
+
+                    {tfHealth.length > tfHealthPrimary.length ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowTfHealthMore((v) => !v)}
+                        className="pt-1 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
+                      >
+                        {showTfHealthMore ? "Show less" : `Show more (${tfHealth.length - tfHealthPrimary.length})`}
+                      </button>
+                    ) : null}
                   </div>
+
                 </div>
               </div>
             </Card>
@@ -1065,16 +1092,14 @@ export default function Page() {
             <Card title="Market Trend & Key Levels" icon={<Layers className="h-5 w-5" />}>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                    <LineChart className="h-4 w-4 text-zinc-300" />
-                    Trend by timeframe (structure)
-                  </div>
+
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {["4h", "1h", "15m", "5m"].map((tf) => {
                       const node = (features?.market_structure as any)?.[tf];
                       const badge = structureTrendBadge(node?.trend);
                       const e = pickLatestStructureEvent(node);
+
 
                       return (
                         <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
@@ -1112,7 +1137,8 @@ export default function Page() {
                     {keyLevels.length === 0 ? (
                       <div className="text-xs text-zinc-400">No market structure levels yet.</div>
                     ) : (
-                      keyLevels.map((l, i) => (
+
+                      keyLevelsView.map((l, i) => (
                         <div key={`${l.tf}-${l.kind}-${i}`} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -1134,7 +1160,6 @@ export default function Page() {
                                 {l.dir && l.dir !== "—" ? <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill> : null}
                               </div>
                               <div className="mt-2 text-sm font-extrabold text-zinc-50">{Number.isFinite(l.level) ? fmtPx(l.level) : "—"}</div>
-                              <div className="mt-1 text-xs text-zinc-400">{Number.isFinite(l.ts) ? `Seen ${relTime(l.ts)}` : ""}</div>
                             </div>
                             {Number.isFinite(mid) && Number.isFinite(l.level) ? (
                               <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" title="Distance from mid (absolute)">
@@ -1148,27 +1173,19 @@ export default function Page() {
                   </div>
                 </div>
               </div>
+              {keyLevels.length > 6 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLevelsMore((v) => !v)}
+                  className="mt-2 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
+                >
+                  {showLevelsMore ? "Show less" : `Show more (${keyLevels.length - 6})`}
+                </button>
+              ) : null}
+
             </Card>
 
-            <Card title="Selected Setup" icon={<Crosshair className="h-5 w-5" />} right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}>
-              {!selected ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-sm font-bold text-zinc-100">No selection</div>
-                  <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
-                </div>
-              ) : (
-                <SetupDetail
-                  symbol={symbol}
-                  mid={mid}
-                  dqOk={dqOk}
-                  bybitOk={bybitOk}
-                  staleSec={staleSec}
-                  paused={paused}
-                  features={features}
-                  setup={selected}
-                />
-              )}
-            </Card>
+
           </div>
         </div>
 
