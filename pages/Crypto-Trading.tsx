@@ -896,50 +896,43 @@ export default function Page() {
                           sel ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
                         ].join(" ")}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-baseline gap-2">
-                              <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
-                              <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
-                            </div>
-
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <Pill tone={statusTone(s.status)}>{String(s.status)}</Pill>
-                              <Pill tone={gradeTone(s.confidence?.grade)}>Grade {String(s.confidence?.grade || "—").toUpperCase()}</Pill>
-                              <Pill tone={chip.tone} icon={chip.icon}>
-                                {chip.label}
-                              </Pill>
-                            </div>
-
-                            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                              <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                <div className="text-[11px] text-zinc-400">Conf</div>
-                                <div className="mt-0.5 font-extrabold text-zinc-100">{fmtScore100(s.confidence?.score)}</div>
+                        <div className="flex items-center gap-3">
+                          {/* LEFT: main info */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="truncate text-sm font-extrabold text-zinc-50">
+                                {humanizeType(String(s.type))}
                               </div>
-                              <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                <div className="text-[11px] text-zinc-400">RR min</div>
-                                <div className="mt-0.5 font-extrabold text-zinc-100">{Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</div>
-                              </div>
-                              <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-2">
-                                <div className="text-[11px] text-zinc-400">Priority</div>
-                                <div className="mt-0.5 font-extrabold text-zinc-100">{pri}</div>
+                              <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>
+                                {s.side}
                               </div>
                             </div>
 
-                            <div className="mt-2">
-                              <div className="h-2.5 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                                <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
-                              </div>
-                              {Array.isArray(s.priority_reasons) && s.priority_reasons.length > 0 ? (
-                                <div className="mt-1 text-[11px] text-zinc-400">Why: {s.priority_reasons.join(" • ")}</div>
-                              ) : null}
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                              <span>Conf {fmtScore100(s.confidence?.score)}</span>
+                              <span>•</span>
+                              <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
+                              <span>•</span>
+                              <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                            </div>
+
+                            <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                              <div
+                                className="h-full rounded-full bg-sky-500/70"
+                                style={{ width: `${pri01 * 100}%` }}
+                              />
                             </div>
                           </div>
 
-                          <div className="mt-1 shrink-0 text-zinc-400">
-                            <ChevronRight className="h-5 w-5" />
+                          {/* RIGHT: pills */}
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <Pill tone={statusTone(s.status)}>{s.status}</Pill>
+                            <Pill tone={chip.tone} icon={chip.icon}>
+                              {chip.label}
+                            </Pill>
                           </div>
                         </div>
+
                       </button>
                     );
                   })
@@ -1398,13 +1391,15 @@ function SetupDetail({
             </div>
           </div>
         </div>
-        <div className="mb-3 rounded-xl border border-white/10 bg-zinc-950/40 px-4 py-3">
-          <div className="text-sm font-extrabold text-zinc-50">
-            {decisionSummary(setup)}
+        <div className="sticky top-2 z-20 space-y-3">
+          <div className="rounded-xl border border-white/10 bg-zinc-950/80 backdrop-blur px-4 py-3">
+            <div className="text-sm font-extrabold text-zinc-50">
+              {decisionSummary(setup)}
+            </div>
           </div>
-        </div>
 
-        <Divider />
+          <Divider />
+        </div>
 
         {/* Guidance */}
         {/* Guidance */}
