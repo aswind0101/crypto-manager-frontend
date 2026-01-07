@@ -183,7 +183,88 @@ function alignmentTone(a: AlignState) {
     if (a === "MIXED") return "warn";
     return "muted";
 }
+type UiSetupStatus = "READY" | "WAITING" | "BLOCKED" | "UNKNOWN";
 
+function computeUiStatus(s: TradeSetup, features: any): UiSetupStatus {
+    // Global hard invalid states from engine setup status
+    const st = String(s.status || "").toUpperCase();
+    if (st === "INVALIDATED" || st === "EXPIRED") return "BLOCKED";
+
+    const ex = s.execution;
+    if (!ex) return "UNKNOWN";
+
+    // Explicit block from execution
+    if (ex.state === "BLOCKED") return "BLOCKED";
+
+    // Permission gate (Phương án A)
+    if (ex.canEnterMarket || ex.canPlaceLimit) return "READY";
+
+    // If not permitted and we have blockers => waiting
+    if (Array.isArray(ex.blockers) && ex.blockers.length > 0) return "WAITING";
+
+    return "UNKNOWN";
+}
+
+function uiStatusTone(u: UiSetupStatus) {
+    if (u === "READY") return "good";
+    if (u === "WAITING") return "warn";
+    if (u === "BLOCKED") return "bad";
+    return "muted";
+}
+
+function pickActionChipStrict(s: TradeSetup): { label: string; tone: "chipGood" | "chipWait" | "chipBad" } {
+    const ex = s.execution;
+    const u = ex ? computeUiStatus(s, null) : "UNKNOWN";
+
+    if (ex?.state === "BLOCKED") return { label: "BLOCKED", tone: "chipBad" };
+    if (ex?.canEnterMarket || ex?.state === "ENTER_MARKET") return { label: "ENTER NOW", tone: "chipGood" };
+    if (ex?.canPlaceLimit || ex?.state === "PLACE_LIMIT") return { label: "PLACE LIMIT", tone: "chipGood" };
+
+    // permission not granted => monitor
+    if (u === "WAITING") return { label: "MONITOR", tone: "chipWait" };
+    return { label: "MONITOR", tone: "chipWait" };
+}
+
+/**
+ * Caution list is shown ONLY when permission is granted (READY),
+ * to keep UI non-contradictory: no "ENTER NOW" + "Waiting for" together.
+ */
+function computeCautions(s: TradeSetup, features: any): string[] {
+    const cautions: string[] = [];
+
+    // Alignment caution
+    const a = computeAlignment(features);
+    if (a === "AGAINST") cautions.push("HTF alignment AGAINST bias");
+    else if (a === "MIXED") cautions.push("HTF alignment MIXED");
+
+    // Bias strength caution (if weak)
+    const bs = features?.bias?.trend_strength;
+    if (Number.isFinite(bs) && (bs as number) < 0.55) cautions.push(`Bias strength low (${Math.round((bs as number) * 100)}%)`);
+
+    // Cross consensus caution
+    const cs = features?.cross?.consensus_score;
+    const dev = features?.cross?.dev_bps;
+    if (Number.isFinite(cs) && (cs as number) < 0.55) {
+        cautions.push(`Cross consensus low (${Math.round((cs as number) * 100)}%)`);
+    }
+    if (Number.isFinite(dev) && Math.abs(dev as number) >= 10) {
+        cautions.push(`Cross dev elevated (${(dev as number).toFixed(1)} bps)`);
+    }
+
+    // Delta caution: if delta_norm opposes side
+    const dn = features?.orderflow?.delta?.delta_norm;
+    if (Number.isFinite(dn)) {
+        const d = dn as number; // [-1..1]
+        if (s.side === "LONG" && d < -0.15) cautions.push(`Delta against LONG (Δnorm ${d.toFixed(2)})`);
+        if (s.side === "SHORT" && d > 0.15) cautions.push(`Delta against SHORT (Δnorm ${d.toFixed(2)})`);
+    }
+
+    // Volatility caution (if high)
+    const vr = String(features?.bias?.vol_regime || "").toLowerCase();
+    if (vr === "high") cautions.push("High volatility regime");
+
+    return cautions;
+}
 function humanizeType(x: string) {
     return (x || "").replace(/_/g, " ");
 }
@@ -436,14 +517,18 @@ function SetupRow({
     isSelected,
     onSelect,
     dqGrade,
+    uiStatus,
 }: {
     s: TradeSetup;
     isSelected: boolean;
     onSelect: () => void;
     dqGrade?: string;
+    uiStatus: UiSetupStatus;
 }) {
-    const tone = statusTone(s.status);
-    const action = pickActionChip(s.execution, s.status);
+
+    const tone = uiStatusTone(uiStatus);
+    const action = pickActionChipStrict(s);
+
     const pri = computePriorityScore(s, dqGrade);
 
     return (
@@ -454,7 +539,7 @@ function SetupRow({
                     <span className="rowSide" style={{ color: sideColor(s.side) }}>{s.side}</span>
                 </div>
                 <div className="rowMeta">
-                    <SafeBadge tone={tone === "ready" ? "good" : tone === "waiting" ? "warn" : "bad"}>{s.status}</SafeBadge>
+                    <SafeBadge tone={tone}>{uiStatus}</SafeBadge>
                     <span className={`chip ${action.tone}`}>{action.label}</span>
                     <span className={`badge ${gradeTone(s.confidence?.grade)}`}>GRADE {String(s.confidence?.grade || "—").toUpperCase()}</span>
                 </div>
@@ -480,7 +565,8 @@ function SetupDetail({
     s: TradeSetup;
     features: any;
 }) {
-    const action = pickActionChip(s.execution, s.status);
+    const action = pickActionChipStrict(s);
+    const uiStatus = computeUiStatus(s, features);
 
     const entry = s.entry;
     const stop = s.stop?.price;
@@ -515,8 +601,8 @@ function SetupDetail({
                         <div className="detailSide" style={{ color: sideColor(s.side) }}>{s.side}</div>
                     </div>
                     <div className="detailBadges">
-                        <SafeBadge tone={statusTone(s.status) === "ready" ? "good" : statusTone(s.status) === "waiting" ? "warn" : "bad"}>
-                            {s.status}
+                        <SafeBadge tone={uiStatusTone(uiStatus)}>
+                            {uiStatus}
                         </SafeBadge>
                         <span className={`chip ${action.tone}`}>{action.label}</span>
                         <span className={`badge ${gradeTone(s.confidence?.grade)}`}>GRADE {String(s.confidence?.grade || "—").toUpperCase()}</span>
@@ -607,17 +693,53 @@ function SetupDetail({
 
                     <div className="panelTitle">Operator guidance</div>
                     <div className="guidance">
-                        <div className="guidanceLine">{reason || entry?.trigger?.summary || "—"}</div>
-                        {blockers.length > 0 && (
-                            <div className="guidanceBlockers">
-                                <div className="mutedSmall">Waiting for / Blocked by:</div>
-                                <div className="pillRow">
-                                    {blockers.map((b) => (
-                                        <span key={b} className="pill warn">{b}</span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        {/* Permission-first guidance */}
+                        {(() => {
+                            const ex = s.execution;
+                            const permitted = !!(ex?.canEnterMarket || ex?.canPlaceLimit);
+                            const waitingFor = !permitted ? (ex?.blockers || []) : [];
+                            const cautions = permitted ? computeCautions(s, features) : [];
+
+                            // Primary one-liner: do NOT contradict permission gate
+                            const headline = permitted
+                                ? (ex?.canEnterMarket ? "Market entry permitted" : "Limit placement permitted")
+                                : "Not permitted yet";
+
+                            const detailLine = permitted
+                                ? (ex?.reason || entry?.trigger?.summary || "")
+                                : (ex?.reason || "Waiting for hard conditions to pass");
+
+                            return (
+                                <>
+                                    <div className="guidanceLine">{headline}</div>
+                                    {detailLine ? <div className="mutedSmall" style={{ marginTop: 6 }}>{detailLine}</div> : null}
+
+                                    {/* WAITING: only show hard gates when not permitted */}
+                                    {waitingFor.length > 0 && (
+                                        <div className="guidanceBlockers">
+                                            <div className="mutedSmall" style={{ marginTop: 10 }}>Waiting for (hard gates):</div>
+                                            <div className="pillRow" style={{ marginTop: 6 }}>
+                                                {waitingFor.map((b) => (
+                                                    <span key={b} className="pill warn">{b}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* CAUTION: only show when permitted */}
+                                    {cautions.length > 0 && (
+                                        <div className="guidanceBlockers">
+                                            <div className="mutedSmall" style={{ marginTop: 10 }}>Caution:</div>
+                                            <div className="pillRow" style={{ marginTop: 6 }}>
+                                                {cautions.map((c) => (
+                                                    <span key={c} className="pill">{c}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
 
@@ -813,15 +935,19 @@ export default function SetupsRadarScreen() {
                                 </div>
                             ) : (
                                 <div className="rows">
-                                    {ranked.map((s) => (
-                                        <SetupRow
-                                            key={s.id}
-                                            s={s}
-                                            dqGrade={dqGrade}
-                                            isSelected={selected?.id === s.id}
-                                            onSelect={() => setSelectedId(s.id)}
-                                        />
-                                    ))}
+                                    {ranked.map((s) => {
+                                        const uiStatus = computeUiStatus(s, features);
+                                        return (
+                                            <SetupRow
+                                                key={s.id}
+                                                s={s}
+                                                dqGrade={dqGrade}
+                                                uiStatus={uiStatus}
+                                                isSelected={selected?.id === s.id}
+                                                onSelect={() => setSelectedId(s.id)}
+                                            />
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
