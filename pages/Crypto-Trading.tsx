@@ -937,7 +937,7 @@ export default function Page() {
                     <div className="mt-1 text-xs text-zinc-400">Either the market has no valid patterns, or data is still filling.</div>
                   </div>
                 ) : (
-                  ranked.map((s, idx) => {
+                  ranked.map((s) => {
                     const key = stableSetupKey(s);        // giờ phải unique thật
                     const isOpen = expandedKey === key;
 
