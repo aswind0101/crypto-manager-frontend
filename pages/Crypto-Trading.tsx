@@ -245,6 +245,8 @@ function actionChip(s: TradeSetup): { label: string; tone: string; icon: React.R
 
 function stableSetupKey(s: TradeSetup): string {
   if (s?.canon) return String(s.canon);
+  if (s?.id) return String(s.id);
+  // fallback cuối cùng (giữ lại để tránh crash nếu data thiếu id)
   const type = String(s?.type ?? "");
   const side = String(s?.side ?? "");
   const tf = String(s?.entry_tf ?? "");
@@ -254,6 +256,7 @@ function stableSetupKey(s: TradeSetup): string {
   const sl = Number.isFinite(s?.stop?.price) ? (s.stop.price as number).toFixed(2) : "na";
   return `${type}|${side}|${tf}|${mode}|z:${zlo}-${zhi}|sl:${sl}`;
 }
+
 
 function humanizeType(x: string) {
   return (x || "").replace(/_/g, " ");
@@ -495,11 +498,10 @@ export default function Page() {
       setSelectedKey(null);
     }
   }, [symbol]);
-
   useEffect(() => {
     if (!selectedKey && ranked.length > 0) setSelectedKey(stableSetupKey(ranked[0]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ranked.length]);
+  }, [ranked, selectedKey]);
+
 
   const selected = useMemo(() => {
     if (!selectedKey) return null;
