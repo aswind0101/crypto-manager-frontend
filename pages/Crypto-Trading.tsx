@@ -99,12 +99,30 @@ type TradeSetup = {
   execution?: ExecutionDecision;
 };
 
+type ExecutionGlobal = {
+  state: "ENABLED" | "BLOCKED";
+  reasons: string[];
+};
+
+type FeedStatus = {
+  evaluated: boolean;
+  candidatesEvaluated: number | null;
+  published: number;
+  rejected: number | null;
+  rejectionByCode: Record<string, number> | null;
+  lastEvaluationTs: number;
+};
+
 type SetupsOutput = {
   ts: number;
   dq_ok: boolean;
   preferred_id?: string;
   setups: Array<TradeSetup>;
+  // optional telemetry (may be injected by useSetupsSnapshot)
+  executionGlobal?: ExecutionGlobal | null;
+  feedStatus?: FeedStatus | null;
 };
+
 
 /** ---------- Formatting helpers ---------- */
 function clamp01(x: number) {
@@ -138,41 +156,98 @@ function fmtScore100(x?: number) {
   return `${Math.round(Math.max(0, Math.min(100, x as number)))}%`;
 }
 
-function relTime(ts?: number) {
-  if (!Number.isFinite(ts as number)) return "—";
-  const t = ts as number;
-  if (t <= 0) return "—";
+/** ---------- Snapshot telemetry helpers (UI contract) ---------- */
+type FeedUiState = "LOADING" | "NO_SIGNAL" | "QUALITY_GATED" | "EMPTY_UNKNOWN" | "HAS_SETUPS";
 
-  const now = Date.now();
-  const diffSec = (t - now) / 1000;
-  const abs = Math.abs(diffSec);
-
-  if (abs < 2) return "just now";
-
-  const fmt = (n: number, u: string) => `${n}${u}`;
-  if (abs < 60) {
-    const v = Math.round(abs);
-    return diffSec > 0 ? `in ${fmt(v, "s")}` : `${fmt(v, "s")} ago`;
-  }
-  const m = abs / 60;
-  if (m < 60) {
-    const v = Math.round(m);
-    return diffSec > 0 ? `in ${fmt(v, "m")}` : `${fmt(v, "m")} ago`;
-  }
-  const h = m / 60;
-  if (h < 24) {
-    const v = Math.round(h);
-    return diffSec > 0 ? `in ${fmt(v, "h")}` : `${fmt(v, "h")} ago`;
-  }
-  const d = h / 24;
-  const v = Math.round(d);
-  return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
+function normalizeExecutionGlobal(x: any): ExecutionGlobal | null {
+  if (!x) return null;
+  const state = x.state === "BLOCKED" ? "BLOCKED" : x.state === "ENABLED" ? "ENABLED" : null;
+  if (!state) return null;
+  const reasons = Array.isArray(x.reasons) ? x.reasons.map((r: any) => String(r)) : [];
+  return { state, reasons };
 }
 
+function normalizeFeedStatus(x: any): FeedStatus | null {
+  if (!x) return null;
+  const evaluated = x.evaluated === true;
+  const published = Number.isFinite(Number(x.published)) ? Number(x.published) : 0;
+  const candidatesEvaluated =
+    x.candidatesEvaluated == null ? null : Number.isFinite(Number(x.candidatesEvaluated)) ? Number(x.candidatesEvaluated) : null;
+  const rejected = x.rejected == null ? null : Number.isFinite(Number(x.rejected)) ? Number(x.rejected) : null;
+
+  const rb = x.rejectionByCode;
+  const rejectionByCode =
+    rb && typeof rb === "object" && !Array.isArray(rb)
+      ? (Object.fromEntries(Object.entries(rb).map(([k, v]) => [String(k), Number(v)])) as Record<string, number>)
+      : null;
+
+  const lastEvaluationTs = Number.isFinite(Number(x.lastEvaluationTs)) ? Number(x.lastEvaluationTs) : Date.now();
+
+  return { evaluated, candidatesEvaluated, published, rejected, rejectionByCode, lastEvaluationTs };
+}
+
+function deriveFeedUiState(feedStatus: FeedStatus | null, publishedCount: number): FeedUiState {
+  // If we have no telemetry, fall back to a conservative state.
+  if (!feedStatus) return publishedCount > 0 ? "HAS_SETUPS" : "EMPTY_UNKNOWN";
+  if (!feedStatus.evaluated) return "LOADING";
+  if (publishedCount > 0) return "HAS_SETUPS";
+
+  // evaluated=true but published=0
+  const ce = feedStatus.candidatesEvaluated;
+  if (typeof ce === "number" && Number.isFinite(ce) && ce <= 0) return "NO_SIGNAL";
+  if (typeof ce === "number" && Number.isFinite(ce) && ce > 0) return "QUALITY_GATED";
+
+  // evaluated=true but candidates unknown
+  return "EMPTY_UNKNOWN";
+}
+
+function formatExecutionGlobalReason(code: string): string {
+  const c = String(code || "").toUpperCase();
+  if (c === "PAUSED") return "Updates are paused";
+  if (c === "DQ_NOT_OK") return "Data quality gate not OK";
+  if (c === "BYBIT_NOT_OK") return "Bybit feed not OK";
+  if (c === "PRICE_STALE") return "Price feed is stale";
+  return code;
+}
+
+function topRejectionPairs(rejectionByCode: Record<string, number> | null, limit = 6) {
+  if (!rejectionByCode) return [];
+  const pairs = Object.entries(rejectionByCode)
+    .map(([k, v]) => ({ code: k, count: Number(v) }))
+    .filter((x) => Number.isFinite(x.count) && x.count > 0)
+    .sort((a, b) => b.count - a.count);
+  return pairs.slice(0, limit);
+}
+
+function isMonitorOnlyGrade(grade?: string) {
+  return String(grade || "").toUpperCase() === "C";
+}
+
+function isSetupActionableNow(setup: TradeSetup, executionGlobal: ExecutionGlobal | null): boolean {
+  // Hard policy: grade C is always monitor-only
+  if (isMonitorOnlyGrade(setup?.confidence?.grade)) return false;
+  if (executionGlobal?.state === "BLOCKED") return false;
+  const ex = setup.execution;
+  if (!ex) return false;
+
+  // Trust the state machine, not booleans, for "now" actions.
+  return ex.state === "ENTER_MARKET" || ex.state === "PLACE_LIMIT";
+}
+
+
 /** ---------- Domain helpers (best-effort, no guessing) ---------- */
-function decisionSummary(s: TradeSetup): string {
+function decisionSummary(s: TradeSetup, executionGlobal: ExecutionGlobal | null): string {
+  if (isMonitorOnlyGrade(s?.confidence?.grade)) {
+    return "Monitor-only (Grade C policy): no execution actions permitted";
+  }
+
+  if (executionGlobal?.state === "BLOCKED") {
+    const primary = executionGlobal.reasons?.[0] ? formatExecutionGlobalReason(executionGlobal.reasons[0]) : "Execution blocked";
+    return `Execution blocked: ${primary}`;
+  }
+
   const ex = s.execution;
-  if (!ex) return "Monitor setup – no execution signal yet";
+  if (!ex) return "Monitor setup – no execution decision yet";
 
   switch (ex.state) {
     case "ENTER_MARKET":
@@ -180,9 +255,13 @@ function decisionSummary(s: TradeSetup): string {
     case "PLACE_LIMIT":
       return "Action now: place limit order";
     case "WAIT_ZONE":
-      return "Wait: price must enter the zone";
+      return "Wait: price must enter the entry zone";
     case "WAIT_CLOSE":
-      return "Wait: candle close required";
+      return "Wait: candle close confirmation required";
+    case "WAIT_RETEST":
+      return "Wait: retest condition required";
+    case "WAIT_FILL":
+      return "Triggered: waiting for limit fill";
     case "BLOCKED":
       return "No trade: setup is blocked";
     case "NO_TRADE":
@@ -191,6 +270,7 @@ function decisionSummary(s: TradeSetup): string {
       return "Monitor setup";
   }
 }
+
 
 function sideTone(side: SetupSide) {
   return side === "LONG" ? "text-emerald-400" : "text-rose-400";
@@ -223,24 +303,68 @@ function statusTone(status?: string) {
   return "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
 }
 
-function actionChip(s: TradeSetup): { label: string; tone: string; icon: React.ReactNode } {
-  const ex = s.execution;
-  if (!ex) {
-    return { label: "MONITOR", tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30", icon: <CircleDashed className="h-4 w-4" /> };
+function actionChip(
+  s: TradeSetup,
+  executionGlobal: ExecutionGlobal | null
+): { label: string; tone: string; icon: React.ReactNode } {
+  // Hard policy first
+  if (isMonitorOnlyGrade(s?.confidence?.grade)) {
+    return {
+      label: "MONITOR ONLY",
+      tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+      icon: <CircleDashed className="h-4 w-4" />,
+    };
   }
 
+  // Global execution gate
+  if (executionGlobal?.state === "BLOCKED") {
+    return {
+      label: "EXEC BLOCKED",
+      tone: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30",
+      icon: <Lock className="h-4 w-4" />,
+    };
+  }
+
+  const ex = s.execution;
+  if (!ex) {
+    return {
+      label: "MONITOR",
+      tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+      icon: <CircleDashed className="h-4 w-4" />,
+    };
+  }
+
+  // Setup-level blocks
   if (ex.state === "BLOCKED") {
-    return { label: "BLOCKED", tone: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30", icon: <Lock className="h-4 w-4" /> };
+    return {
+      label: "BLOCKED",
+      tone: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30",
+      icon: <Lock className="h-4 w-4" />,
+    };
   }
-  if (ex.canEnterMarket || ex.state === "ENTER_MARKET") {
-    return { label: "ENTER NOW", tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30", icon: <Crosshair className="h-4 w-4" /> };
+
+  // Trust the state machine (not booleans) for chips
+  if (ex.state === "ENTER_MARKET") {
+    return {
+      label: "ENTER NOW",
+      tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30",
+      icon: <Crosshair className="h-4 w-4" />,
+    };
   }
-  if (ex.canPlaceLimit || ex.state === "PLACE_LIMIT") {
-    return { label: "PLACE LIMIT", tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30", icon: <Target className="h-4 w-4" /> };
+  if (ex.state === "PLACE_LIMIT") {
+    return {
+      label: "PLACE LIMIT",
+      tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30",
+      icon: <Target className="h-4 w-4" />,
+    };
   }
 
   // waiting states
-  return { label: "MONITOR", tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30", icon: <Clock className="h-4 w-4" /> };
+  return {
+    label: "MONITOR",
+    tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+    icon: <Clock className="h-4 w-4" />,
+  };
 }
 
 function stableSetupKey(s: TradeSetup): string {
@@ -408,6 +532,36 @@ function KV({
 function Divider() {
   return <div className="my-3 h-px w-full bg-white/10" />;
 }
+function relTime(ts?: number) {
+  if (!Number.isFinite(ts as number)) return "—";
+  const t = ts as number;
+  if (t <= 0) return "—";
+
+  const now = Date.now();
+  const diffSec = (t - now) / 1000;
+  const abs = Math.abs(diffSec);
+
+  if (abs < 2) return "just now";
+
+  const fmt = (n: number, u: string) => `${n}${u}`;
+  if (abs < 60) {
+    const v = Math.round(abs);
+    return diffSec > 0 ? `in ${fmt(v, "s")}` : `${fmt(v, "s")} ago`;
+  }
+  const m = abs / 60;
+  if (m < 60) {
+    const v = Math.round(m);
+    return diffSec > 0 ? `in ${fmt(v, "m")}` : `${fmt(v, "m")} ago`;
+  }
+  const h = m / 60;
+  if (h < 24) {
+    const v = Math.round(h);
+    return diffSec > 0 ? `in ${fmt(v, "h")}` : `${fmt(v, "h")} ago`;
+  }
+  const d = h / 24;
+  const v = Math.round(d);
+  return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
+}
 
 /** ---------- Main Page ---------- */
 export default function Page() {
@@ -444,8 +598,24 @@ export default function Page() {
     } catch { }
   }, [paused]);
 
-  const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
+  const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
   const out = (setups as unknown as SetupsOutput | null) ?? null;
+  const executionGlobal = useMemo(() => {
+    // Prefer hook-level fields, fall back to out.* if present.
+    return (
+      normalizeExecutionGlobal(execGlobalRaw) ||
+      normalizeExecutionGlobal(out?.executionGlobal) ||
+      null
+    );
+  }, [execGlobalRaw, out?.executionGlobal]);
+
+  const feedStatus = useMemo(() => {
+    return (
+      normalizeFeedStatus(feedStatusRaw) ||
+      normalizeFeedStatus(out?.feedStatus) ||
+      null
+    );
+  }, [feedStatusRaw, out?.feedStatus]);
 
   // Live derived metrics (best-effort)
   const mid = useMemo(() => {
@@ -503,35 +673,38 @@ export default function Page() {
   };
 
 
-  // Banner for READY (non-intrusive)
-  const readyKeys = useMemo(() => {
-    return (out?.setups || []).filter((s) => String(s.status) === "READY").map((s) => stableSetupKey(s));
-  }, [out?.setups]);
+  // Banner for ACTIONABLE (state-machine based, policy-safe)
+  const actionableKeys = useMemo(() => {
+    return (out?.setups || [])
+      .filter((s) => isSetupActionableNow(s, executionGlobal))
+      .map((s) => stableSetupKey(s));
+  }, [out?.setups, executionGlobal]);
 
-  const prevReadyRef = useRef<string[]>([]);
+  const prevActionableRef = useRef<string[]>([]);
   const [banner, setBanner] = useState<{ active: boolean; text: string }>({ active: false, text: "" });
 
   useEffect(() => {
-    const prev = prevReadyRef.current;
-    const now = readyKeys;
-    prevReadyRef.current = now;
+    const prev = prevActionableRef.current;
+    const now = actionableKeys;
+    prevActionableRef.current = now;
 
     const newOnes = now.filter((k) => !prev.includes(k));
+
     if (newOnes.length > 0) {
       const s = ranked.find((x) => stableSetupKey(x) === newOnes[0]);
       const text = s
-        ? `READY: ${symbol} • ${humanizeType(s.type)} • ${s.side} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}`
-        : `READY setup detected`;
+        ? `ACTION: ${symbol} • ${humanizeType(s.type)} • ${s.side} • ${String(s.execution?.state || "")} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}`
+        : "Actionable setup detected";
       setBanner({ active: true, text });
       try {
         if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
       } catch { }
     } else {
       if (now.length === 0 && banner.active) setBanner({ active: false, text: "" });
-      if (now.length > 0 && !banner.active) setBanner({ active: true, text: "READY setup available" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readyKeys.join("|")]);
+  }, [actionableKeys.join("|")]);
+
 
   // Market context
   const biasDir = useMemo(() => {
@@ -616,15 +789,8 @@ export default function Page() {
 
   const tfHealthView = showTfHealthMore ? tfHealth : tfHealthPrimary;
 
-  const appBlocked = useMemo(() => {
-    // hard block: DQ not ok, or feeds not ok, or stale too large
-    if (!features) return false;
-    if (!dqOk) return true;
-    if (!bybitOk) return true; // execution venue
-    if (staleSec != null && staleSec > 5) return true;
-    if (paused) return true;
-    return false;
-  }, [features, dqOk, bybitOk, staleSec, paused]);
+  const appBlocked = executionGlobal?.state === "BLOCKED";
+
 
   const onAnalyze = () => {
     const cleaned = String(inputSymbol || "").trim().toUpperCase();
@@ -900,17 +1066,29 @@ export default function Page() {
               </div>
             </div>
             <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
-              {appBlocked ? (
+              {executionGlobal?.state === "BLOCKED" ? (
                 <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
                   <div className="flex items-start gap-3">
                     <div className="rounded-xl bg-rose-500/15 p-2 ring-1 ring-rose-500/25">
                       <ShieldAlert className="h-5 w-5 text-rose-200" />
                     </div>
-                    <div>
-                      <div className="text-sm font-extrabold text-rose-100">Execution gated</div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-extrabold text-rose-100">Execution blocked (system gate)</div>
                       <div className="mt-1 text-xs text-rose-100/90">
-                        DQ / Bybit feed / staleness / paused is blocking actionable execution signals. You can still review context, but do not enter trades until health returns.
+                        The system is running, but execution actions are blocked by policy/health gates. You may still review market context and monitor setups.
                       </div>
+
+                      {Array.isArray(executionGlobal.reasons) && executionGlobal.reasons.length > 0 ? (
+                        <div className="mt-3 space-y-1.5 text-xs">
+                          {executionGlobal.reasons.slice(0, 6).map((r) => (
+                            <div key={r} className="flex items-start gap-2">
+                              <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-rose-200/70" />
+                              <span className="min-w-0">{formatExecutionGlobalReason(r)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                         <Pill tone={dqTone(dq)} icon={<Database className="h-4 w-4" />}>
                           DQ {String(dq || "—")}
@@ -928,92 +1106,186 @@ export default function Page() {
               ) : null}
 
               <div className="mt-3 space-y-2">
-                {ranked.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="text-sm font-bold text-zinc-100">No setups</div>
-                    <div className="mt-1 text-xs text-zinc-400">Either the market has no valid patterns, or data is still filling.</div>
-                  </div>
-                ) : (
-                  ranked.map((s, idx) => {
-                    const keyStr = stableSetupKey(s);          // key string (có thể trùng)
-                    const reactKey = `${keyStr}::${idx}`;      // React key luôn unique
-                    const accordionKey = idx;                  // Accordion key = index
-                    const isOpen = expandedKey === accordionKey;
+                {(() => {
+                  const publishedCount = ranked.length;
+                  const state = deriveFeedUiState(feedStatus, publishedCount);
 
-                    const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
-                    const pri01 = clamp01(pri / 100);
+                  if (state === "HAS_SETUPS") {
+                    return ranked.map((s, idx) => {
+                      const keyStr = stableSetupKey(s);
+                      const reactKey = `${keyStr}::${idx}`;
+                      const accordionKey = idx;
+                      const isOpen = expandedKey === accordionKey;
 
-                    const chip = actionChip(s);
+                      const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
+                      const pri01 = clamp01(pri / 100);
 
-                    return (
-                      <div
-                        key={reactKey}
-                        className={[
-                          "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
-                          isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-start gap-3">
-                          {/* LEFT: main info */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <div className="truncate text-sm font-extrabold text-zinc-50">
-                                {humanizeType(String(s.type))}
+                      const chip = actionChip(s, executionGlobal);
+
+                      return (
+                        <div
+                          key={reactKey}
+                          className={[
+                            "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
+                            isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
+                          ].join(" ")}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
+                                <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
+                                {isMonitorOnlyGrade(s.confidence?.grade) ? (
+                                  <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
+                                    MONITOR-ONLY
+                                  </Pill>
+                                ) : null}
                               </div>
-                              <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
+
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                                <span>Conf {fmtScore100(s.confidence?.score)}</span>
+                                <span>•</span>
+                                <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
+                                <span>•</span>
+                                <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                              </div>
+
+                              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                                <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
+                              </div>
                             </div>
 
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
-                              <span>Conf {fmtScore100(s.confidence?.score)}</span>
-                              <span>•</span>
-                              <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
-                              <span>•</span>
-                              <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
-                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-2">
+                              <div className="flex flex-col items-end gap-1">
+                                <Pill tone={statusTone(s.status)}>{s.status}</Pill>
+                                <Pill tone={chip.tone} icon={chip.icon}>
+                                  {chip.label}
+                                </Pill>
+                              </div>
 
-                            <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                              <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(accordionKey)}
+                                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-white/10"
+                              >
+                                {isOpen ? "Hide details" : "View details"}
+                              </button>
                             </div>
                           </div>
 
-                          {/* RIGHT: pills + toggle */}
-                          <div className="flex shrink-0 flex-col items-end gap-2">
-                            <div className="flex flex-col items-end gap-1">
-                              <Pill tone={statusTone(s.status)}>{s.status}</Pill>
-                              <Pill tone={chip.tone} icon={chip.icon}>
-                                {chip.label}
-                              </Pill>
+                          {isOpen ? (
+                            <div className="mt-3">
+                              <SetupDetail
+                                symbol={symbol}
+                                mid={mid}
+                                dqOk={dqOk}
+                                bybitOk={bybitOk}
+                                staleSec={staleSec}
+                                paused={paused}
+                                features={features}
+                                setup={s}
+                                executionGlobal={executionGlobal}
+                              />
                             </div>
+                          ) : null}
+                        </div>
+                      );
+                    });
+                  }
 
-                            <button
-                              type="button"
-                              onClick={() => toggleExpanded(accordionKey)}
-                              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-white/10"
-                            >
-                              {isOpen ? "Hide details" : "View details"}
-                            </button>
+                  // Empty states (policy-safe)
+                  if (state === "LOADING") {
+                    return (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                            <RefreshCw className="h-5 w-5 text-zinc-200" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-zinc-100">Loading snapshots and evaluating setups…</div>
+                            <div className="mt-1 text-xs text-zinc-400">This may be normal during warm-up or when switching symbols/timeframes.</div>
                           </div>
                         </div>
-
-                        {isOpen ? (
-                          <div className="mt-3">
-                            <SetupDetail
-                              symbol={symbol}
-                              mid={mid}
-                              dqOk={dqOk}
-                              bybitOk={bybitOk}
-                              staleSec={staleSec}
-                              paused={paused}
-                              features={features}
-                              setup={s}
-                            />
-                          </div>
-                        ) : null}
                       </div>
                     );
-                  })
+                  }
 
-                )}
+                  if (state === "NO_SIGNAL") {
+                    return (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                            <Minus className="h-5 w-5 text-zinc-200" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-zinc-100">No setups (no-signal market)</div>
+                            <div className="mt-1 text-xs text-zinc-400">
+                              The engine evaluated the current market context and found no candidate patterns worth publishing.
+                            </div>
+                            {feedStatus?.lastEvaluationTs ? (
+                              <div className="mt-2 text-[11px] text-zinc-500">Last evaluation: {relTime(feedStatus.lastEvaluationTs)}</div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (state === "QUALITY_GATED") {
+                    const ce = feedStatus?.candidatesEvaluated;
+                    const rejected = feedStatus?.rejected;
+                    const top = topRejectionPairs(feedStatus?.rejectionByCode || null, 6);
+
+                    return (
+                      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-xl bg-amber-500/15 p-2 ring-1 ring-amber-500/25">
+                            <ShieldAlert className="h-5 w-5 text-amber-200" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-extrabold text-amber-100">No setups published (quality gated)</div>
+                            <div className="mt-1 text-xs text-amber-100/90">
+                              Candidates were generated but rejected by quality gates (conflict checks, invariants, RR/TP tradeability, or publish constraints).
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Candidates {ce != null ? ce : "—"}</Pill>
+                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Rejected {rejected != null ? rejected : "—"}</Pill>
+                            </div>
+
+                            {top.length > 0 ? (
+                              <div className="mt-3">
+                                <div className="text-[11px] font-bold text-amber-100">Top rejection reasons</div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {top.map((p) => (
+                                    <Pill key={p.code} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                                      {p.code} • {p.count}
+                                    </Pill>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-3 text-[11px] text-amber-100/80">
+                                Rejection breakdown not available yet (telemetry not provided by the engine). The empty feed is still a valid outcome.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // EMPTY_UNKNOWN
+                  return (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-sm font-bold text-zinc-100">No setups</div>
+                      <div className="mt-1 text-xs text-zinc-400">
+                        The system did not publish setups. This can be normal when conditions are not met or telemetry is not available yet.
+                      </div>
+                    </div>
+                  );
+                })()}
+
               </div>
             </Card>
           </div>
@@ -1253,6 +1525,7 @@ function SetupDetail({
   paused,
   features,
   setup,
+  executionGlobal,
 }: {
   symbol: string;
   mid: number;
@@ -1262,8 +1535,9 @@ function SetupDetail({
   paused: boolean;
   features: any;
   setup: TradeSetup;
+  executionGlobal: ExecutionGlobal | null;
 }) {
-  const action = actionChip(setup);
+  const action = actionChip(setup, executionGlobal);
   const [showGuidanceDetails, setShowGuidanceDetails] = useState(false);
   const [showRiskMore, setShowRiskMore] = useState(false);
   useEffect(() => {
@@ -1322,6 +1596,27 @@ function SetupDetail({
     // - If global gate not ok: show that first.
     // - Else show execution state and how to proceed.
     const ex = setup.execution;
+    // Hard policy: Grade C is monitor-only, regardless of local booleans
+    if (isMonitorOnlyGrade(setup?.confidence?.grade)) {
+      return {
+        headline: "Monitor-only (Grade C)",
+        tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
+        bullets: ["Policy enforced: this setup is for monitoring only. No market/limit entry actions are permitted."],
+      };
+    }
+
+    // Global execution gate overrides any local action suggestions
+    if (executionGlobal?.state === "BLOCKED") {
+      const primary = executionGlobal.reasons?.[0] ? formatExecutionGlobalReason(executionGlobal.reasons[0]) : "Execution blocked";
+      return {
+        headline: "Do not execute (system gate blocked)",
+        tone: "bg-rose-500/10 text-rose-100 ring-1 ring-rose-500/25",
+        bullets: [
+          primary,
+          ...(Array.isArray(executionGlobal.reasons) ? executionGlobal.reasons.slice(1, 4).map(formatExecutionGlobalReason) : []),
+        ].filter(Boolean),
+      };
+    }
 
     if (!globalGateOk) {
       const reasons: string[] = [];
@@ -1352,7 +1647,7 @@ function SetupDetail({
       };
     }
 
-    if (ex.canEnterMarket) {
+    if (ex.state === "ENTER_MARKET") {
       return {
         headline: "Enter market now",
         tone: "bg-emerald-500/10 text-emerald-100 ring-1 ring-emerald-500/25",
@@ -1363,7 +1658,7 @@ function SetupDetail({
       };
     }
 
-    if (ex.canPlaceLimit) {
+    if (ex.state === "PLACE_LIMIT") {
       return {
         headline: "Place limit order",
         tone: "bg-emerald-500/10 text-emerald-100 ring-1 ring-emerald-500/25",
@@ -1412,7 +1707,7 @@ function SetupDetail({
       tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
       bullets: [ex.reason || "Monitor conditions"],
     };
-  }, [setup.execution, globalGateOk, dqOk, bybitOk, paused, staleSec]);
+  }, [setup.execution, setup.confidence?.grade, executionGlobal, globalGateOk, dqOk, bybitOk, paused, staleSec]);
 
   return (
     <div className="space-y-4">
@@ -1461,7 +1756,7 @@ function SetupDetail({
         <div className="sticky top-2 z-20 space-y-3">
           <div className="rounded-xl border border-white/10 bg-zinc-950/80 backdrop-blur px-4 py-3">
             <div className="text-sm font-extrabold text-zinc-50">
-              {decisionSummary(setup)}
+              {decisionSummary(setup, executionGlobal)}
             </div>
           </div>
 

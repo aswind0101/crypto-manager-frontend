@@ -614,6 +614,18 @@ function deriveExecutionDecision(
   };
 }
 
+function deriveExecutionGlobal(ctx: { dqOk: boolean; bybitOk: boolean; staleSec?: number; paused: boolean }) {
+  const reasons: string[] = [];
+  if (ctx.paused) reasons.push("PAUSED");
+  if (!ctx.dqOk) reasons.push("DQ_NOT_OK");
+  if (!ctx.bybitOk) reasons.push("BYBIT_NOT_OK");
+  if (typeof ctx.staleSec === "number" && ctx.staleSec > 15) reasons.push("PRICE_STALE");
+
+  return {
+    state: reasons.length ? "BLOCKED" : "ENABLED",
+    reasons,
+  } as const;
+}
 
 /**
  * Snapshot builder (client-side):
@@ -667,11 +679,44 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
       }))
       : scored?.setups;
 
+    const executionGlobal = deriveExecutionGlobal(ctx);
+
+    const published = Array.isArray(enriched) ? enriched.length : 0;
+
+    // Feed telemetry: prefer engine-provided diagnostics if present; otherwise expose what we can from the client snapshot.
+    const candidatesEvaluated =
+      typeof scored?.telemetry?.candidatesEvaluated === "number"
+        ? scored.telemetry.candidatesEvaluated
+        : typeof scored?.diagnostics?.candidatesEvaluated === "number"
+          ? scored.diagnostics.candidatesEvaluated
+          : null;
+
+    const rejectionByCode =
+      (scored?.telemetry?.rejectionByCode as Record<string, number> | undefined) ??
+      (scored?.diagnostics?.rejectionByCode as Record<string, number> | undefined) ??
+      null;
+
+    const rejected =
+      typeof candidatesEvaluated === "number" && Number.isFinite(candidatesEvaluated)
+        ? Math.max(0, candidatesEvaluated - published)
+        : null;
+
+    const lastEvaluationTs = Number.isFinite(Number(snap?.price?.ts)) ? Number(snap.price.ts) : Date.now();
+
     return {
       ...scored,
       setups: enriched,
+      executionGlobal,
+      feedStatus: {
+        evaluated: true,
+        candidatesEvaluated,
+        published,
+        rejected,
+        rejectionByCode,
+        lastEvaluationTs,
+      },
     };
   }, [snap, features, paused]);
 
-  return { snap, features, setups };
+  return { snap, features, setups, feedStatus: setups?.feedStatus ?? null, executionGlobal: setups?.executionGlobal ?? null };
 }
