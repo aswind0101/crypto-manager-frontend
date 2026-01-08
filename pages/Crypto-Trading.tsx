@@ -1103,190 +1103,189 @@ export default function Page() {
                     </div>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {(() => {
+                    const publishedCount = ranked.length;
+                    const state = deriveFeedUiState(feedStatus, publishedCount);
 
-              <div className="mt-3 space-y-2">
-                {(() => {
-                  const publishedCount = ranked.length;
-                  const state = deriveFeedUiState(feedStatus, publishedCount);
+                    if (state === "HAS_SETUPS") {
+                      return ranked.map((s, idx) => {
+                        const keyStr = stableSetupKey(s);
+                        const reactKey = `${keyStr}::${idx}`;
+                        const accordionKey = idx;
+                        const isOpen = expandedKey === accordionKey;
 
-                  if (state === "HAS_SETUPS") {
-                    return ranked.map((s, idx) => {
-                      const keyStr = stableSetupKey(s);
-                      const reactKey = `${keyStr}::${idx}`;
-                      const accordionKey = idx;
-                      const isOpen = expandedKey === accordionKey;
+                        const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
+                        const pri01 = clamp01(pri / 100);
 
-                      const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
-                      const pri01 = clamp01(pri / 100);
+                        const chip = actionChip(s, executionGlobal);
 
-                      const chip = actionChip(s, executionGlobal);
-
-                      return (
-                        <div
-                          key={reactKey}
-                          className={[
-                            "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
-                            isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
-                                <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
-                                {isMonitorOnlyGrade(s.confidence?.grade) ? (
-                                  <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
-                                    MONITOR-ONLY
-                                  </Pill>
-                                ) : null}
-                              </div>
-
-                              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
-                                <span>Conf {fmtScore100(s.confidence?.score)}</span>
-                                <span>•</span>
-                                <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
-                                <span>•</span>
-                                <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
-                              </div>
-
-                              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                                <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
-                              </div>
-                            </div>
-
-                            <div className="flex shrink-0 flex-col items-end gap-2">
-                              <div className="flex flex-col items-end gap-1">
-                                <Pill tone={statusTone(s.status)}>{s.status}</Pill>
-                                <Pill tone={chip.tone} icon={chip.icon}>
-                                  {chip.label}
-                                </Pill>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => toggleExpanded(accordionKey)}
-                                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-white/10"
-                              >
-                                {isOpen ? "Hide details" : "View details"}
-                              </button>
-                            </div>
-                          </div>
-
-                          {isOpen ? (
-                            <div className="mt-3">
-                              <SetupDetail
-                                symbol={symbol}
-                                mid={mid}
-                                dqOk={dqOk}
-                                bybitOk={bybitOk}
-                                staleSec={staleSec}
-                                paused={paused}
-                                features={features}
-                                setup={s}
-                                executionGlobal={executionGlobal}
-                              />
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    });
-                  }
-
-                  // Empty states (policy-safe)
-                  if (state === "LOADING") {
-                    return (
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
-                            <RefreshCw className="h-5 w-5 text-zinc-200" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-bold text-zinc-100">Loading snapshots and evaluating setups…</div>
-                            <div className="mt-1 text-xs text-zinc-400">This may be normal during warm-up or when switching symbols/timeframes.</div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (state === "NO_SIGNAL") {
-                    return (
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
-                            <Minus className="h-5 w-5 text-zinc-200" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-bold text-zinc-100">No setups (no-signal market)</div>
-                            <div className="mt-1 text-xs text-zinc-400">
-                              The engine evaluated the current market context and found no candidate patterns worth publishing.
-                            </div>
-                            {feedStatus?.lastEvaluationTs ? (
-                              <div className="mt-2 text-[11px] text-zinc-500">Last evaluation: {relTime(feedStatus.lastEvaluationTs)}</div>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (state === "QUALITY_GATED") {
-                    const ce = feedStatus?.candidatesEvaluated;
-                    const rejected = feedStatus?.rejected;
-                    const top = topRejectionPairs(feedStatus?.rejectionByCode || null, 6);
-
-                    return (
-                      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="rounded-xl bg-amber-500/15 p-2 ring-1 ring-amber-500/25">
-                            <ShieldAlert className="h-5 w-5 text-amber-200" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-extrabold text-amber-100">No setups published (quality gated)</div>
-                            <div className="mt-1 text-xs text-amber-100/90">
-                              Candidates were generated but rejected by quality gates (conflict checks, invariants, RR/TP tradeability, or publish constraints).
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Candidates {ce != null ? ce : "—"}</Pill>
-                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Rejected {rejected != null ? rejected : "—"}</Pill>
-                            </div>
-
-                            {top.length > 0 ? (
-                              <div className="mt-3">
-                                <div className="text-[11px] font-bold text-amber-100">Top rejection reasons</div>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {top.map((p) => (
-                                    <Pill key={p.code} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
-                                      {p.code} • {p.count}
+                        return (
+                          <div
+                            key={reactKey}
+                            className={[
+                              "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
+                              isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
+                                  <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
+                                  {isMonitorOnlyGrade(s.confidence?.grade) ? (
+                                    <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
+                                      MONITOR-ONLY
                                     </Pill>
-                                  ))}
+                                  ) : null}
+                                </div>
+
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                                  <span>Conf {fmtScore100(s.confidence?.score)}</span>
+                                  <span>•</span>
+                                  <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
+                                  <span>•</span>
+                                  <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                                </div>
+
+                                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                                  <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
                                 </div>
                               </div>
-                            ) : (
-                              <div className="mt-3 text-[11px] text-amber-100/80">
-                                Rejection breakdown not available yet (telemetry not provided by the engine). The empty feed is still a valid outcome.
+
+                              <div className="flex shrink-0 flex-col items-end gap-2">
+                                <div className="flex flex-col items-end gap-1">
+                                  <Pill tone={statusTone(s.status)}>{s.status}</Pill>
+                                  <Pill tone={chip.tone} icon={chip.icon}>
+                                    {chip.label}
+                                  </Pill>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpanded(accordionKey)}
+                                  className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-white/10"
+                                >
+                                  {isOpen ? "Hide details" : "View details"}
+                                </button>
                               </div>
-                            )}
+                            </div>
+
+                            {isOpen ? (
+                              <div className="mt-3">
+                                <SetupDetail
+                                  symbol={symbol}
+                                  mid={mid}
+                                  dqOk={dqOk}
+                                  bybitOk={bybitOk}
+                                  staleSec={staleSec}
+                                  paused={paused}
+                                  features={features}
+                                  setup={s}
+                                  executionGlobal={executionGlobal}
+                                />
+                              </div>
+                            ) : null}
                           </div>
+                        );
+                      });
+                    }
+
+                    // Empty states (policy-safe)
+                    if (state === "LOADING") {
+                      return (
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                              <RefreshCw className="h-5 w-5 text-zinc-200" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-zinc-100">Loading snapshots and evaluating setups…</div>
+                              <div className="mt-1 text-xs text-zinc-400">This may be normal during warm-up or when switching symbols/timeframes.</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (state === "NO_SIGNAL") {
+                      return (
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                              <Minus className="h-5 w-5 text-zinc-200" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-zinc-100">No setups (no-signal market)</div>
+                              <div className="mt-1 text-xs text-zinc-400">
+                                The engine evaluated the current market context and found no candidate patterns worth publishing.
+                              </div>
+                              {feedStatus?.lastEvaluationTs ? (
+                                <div className="mt-2 text-[11px] text-zinc-500">Last evaluation: {relTime(feedStatus.lastEvaluationTs)}</div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (state === "QUALITY_GATED") {
+                      const ce = feedStatus?.candidatesEvaluated;
+                      const rejected = feedStatus?.rejected;
+                      const top = topRejectionPairs(feedStatus?.rejectionByCode || null, 6);
+
+                      return (
+                        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-amber-500/15 p-2 ring-1 ring-amber-500/25">
+                              <ShieldAlert className="h-5 w-5 text-amber-200" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-extrabold text-amber-100">No setups published (quality gated)</div>
+                              <div className="mt-1 text-xs text-amber-100/90">
+                                Candidates were generated but rejected by quality gates (conflict checks, invariants, RR/TP tradeability, or publish constraints).
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Candidates {ce != null ? ce : "—"}</Pill>
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Rejected {rejected != null ? rejected : "—"}</Pill>
+                              </div>
+
+                              {top.length > 0 ? (
+                                <div className="mt-3">
+                                  <div className="text-[11px] font-bold text-amber-100">Top rejection reasons</div>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {top.map((p) => (
+                                      <Pill key={p.code} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                                        {p.code} • {p.count}
+                                      </Pill>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-3 text-[11px] text-amber-100/80">
+                                  Rejection breakdown not available yet (telemetry not provided by the engine). The empty feed is still a valid outcome.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // EMPTY_UNKNOWN
+                    return (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="text-sm font-bold text-zinc-100">No setups</div>
+                        <div className="mt-1 text-xs text-zinc-400">
+                          The system did not publish setups. This can be normal when conditions are not met or telemetry is not available yet.
                         </div>
                       </div>
                     );
-                  }
-
-                  // EMPTY_UNKNOWN
-                  return (
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <div className="text-sm font-bold text-zinc-100">No setups</div>
-                      <div className="mt-1 text-xs text-zinc-400">
-                        The system did not publish setups. This can be normal when conditions are not met or telemetry is not available yet.
-                      </div>
-                    </div>
-                  );
-                })()}
-
-              </div>
+                  })()}
+                </div>
+              )}
             </Card>
           </div>
 
