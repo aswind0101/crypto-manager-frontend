@@ -88,6 +88,8 @@ export type SetupEngineOutput = {
 // Execution / Operator readiness (derived, not engine state)
 export type ExecutionState =
   | "BLOCKED"        // dq / feed / stale / paused
+  | "MONITOR"        // setup exists but execution is intentionally disabled (e.g., grade C/D)
+  | "FORMING"        // setup forming; do not execute yet
   | "NO_TRADE"       // setup dead / invalid
   | "WAIT_CLOSE"     // waiting close-confirm
   | "WAIT_RETEST"    // waiting retest condition
@@ -95,6 +97,7 @@ export type ExecutionState =
   | "PLACE_LIMIT"    // can place limit order
   | "ENTER_MARKET"   // can enter market now
   | "WAIT_FILL";     // triggered + limit, waiting fill
+
 
 export interface ExecutionDecision {
   state: ExecutionState;

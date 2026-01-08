@@ -8,6 +8,52 @@ import type { SetupEngineOutput, TradeSetup, SetupSide } from "./types";
 function now() { return Date.now(); }
 function uid(prefix: string) { return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`; }
 
+// Stable IDs prevent UI flicker / status-cache misses when the same structural setup persists across ticks.
+// We intentionally round price anchors to reduce churn from tiny float noise.
+function fnv1a32(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    // 32-bit FNV-1a prime: 16777619
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+function roundAnchor(x: number, dp = 2): number {
+  const k = Math.pow(10, dp);
+  return Math.round(x * k) / k;
+}
+
+function stableSetupId(args: {
+  prefix: string;
+  canon: string;
+  type: TradeSetup["type"];
+  side: SetupSide;
+  bias_tf: TradeSetup["bias_tf"];
+  entry_tf: TradeSetup["entry_tf"];
+  trigger_tf: TradeSetup["trigger_tf"];
+  anchor_price?: number;
+}): string {
+  const anchor =
+    typeof args.anchor_price === "number" && Number.isFinite(args.anchor_price)
+      ? roundAnchor(args.anchor_price, 2)
+      : undefined;
+
+  const raw = JSON.stringify({
+    canon: args.canon,
+    type: args.type,
+    side: args.side,
+    bias_tf: args.bias_tf,
+    entry_tf: args.entry_tf,
+    trigger_tf: args.trigger_tf,
+    anchor,
+  });
+
+  return `${args.prefix}_${fnv1a32(raw)}`;
+}
+
+
 function lastClose(candles?: Candle[]) {
   if (!candles || !candles.length) return undefined;
   return candles[candles.length - 1].c;
@@ -514,7 +560,17 @@ export function buildSetups(args: {
     if (!dOk.ok) confScore = Math.max(0, confScore - 6);
 
     const s: TradeSetup = {
-      id: uid("tpb"),
+      id: stableSetupId({
+        prefix: "tpb",
+        canon: snap.canon,
+        type: "TREND_PULLBACK",
+        side: biasSide,
+        bias_tf: f.bias.tf,
+        entry_tf: "5m",
+        trigger_tf: "5m",
+        anchor_price: ref,
+      }),
+
       canon: snap.canon,
       type: "TREND_PULLBACK",
       side: biasSide,
@@ -622,7 +678,17 @@ export function buildSetups(args: {
 
 
     const s: TradeSetup = {
-      id: uid("brt"),
+      id: stableSetupId({
+        prefix: "brt",
+        canon: snap.canon,
+        type: "BREAKOUT",
+        side: dir,
+        bias_tf: f.bias.tf,
+        entry_tf: "5m",
+        trigger_tf: "5m",
+        anchor_price: level,
+      }),
+
       canon: snap.canon,
       type: "BREAKOUT",
       side: dir,
@@ -726,7 +792,17 @@ export function buildSetups(args: {
       const ready = rr1 >= (bias_incomplete ? 1.8 : 1.5) && common.grade !== "D";
 
       const s: TradeSetup = {
-        id: uid("brk"),
+        id: stableSetupId({
+          prefix: "brk",
+          canon: snap.canon,
+          type: "BREAKOUT",
+          side: dir,
+          bias_tf: f.bias.tf,
+          entry_tf: "5m",
+          trigger_tf: "5m",
+          anchor_price: brk,
+        }),
+
         canon: snap.canon,
         type: "BREAKOUT",
         side: dir,
@@ -835,7 +911,18 @@ export function buildSetups(args: {
         let confScore = Math.min(100, common.score + 5 + (rr1 >= 3.2 ? 3 : 0));
 
         const s: TradeSetup = {
-          id: uid("lsr"),
+          id: stableSetupId({
+            prefix: "lsr",
+            canon: snap.canon,
+            type: "LIQUIDITY_SWEEP_REVERSAL",
+            side,
+            bias_tf: f.bias.tf,
+            entry_tf: "15m",
+            trigger_tf: "5m",
+            anchor_price: level,
+          }),
+
+
           canon: snap.canon,
           type: "LIQUIDITY_SWEEP_REVERSAL",
           side,
@@ -960,7 +1047,17 @@ export function buildSetups(args: {
         }
 
         const s: TradeSetup = {
-          id: uid("fsc"),
+          id: stableSetupId({
+            prefix: "fsc",
+            canon: snap.canon,
+            type: "FAILED_SWEEP_CONTINUATION",
+            side: dir,
+            bias_tf: f.bias.tf,
+            entry_tf: "5m",
+            trigger_tf: "5m",
+            anchor_price: level,
+          }),
+
           canon: snap.canon,
           type: "FAILED_SWEEP_CONTINUATION",
           side: dir,
@@ -1049,7 +1146,18 @@ export function buildSetups(args: {
       }
 
       const s: TradeSetup = {
-        id: uid("mr"),
+        id: stableSetupId({
+          prefix: "mr",
+          canon: snap.canon,
+          type: "RANGE_MEAN_REVERT",
+          side: dir,
+          bias_tf: f.bias.tf,
+          entry_tf: "15m",
+          trigger_tf: "5m",
+          anchor_price: ref,
+        }),
+
+
         canon: snap.canon,
         type: "RANGE_MEAN_REVERT",
         side: dir,

@@ -47,6 +47,259 @@ function rr(entry: number, stop: number, tp: number, side: SetupSide) {
   return reward / risk;
 }
 const LSR_RR_MIN = 2.8;
+function isFiniteNum(x: unknown): x is number {
+  return typeof x === "number" && Number.isFinite(x);
+}
+
+function clamp01(x: number) {
+  return Math.max(0, Math.min(1, x));
+}
+
+function sideMatchesBiasDir(f: FeaturesSnapshot, side: SetupSide) {
+  if (f.bias.trend_dir === "sideways") return true;
+  if (side === "LONG" && f.bias.trend_dir === "bull") return true;
+  if (side === "SHORT" && f.bias.trend_dir === "bear") return true;
+  return false;
+}
+
+type ConflictSignal = {
+  code: string;
+  severity: "MAJOR" | "MINOR";
+  note: string;
+};
+
+function detectConflicts(f: FeaturesSnapshot, side: SetupSide): ConflictSignal[] {
+  const out: ConflictSignal[] = [];
+
+  // 1) Bias conflict when bias is strong
+  const biasStrength = isFiniteNum(f.bias.trend_strength) ? f.bias.trend_strength : undefined;
+  if (biasStrength != null && biasStrength >= 0.6 && f.bias.trend_dir !== "sideways") {
+    if (!sideMatchesBiasDir(f, side)) {
+      out.push({
+        code: "CONFLICT_STRONG_BIAS_OPPOSES_SIDE",
+        severity: "MAJOR",
+        note: `Strong bias (${biasStrength.toFixed(2)}) opposes ${side}`,
+      });
+    }
+  }
+
+  // 2) Strong opposite divergence = MAJOR (you already partly do this via deltaOk; we keep it centralized too)
+  const d = f.orderflow?.delta as any;
+  const divScore = isFiniteNum(d?.divergence_score) ? Number(d.divergence_score) : undefined;
+  const divDir = typeof d?.divergence_dir === "string" ? String(d.divergence_dir) : undefined;
+  if (divScore != null && divScore >= 0.65 && divDir) {
+    if (side === "LONG" && divDir.toLowerCase() === "bear") {
+      out.push({ code: "CONFLICT_STRONG_BEAR_DIVERGENCE", severity: "MAJOR", note: "Strong bear divergence" });
+    }
+    if (side === "SHORT" && divDir.toLowerCase() === "bull") {
+      out.push({ code: "CONFLICT_STRONG_BULL_DIVERGENCE", severity: "MAJOR", note: "Strong bull divergence" });
+    }
+  }
+
+  // 3) Absorption: strong opposite absorption = MAJOR
+  const absScore = isFiniteNum(d?.absorption_score) ? Number(d.absorption_score) : undefined;
+  const absDir = typeof d?.absorption_dir === "string" ? String(d.absorption_dir) : undefined;
+  if (absScore != null && absScore >= 0.65 && absDir) {
+    if (side === "LONG" && absDir.toLowerCase() === "bear") {
+      out.push({ code: "CONFLICT_STRONG_BEAR_ABSORPTION", severity: "MAJOR", note: "Strong bear absorption" });
+    }
+    if (side === "SHORT" && absDir.toLowerCase() === "bull") {
+      out.push({ code: "CONFLICT_STRONG_BULL_ABSORPTION", severity: "MAJOR", note: "Strong bull absorption" });
+    }
+  }
+
+  // 4) Cross consensus disagreement: treat as MAJOR only when very low
+  const cs = isFiniteNum(f.cross?.consensus_score) ? Number(f.cross.consensus_score) : undefined;
+  if (cs != null && cs <= 0.35) {
+    out.push({ code: "CONFLICT_LOW_CROSS_CONSENSUS", severity: "MAJOR", note: `Low cross consensus (${cs.toFixed(2)})` });
+  } else if (cs != null && cs <= 0.5) {
+    out.push({ code: "CONFLICT_WEAK_CROSS_CONSENSUS", severity: "MINOR", note: `Weak cross consensus (${cs.toFixed(2)})` });
+  }
+
+  return out;
+}
+
+type InvariantResult = { ok: true } | { ok: false; codes: string[]; notes: string[] };
+
+function zoneKMultiplierByType(type: TradeSetup["type"]): number {
+  switch (type) {
+    case "BREAKOUT":
+      return 0.35;
+    case "FAILED_SWEEP_CONTINUATION":
+      return 0.35;
+    case "TREND_PULLBACK":
+      return 0.60;
+    case "RANGE_MEAN_REVERT":
+      return 0.80;
+    case "LIQUIDITY_SWEEP_REVERSAL":
+      return 0.40;
+    default:
+      return 0.60;
+  }
+}
+
+function validateSetupInvariant(args: {
+  setup: TradeSetup;
+  px: number;
+  atrp: number; // percent as fraction (0.007 = 0.7%)
+}): InvariantResult {
+  const { setup, px, atrp } = args;
+
+  const codes: string[] = [];
+  const notes: string[] = [];
+
+  const zone = setup.entry?.zone;
+  const stop = setup.stop?.price;
+  const tps = Array.isArray(setup.tp) ? setup.tp : [];
+
+  if (!zone || !isFiniteNum(zone.lo) || !isFiniteNum(zone.hi) || zone.lo >= zone.hi) {
+    codes.push("INV_BAD_ZONE");
+    notes.push("Zone invalid (lo/hi)");
+  }
+  if (!isFiniteNum(stop)) {
+    codes.push("INV_BAD_STOP");
+    notes.push("Stop invalid");
+  }
+  if (!isFiniteNum(px) || px <= 0) {
+    codes.push("INV_BAD_PX");
+    notes.push("px invalid");
+  }
+  if (!isFiniteNum(atrp) || atrp <= 0) {
+    codes.push("INV_BAD_ATRP");
+    notes.push("atrp invalid");
+  }
+
+  if (codes.length) return { ok: false, codes, notes };
+
+  const lo = Number(zone!.lo);
+  const hi = Number(zone!.hi);
+  const st = Number(stop);
+
+  // Zone width ATR constraint
+  const atrAbs = px * atrp;
+  const k = zoneKMultiplierByType(setup.type);
+  const maxW = Math.max(px * 0.0001, atrAbs * k); // floor 1bp-equivalent-ish, but safe
+  const w = hi - lo;
+  if (w > maxW) {
+    codes.push("INV_ZONE_TOO_WIDE");
+    notes.push(`Zone width ${w.toFixed(6)} > max ${maxW.toFixed(6)} (k=${k})`);
+  }
+
+  // Stop must be outside zone in the correct direction
+  if (setup.side === "LONG") {
+    if (!(st < lo)) {
+      codes.push("INV_STOP_NOT_BELOW_ZONE");
+      notes.push("LONG stop must be below zone.lo");
+    }
+  } else {
+    if (!(st > hi)) {
+      codes.push("INV_STOP_NOT_ABOVE_ZONE");
+      notes.push("SHORT stop must be above zone.hi");
+    }
+  }
+
+  // Stop distance bounds (noise vs absurd)
+  const entryAnchor = (lo + hi) / 2;
+  const risk = setup.side === "LONG" ? (entryAnchor - st) : (st - entryAnchor);
+  const minRisk = Math.max(px * 0.0006, atrAbs * 0.25); // min(60 bps floor, 0.25*ATRabs) — conservative
+  const maxRisk = atrAbs * 2.5; // intraday constraint; swing still acceptable because atrp uses max of 15m/1h/4h
+  if (risk < minRisk) {
+    codes.push("INV_STOP_TOO_TIGHT");
+    notes.push(`Risk ${risk.toFixed(6)} < min ${minRisk.toFixed(6)}`);
+  }
+  if (risk > maxRisk) {
+    codes.push("INV_STOP_TOO_FAR");
+    notes.push(`Risk ${risk.toFixed(6)} > max ${maxRisk.toFixed(6)}`);
+  }
+
+  // TP sanity: must be finite and in correct direction; TP1 must offer meaningful reward
+  if (tps.length === 0 || !isFiniteNum(tps[0]?.price)) {
+    codes.push("INV_NO_TP");
+    notes.push("No TP1");
+  } else {
+    const tp1 = Number(tps[0].price);
+    const reward = setup.side === "LONG" ? (tp1 - entryAnchor) : (entryAnchor - tp1);
+    const minReward = Math.max(px * 0.0008, atrAbs * 0.35); // avoid TP too close (fees/slippage)
+    if (reward <= 0) {
+      codes.push("INV_TP_WRONG_SIDE");
+      notes.push("TP1 is on wrong side of entry");
+    } else if (reward < minReward) {
+      codes.push("INV_TP_TOO_CLOSE");
+      notes.push(`Reward ${reward.toFixed(6)} < min ${minReward.toFixed(6)}`);
+    }
+  }
+
+  // RR sanity (keep lightweight; exact RR policy can still be type-specific elsewhere)
+  if (isFiniteNum(setup.rr_min) && setup.rr_min < 1.2) {
+    codes.push("INV_RR_TOO_LOW");
+    notes.push(`rr_min ${setup.rr_min.toFixed(2)} < 1.20`);
+  }
+
+  return codes.length ? { ok: false, codes, notes } : { ok: true };
+}
+
+function applyQualityGates(args: {
+  setup: TradeSetup;
+  f: FeaturesSnapshot;
+  px: number;
+  atrp: number;
+}): { ok: true; tagsAdd: string[]; reasonsAdd: string[] } | { ok: false; rejectCodes: string[]; rejectNotes: string[] } {
+  const { setup, f, px, atrp } = args;
+
+  // Conflict kill-switch: kill if >=2 MAJOR conflicts
+  const conflicts = detectConflicts(f, setup.side);
+  const major = conflicts.filter((c) => c.severity === "MAJOR");
+  if (major.length >= 2) {
+    return {
+      ok: false,
+      rejectCodes: ["REJECT_CONFLICT_KILL", ...major.map((m) => m.code)],
+      rejectNotes: major.map((m) => m.note),
+    };
+  }
+
+  // Final invariants
+  const inv = validateSetupInvariant({ setup, px, atrp });
+  if (inv.ok === false) {
+    return { ok: false, rejectCodes: ["REJECT_INVARIANT", ...inv.codes], rejectNotes: inv.notes };
+  }
+
+  // If we have 1 MAJOR conflict, keep but mark as cautious (monitor bias)
+  const tagsAdd: string[] = [];
+  const reasonsAdd: string[] = [];
+  if (major.length === 1) {
+    tagsAdd.push("caution");
+    reasonsAdd.push(`Caution: ${major[0].note}`);
+  }
+
+  // Minor conflicts -> annotate only
+  const minor = conflicts.filter((c) => c.severity === "MINOR");
+  if (minor.length) {
+    reasonsAdd.push(...minor.slice(0, 2).map((m) => `Weakness: ${m.note}`));
+  }
+
+  return { ok: true, tagsAdd, reasonsAdd };
+}
+
+function pickPrimarySetup(setups: TradeSetup[]): TradeSetup | undefined {
+  if (!setups.length) return undefined;
+
+  // Priority: READY first, then confidence score, then rr_min
+  const scored = setups.slice().sort((a, b) => {
+    const pa = a.status === "READY" ? 0 : 1;
+    const pb = b.status === "READY" ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+
+    const csA = isFiniteNum(a.confidence?.score) ? a.confidence.score : 0;
+    const csB = isFiniteNum(b.confidence?.score) ? b.confidence.score : 0;
+    if (csA !== csB) return csB - csA;
+
+    const rrA = isFiniteNum(a.rr_min) ? a.rr_min : 0;
+    const rrB = isFiniteNum(b.rr_min) ? b.rr_min : 0;
+    return rrB - rrA;
+  });
+
+  return scored[0];
+}
 
 // Freshness window (ms): 6 candles
 const LSR_FRESH_15M_MS = 6 * 15 * 60 * 1000;
@@ -133,14 +386,42 @@ export function buildSetups(args: {
   const { snap, features: f } = args;
   const ts = now();
 
+  const telemetry = {
+    gate: "OK" as "OK" | "DQ_NOT_OK" | "NO_PRICE",
+    candidates: 0,
+    accepted: 0,
+    rejected: 0,
+    rejectByCode: {} as Record<string, number>,
+    rejectNotesSample: [] as string[],
+  };
+
+  const bumpReject = (codes: string[], notes: string[]) => {
+    for (const c of codes) {
+      telemetry.rejectByCode[c] = (telemetry.rejectByCode[c] ?? 0) + 1;
+    }
+    // keep a tiny bounded sample for UI
+    for (const n of notes) {
+      if (telemetry.rejectNotesSample.length >= 12) break;
+      telemetry.rejectNotesSample.push(n);
+    }
+  };
+
   const dq_ok = f.quality.dq_grade === "A" || f.quality.dq_grade === "B";
-  if (!dq_ok) return { ts, dq_ok: false, setups: [], preferred_id: undefined };
+  if (!dq_ok) {
+    telemetry.gate = "DQ_NOT_OK";
+    return { ts, dq_ok: false, setups: [], preferred_id: undefined, telemetry };
+  }
+
 
   // Bybit execution candles
   const tf15 = (snap.timeframes.find((x: any) => x.tf === "15m")?.candles?.ohlcv ?? []) as Candle[];
   const tf1h = (snap.timeframes.find((x: any) => x.tf === "1h")?.candles?.ohlcv ?? []) as Candle[];
   const px = lastClose(tf15) ?? lastClose(tf1h) ?? 0;
-  if (!px) return { ts, dq_ok: true, setups: [], preferred_id: undefined };
+  if (!px) {
+    telemetry.gate = "NO_PRICE";
+    return { ts, dq_ok: true, setups: [], preferred_id: undefined, telemetry };
+  }
+
 
   // Levels
   const lv15 = computePivotLevels(tf15, 2, 10);
@@ -155,6 +436,34 @@ export function buildSetups(args: {
   const biasMeta = getBiasCompleteness(snap, f);
   const bias_incomplete = !biasMeta.complete;
   const biasSide = pickBiasSide(f);
+  const tryAccept = (s: TradeSetup) => {
+    telemetry.candidates += 1;
+
+    const g = applyQualityGates({ setup: s, f, px, atrp });
+
+    if (g.ok === false) {
+      telemetry.rejected += 1;
+
+      const codes = ("rejectCodes" in g && Array.isArray(g.rejectCodes)) ? g.rejectCodes : [];
+      const notes = ("rejectNotes" in g && Array.isArray(g.rejectNotes)) ? g.rejectNotes : [];
+
+      bumpReject(codes, notes);
+      return false;
+    }
+
+    telemetry.accepted += 1;
+
+    const tagsAdd = ("tagsAdd" in g && Array.isArray(g.tagsAdd)) ? g.tagsAdd : [];
+    const reasonsAdd = ("reasonsAdd" in g && Array.isArray(g.reasonsAdd)) ? g.reasonsAdd : [];
+
+    s.tags = Array.from(new Set([...(s.tags || []), ...tagsAdd]));
+    s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...reasonsAdd]));
+
+    setups.push(s);
+    return true;
+
+  };
+
 
   // 1) TREND_PULLBACK (ưu tiên) — B+ policy: only when HTF bias is complete
   if (biasSide && !bias_incomplete) {
@@ -204,7 +513,7 @@ export function buildSetups(args: {
     if (!ht.ok) confScore = Math.max(0, confScore - 10);
     if (!dOk.ok) confScore = Math.max(0, confScore - 6);
 
-    setups.push({
+    const s: TradeSetup = {
       id: uid("tpb"),
       canon: snap.canon,
       type: "TREND_PULLBACK",
@@ -212,7 +521,6 @@ export function buildSetups(args: {
       entry_tf: "5m",
       bias_tf: f.bias.tf,
       trigger_tf: "5m",
-
 
       status: ready ? "READY" : "FORMING",
       created_ts: ts,
@@ -245,7 +553,10 @@ export function buildSetups(args: {
       },
 
       tags: ["intraday", "pullback", f.bias.trend_dir],
-    });
+    };
+
+    tryAccept(s);
+
   }
 
   /**
@@ -310,7 +621,7 @@ export function buildSetups(args: {
     const ready = rr1 >= rrNeed && common.grade !== "D";
 
 
-    setups.push({
+    const s: TradeSetup = {
       id: uid("brt"),
       canon: snap.canon,
       type: "BREAKOUT",
@@ -339,7 +650,6 @@ export function buildSetups(args: {
             { key: "bos", ok: true, note: `BOS ${bos.dir} @ ${level.toFixed(2)} (15m)` },
             { key: "delta", ok: deltaOk(f, dir).ok, note: `Delta: ${deltaOk(f, dir).note}` },
             { key: "htf_ms", ok: htfConfirm(f, dir).ok, note: `HTF MS: ${htfConfirm(f, dir).note}` },
-            // Keep a “level” item with "@ <number>" so existing parsing logic works without assumptions
             { key: "level", ok: true, note: `Break ${dir === "LONG" ? "R" : "S"} @ ${level.toFixed(2)}` },
             { key: "retest", ok: false, note: `Wait retest zone [${zone.lo.toFixed(2)}–${zone.hi.toFixed(2)}]` },
           ],
@@ -369,7 +679,11 @@ export function buildSetups(args: {
       },
 
       tags: ["intraday", "breakout", "bos", "retest"],
-    });
+    };
+
+    tryAccept(s);
+
+
 
     createdStructureBreakout = true;
   }
@@ -411,7 +725,7 @@ export function buildSetups(args: {
 
       const ready = rr1 >= (bias_incomplete ? 1.8 : 1.5) && common.grade !== "D";
 
-      setups.push({
+      const s: TradeSetup = {
         id: uid("brk"),
         canon: snap.canon,
         type: "BREAKOUT",
@@ -461,7 +775,11 @@ export function buildSetups(args: {
         },
 
         tags: ["intraday", "breakout", "squeeze"],
-      });
+      };
+
+      tryAccept(s);
+
+
     }
   }
   /**
@@ -516,7 +834,7 @@ export function buildSetups(args: {
 
         let confScore = Math.min(100, common.score + 5 + (rr1 >= 3.2 ? 3 : 0));
 
-        setups.push({
+        const s: TradeSetup = {
           id: uid("lsr"),
           canon: snap.canon,
           type: "LIQUIDITY_SWEEP_REVERSAL",
@@ -563,7 +881,11 @@ export function buildSetups(args: {
           },
 
           tags: ["intraday", "lsr", "sweep_reversal"],
-        });
+        };
+
+        tryAccept(s);
+
+
       }
     }
   }
@@ -592,16 +914,16 @@ export function buildSetups(args: {
 
       for (const c of recent) {
         if (dir === "LONG") {
-          // Wick through level and close holds above -> stop-run + acceptance
-          if (c.h > level + wickBuf && c.c > level) {
-            hasDisplacement = true;
-            wickExtreme = Math.max(wickExtreme ?? -Infinity, c.h);
-          }
-        } else {
-          // Wick through level and close holds below -> stop-run + acceptance
-          if (c.l < level - wickBuf && c.c < level) {
+          // Sweep below the level (down-wick) then reclaim above the level -> liquidity grab + continuation
+          if (c.l < level - wickBuf && c.c > level) {
             hasDisplacement = true;
             wickExtreme = Math.min(wickExtreme ?? Infinity, c.l);
+          }
+        } else {
+          // Sweep above the level (up-wick) then reject back below the level -> liquidity grab + continuation
+          if (c.h > level + wickBuf && c.c < level) {
+            hasDisplacement = true;
+            wickExtreme = Math.max(wickExtreme ?? -Infinity, c.h);
           }
         }
       }
@@ -609,12 +931,13 @@ export function buildSetups(args: {
       if (hasDisplacement && wickExtreme != null) {
         const zone = makeRetestZone(level, atrp, dir);
 
-        // SL outside displacement wick
+        // SL outside sweep wick (must be beyond wick in the adverse direction)
         const slBuffer = Math.max(level * 0.0008, level * atrp * 0.35);
         const sl =
           dir === "LONG"
-            ? (wickExtreme + slBuffer)
-            : (wickExtreme - slBuffer);
+            ? (wickExtreme - slBuffer)
+            : (wickExtreme + slBuffer);
+
 
         // TP: use nearest pivot in continuation direction (same philosophy as breakout structure)
         const tp1 =
@@ -636,7 +959,7 @@ export function buildSetups(args: {
           confScore = Math.min(confScore, 84);
         }
 
-        setups.push({
+        const s: TradeSetup = {
           id: uid("fsc"),
           canon: snap.canon,
           type: "FAILED_SWEEP_CONTINUATION",
@@ -693,7 +1016,10 @@ export function buildSetups(args: {
           },
 
           tags: ["intraday", "failed_sweep", "continuation", "bos", "retest"],
-        });
+        };
+
+        tryAccept(s);
+
       }
     }
   }
@@ -722,7 +1048,7 @@ export function buildSetups(args: {
         confScore = Math.min(confScore, 82);
       }
 
-      setups.push({
+      const s: TradeSetup = {
         id: uid("mr"),
         canon: snap.canon,
         type: "RANGE_MEAN_REVERT",
@@ -772,24 +1098,29 @@ export function buildSetups(args: {
         },
 
         tags: ["intraday", "range", nearSupport ? "support" : "resistance"],
-      });
+      };
+
+      tryAccept(s);
+
+
     }
   }
 
-  // Preferred: READY + confidence cao nhất
-  const candidates = setups
-    .filter((s) => s.status === "READY" && s.confidence.grade !== "D")
-    .sort((a, b) => b.confidence.score - a.confidence.score);
+  // Publish only ONE primary setup per symbol (quality-first).
+  // Priority: READY > confidence > rr_min. If none READY, we still publish the best FORMING as monitor.
+  const primary = pickPrimarySetup(setups);
+
+  if (!primary) {
+    return { ts, dq_ok: true, preferred_id: undefined, setups: [], telemetry };
+  }
 
   return {
     ts,
     dq_ok: true,
-    preferred_id: candidates[0]?.id,
-    setups: setups.sort((a, b) => {
-      const pa = a.status === "READY" ? 0 : 1;
-      const pb = b.status === "READY" ? 0 : 1;
-      if (pa !== pb) return pa - pb;
-      return b.confidence.score - a.confidence.score;
-    }),
+    preferred_id: primary.id,
+    setups: [primary],
+    telemetry,
   };
+
+
 }
