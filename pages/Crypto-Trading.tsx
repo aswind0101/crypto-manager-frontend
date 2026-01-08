@@ -1165,10 +1165,38 @@ export default function Page() {
                                 <button
                                   type="button"
                                   onClick={() => toggleExpanded(accordionKey)}
-                                  className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-white/10"
+                                  className="
+    inline-flex items-center gap-1.5
+    rounded-full
+    border border-white/10
+    bg-white/5
+    px-3 py-1.5
+    text-[11px] font-medium
+    text-zinc-300
+    transition
+    hover:bg-white/10 hover:text-white
+    active:scale-95
+    focus-visible:outline-none
+    focus-visible:ring-2 focus-visible:ring-white/20
+  "
                                 >
-                                  {isOpen ? "Hide details" : "View details"}
+                                  <span className="opacity-80">
+                                    {isOpen ? "Hide" : "Details"}
+                                  </span>
+                                  <svg
+                                    className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""
+                                      }`}
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M6.293 4.293a1 1 0 011.414 0L13.414 10l-5.707 5.707a1 1 0 01-1.414-1.414L10.586 10 6.293 5.707a1 1 0 010-1.414z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
                                 </button>
+
                               </div>
                             </div>
 
