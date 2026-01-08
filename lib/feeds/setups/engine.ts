@@ -636,8 +636,7 @@ export function buildSetups(args: {
 
     const desired: TradeSetup["status"] = ready ? "READY" : "FORMING";
 
-    const s: TradeSetup = {
-      id: stableSetupId({
+    const id = stableSetupId({
         prefix: "tpb",
         canon: snap.canon,
         type: "TREND_PULLBACK",
@@ -646,7 +645,10 @@ export function buildSetups(args: {
         entry_tf: "5m",
         trigger_tf: "5m",
         anchor_price: ref,
-      }),
+      });
+
+    const s: TradeSetup = {
+      id,
 
       canon: snap.canon,
       type: "TREND_PULLBACK",
@@ -657,7 +659,8 @@ export function buildSetups(args: {
 
       status: desired,
       status_tf: f.bias.tf,
-      status_close_ts: 0,
+      status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
+
 
       created_ts: ts,
       expires_ts: ts + 1000 * 60 * 90,
@@ -758,8 +761,7 @@ export function buildSetups(args: {
 
     const desired: TradeSetup["status"] = ready ? "READY" : "FORMING";
 
-    const s: TradeSetup = {
-      id: stableSetupId({
+    const id = stableSetupId({
         prefix: "brt",
         canon: snap.canon,
         type: "BREAKOUT",
@@ -768,7 +770,10 @@ export function buildSetups(args: {
         entry_tf: "5m",
         trigger_tf: "5m",
         anchor_price: level,
-      }),
+      });
+
+    const s: TradeSetup = {
+      id,
 
       canon: snap.canon,
       type: "BREAKOUT",
@@ -779,7 +784,8 @@ export function buildSetups(args: {
 
       status: desired,
       status_tf: f.bias.tf,
-      status_close_ts: 0,
+      status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
+
 
       created_ts: ts,
       expires_ts: ts + 1000 * 60 * 60,
@@ -875,8 +881,7 @@ export function buildSetups(args: {
       const ready = rr1 >= (bias_incomplete ? 1.8 : 1.5) && common.grade !== "D";
       const desired: TradeSetup["status"] = ready ? "READY" : "FORMING";
 
-      const s: TradeSetup = {
-        id: stableSetupId({
+      const id = stableSetupId({
           prefix: "brk",
           canon: snap.canon,
           type: "BREAKOUT",
@@ -885,7 +890,10 @@ export function buildSetups(args: {
           entry_tf: "5m",
           trigger_tf: "5m",
           anchor_price: brk,
-        }),
+        });
+
+      const s: TradeSetup = {
+        id,
 
         canon: snap.canon,
         type: "BREAKOUT",
@@ -896,7 +904,8 @@ export function buildSetups(args: {
 
         status: desired,
         status_tf: f.bias.tf,
-        status_close_ts: 0,
+        status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
+
 
         created_ts: ts,
         expires_ts: ts + 1000 * 60 * 60,
@@ -998,8 +1007,7 @@ export function buildSetups(args: {
 
         let confScore = Math.min(100, common.score + 5 + (rr1 >= 3.2 ? 3 : 0));
 
-        const s: TradeSetup = {
-          id: stableSetupId({
+        const id = stableSetupId({
             prefix: "lsr",
             canon: snap.canon,
             type: "LIQUIDITY_SWEEP_REVERSAL",
@@ -1008,7 +1016,10 @@ export function buildSetups(args: {
             entry_tf: "15m",
             trigger_tf: "5m",
             anchor_price: level,
-          }),
+          });
+
+        const s: TradeSetup = {
+          id,
 
           canon: snap.canon,
           type: "LIQUIDITY_SWEEP_REVERSAL",
@@ -1019,7 +1030,8 @@ export function buildSetups(args: {
 
           status: desired,
           status_tf: f.bias.tf,
-          status_close_ts: 0,
+          status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
+
 
           created_ts: ts,
           expires_ts: ts + 1000 * 60 * 120, // 2h (consistent with MR horizon)
@@ -1139,8 +1151,7 @@ export function buildSetups(args: {
           confScore = Math.min(confScore, 84);
         }
 
-        const s: TradeSetup = {
-          id: stableSetupId({
+        const id = stableSetupId({
             prefix: "fsc",
             canon: snap.canon,
             type: "FAILED_SWEEP_CONTINUATION",
@@ -1149,7 +1160,10 @@ export function buildSetups(args: {
             entry_tf: "5m",
             trigger_tf: "5m",
             anchor_price: level,
-          }),
+          });
+
+        const s: TradeSetup = {
+          id,
 
           canon: snap.canon,
           type: "FAILED_SWEEP_CONTINUATION",
@@ -1160,7 +1174,8 @@ export function buildSetups(args: {
 
           status: desired,
           status_tf: f.bias.tf,
-          status_close_ts: 0,
+          status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
+
 
           created_ts: ts,
           expires_ts: ts + 1000 * 60 * 60,
@@ -1245,8 +1260,7 @@ export function buildSetups(args: {
       const desired: TradeSetup["status"] =
         rr1 >= (bias_incomplete ? 1.6 : 1.3) ? "READY" : "FORMING";
 
-      const s: TradeSetup = {
-        id: stableSetupId({
+      const id = stableSetupId({
           prefix: "mr",
           canon: snap.canon,
           type: "RANGE_MEAN_REVERT",
@@ -1255,7 +1269,10 @@ export function buildSetups(args: {
           entry_tf: "15m",
           trigger_tf: "5m",
           anchor_price: ref,
-        }),
+        });
+
+      const s: TradeSetup = {
+        id,
 
         canon: snap.canon,
         type: "RANGE_MEAN_REVERT",
@@ -1266,7 +1283,8 @@ export function buildSetups(args: {
 
         status: desired,
         status_tf: f.bias.tf,
-        status_close_ts: 0,
+        status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
+
 
         created_ts: ts,
         expires_ts: ts + 1000 * 60 * 120,
