@@ -14,6 +14,18 @@ const BINANCE_WS_DEAD_MS = 6000;
 
 // Bybit REST probe window (VPN gate)
 const PROBE_DEAD_MS = 10000;
+function tfMs(tf: string): number {
+  switch (tf) {
+    case "1m": return 60_000;
+    case "3m": return 3 * 60_000;
+    case "5m": return 5 * 60_000;
+    case "15m": return 15 * 60_000;
+    case "1h": return 60 * 60_000;
+    case "4h": return 4 * 60 * 60_000;
+    case "1D": return 24 * 60 * 60_000;
+    default: return 0;
+  }
+}
 
 // ---------------------------
 // Helpers: Cross-Exchange
@@ -178,13 +190,17 @@ export function buildUnifiedSnapshotFromBybit(args: {
   } as any);
 
   const timeframes = TFS.map((tf) => {
-    const candles = st.klines?.[tf] as Candle[] | undefined;
-    const tsLast = candles?.length ? candles[candles.length - 1].ts : 0;
-    const staleMs = tsLast ? now - tsLast : 999_999;
+    const candlesRaw = st.klines?.[tf] as Candle[] | undefined;
+    const hasCandles = Array.isArray(candlesRaw) && candlesRaw.length > 0;
+    const candles = hasCandles ? candlesRaw : undefined;
+
+    const tsLast = hasCandles ? candlesRaw![candlesRaw!.length - 1].ts : 0;
+    const closeTs = tsLast ? tsLast + tfMs(tf) : 0;
+    const staleMs = closeTs ? Math.max(0, now - closeTs) : 999_999;
 
     return {
       tf,
-      candles: candles ? { ohlcv: candles, src: "bybit" as const, ts_last: tsLast } : undefined,
+      candles: hasCandles ? { ohlcv: candlesRaw!, src: "bybit" as const, ts_last: tsLast } : undefined,
 
       // Binance candles will be attached in Bybit+Binance builder
       candles_binance: undefined,
@@ -197,7 +213,7 @@ export function buildUnifiedSnapshotFromBybit(args: {
           }
           : undefined,
 
-      diagnostics: { stale_ms: staleMs, partial: !candles },
+      diagnostics: { stale_ms: staleMs, partial: !hasCandles },
     };
   });
 
