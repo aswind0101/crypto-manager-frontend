@@ -48,11 +48,6 @@ export type TradeSetup = {
   trigger_tf: "5m" | "15m";
 
   status: SetupStatus;
-
-  // Status only updates on bias_tf candle close (1h/4h)
-  status_tf: "1h" | "4h";
-  status_close_ts: number;
-  
   created_ts: number;
   expires_ts: number;
 

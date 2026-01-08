@@ -53,80 +53,6 @@ function stableSetupId(args: {
   return `${args.prefix}_${fnv1a32(raw)}`;
 }
 
-function tfMs(tf: TradeSetup["bias_tf"] | TradeSetup["entry_tf"] | TradeSetup["trigger_tf"]): number {
-  switch (tf) {
-    case "5m": return 5 * 60_000;
-    case "15m": return 15 * 60_000;
-    case "1h": return 60 * 60_000;
-    case "4h": return 4 * 60 * 60_000;
-    default: return 0;
-  }
-}
-
-function lastConfirmedOpenTs(candles: Candle[]): number {
-  for (let i = candles.length - 1; i >= 0; i--) {
-    if (candles[i]?.confirm) return candles[i].ts;
-  }
-  return 0;
-}
-function getStatusCloseTs(snap: UnifiedSnapshot, tf: TradeSetup["bias_tf"]): number {
-  const tfSnap = (snap.timeframes as any[] | undefined)?.find((t) => t?.tf === tf);
-  const candles = (tfSnap?.candles?.ohlcv ?? []) as Candle[];
-  if (!Array.isArray(candles) || candles.length === 0) return 0;
-
-  // Prefer the last confirmed candle, because "confirm" means closed in your normBybitKlines()
-  for (let i = candles.length - 1; i >= 0; i--) {
-    const c = candles[i];
-    if (c?.confirm) return c.ts + tfMs(tf);
-  }
-
-  // Fallback: last candle close (open ts + tfMs)
-  const last = candles[candles.length - 1];
-  return (last?.ts ? last.ts + tfMs(tf) : 0);
-}
-
-function applyStatusPolicy(params: {
-  setup: TradeSetup;
-  desired: TradeSetup["status"];
-  snap: UnifiedSnapshot;
-  prevSetup: TradeSetup | null;
-  px: number;
-}) {
-  const { setup, desired, snap, prevSetup, px } = params;
-
-  const status_tf = setup.bias_tf; // your policy: status_tf = bias_tf (1h/4h)
-  const status_close_ts = getStatusCloseTs(snap, status_tf);
-
-  setup.status_tf = status_tf;
-  setup.status_close_ts = status_close_ts;
-
-  // Hard invalidation intrabar allowed (using px since UnifiedSnapshot has no mid)
-  const stopPx = setup.stop.price;
-  const hardInvalid =
-    (setup.side === "LONG" && px <= stopPx) ||
-    (setup.side === "SHORT" && px >= stopPx);
-
-  if (hardInvalid) {
-    setup.status = "INVALIDATED";
-    return;
-  }
-
-  // Same setup + same close window => freeze status (no intrabar flips)
-  if (
-    prevSetup &&
-    prevSetup.id === setup.id &&
-    prevSetup.status_close_ts === status_close_ts
-  ) {
-    setup.status = prevSetup.status;
-    setup.status_tf = prevSetup.status_tf;
-    setup.status_close_ts = prevSetup.status_close_ts;
-    return;
-  }
-
-  // New status_tf close => allow recompute
-  setup.status = desired;
-}
-
 
 function lastClose(candles?: Candle[]) {
   if (!candles || !candles.length) return undefined;
@@ -502,11 +428,9 @@ function biasStrengthOk(f: FeaturesSnapshot) {
 export function buildSetups(args: {
   snap: UnifiedSnapshot;
   features: FeaturesSnapshot;
-  prevSetup?: TradeSetup | null;
 }): SetupEngineOutput {
   const { snap, features: f } = args;
   const ts = now();
-  const prevSetup = args.prevSetup ?? null;
 
   const telemetry = {
     gate: "OK" as "OK" | "DQ_NOT_OK" | "NO_PRICE",
@@ -620,6 +544,7 @@ export function buildSetups(args: {
       },
       { key: "delta", ok: deltaOk(f, biasSide).ok, note: `Delta: ${deltaOk(f, biasSide).note}` },
       { key: "htf_ms", ok: htfConfirm(f, biasSide).ok, note: `HTF MS: ${htfConfirm(f, biasSide).note}` },
+
     ];
 
     const bs = biasStrengthOk(f);
@@ -634,9 +559,8 @@ export function buildSetups(args: {
     if (!ht.ok) confScore = Math.max(0, confScore - 10);
     if (!dOk.ok) confScore = Math.max(0, confScore - 6);
 
-    const desired: TradeSetup["status"] = ready ? "READY" : "FORMING";
-
-    const id = stableSetupId({
+    const s: TradeSetup = {
+      id: stableSetupId({
         prefix: "tpb",
         canon: snap.canon,
         type: "TREND_PULLBACK",
@@ -645,10 +569,7 @@ export function buildSetups(args: {
         entry_tf: "5m",
         trigger_tf: "5m",
         anchor_price: ref,
-      });
-
-    const s: TradeSetup = {
-      id,
+      }),
 
       canon: snap.canon,
       type: "TREND_PULLBACK",
@@ -657,11 +578,7 @@ export function buildSetups(args: {
       bias_tf: f.bias.tf,
       trigger_tf: "5m",
 
-      status: desired,
-      status_tf: f.bias.tf,
-      status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
-
-
+      status: ready ? "READY" : "FORMING",
       created_ts: ts,
       expires_ts: ts + 1000 * 60 * 90,
 
@@ -694,8 +611,8 @@ export function buildSetups(args: {
       tags: ["intraday", "pullback", f.bias.trend_dir],
     };
 
-    applyStatusPolicy({ setup: s, desired, snap, prevSetup, px });
     tryAccept(s);
+
   }
 
   /**
@@ -759,9 +676,9 @@ export function buildSetups(args: {
     const rrNeed = (!ht.ok || !dOk.ok) ? (rrNeedBase + 0.2) : rrNeedBase;
     const ready = rr1 >= rrNeed && common.grade !== "D";
 
-    const desired: TradeSetup["status"] = ready ? "READY" : "FORMING";
 
-    const id = stableSetupId({
+    const s: TradeSetup = {
+      id: stableSetupId({
         prefix: "brt",
         canon: snap.canon,
         type: "BREAKOUT",
@@ -770,10 +687,7 @@ export function buildSetups(args: {
         entry_tf: "5m",
         trigger_tf: "5m",
         anchor_price: level,
-      });
-
-    const s: TradeSetup = {
-      id,
+      }),
 
       canon: snap.canon,
       type: "BREAKOUT",
@@ -782,11 +696,7 @@ export function buildSetups(args: {
       bias_tf: f.bias.tf,
       trigger_tf: "5m",
 
-      status: desired,
-      status_tf: f.bias.tf,
-      status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
-
-
+      status: ready ? "READY" : "FORMING",
       created_ts: ts,
       expires_ts: ts + 1000 * 60 * 60,
 
@@ -837,8 +747,9 @@ export function buildSetups(args: {
       tags: ["intraday", "breakout", "bos", "retest"],
     };
 
-    applyStatusPolicy({ setup: s, desired, snap, prevSetup, px });
     tryAccept(s);
+
+
 
     createdStructureBreakout = true;
   }
@@ -879,9 +790,9 @@ export function buildSetups(args: {
       }
 
       const ready = rr1 >= (bias_incomplete ? 1.8 : 1.5) && common.grade !== "D";
-      const desired: TradeSetup["status"] = ready ? "READY" : "FORMING";
 
-      const id = stableSetupId({
+      const s: TradeSetup = {
+        id: stableSetupId({
           prefix: "brk",
           canon: snap.canon,
           type: "BREAKOUT",
@@ -890,10 +801,7 @@ export function buildSetups(args: {
           entry_tf: "5m",
           trigger_tf: "5m",
           anchor_price: brk,
-        });
-
-      const s: TradeSetup = {
-        id,
+        }),
 
         canon: snap.canon,
         type: "BREAKOUT",
@@ -902,11 +810,7 @@ export function buildSetups(args: {
         bias_tf: f.bias.tf,
         trigger_tf: "5m",
 
-        status: desired,
-        status_tf: f.bias.tf,
-        status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
-
-
+        status: ready ? "READY" : "FORMING",
         created_ts: ts,
         expires_ts: ts + 1000 * 60 * 60,
 
@@ -949,11 +853,11 @@ export function buildSetups(args: {
         tags: ["intraday", "breakout", "squeeze"],
       };
 
-      applyStatusPolicy({ setup: s, desired, snap, prevSetup, px });
       tryAccept(s);
+
+
     }
   }
-
   /**
    * 2c) LIQUIDITY_SWEEP_REVERSAL (Task 3.4c)
    * - New archetype (does NOT override RANGE_MEAN_REVERT)
@@ -1001,13 +905,13 @@ export function buildSetups(args: {
       const rr1 = rr(entryMid, sl, tp1, side);
 
       if (rr1 >= LSR_RR_MIN) {
-        // READY only when current price is back in entry zone
+        // READY only when current price is back in entry zone (using px close; intrabar mid is handled elsewhere)
         const ready = px >= zone.lo && px <= zone.hi;
-        const desired: TradeSetup["status"] = ready ? "READY" : "FORMING";
 
         let confScore = Math.min(100, common.score + 5 + (rr1 >= 3.2 ? 3 : 0));
 
-        const id = stableSetupId({
+        const s: TradeSetup = {
+          id: stableSetupId({
             prefix: "lsr",
             canon: snap.canon,
             type: "LIQUIDITY_SWEEP_REVERSAL",
@@ -1016,10 +920,8 @@ export function buildSetups(args: {
             entry_tf: "15m",
             trigger_tf: "5m",
             anchor_price: level,
-          });
+          }),
 
-        const s: TradeSetup = {
-          id,
 
           canon: snap.canon,
           type: "LIQUIDITY_SWEEP_REVERSAL",
@@ -1028,11 +930,7 @@ export function buildSetups(args: {
           bias_tf: f.bias.tf,
           trigger_tf: "5m",
 
-          status: desired,
-          status_tf: f.bias.tf,
-          status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
-
-
+          status: ready ? "READY" : "FORMING",
           created_ts: ts,
           expires_ts: ts + 1000 * 60 * 120, // 2h (consistent with MR horizon)
 
@@ -1072,19 +970,19 @@ export function buildSetups(args: {
           tags: ["intraday", "lsr", "sweep_reversal"],
         };
 
-        applyStatusPolicy({ setup: s, desired, snap, prevSetup, px });
         tryAccept(s);
+
+
       }
     }
   }
-
   /**
-   * 2d) FAILED_SWEEP_CONTINUATION (Task 3.4d)
-   * Idea:
-   * - Fresh BOS on 15m
-   * - BOS candle cluster shows "stop-run displacement" (wick through level + close holds beyond)
-   * - Plan is continuation via retest of BOS level (close-confirm handled by Trigger Engine)
-   */
+ * 2d) FAILED_SWEEP_CONTINUATION (Task 3.4d)
+ * Idea:
+ * - Fresh BOS on 15m
+ * - BOS candle cluster shows "stop-run displacement" (wick through level + close holds beyond)
+ * - Plan is continuation via retest of BOS level (close-confirm handled by Trigger Engine)
+ */
   if (ms15?.lastBOS && typeof ms15.lastBOS.level === "number" && typeof ms15.lastBOS.ts === "number") {
     const bos = ms15.lastBOS;
 
@@ -1127,7 +1025,8 @@ export function buildSetups(args: {
             ? (wickExtreme - slBuffer)
             : (wickExtreme + slBuffer);
 
-        // TP: use nearest pivot in continuation direction
+
+        // TP: use nearest pivot in continuation direction (same philosophy as breakout structure)
         const tp1 =
           dir === "LONG"
             ? (above?.price ?? (level + level * atrp * 2.0))
@@ -1136,22 +1035,19 @@ export function buildSetups(args: {
         const entryMid = (zone.lo + zone.hi) / 2;
         const rr1 = rr(entryMid, sl, tp1, dir);
 
-        // Continuation should have decent RR
+        // Continuation should have decent RR, but not as strict as LSR
         const rrNeed = bias_incomplete ? 2.1 : 2.0;
         const ready = rr1 >= rrNeed && common.grade !== "D" && (px >= zone.lo && px <= zone.hi);
 
-        // Desired status (this is your original expression, unchanged)
-        const desired: TradeSetup["status"] =
-          (rr1 >= rrNeed && common.grade !== "D") ? (ready ? "READY" : "FORMING") : "FORMING";
-
-        // Confidence
+        // Confidence: breakout + displacement premium; cap if HTF bias incomplete
         let confScore = Math.min(100, common.score + 8);
         if (bias_incomplete) {
           confScore = Math.floor(confScore * 0.75);
           confScore = Math.min(confScore, 84);
         }
 
-        const id = stableSetupId({
+        const s: TradeSetup = {
+          id: stableSetupId({
             prefix: "fsc",
             canon: snap.canon,
             type: "FAILED_SWEEP_CONTINUATION",
@@ -1160,10 +1056,7 @@ export function buildSetups(args: {
             entry_tf: "5m",
             trigger_tf: "5m",
             anchor_price: level,
-          });
-
-        const s: TradeSetup = {
-          id,
+          }),
 
           canon: snap.canon,
           type: "FAILED_SWEEP_CONTINUATION",
@@ -1172,11 +1065,7 @@ export function buildSetups(args: {
           bias_tf: f.bias.tf,
           trigger_tf: "5m",
 
-          status: desired,
-          status_tf: f.bias.tf,
-          status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
-
-
+          status: (rr1 >= rrNeed && common.grade !== "D") ? (ready ? "READY" : "FORMING") : "FORMING",
           created_ts: ts,
           expires_ts: ts + 1000 * 60 * 60,
 
@@ -1226,12 +1115,11 @@ export function buildSetups(args: {
           tags: ["intraday", "failed_sweep", "continuation", "bos", "retest"],
         };
 
-        applyStatusPolicy({ setup: s, desired, snap, prevSetup, px });
         tryAccept(s);
+
       }
     }
   }
-
   // 3) RANGE_MEAN_REVERT (bias sideways) — B+ policy: allowed even when HTF bias incomplete (with stricter RR)
   if (f.bias.trend_dir === "sideways" && below && above) {
     const nearSupport = Math.abs(px - below.price) / px < 0.002;
@@ -1257,10 +1145,8 @@ export function buildSetups(args: {
         confScore = Math.min(confScore, 82);
       }
 
-      const desired: TradeSetup["status"] =
-        rr1 >= (bias_incomplete ? 1.6 : 1.3) ? "READY" : "FORMING";
-
-      const id = stableSetupId({
+      const s: TradeSetup = {
+        id: stableSetupId({
           prefix: "mr",
           canon: snap.canon,
           type: "RANGE_MEAN_REVERT",
@@ -1269,10 +1155,8 @@ export function buildSetups(args: {
           entry_tf: "15m",
           trigger_tf: "5m",
           anchor_price: ref,
-        });
+        }),
 
-      const s: TradeSetup = {
-        id,
 
         canon: snap.canon,
         type: "RANGE_MEAN_REVERT",
@@ -1281,11 +1165,7 @@ export function buildSetups(args: {
         bias_tf: f.bias.tf,
         trigger_tf: "5m",
 
-        status: desired,
-        status_tf: f.bias.tf,
-        status_close_ts: prevSetup?.id === id ? prevSetup.status_close_ts : 0,
-
-
+        status: rr1 >= (bias_incomplete ? 1.6 : 1.3) ? "READY" : "FORMING",
         created_ts: ts,
         expires_ts: ts + 1000 * 60 * 120,
 
@@ -1328,8 +1208,9 @@ export function buildSetups(args: {
         tags: ["intraday", "range", nearSupport ? "support" : "resistance"],
       };
 
-      applyStatusPolicy({ setup: s, desired, snap, prevSetup, px });
       tryAccept(s);
+
+
     }
   }
 
@@ -1348,4 +1229,6 @@ export function buildSetups(args: {
     setups: [primary],
     telemetry,
   };
+
+
 }

@@ -783,9 +783,8 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
       prevSymbolRef.current = symbol;
       statusCacheRef.current.clear();
     }
-    const prevSetup = persistRef.current?.setup ?? null;
-    const base = buildSetups({ snap, features, prevSetup });
 
+    const base = buildSetups({ snap, features });
 
     // Hard invalidation is intrabar (by mid)
     const withHardInvalid = applyHardInvalidationIntrabar(base, snap);
@@ -886,4 +885,3 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
   return { snap, features, setups };
 }
-
