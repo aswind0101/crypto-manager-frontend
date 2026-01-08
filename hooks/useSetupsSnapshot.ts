@@ -3,6 +3,7 @@ import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
 import type { ExecutionDecision } from "../lib/feeds/setups/types";
 
+
 type Candle = {
   ts: number;
   o: number;
@@ -683,25 +684,47 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
     const published = Array.isArray(enriched) ? enriched.length : 0;
 
-    // Feed telemetry: prefer engine-provided diagnostics if present; otherwise expose what we can from the client snapshot.
+    // Feed telemetry: prefer engine-provided telemetry if present; otherwise expose what we can from the client snapshot.
+    //
+    // Engine telemetry (from engine.ts) shape (preferred):
+    //   telemetry: { candidates, accepted, rejected, rejectByCode, ... }
+    //
+    // Backward-compat (older shapes):
+    //   telemetry/diagnostics: { candidatesEvaluated, rejectionByCode, ... }
+    const tAny = (scored as any)?.telemetry ?? null;
+    const dAny = (scored as any)?.diagnostics ?? null;
+
+    // Preferred: engine.ts telemetry
     const candidatesEvaluated =
-      typeof scored?.telemetry?.candidatesEvaluated === "number"
-        ? scored.telemetry.candidatesEvaluated
-        : typeof scored?.diagnostics?.candidatesEvaluated === "number"
-          ? scored.diagnostics.candidatesEvaluated
-          : null;
+      typeof tAny?.candidates === "number"
+        ? tAny.candidates
+        : typeof dAny?.candidates === "number"
+          ? dAny.candidates
+          : typeof tAny?.candidatesEvaluated === "number"
+            ? tAny.candidatesEvaluated
+            : typeof dAny?.candidatesEvaluated === "number"
+              ? dAny.candidatesEvaluated
+              : null;
 
     const rejectionByCode =
-      (scored?.telemetry?.rejectionByCode as Record<string, number> | undefined) ??
-      (scored?.diagnostics?.rejectionByCode as Record<string, number> | undefined) ??
+      (tAny?.rejectByCode && typeof tAny.rejectByCode === "object" ? (tAny.rejectByCode as Record<string, number>) : null) ??
+      (dAny?.rejectByCode && typeof dAny.rejectByCode === "object" ? (dAny.rejectByCode as Record<string, number>) : null) ??
+      (tAny?.rejectionByCode && typeof tAny.rejectionByCode === "object" ? (tAny.rejectionByCode as Record<string, number>) : null) ??
+      (dAny?.rejectionByCode && typeof dAny.rejectionByCode === "object" ? (dAny.rejectionByCode as Record<string, number>) : null) ??
       null;
 
+    // Prefer engine-provided rejected count if present; otherwise derive from candidates - published
     const rejected =
-      typeof candidatesEvaluated === "number" && Number.isFinite(candidatesEvaluated)
-        ? Math.max(0, candidatesEvaluated - published)
-        : null;
+      typeof tAny?.rejected === "number"
+        ? tAny.rejected
+        : typeof dAny?.rejected === "number"
+          ? dAny.rejected
+          : typeof candidatesEvaluated === "number" && Number.isFinite(candidatesEvaluated)
+            ? Math.max(0, candidatesEvaluated - published)
+            : null;
 
     const lastEvaluationTs = Number.isFinite(Number(snap?.price?.ts)) ? Number(snap.price.ts) : Date.now();
+
 
     return {
       ...scored,
