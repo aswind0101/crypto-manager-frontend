@@ -932,7 +932,7 @@ export default function Page() {
         </div>
 
         {/* Main layout */}
-        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[380px_1fr]">
+        <div className="mt-4 grid grid-cols-1 gap-4 min-[1440px]:grid-cols-[380px_1fr]">
           {/* LEFT: queue */}
           <div className="space-y-4">
             <Card
