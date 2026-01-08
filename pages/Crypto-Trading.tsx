@@ -1154,38 +1154,40 @@ export default function Page() {
                                 </div>
                               </div>
 
-                              <div className="flex shrink-0 flex-col items-end gap-2">
-                                <div className="flex flex-col items-end gap-1">
-                                  <Pill tone={statusTone(s.status)}>{s.status}</Pill>
-                                  <Pill tone={chip.tone} icon={chip.icon}>
-                                    {chip.label}
-                                  </Pill>
+                              <div className="flex shrink-0 flex-col items-end justify-center gap-2">
+                                <div className="flex flex-col items-end gap-2">
+                                  <div className="h-7 flex items-center">
+                                    <Pill tone={statusTone(s.status)}>{s.status}</Pill>
+                                  </div>
+
+                                  <div className="h-7 flex items-center">
+                                    <Pill tone={chip.tone} icon={chip.icon}>
+                                      {chip.label}
+                                    </Pill>
+                                  </div>
                                 </div>
 
                                 <button
                                   type="button"
                                   onClick={() => toggleExpanded(accordionKey)}
                                   className="
-    inline-flex items-center gap-1.5
-    rounded-full
-    border border-white/10
-    bg-white/5
-    px-3 py-1.5
-    text-[11px] font-medium
-    text-zinc-300
-    transition
-    hover:bg-white/10 hover:text-white
-    active:scale-95
-    focus-visible:outline-none
-    focus-visible:ring-2 focus-visible:ring-white/20
-  "
+      inline-flex h-7 items-center gap-1.5
+      rounded-full
+      border border-white/10
+      bg-white/5
+      px-3
+      text-[11px] font-medium
+      text-zinc-300
+      transition
+      hover:bg-white/10 hover:text-white
+      active:scale-95
+      focus-visible:outline-none
+      focus-visible:ring-2 focus-visible:ring-white/20
+    "
                                 >
-                                  <span className="opacity-80">
-                                    {isOpen ? "Hide" : "Details"}
-                                  </span>
+                                  <span className="opacity-80">{isOpen ? "Hide" : "Details"}</span>
                                   <svg
-                                    className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""
-                                      }`}
+                                    className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`}
                                     viewBox="0 0 20 20"
                                     fill="currentColor"
                                   >
@@ -1196,8 +1198,8 @@ export default function Page() {
                                     />
                                   </svg>
                                 </button>
-
                               </div>
+
                             </div>
 
                             {isOpen ? (
