@@ -768,6 +768,11 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   // Persisted per-hook instance cache to stabilize FORMING/READY status
   const statusCacheRef = useRef<Map<string, { status: SetupStatus; barTs: number }>>(new Map());
   const prevSymbolRef = useRef<string>(symbol);
+  const persistRef = useRef<{
+    key: string;
+    setup: any;
+    ts: number;
+  } | null>(null);
 
   const setups = useMemo(() => {
     if (!snap || !features) return null;
@@ -818,15 +823,52 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
     const enriched = Array.isArray(scored?.setups)
       ? scored.setups.map((s: any) => ({
-          ...s,
-          execution: deriveExecutionDecision(s, ctx),
-        }))
+        ...s,
+        execution: deriveExecutionDecision(s, ctx),
+      }))
       : scored?.setups;
+
+    const arr = Array.isArray(enriched) ? enriched : [];
+    const nowTs = Date.now();
+
+    // TTL giữ setup hiển thị để giảm flicker (không ảnh hưởng execution)
+    const PERSIST_TTL_MS = 20_000;
+
+    // Ưu tiên setup publish hiện tại (nếu có)
+    let finalArr = arr;
+
+    // Cache setup hiện tại nếu có
+    if (arr.length > 0) {
+      // Lưu “primary” hiện tại (setup[0] vì engine đã only-1-per-symbol)
+      const s0 = arr[0];
+      const k = String(s0?.canon ?? s0?.id ?? "");
+      if (k) persistRef.current = { key: k, setup: s0, ts: nowTs };
+    } else {
+      // Nếu hiện tại rỗng, thử giữ lại setup trước đó trong TTL
+      const prev = persistRef.current;
+      if (prev && nowTs - prev.ts <= PERSIST_TTL_MS) {
+        const sPrev = prev.setup;
+
+        // Nếu hard invalidation đã xảy ra thì không giữ
+        const st = String(sPrev?.status ?? "");
+        if (st !== "INVALIDATED" && st !== "EXPIRED") {
+          finalArr = [
+            {
+              ...sPrev,
+              execution: deriveExecutionDecision(sPrev, ctx),
+            },
+          ];
+        } else {
+          persistRef.current = null;
+        }
+      }
+    }
 
     return {
       ...scored,
-      setups: enriched,
+      setups: finalArr,
     };
+
   }, [snap, features, paused, symbol]);
 
   return { snap, features, setups };
