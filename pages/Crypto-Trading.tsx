@@ -54,13 +54,6 @@ type ExecutionState =
   | "WAIT_FILL"
   | "NO_TRADE";
 
-const STATUS_COLOR: Record<SetupStatus, string> = {
-  FORMING: "bg-zinc-500/10 text-zinc-300 ring-zinc-500/30",
-  READY: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/30",
-  TRIGGERED: "bg-blue-500/10 text-blue-400 ring-blue-500/30",
-  INVALIDATED: "bg-red-500/10 text-red-400 ring-red-500/30",
-  EXPIRED: "bg-zinc-500/10 text-zinc-400 ring-zinc-500/30",
-};
 type ExecutionDecision = {
   state: ExecutionState;
   canEnterMarket: boolean;
@@ -1134,7 +1127,6 @@ export default function Page() {
                         const pri01 = clamp01(pri / 100);
 
                         const chip = actionChip(s, executionGlobal);
-                        const tone = STATUS_COLOR[s.status as SetupStatus];
 
                         return (
                           <div
@@ -1171,9 +1163,10 @@ export default function Page() {
 
                               <div className="flex shrink-0 flex-col items-end justify-center gap-2">
                                 <div className="grid justify-items-end gap-2">
-                                  <Pill tone={tone} fullWidth>
+                                  <Pill tone={statusTone(s.status)} fullWidth>
                                     {s.status}
                                   </Pill>
+
                                   <Pill tone={chip.tone} icon={chip.icon} fullWidth>
                                     {chip.label}
                                   </Pill>
