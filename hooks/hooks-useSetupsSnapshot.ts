@@ -601,7 +601,7 @@ function deriveExecutionDecision(
   const grade = String(setup?.confidence?.grade ?? "").toUpperCase();
   if (grade === "C" || grade === "D") {
     return {
-      state: "NO_TRADE",
+      state: "MONITOR",
       canEnterMarket: false,
       canPlaceLimit: false,
       blockers: ["CONFIDENCE_MONITOR_ONLY"],
@@ -653,13 +653,14 @@ function deriveExecutionDecision(
   // ---------- FORMING ----------
   if (status === "FORMING") {
     return {
-      state: blockers.includes("retest") ? "WAIT_RETEST" : "NO_TRADE",
+      state: blockers.includes("retest") ? "WAIT_RETEST" : "FORMING",
       canEnterMarket: false,
       canPlaceLimit: false,
       blockers,
       reason: "Setup forming",
     };
   }
+
 
   // ---------- READY ----------
   if (status === "READY") {
@@ -832,33 +833,44 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     const nowTs = Date.now();
 
     // TTL giữ setup hiển thị để giảm flicker (không ảnh hưởng execution)
-    const PERSIST_TTL_MS = 20_000;
-
-    // Ưu tiên setup publish hiện tại (nếu có)
+    // Sticky cache: keep last valid setup visible across transient upstream drops
+    // - Upstream drops happen on DQ jitter, price feed hiccups, or engine gating.
+    // - We keep the last setup until it is INVALIDATED/EXPIRED or past expires_ts (+grace), whichever comes first.
     let finalArr = arr;
 
-    // Cache setup hiện tại nếu có
+    const prev = persistRef.current;
     if (arr.length > 0) {
-      // Lưu “primary” hiện tại (setup[0] vì engine đã only-1-per-symbol)
+      // Engine currently publishes a setup (engine enforces only-1-per-symbol)
       const s0 = arr[0];
       const k = String(s0?.canon ?? s0?.id ?? "");
       if (k) persistRef.current = { key: k, setup: s0, ts: nowTs };
-    } else {
-      // Nếu hiện tại rỗng, thử giữ lại setup trước đó trong TTL
-      const prev = persistRef.current;
-      if (prev && nowTs - prev.ts <= PERSIST_TTL_MS) {
-        const sPrev = prev.setup;
+    } else if (prev) {
+      const sPrev = prev.setup;
+      const st = String(sPrev?.status ?? "");
 
-        // Nếu hard invalidation đã xảy ra thì không giữ
-        const st = String(sPrev?.status ?? "");
-        if (st !== "INVALIDATED" && st !== "EXPIRED") {
-          finalArr = [
-            {
-              ...sPrev,
-              execution: deriveExecutionDecision(sPrev, ctx),
-            },
-          ];
+      // Never keep terminal setups
+      if (st === "INVALIDATED" || st === "EXPIRED") {
+        persistRef.current = null;
+      } else {
+        const expiresTs = Number(sPrev?.expires_ts ?? 0);
+        const graceMs = 60_000; // 1m grace to avoid edge flicker at expiry boundary
+        const withinExpiry =
+          expiresTs > 0 ? (nowTs <= expiresTs + graceMs) : (nowTs - prev.ts <= 10 * 60_000);
+
+        if (withinExpiry) {
+          // Re-derive execution with current ctx (DQ/paused/stale), and re-apply hard invalidation against current mid.
+          let kept = { ...sPrev, execution: deriveExecutionDecision(sPrev, ctx) };
+
+          // Apply hard invalidation intrabar against current mid/stop
+          const stopPx = kept?.stop?.price;
+          if (Number.isFinite(Number(ctx.mid)) && typeof stopPx === "number" && Number.isFinite(stopPx)) {
+            if (kept.side === "LONG" && ctx.mid <= stopPx) kept = { ...kept, status: "INVALIDATED" };
+            if (kept.side === "SHORT" && ctx.mid >= stopPx) kept = { ...kept, status: "INVALIDATED" };
+          }
+
+          finalArr = [kept];
         } else {
+          // Past expiry horizon → drop
           persistRef.current = null;
         }
       }
