@@ -386,14 +386,42 @@ export function buildSetups(args: {
   const { snap, features: f } = args;
   const ts = now();
 
+  const telemetry = {
+    gate: "OK" as "OK" | "DQ_NOT_OK" | "NO_PRICE",
+    candidates: 0,
+    accepted: 0,
+    rejected: 0,
+    rejectByCode: {} as Record<string, number>,
+    rejectNotesSample: [] as string[],
+  };
+
+  const bumpReject = (codes: string[], notes: string[]) => {
+    for (const c of codes) {
+      telemetry.rejectByCode[c] = (telemetry.rejectByCode[c] ?? 0) + 1;
+    }
+    // keep a tiny bounded sample for UI
+    for (const n of notes) {
+      if (telemetry.rejectNotesSample.length >= 12) break;
+      telemetry.rejectNotesSample.push(n);
+    }
+  };
+
   const dq_ok = f.quality.dq_grade === "A" || f.quality.dq_grade === "B";
-  if (!dq_ok) return { ts, dq_ok: false, setups: [], preferred_id: undefined };
+  if (!dq_ok) {
+    telemetry.gate = "DQ_NOT_OK";
+    return { ts, dq_ok: false, setups: [], preferred_id: undefined, telemetry };
+  }
+
 
   // Bybit execution candles
   const tf15 = (snap.timeframes.find((x: any) => x.tf === "15m")?.candles?.ohlcv ?? []) as Candle[];
   const tf1h = (snap.timeframes.find((x: any) => x.tf === "1h")?.candles?.ohlcv ?? []) as Candle[];
   const px = lastClose(tf15) ?? lastClose(tf1h) ?? 0;
-  if (!px) return { ts, dq_ok: true, setups: [], preferred_id: undefined };
+  if (!px) {
+    telemetry.gate = "NO_PRICE";
+    return { ts, dq_ok: true, setups: [], preferred_id: undefined, telemetry };
+  }
+
 
   // Levels
   const lv15 = computePivotLevels(tf15, 2, 10);
@@ -408,6 +436,34 @@ export function buildSetups(args: {
   const biasMeta = getBiasCompleteness(snap, f);
   const bias_incomplete = !biasMeta.complete;
   const biasSide = pickBiasSide(f);
+  const tryAccept = (s: TradeSetup) => {
+    telemetry.candidates += 1;
+
+    const g = applyQualityGates({ setup: s, f, px, atrp });
+
+    if (g.ok === false) {
+      telemetry.rejected += 1;
+
+      const codes = ("rejectCodes" in g && Array.isArray(g.rejectCodes)) ? g.rejectCodes : [];
+      const notes = ("rejectNotes" in g && Array.isArray(g.rejectNotes)) ? g.rejectNotes : [];
+
+      bumpReject(codes, notes);
+      return false;
+    }
+
+    telemetry.accepted += 1;
+
+    const tagsAdd = ("tagsAdd" in g && Array.isArray(g.tagsAdd)) ? g.tagsAdd : [];
+    const reasonsAdd = ("reasonsAdd" in g && Array.isArray(g.reasonsAdd)) ? g.reasonsAdd : [];
+
+    s.tags = Array.from(new Set([...(s.tags || []), ...tagsAdd]));
+    s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...reasonsAdd]));
+
+    setups.push(s);
+    return true;
+
+  };
+
 
   // 1) TREND_PULLBACK (ưu tiên) — B+ policy: only when HTF bias is complete
   if (biasSide && !bias_incomplete) {
@@ -499,12 +555,7 @@ export function buildSetups(args: {
       tags: ["intraday", "pullback", f.bias.trend_dir],
     };
 
-    const g = applyQualityGates({ setup: s, f, px, atrp });
-    if (g.ok) {
-      s.tags = Array.from(new Set([...(s.tags || []), ...g.tagsAdd]));
-      s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...g.reasonsAdd]));
-      setups.push(s);
-    }
+    tryAccept(s);
 
   }
 
@@ -630,12 +681,8 @@ export function buildSetups(args: {
       tags: ["intraday", "breakout", "bos", "retest"],
     };
 
-    const g = applyQualityGates({ setup: s, f, px, atrp });
-    if (g.ok) {
-      s.tags = Array.from(new Set([...(s.tags || []), ...g.tagsAdd]));
-      s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...g.reasonsAdd]));
-      setups.push(s);
-    }
+    tryAccept(s);
+
 
 
     createdStructureBreakout = true;
@@ -730,12 +777,8 @@ export function buildSetups(args: {
         tags: ["intraday", "breakout", "squeeze"],
       };
 
-      const g = applyQualityGates({ setup: s, f, px, atrp });
-      if (g.ok) {
-        s.tags = Array.from(new Set([...(s.tags || []), ...g.tagsAdd]));
-        s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...g.reasonsAdd]));
-        setups.push(s);
-      }
+      tryAccept(s);
+
 
     }
   }
@@ -840,12 +883,8 @@ export function buildSetups(args: {
           tags: ["intraday", "lsr", "sweep_reversal"],
         };
 
-        const g = applyQualityGates({ setup: s, f, px, atrp });
-        if (g.ok) {
-          s.tags = Array.from(new Set([...(s.tags || []), ...g.tagsAdd]));
-          s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...g.reasonsAdd]));
-          setups.push(s);
-        }
+        tryAccept(s);
+
 
       }
     }
@@ -979,12 +1018,7 @@ export function buildSetups(args: {
           tags: ["intraday", "failed_sweep", "continuation", "bos", "retest"],
         };
 
-        const g = applyQualityGates({ setup: s, f, px, atrp });
-        if (g.ok) {
-          s.tags = Array.from(new Set([...(s.tags || []), ...g.tagsAdd]));
-          s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...g.reasonsAdd]));
-          setups.push(s);
-        }
+        tryAccept(s);
 
       }
     }
@@ -1066,12 +1100,8 @@ export function buildSetups(args: {
         tags: ["intraday", "range", nearSupport ? "support" : "resistance"],
       };
 
-      const g = applyQualityGates({ setup: s, f, px, atrp });
-      if (g.ok) {
-        s.tags = Array.from(new Set([...(s.tags || []), ...g.tagsAdd]));
-        s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...g.reasonsAdd]));
-        setups.push(s);
-      }
+      tryAccept(s);
+
 
     }
   }
@@ -1081,7 +1111,7 @@ export function buildSetups(args: {
   const primary = pickPrimarySetup(setups);
 
   if (!primary) {
-    return { ts, dq_ok: true, preferred_id: undefined, setups: [] };
+    return { ts, dq_ok: true, preferred_id: undefined, setups: [], telemetry };
   }
 
   return {
@@ -1089,6 +1119,8 @@ export function buildSetups(args: {
     dq_ok: true,
     preferred_id: primary.id,
     setups: [primary],
+    telemetry,
   };
+
 
 }

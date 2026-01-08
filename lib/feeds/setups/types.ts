@@ -62,12 +62,29 @@ export type TradeSetup = {
   tags: string[];
 };
 
+export type SetupEngineTelemetry = {
+  // Global gates (engine-level)
+  gate?: "OK" | "DQ_NOT_OK" | "NO_PRICE";
+
+  // Candidate accounting (quality gates)
+  candidates: number;
+  accepted: number;
+  rejected: number;
+
+  // Reject breakdown
+  rejectByCode: Record<string, number>;
+  rejectNotesSample: string[]; // small sample for UI/debug (bounded)
+};
+
 export type SetupEngineOutput = {
   ts: number;
   dq_ok: boolean;
   preferred_id?: string;
   setups: TradeSetup[];
+
+  telemetry?: SetupEngineTelemetry;
 };
+
 // Execution / Operator readiness (derived, not engine state)
 export type ExecutionState =
   | "BLOCKED"        // dq / feed / stale / paused
