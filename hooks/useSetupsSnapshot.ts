@@ -439,34 +439,89 @@ function deriveExecutionDecision(
   const status = setup?.status;
   const mode = setup?.entry?.mode;
 
-  // --- Global execution gates ---
-  if (!ctx.dqOk || !ctx.bybitOk || ctx.paused || (ctx.staleSec != null && ctx.staleSec > 5)) {
+  // ---------- Helper: parse timeframe to minutes ----------
+  const tfToMinutes = (tf: unknown): number | undefined => {
+    const s = String(tf ?? "").trim().toLowerCase();
+    const m = s.match(/^(\d+)(m|h|d)$/);
+    if (!m) return undefined;
+    const n = Number(m[1]);
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    const unit = m[2];
+    if (unit === "m") return n;
+    if (unit === "h") return n * 60;
+    if (unit === "d") return n * 60 * 24;
+    return undefined;
+  };
+
+  // ---------- Helper: dynamic stale threshold (intraday stricter) ----------
+  const inferStaleLimitSec = (): number => {
+    const entryTfMin = tfToMinutes(setup?.entry_tf);
+    // Default conservative
+    if (entryTfMin == null) return 5;
+
+    // Intraday entry TF => stricter stale gate
+    if (entryTfMin <= 5) return 2;   // 1m/3m/5m
+    if (entryTfMin <= 15) return 3;  // 10m/15m
+    if (entryTfMin <= 60) return 5;  // 30m/1h
+    return 8;                        // 4h+ (swing context)
+  };
+
+  // ---------- Quality gate: grade C/D are monitor-only ----------
+  // Requirement from you: grade C must never allow canEnterMarket.
+  // We also treat grade D as monitor-only to prevent low-confidence execution.
+  const grade = String(setup?.confidence?.grade ?? "").toUpperCase();
+  if (grade === "C" || grade === "D") {
+    return {
+      state: "NO_TRADE",
+      canEnterMarket: false,
+      canPlaceLimit: false,
+      blockers: ["CONFIDENCE_MONITOR_ONLY"],
+      reason: `Confidence ${grade}: monitor only`,
+    };
+  }
+
+  // ---------- Global execution gates (machine-readable blockers) ----------
+  const gateBlockers: string[] = [];
+  if (!ctx.dqOk) gateBlockers.push("DQ_NOT_OK");
+  if (!ctx.bybitOk) gateBlockers.push("BYBIT_FEED_NOT_OK");
+  if (ctx.paused) gateBlockers.push("PAUSED");
+
+  const staleLimitSec = inferStaleLimitSec();
+  if (ctx.staleSec != null && ctx.staleSec > staleLimitSec) gateBlockers.push("STALE_PRICE_FEED");
+
+  if (gateBlockers.length > 0) {
+    const parts: string[] = [];
+    if (!ctx.dqOk) parts.push("DQ not OK");
+    if (!ctx.bybitOk) parts.push("Bybit feed not OK");
+    if (ctx.paused) parts.push("Paused");
+    if (ctx.staleSec != null && ctx.staleSec > staleLimitSec) parts.push(`Stale (${ctx.staleSec.toFixed(1)}s > ${staleLimitSec}s)`);
+
     return {
       state: "BLOCKED",
       canEnterMarket: false,
       canPlaceLimit: false,
-      blockers: [],
-      reason: "Execution gated (DQ / feed / stale / paused)",
+      blockers: gateBlockers,
+      reason: parts.length ? `Execution gated: ${parts.join(" • ")}` : "Execution gated",
     };
   }
 
-  // --- Dead setups ---
+  // ---------- Dead setups ----------
   if (status === "INVALIDATED" || status === "EXPIRED") {
     return {
       state: "NO_TRADE",
       canEnterMarket: false,
       canPlaceLimit: false,
-      blockers: [],
+      blockers: ["SETUP_DEAD"],
       reason: "Setup no longer valid",
     };
   }
 
-  // --- Collect checklist blockers ---
+  // ---------- Collect checklist blockers ----------
   for (const item of checklist) {
     if (item?.ok === false) blockers.push(item.key);
   }
 
-  // --- FORMING ---
+  // ---------- FORMING ----------
   if (status === "FORMING") {
     return {
       state: blockers.includes("retest") ? "WAIT_RETEST" : "NO_TRADE",
@@ -477,7 +532,7 @@ function deriveExecutionDecision(
     };
   }
 
-  // --- READY ---
+  // ---------- READY ----------
   if (status === "READY") {
     if (blockers.includes("close_confirm")) {
       return {
@@ -491,7 +546,13 @@ function deriveExecutionDecision(
 
     if (mode === "LIMIT") {
       const z = setup?.entry?.zone;
-      const inZone = z && ctx.mid >= z.lo && ctx.mid <= z.hi;
+      const inZone =
+        z &&
+        Number.isFinite(Number(z.lo)) &&
+        Number.isFinite(Number(z.hi)) &&
+        Number.isFinite(Number(ctx.mid)) &&
+        ctx.mid >= Number(z.lo) &&
+        ctx.mid <= Number(z.hi);
 
       if (!inZone) {
         return {
@@ -522,7 +583,7 @@ function deriveExecutionDecision(
     };
   }
 
-  // --- TRIGGERED ---
+  // ---------- TRIGGERED ----------
   if (status === "TRIGGERED") {
     if (mode === "LIMIT") {
       return {
@@ -543,7 +604,7 @@ function deriveExecutionDecision(
     };
   }
 
-  // --- Fallback ---
+  // ---------- Fallback ----------
   return {
     state: "NO_TRADE",
     canEnterMarket: false,
@@ -552,6 +613,7 @@ function deriveExecutionDecision(
     reason: "No execution action",
   };
 }
+
 
 /**
  * Snapshot builder (client-side):
@@ -600,9 +662,9 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
     const enriched = Array.isArray(scored?.setups)
       ? scored.setups.map((s: any) => ({
-          ...s,
-          execution: deriveExecutionDecision(s, ctx),
-        }))
+        ...s,
+        execution: deriveExecutionDecision(s, ctx),
+      }))
       : scored?.setups;
 
     return {

@@ -92,6 +92,8 @@ function bpsDistanceToLevel(mid: number, level?: number) {
 
 /**
  * Task 5.2 — Priority Score
+ * - IMPORTANT: This function sorts setups for display.
+ * - We keep preferred_id for backward compatibility, but UI should ignore it.
  */
 function applyPriorityScore(out: any, snap: any, features: any): any {
   if (!out || !Array.isArray(out.setups)) return out;
@@ -112,7 +114,7 @@ function applyPriorityScore(out: any, snap: any, features: any): any {
     let distBps = 9999;
     if (Number.isFinite(mid)) {
       if (s.type === "BREAKOUT") {
-        // Task 3.4b: if breakout has an explicit retest zone, use it
+        // If breakout has explicit retest zone, use it; else fallback to break level parsed from checklist.
         const z = s?.entry?.zone;
         if (z && typeof z.lo === "number" && typeof z.hi === "number") {
           distBps = bpsDistanceToZone(mid, z);
@@ -169,11 +171,12 @@ function applyPriorityScore(out: any, snap: any, features: any): any {
     return cb - ca;
   });
 
-  const preferred = sorted.find((s: any) => s?.status === "READY")?.id ?? sorted[0]?.id;
+  // Keep a value for compatibility, but DO NOT use it to auto-select in UI.
+  const preferredCompat = sorted.find((s: any) => s?.status === "READY")?.id ?? sorted[0]?.id;
 
   return {
     ...out,
-    preferred_id: preferred,
+    preferred_id: preferredCompat,
     setups: sorted,
   };
 }
@@ -200,7 +203,7 @@ function applyPreTrigger(out: any, snap: any): any {
       const z = s?.entry?.zone;
       const brk = parseBreakLevelFromChecklist(s);
 
-      // Task 3.4b: if we have a retest zone, use in-zone as “retest ok”
+      // If we have a retest zone, use in-zone as “retest ok”
       if (z && typeof z.lo === "number" && typeof z.hi === "number") {
         const inZone = mid >= z.lo && mid <= z.hi;
 
@@ -309,7 +312,7 @@ function applyCloseConfirm(out: any, snap: any): any {
 
       const strength = candleCloseStrengthPct(last, s.side);
 
-      // Task 3.4b: if breakout has a retest zone, require “touch retest + close beyond level”
+      // If breakout has a retest zone, require “touch retest + close beyond level”
       const z = s?.entry?.zone;
       if (z && typeof z.lo === "number" && typeof z.hi === "number") {
         const buffer = brk * 0.0008; // 8 bps buffer after reclaim/break
@@ -553,8 +556,8 @@ function deriveExecutionDecision(
 /**
  * Snapshot builder (client-side):
  * - buildSetups() returns canonical setup lifecycle status (FORMING/READY/TRIGGERED/...)
- * - this hook enriches each setup with an **execution decision** that is explicitly
- *   separate from setup.status, so UI can communicate "ready" vs "enter now / place limit / wait".
+ * - this hook enriches each setup with an execution decision separate from setup.status
+ * - IMPORTANT: This hook does NOT auto-select. UI must handle user selection.
  */
 export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   const { snap, features } = useFeaturesSnapshot(symbol);
@@ -571,26 +574,21 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     // Attach execution decision per setup (UI-facing)
     const mid = Number.isFinite(Number(snap?.price?.mid))
       ? Number(snap.price.mid)
-      : (Number.isFinite(Number(snap?.price?.bid)) && Number.isFinite(Number(snap?.price?.ask)))
+      : Number.isFinite(Number(snap?.price?.bid)) && Number.isFinite(Number(snap?.price?.ask))
         ? (Number(snap.price.bid) + Number(snap.price.ask)) / 2
         : NaN;
 
-    const dqOk = Boolean(
-      scored?.dq_ok ?? (features?.quality?.dq_grade === "A" || features?.quality?.dq_grade === "B")
-    );
+    const dqOk = Boolean(scored?.dq_ok ?? (features?.quality?.dq_grade === "A" || features?.quality?.dq_grade === "B"));
     const bybitOk = Boolean(features?.quality?.bybit_ok);
-    // --- staleness: based on price feed timestamp or activity clock ---
-    let staleSec: number | undefined = undefined;
 
+    // staleness based on price feed timestamp
+    let staleSec: number | undefined = undefined;
     const priceTs = Number(snap?.price?.ts);
     if (Number.isFinite(priceTs)) {
       staleSec = (Date.now() - priceTs) / 1000;
     } else {
-      // fallback: activity clock (price changes)
-      // NOTE: do NOT invent timestamps
       staleSec = undefined;
     }
-
 
     const ctx = {
       mid,
@@ -602,9 +600,9 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
     const enriched = Array.isArray(scored?.setups)
       ? scored.setups.map((s: any) => ({
-        ...s,
-        execution: deriveExecutionDecision(s, ctx),
-      }))
+          ...s,
+          execution: deriveExecutionDecision(s, ctx),
+        }))
       : scored?.setups;
 
     return {
