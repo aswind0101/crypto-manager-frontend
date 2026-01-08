@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
 import type { ExecutionDecision } from "../lib/feeds/setups/types";
@@ -13,6 +13,134 @@ type Candle = {
   v: number;
   confirm: boolean;
 };
+type SetupStatus = "FORMING" | "READY" | "TRIGGERED" | "INVALIDATED" | "EXPIRED";
+
+/**
+ * Status timeframe policy:
+ * - If bias_tf is 4h => swing status_tf = 4h
+ * - Else => intraday status_tf = 1h
+ *
+ * This matches your chosen rule:
+ * - intraday status_tf = 1h
+ * - swing status_tf = 4h
+ */
+function inferStatusTf(setup: any): "1h" | "4h" {
+  const biasTf = String(setup?.bias_tf ?? "").toLowerCase().trim();
+  if (biasTf === "4h") return "4h";
+  return "1h";
+}
+
+function computeMidFromSnap(snap: any): number {
+  const m = Number(snap?.price?.mid);
+  if (Number.isFinite(m)) return m;
+  const bid = Number(snap?.price?.bid);
+  const ask = Number(snap?.price?.ask);
+  if (Number.isFinite(bid) && Number.isFinite(ask)) return (bid + ask) / 2;
+  return NaN;
+}
+
+/**
+ * Hard invalidation (intrabar):
+ * - LONG: mid <= stop => INVALIDATED
+ * - SHORT: mid >= stop => INVALIDATED
+ */
+function applyHardInvalidationIntrabar(out: any, snap: any): any {
+  if (!out || !Array.isArray(out.setups) || !snap) return out;
+
+  const mid = computeMidFromSnap(snap);
+  if (!Number.isFinite(mid)) return out;
+
+  const updated = out.setups.map((s: any) => {
+    if (!s) return s;
+
+    const status = String(s?.status ?? "") as SetupStatus | string;
+    if (status === "INVALIDATED" || status === "EXPIRED") return s;
+
+    const stopPx = s?.stop?.price;
+    if (typeof stopPx !== "number" || !Number.isFinite(stopPx)) return s;
+
+    if (s.side === "LONG" && mid <= stopPx) return { ...s, status: "INVALIDATED" };
+    if (s.side === "SHORT" && mid >= stopPx) return { ...s, status: "INVALIDATED" };
+
+    return s;
+  });
+
+  return { ...out, setups: updated };
+}
+
+/**
+ * Stabilize status changes (FORMING <-> READY) so they only change
+ * when a new CONFIRMED candle of status_tf arrives.
+ *
+ * Notes:
+ * - TRIGGERED is allowed to change based on applyCloseConfirm() (trigger_tf close-confirm).
+ * - INVALIDATED/EXPIRED always apply immediately (invalidated also intrabar via applyHardInvalidationIntrabar).
+ */
+function stabilizeStatusByConfirmedBar(
+  out: any,
+  snap: any,
+  cache: Map<string, { status: SetupStatus; barTs: number }>,
+): any {
+  if (!out || !Array.isArray(out.setups) || !snap) return out;
+
+  const last1h = lastConfirmedCandle(getTimeframeCandles(snap, "1h"));
+  const last4h = lastConfirmedCandle(getTimeframeCandles(snap, "4h"));
+
+  const barTsByTf: Record<"1h" | "4h", number> = {
+    "1h": Number.isFinite(last1h?.ts as number) ? (last1h!.ts as number) : 0,
+    "4h": Number.isFinite(last4h?.ts as number) ? (last4h!.ts as number) : 0,
+  };
+
+  const updated = out.setups.map((s: any) => {
+    if (!s) return s;
+
+    const key = String(s?.canon ?? s?.id ?? "");
+    if (!key) return s;
+
+    const statusTf = inferStatusTf(s);
+    const barTs = barTsByTf[statusTf];
+
+    const incoming = String(s?.status ?? "") as SetupStatus | string;
+
+    // Always keep hard terminal statuses
+    if (incoming === "INVALIDATED" || incoming === "EXPIRED") {
+      cache.set(key, { status: incoming as SetupStatus, barTs });
+      return { ...s, status_tf: statusTf };
+    }
+
+    // Allow TRIGGERED to update immediately (it is a trigger layer outcome)
+    if (incoming === "TRIGGERED") {
+      cache.set(key, { status: "TRIGGERED", barTs });
+      return { ...s, status_tf: statusTf };
+    }
+
+    // Only stabilize FORMING/READY transitions
+    if (incoming !== "FORMING" && incoming !== "READY") {
+      // unknown status -> pass through, but still tag status_tf
+      return { ...s, status_tf: statusTf };
+    }
+
+    const prev = cache.get(key);
+
+    // First time seeing this setup => accept
+    if (!prev) {
+      cache.set(key, { status: incoming as SetupStatus, barTs });
+      return { ...s, status_tf: statusTf };
+    }
+
+    // If status_tf bar hasn't advanced, freeze FORMING/READY to previous value
+    if (prev.barTs === barTs) {
+      cache.set(key, { status: prev.status, barTs }); // refresh
+      return { ...s, status: prev.status, status_tf: statusTf };
+    }
+
+    // New confirmed bar => accept new status
+    cache.set(key, { status: incoming as SetupStatus, barTs });
+    return { ...s, status_tf: statusTf };
+  });
+
+  return { ...out, setups: updated };
+}
 
 function getTimeframeCandles(snap: any, tf: string): Candle[] {
   const node = snap?.timeframes?.find((x: any) => String(x?.tf) === tf);
@@ -637,21 +765,36 @@ function deriveExecutionGlobal(ctx: { dqOk: boolean; bybitOk: boolean; staleSec?
 export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   const { snap, features } = useFeaturesSnapshot(symbol);
 
+  // Persisted per-hook instance cache to stabilize FORMING/READY status
+  const statusCacheRef = useRef<Map<string, { status: SetupStatus; barTs: number }>>(new Map());
+  const prevSymbolRef = useRef<string>(symbol);
+
   const setups = useMemo(() => {
     if (!snap || !features) return null;
 
+    // Reset cache when symbol changes (so we don't carry status across symbols)
+    if (prevSymbolRef.current !== symbol) {
+      prevSymbolRef.current = symbol;
+      statusCacheRef.current.clear();
+    }
+
     const base = buildSetups({ snap, features });
 
-    const withPre = applyPreTrigger(base, snap);
+    // Hard invalidation is intrabar (by mid)
+    const withHardInvalid = applyHardInvalidationIntrabar(base, snap);
+
+    const withPre = applyPreTrigger(withHardInvalid, snap);
+
+    // Trigger confirmation still uses trigger_tf close-confirm (5m/15m)
     const withConfirm = applyCloseConfirm(withPre, snap);
-    const scored = applyPriorityScore(withConfirm, snap, features);
+
+    // Stabilize FORMING/READY by status_tf confirmed bar (1h for intraday, 4h for swing)
+    const stabilized = stabilizeStatusByConfirmedBar(withConfirm, snap, statusCacheRef.current);
+
+    const scored = applyPriorityScore(stabilized, snap, features);
 
     // Attach execution decision per setup (UI-facing)
-    const mid = Number.isFinite(Number(snap?.price?.mid))
-      ? Number(snap.price.mid)
-      : Number.isFinite(Number(snap?.price?.bid)) && Number.isFinite(Number(snap?.price?.ask))
-        ? (Number(snap.price.bid) + Number(snap.price.ask)) / 2
-        : NaN;
+    const mid = computeMidFromSnap(snap);
 
     const dqOk = Boolean(scored?.dq_ok ?? (features?.quality?.dq_grade === "A" || features?.quality?.dq_grade === "B"));
     const bybitOk = Boolean(features?.quality?.bybit_ok);
@@ -675,71 +818,17 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
     const enriched = Array.isArray(scored?.setups)
       ? scored.setups.map((s: any) => ({
-        ...s,
-        execution: deriveExecutionDecision(s, ctx),
-      }))
+          ...s,
+          execution: deriveExecutionDecision(s, ctx),
+        }))
       : scored?.setups;
-
-    const executionGlobal = deriveExecutionGlobal(ctx);
-
-    const published = Array.isArray(enriched) ? enriched.length : 0;
-
-    // Feed telemetry: prefer engine-provided telemetry if present; otherwise expose what we can from the client snapshot.
-    //
-    // Engine telemetry (from engine.ts) shape (preferred):
-    //   telemetry: { candidates, accepted, rejected, rejectByCode, ... }
-    //
-    // Backward-compat (older shapes):
-    //   telemetry/diagnostics: { candidatesEvaluated, rejectionByCode, ... }
-    const tAny = (scored as any)?.telemetry ?? null;
-    const dAny = (scored as any)?.diagnostics ?? null;
-
-    // Preferred: engine.ts telemetry
-    const candidatesEvaluated =
-      typeof tAny?.candidates === "number"
-        ? tAny.candidates
-        : typeof dAny?.candidates === "number"
-          ? dAny.candidates
-          : typeof tAny?.candidatesEvaluated === "number"
-            ? tAny.candidatesEvaluated
-            : typeof dAny?.candidatesEvaluated === "number"
-              ? dAny.candidatesEvaluated
-              : null;
-
-    const rejectionByCode =
-      (tAny?.rejectByCode && typeof tAny.rejectByCode === "object" ? (tAny.rejectByCode as Record<string, number>) : null) ??
-      (dAny?.rejectByCode && typeof dAny.rejectByCode === "object" ? (dAny.rejectByCode as Record<string, number>) : null) ??
-      (tAny?.rejectionByCode && typeof tAny.rejectionByCode === "object" ? (tAny.rejectionByCode as Record<string, number>) : null) ??
-      (dAny?.rejectionByCode && typeof dAny.rejectionByCode === "object" ? (dAny.rejectionByCode as Record<string, number>) : null) ??
-      null;
-
-    // Prefer engine-provided rejected count if present; otherwise derive from candidates - published
-    const rejected =
-      typeof tAny?.rejected === "number"
-        ? tAny.rejected
-        : typeof dAny?.rejected === "number"
-          ? dAny.rejected
-          : typeof candidatesEvaluated === "number" && Number.isFinite(candidatesEvaluated)
-            ? Math.max(0, candidatesEvaluated - published)
-            : null;
-
-    const lastEvaluationTs = Number.isFinite(Number(snap?.price?.ts)) ? Number(snap.price.ts) : Date.now();
-
 
     return {
       ...scored,
       setups: enriched,
-      executionGlobal,
-      feedStatus: {
-        evaluated: true,
-        candidatesEvaluated,
-        published,
-        rejected,
-        rejectionByCode,
-        lastEvaluationTs,
-      },
     };
-  }, [snap, features, paused]);
+  }, [snap, features, paused, symbol]);
 
-  return { snap, features, setups, feedStatus: setups?.feedStatus ?? null, executionGlobal: setups?.executionGlobal ?? null };
+  return { snap, features, setups };
 }
+
