@@ -424,19 +424,25 @@ function Pill({
   tone,
   icon,
   title,
+  className,
+  fullWidth,
 }: {
   children: React.ReactNode;
   tone?: string;
   icon?: React.ReactNode;
   title?: string;
+  className?: string;
+  fullWidth?: boolean;
 }) {
   return (
     <span
       title={title}
       className={[
-        "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold",
+        "flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
         "ring-1 ring-white/10 bg-white/5 text-zinc-100",
+        fullWidth ? "w-full justify-center" : "inline-flex",
         tone || "",
+        className || "",
       ].join(" ")}
     >
       {icon ? <span className="opacity-90">{icon}</span> : null}
@@ -444,6 +450,7 @@ function Pill({
     </span>
   );
 }
+
 
 function Card({
   title,
@@ -1155,39 +1162,31 @@ export default function Page() {
                               </div>
 
                               <div className="flex shrink-0 flex-col items-end justify-center gap-2">
-                                <div className="flex flex-col items-end gap-2">
-                                  <div className="h-7 flex items-center">
-                                    <Pill tone={statusTone(s.status)}>{s.status}</Pill>
-                                  </div>
+                                <div className="grid justify-items-end gap-2">
+                                  <Pill tone={statusTone(s.status)} fullWidth>
+                                    {s.status}
+                                  </Pill>
 
-                                  <div className="h-7 flex items-center">
-                                    <Pill tone={chip.tone} icon={chip.icon}>
-                                      {chip.label}
-                                    </Pill>
-                                  </div>
+                                  <Pill tone={chip.tone} icon={chip.icon} fullWidth>
+                                    {chip.label}
+                                  </Pill>
                                 </div>
-
                                 <button
                                   type="button"
                                   onClick={() => toggleExpanded(accordionKey)}
                                   className="
-      inline-flex h-7 items-center gap-1.5
-      rounded-full
-      border border-white/10
-      bg-white/5
-      px-3
-      text-[11px] font-medium
-      text-zinc-300
-      transition
-      hover:bg-white/10 hover:text-white
-      active:scale-95
-      focus-visible:outline-none
-      focus-visible:ring-2 focus-visible:ring-white/20
-    "
+                                    inline-flex items-center gap-1
+                                    text-[11px] font-medium
+                                    text-zinc-400
+                                    transition
+                                    hover:text-zinc-200
+                                    focus-visible:outline-none
+                                  "
                                 >
-                                  <span className="opacity-80">{isOpen ? "Hide" : "Details"}</span>
+                                  <span>{isOpen ? "Hide" : "Details"}</span>
                                   <svg
-                                    className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                                    className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""
+                                      }`}
                                     viewBox="0 0 20 20"
                                     fill="currentColor"
                                   >
@@ -1198,6 +1197,7 @@ export default function Page() {
                                     />
                                   </svg>
                                 </button>
+
                               </div>
 
                             </div>
