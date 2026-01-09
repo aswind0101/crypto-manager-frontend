@@ -763,6 +763,62 @@ function deriveExecutionGlobal(ctx: { dqOk: boolean; bybitOk: boolean; staleSec?
  * - this hook enriches each setup with an execution decision separate from setup.status
  * - IMPORTANT: This hook does NOT auto-select. UI must handle user selection.
  */
+// --- Engine input keying (frontend-only performance + timeliness) ---
+function lastCandleTsOfTf(snap: any, tf: string): number {
+  const node = snap?.timeframes?.find((x: any) => String(x?.tf) === tf);
+  const arr = node?.candles?.ohlcv;
+  if (!Array.isArray(arr) || arr.length === 0) return 0;
+  const last = arr[arr.length - 1];
+  const ts = Number(last?.ts);
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function featureKeySubset(features: any): string {
+  // Conservative subset: include all fields that engine gates/uses heavily (best-effort, no guessing).
+  // If your FeaturesSnapshot later exposes a stable revision (e.g., features.ts), you can switch to that.
+  const q = features?.quality;
+  const bias = features?.bias;
+  const cross = features?.cross;
+  const ms = features?.market_structure;
+
+  const msKey = (() => {
+    // include latest event timestamps for common tfs if present
+    const tfs = ["4h", "1h", "15m", "5m"];
+    const parts: string[] = [];
+    for (const tf of tfs) {
+      const node = (ms as any)?.[tf];
+      const bosTs = Number(node?.lastBOS?.ts);
+      const chochTs = Number(node?.lastCHOCH?.ts);
+      const shTs = Number(node?.lastSwingHigh?.ts);
+      const slTs = Number(node?.lastSwingLow?.ts);
+      parts.push(
+        `${tf}:bos=${Number.isFinite(bosTs) ? bosTs : 0},choch=${Number.isFinite(chochTs) ? chochTs : 0},sh=${Number.isFinite(shTs) ? shTs : 0},sl=${Number.isFinite(slTs) ? slTs : 0}`
+      );
+    }
+    return parts.join("|");
+  })();
+
+  return [
+    `dq=${String(q?.dq_grade ?? "")}`,
+    `bybit_ok=${String(q?.bybit_ok ?? "")}`,
+    `binance_ok=${String(q?.binance_ok ?? "")}`,
+    `bias_dir=${String(bias?.trend_dir ?? "")}`,
+    `bias_strength=${String(bias?.trend_strength ?? "")}`,
+    `vol_regime=${String(bias?.vol_regime ?? "")}`,
+    `cross_consensus=${String(cross?.consensus_score ?? "")}`,
+    `ms=${msKey}`,
+  ].join("|");
+}
+
+function engineInputKey(snap: any, features: any): string {
+  // Engine currently derives px from 15m/1h close (see engine.ts), so these are must-include.
+  const c15 = lastCandleTsOfTf(snap, "15m");
+  const c1h = lastCandleTsOfTf(snap, "1h");
+  const c4h = lastCandleTsOfTf(snap, "4h");
+  const c5m = lastCandleTsOfTf(snap, "5m"); // affects your close-confirm layer
+  const fKey = featureKeySubset(features);
+  return `c15=${c15}|c1h=${c1h}|c4h=${c4h}|c5m=${c5m}|f=${fKey}`;
+}
 
 export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   const { snap, features } = useFeaturesSnapshot(symbol);
@@ -775,6 +831,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     setup: any;
     ts: number;
   } | null>(null);
+  const engineCacheRef = useRef<{ key: string; base: any } | null>(null);
 
   const setups = useMemo(() => {
     if (!snap || !features) return null;

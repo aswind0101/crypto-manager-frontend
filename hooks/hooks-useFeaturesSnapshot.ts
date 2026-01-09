@@ -90,7 +90,7 @@ export function useFeaturesSnapshot(symbol: string) {
 
     const obKey = input.orderbook?.bids?.[0]?.[0] ?? 0; // top bid price proxy
 
-    const key = `${k5}|${k15}|${k1h}|${k4h}|${bk5}|${bk15}|${obKey}|${input.ts}`;
+    const key = `${k5}|${k15}|${k1h}|${k4h}|${bk5}|${bk15}|${obKey}`;
 
     if (key !== lastKeyRef.current) {
       lastKeyRef.current = key;
