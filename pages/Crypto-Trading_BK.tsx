@@ -25,6 +25,7 @@ import {
   TrendingDown,
   TrendingUp,
   Waves,
+  Sparkles,
 } from "lucide-react";
 
 /**
@@ -99,12 +100,30 @@ type TradeSetup = {
   execution?: ExecutionDecision;
 };
 
+type ExecutionGlobal = {
+  state: "ENABLED" | "BLOCKED";
+  reasons: string[];
+};
+
+type FeedStatus = {
+  evaluated: boolean;
+  candidatesEvaluated: number | null;
+  published: number;
+  rejected: number | null;
+  rejectionByCode: Record<string, number> | null;
+  lastEvaluationTs: number;
+};
+
 type SetupsOutput = {
   ts: number;
   dq_ok: boolean;
   preferred_id?: string;
   setups: Array<TradeSetup>;
+  // optional telemetry (may be injected by useSetupsSnapshot)
+  executionGlobal?: ExecutionGlobal | null;
+  feedStatus?: FeedStatus | null;
 };
+
 
 /** ---------- Formatting helpers ---------- */
 function clamp01(x: number) {
@@ -138,41 +157,98 @@ function fmtScore100(x?: number) {
   return `${Math.round(Math.max(0, Math.min(100, x as number)))}%`;
 }
 
-function relTime(ts?: number) {
-  if (!Number.isFinite(ts as number)) return "—";
-  const t = ts as number;
-  if (t <= 0) return "—";
+/** ---------- Snapshot telemetry helpers (UI contract) ---------- */
+type FeedUiState = "LOADING" | "NO_SIGNAL" | "QUALITY_GATED" | "EMPTY_UNKNOWN" | "HAS_SETUPS";
 
-  const now = Date.now();
-  const diffSec = (t - now) / 1000;
-  const abs = Math.abs(diffSec);
-
-  if (abs < 2) return "just now";
-
-  const fmt = (n: number, u: string) => `${n}${u}`;
-  if (abs < 60) {
-    const v = Math.round(abs);
-    return diffSec > 0 ? `in ${fmt(v, "s")}` : `${fmt(v, "s")} ago`;
-  }
-  const m = abs / 60;
-  if (m < 60) {
-    const v = Math.round(m);
-    return diffSec > 0 ? `in ${fmt(v, "m")}` : `${fmt(v, "m")} ago`;
-  }
-  const h = m / 60;
-  if (h < 24) {
-    const v = Math.round(h);
-    return diffSec > 0 ? `in ${fmt(v, "h")}` : `${fmt(v, "h")} ago`;
-  }
-  const d = h / 24;
-  const v = Math.round(d);
-  return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
+function normalizeExecutionGlobal(x: any): ExecutionGlobal | null {
+  if (!x) return null;
+  const state = x.state === "BLOCKED" ? "BLOCKED" : x.state === "ENABLED" ? "ENABLED" : null;
+  if (!state) return null;
+  const reasons = Array.isArray(x.reasons) ? x.reasons.map((r: any) => String(r)) : [];
+  return { state, reasons };
 }
 
+function normalizeFeedStatus(x: any): FeedStatus | null {
+  if (!x) return null;
+  const evaluated = x.evaluated === true;
+  const published = Number.isFinite(Number(x.published)) ? Number(x.published) : 0;
+  const candidatesEvaluated =
+    x.candidatesEvaluated == null ? null : Number.isFinite(Number(x.candidatesEvaluated)) ? Number(x.candidatesEvaluated) : null;
+  const rejected = x.rejected == null ? null : Number.isFinite(Number(x.rejected)) ? Number(x.rejected) : null;
+
+  const rb = x.rejectionByCode;
+  const rejectionByCode =
+    rb && typeof rb === "object" && !Array.isArray(rb)
+      ? (Object.fromEntries(Object.entries(rb).map(([k, v]) => [String(k), Number(v)])) as Record<string, number>)
+      : null;
+
+  const lastEvaluationTs = Number.isFinite(Number(x.lastEvaluationTs)) ? Number(x.lastEvaluationTs) : Date.now();
+
+  return { evaluated, candidatesEvaluated, published, rejected, rejectionByCode, lastEvaluationTs };
+}
+
+function deriveFeedUiState(feedStatus: FeedStatus | null, publishedCount: number): FeedUiState {
+  // If we have no telemetry, fall back to a conservative state.
+  if (!feedStatus) return publishedCount > 0 ? "HAS_SETUPS" : "EMPTY_UNKNOWN";
+  if (!feedStatus.evaluated) return "LOADING";
+  if (publishedCount > 0) return "HAS_SETUPS";
+
+  // evaluated=true but published=0
+  const ce = feedStatus.candidatesEvaluated;
+  if (typeof ce === "number" && Number.isFinite(ce) && ce <= 0) return "NO_SIGNAL";
+  if (typeof ce === "number" && Number.isFinite(ce) && ce > 0) return "QUALITY_GATED";
+
+  // evaluated=true but candidates unknown
+  return "EMPTY_UNKNOWN";
+}
+
+function formatExecutionGlobalReason(code: string): string {
+  const c = String(code || "").toUpperCase();
+  if (c === "PAUSED") return "Updates are paused";
+  if (c === "DQ_NOT_OK") return "Data quality gate not OK";
+  if (c === "BYBIT_NOT_OK") return "Bybit feed not OK";
+  if (c === "PRICE_STALE") return "Price feed is stale";
+  return code;
+}
+
+function topRejectionPairs(rejectionByCode: Record<string, number> | null, limit = 6) {
+  if (!rejectionByCode) return [];
+  const pairs = Object.entries(rejectionByCode)
+    .map(([k, v]) => ({ code: k, count: Number(v) }))
+    .filter((x) => Number.isFinite(x.count) && x.count > 0)
+    .sort((a, b) => b.count - a.count);
+  return pairs.slice(0, limit);
+}
+
+function isMonitorOnlyGrade(grade?: string) {
+  return String(grade || "").toUpperCase() === "C";
+}
+
+function isSetupActionableNow(setup: TradeSetup, executionGlobal: ExecutionGlobal | null): boolean {
+  // Hard policy: grade C is always monitor-only
+  if (isMonitorOnlyGrade(setup?.confidence?.grade)) return false;
+  if (executionGlobal?.state === "BLOCKED") return false;
+  const ex = setup.execution;
+  if (!ex) return false;
+
+  // Trust the state machine, not booleans, for "now" actions.
+  return ex.state === "ENTER_MARKET" || ex.state === "PLACE_LIMIT";
+}
+
+
 /** ---------- Domain helpers (best-effort, no guessing) ---------- */
-function decisionSummary(s: TradeSetup): string {
+function decisionSummary(s: TradeSetup, executionGlobal: ExecutionGlobal | null): string {
+  if (isMonitorOnlyGrade(s?.confidence?.grade)) {
+    return "Monitor-only (Grade C policy): no execution actions permitted";
+  }
+
+  if (executionGlobal?.state === "BLOCKED") {
+    const primary = executionGlobal.reasons?.[0] ? formatExecutionGlobalReason(executionGlobal.reasons[0]) : "Execution blocked";
+    return `Execution blocked: ${primary}`;
+  }
+
   const ex = s.execution;
-  if (!ex) return "Monitor setup – no execution signal yet";
+  if (!ex) return "Monitor setup – no execution decision yet";
 
   switch (ex.state) {
     case "ENTER_MARKET":
@@ -180,9 +256,13 @@ function decisionSummary(s: TradeSetup): string {
     case "PLACE_LIMIT":
       return "Action now: place limit order";
     case "WAIT_ZONE":
-      return "Wait: price must enter the zone";
+      return "Wait: price must enter the entry zone";
     case "WAIT_CLOSE":
-      return "Wait: candle close required";
+      return "Wait: candle close confirmation required";
+    case "WAIT_RETEST":
+      return "Wait: retest condition required";
+    case "WAIT_FILL":
+      return "Triggered: waiting for limit fill";
     case "BLOCKED":
       return "No trade: setup is blocked";
     case "NO_TRADE":
@@ -191,6 +271,7 @@ function decisionSummary(s: TradeSetup): string {
       return "Monitor setup";
   }
 }
+
 
 function sideTone(side: SetupSide) {
   return side === "LONG" ? "text-emerald-400" : "text-rose-400";
@@ -223,28 +304,73 @@ function statusTone(status?: string) {
   return "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
 }
 
-function actionChip(s: TradeSetup): { label: string; tone: string; icon: React.ReactNode } {
-  const ex = s.execution;
-  if (!ex) {
-    return { label: "MONITOR", tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30", icon: <CircleDashed className="h-4 w-4" /> };
+function actionChip(
+  s: TradeSetup,
+  executionGlobal: ExecutionGlobal | null
+): { label: string; tone: string; icon: React.ReactNode } {
+  // Hard policy first
+  if (isMonitorOnlyGrade(s?.confidence?.grade)) {
+    return {
+      label: "MONITOR ONLY",
+      tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+      icon: <CircleDashed className="h-4 w-4" />,
+    };
   }
 
+  // Global execution gate
+  if (executionGlobal?.state === "BLOCKED") {
+    return {
+      label: "EXEC BLOCKED",
+      tone: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30",
+      icon: <Lock className="h-4 w-4" />,
+    };
+  }
+
+  const ex = s.execution;
+  if (!ex) {
+    return {
+      label: "MONITOR",
+      tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+      icon: <CircleDashed className="h-4 w-4" />,
+    };
+  }
+
+  // Setup-level blocks
   if (ex.state === "BLOCKED") {
-    return { label: "BLOCKED", tone: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30", icon: <Lock className="h-4 w-4" /> };
+    return {
+      label: "BLOCKED",
+      tone: "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30",
+      icon: <Lock className="h-4 w-4" />,
+    };
   }
-  if (ex.canEnterMarket || ex.state === "ENTER_MARKET") {
-    return { label: "ENTER NOW", tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30", icon: <Crosshair className="h-4 w-4" /> };
+
+  // Trust the state machine (not booleans) for chips
+  if (ex.state === "ENTER_MARKET") {
+    return {
+      label: "ENTER NOW",
+      tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30",
+      icon: <Crosshair className="h-4 w-4" />,
+    };
   }
-  if (ex.canPlaceLimit || ex.state === "PLACE_LIMIT") {
-    return { label: "PLACE LIMIT", tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30", icon: <Target className="h-4 w-4" /> };
+  if (ex.state === "PLACE_LIMIT") {
+    return {
+      label: "PLACE LIMIT",
+      tone: "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30",
+      icon: <Target className="h-4 w-4" />,
+    };
   }
 
   // waiting states
-  return { label: "MONITOR", tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30", icon: <Clock className="h-4 w-4" /> };
+  return {
+    label: "MONITOR",
+    tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+    icon: <Clock className="h-4 w-4" />,
+  };
 }
 
 function stableSetupKey(s: TradeSetup): string {
   if (s?.canon) return String(s.canon);
+  if (s?.id) return String(s.id);
   const type = String(s?.type ?? "");
   const side = String(s?.side ?? "");
   const tf = String(s?.entry_tf ?? "");
@@ -292,26 +418,186 @@ function structureTrendBadge(trend?: string) {
   if (t === "RANGE") return { label: "RANGE", icon: <Waves className="h-4 w-4" />, cls: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" };
   return { label: "UNKNOWN", icon: <Minus className="h-4 w-4" />, cls: "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30" };
 }
+function signalLevelFromStale(staleSec?: number): 0 | 1 | 2 | 3 | 4 {
+  // 0: unknown/no data
+  if (!Number.isFinite(staleSec as number)) return 0;
+  const s = staleSec as number;
+  // Keep thresholds consistent with existing UI gate:
+  // <= 1.5s (fresh), <= 5s (warn), > 5s (stale)
+  if (s <= 1.5) return 4;
+  if (s <= 5) return 3;
+  // make stale visibly worse
+  if (s <= 10) return 2;
+  return 1;
+}
 
+function signalToneFromLevel(level: 0 | 1 | 2 | 3 | 4): string {
+  // Tailwind classes (no inline colors)
+  switch (level) {
+    case 4:
+      return "text-emerald-200";
+    case 3:
+      return "text-amber-200";
+    case 2:
+    case 1:
+      return "text-rose-200";
+    default:
+      return "text-zinc-300";
+  }
+}
+
+function signalRingFromLevel(level: 0 | 1 | 2 | 3 | 4): string {
+  // background/ring consistent with your Pills
+  switch (level) {
+    case 4:
+      return "bg-emerald-500/10 ring-1 ring-emerald-500/30";
+    case 3:
+      return "bg-amber-500/10 ring-1 ring-amber-500/30";
+    case 2:
+    case 1:
+      return "bg-rose-500/10 ring-1 ring-rose-500/30";
+    default:
+      return "bg-zinc-500/10 ring-1 ring-zinc-500/30";
+  }
+}
+
+function RealtimeSignal({
+  staleSec,
+  label = "Realtime",
+  title,
+  showSeconds = false,
+}: {
+  staleSec?: number;
+  label?: string;
+  title?: string;
+  showSeconds?: boolean;
+}) {
+  const level = signalLevelFromStale(staleSec);
+  const tone = signalToneFromLevel(level);
+  const ring = signalRingFromLevel(level);
+
+  // Bars: 4 columns, fill based on level
+  // level=4 => all on; level=3 => first 3; level=2 => first 2; level=1 => first 1; level=0 => none
+  const on = (idx: number) => level >= idx;
+
+  const secText =
+    Number.isFinite(staleSec as number) ? `${(staleSec as number).toFixed(1)}s` : "—";
+
+  const tooltip =
+    title ||
+    (Number.isFinite(staleSec as number)
+      ? `Realtime price freshness • last update ${secText} ago`
+      : "Realtime price freshness • no timestamp");
+
+  return (
+    <span
+      title={tooltip}
+      className={[
+        "inline-flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
+        "ring-1 ring-white/10 bg-white/5 text-zinc-100",
+        ring,
+      ].join(" ")}
+      aria-label={`Realtime feed ${level === 0 ? "unknown" : level >= 3 ? "ok" : "stale"}`}
+    >
+      {/* Signal icon */}
+      <span className={["inline-flex items-center", tone].join(" ")}>
+        <svg
+          width="18"
+          height="14"
+          viewBox="0 0 18 14"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="block"
+          aria-hidden="true"
+        >
+          {/* baseline */}
+          <rect x="1" y="12" width="16" height="1" rx="0.5" fill="currentColor" opacity="0.35" />
+          {/* bars */}
+          <rect x="2" y="8" width="3" height="4" rx="1" fill="currentColor" opacity={on(1) ? 1 : 0.25} />
+          <rect x="6.5" y="6" width="3" height="6" rx="1" fill="currentColor" opacity={on(2) ? 1 : 0.25} />
+          <rect x="11" y="4" width="3" height="8" rx="1" fill="currentColor" opacity={on(3) ? 1 : 0.25} />
+          <rect x="15.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity={on(4) ? 1 : 0.25} />
+        </svg>
+      </span>
+
+      {/* Label */}
+      <span className="whitespace-nowrap">{label}</span>
+
+      {/* Optional seconds (small, secondary) */}
+      {showSeconds ? (
+        <span
+          className={[
+            "ml-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-zinc-100 ring-1 ring-white/10",
+            "tabular-nums text-center",
+            // Reserve space so the pill never changes width (prevents page jitter)
+            "min-w-[46px]",
+          ].join(" ")}
+        >
+          {secText}
+        </span>
+      ) : null}
+
+    </span>
+  );
+}
+function fmtPxWithSep(x?: number) {
+  if (!Number.isFinite(x as number)) return "—";
+  const v = x as number;
+
+  // Giữ logic decimal như fmtPx nhưng thêm thousands separator
+  let digits = 6;
+  if (v >= 10000) digits = 0;
+  else if (v >= 1000) digits = 1;
+  else if (v >= 100) digits = 2;
+  else if (v >= 1) digits = 4;
+
+  return new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  }).format(v);
+}
+
+function MidBadge({ mid }: { mid: number }) {
+  const text = Number.isFinite(mid) ? `$${fmtPxWithSep(mid)}` : "—";
+
+  return (
+    <span
+      className={[
+        "flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
+        "bg-sky-500/15 text-sky-200 ring-1 ring-sky-500/30",
+        "tabular-nums min-w-[110px] justify-center",
+      ].join(" ")}
+      title="Realtime mid price"
+    >
+      {text}
+    </span>
+  );
+}
 /** ---------- Small UI atoms ---------- */
 function Pill({
   children,
   tone,
   icon,
   title,
+  className,
+  fullWidth,
 }: {
   children: React.ReactNode;
   tone?: string;
   icon?: React.ReactNode;
   title?: string;
+  className?: string;
+  fullWidth?: boolean;
 }) {
   return (
     <span
       title={title}
       className={[
-        "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold",
+        "flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
         "ring-1 ring-white/10 bg-white/5 text-zinc-100",
+        fullWidth ? "w-full justify-center" : "inline-flex",
         tone || "",
+        className || "",
       ].join(" ")}
     >
       {icon ? <span className="opacity-90">{icon}</span> : null}
@@ -319,6 +605,7 @@ function Pill({
     </span>
   );
 }
+
 
 function Card({
   title,
@@ -407,6 +694,36 @@ function KV({
 function Divider() {
   return <div className="my-3 h-px w-full bg-white/10" />;
 }
+function relTime(ts?: number) {
+  if (!Number.isFinite(ts as number)) return "—";
+  const t = ts as number;
+  if (t <= 0) return "—";
+
+  const now = Date.now();
+  const diffSec = (t - now) / 1000;
+  const abs = Math.abs(diffSec);
+
+  if (abs < 2) return "just now";
+
+  const fmt = (n: number, u: string) => `${n}${u}`;
+  if (abs < 60) {
+    const v = Math.round(abs);
+    return diffSec > 0 ? `in ${fmt(v, "s")}` : `${fmt(v, "s")} ago`;
+  }
+  const m = abs / 60;
+  if (m < 60) {
+    const v = Math.round(m);
+    return diffSec > 0 ? `in ${fmt(v, "m")}` : `${fmt(v, "m")} ago`;
+  }
+  const h = m / 60;
+  if (h < 24) {
+    const v = Math.round(h);
+    return diffSec > 0 ? `in ${fmt(v, "h")}` : `${fmt(v, "h")} ago`;
+  }
+  const d = h / 24;
+  const v = Math.round(d);
+  return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
+}
 
 /** ---------- Main Page ---------- */
 export default function Page() {
@@ -443,8 +760,24 @@ export default function Page() {
     } catch { }
   }, [paused]);
 
-  const { snap, features, setups } = useSetupsSnapshot(symbol, paused);
+  const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
   const out = (setups as unknown as SetupsOutput | null) ?? null;
+  const executionGlobal = useMemo(() => {
+    // Prefer hook-level fields, fall back to out.* if present.
+    return (
+      normalizeExecutionGlobal(execGlobalRaw) ||
+      normalizeExecutionGlobal(out?.executionGlobal) ||
+      null
+    );
+  }, [execGlobalRaw, out?.executionGlobal]);
+
+  const feedStatus = useMemo(() => {
+    return (
+      normalizeFeedStatus(feedStatusRaw) ||
+      normalizeFeedStatus(out?.feedStatus) ||
+      null
+    );
+  }, [feedStatusRaw, out?.feedStatus]);
 
   // Live derived metrics (best-effort)
   const mid = useMemo(() => {
@@ -482,7 +815,8 @@ export default function Page() {
     });
   }, [out?.setups]);
 
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<number | null>(null);
+
   const [showLevelsMore, setShowLevelsMore] = useState(false);
   const [showDataCompleteness, setShowDataCompleteness] = useState(false);
   const [showKeyLevels, setShowKeyLevels] = useState(false);
@@ -492,49 +826,47 @@ export default function Page() {
   useEffect(() => {
     if (lastSymbolRef.current !== symbol) {
       lastSymbolRef.current = symbol;
-      setSelectedKey(null);
+      setExpandedKey(null);
     }
   }, [symbol]);
 
-  useEffect(() => {
-    if (!selectedKey && ranked.length > 0) setSelectedKey(stableSetupKey(ranked[0]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ranked.length]);
+  const toggleExpanded = (key: number) => {
+    setExpandedKey((prev) => (prev === key ? null : key));
+  };
 
-  const selected = useMemo(() => {
-    if (!selectedKey) return null;
-    return ranked.find((s) => stableSetupKey(s) === selectedKey) || null;
-  }, [ranked, selectedKey]);
 
-  // Banner for READY (non-intrusive)
-  const readyKeys = useMemo(() => {
-    return (out?.setups || []).filter((s) => String(s.status) === "READY").map((s) => stableSetupKey(s));
-  }, [out?.setups]);
+  // Banner for ACTIONABLE (state-machine based, policy-safe)
+  const actionableKeys = useMemo(() => {
+    return (out?.setups || [])
+      .filter((s) => isSetupActionableNow(s, executionGlobal))
+      .map((s) => stableSetupKey(s));
+  }, [out?.setups, executionGlobal]);
 
-  const prevReadyRef = useRef<string[]>([]);
+  const prevActionableRef = useRef<string[]>([]);
   const [banner, setBanner] = useState<{ active: boolean; text: string }>({ active: false, text: "" });
 
   useEffect(() => {
-    const prev = prevReadyRef.current;
-    const now = readyKeys;
-    prevReadyRef.current = now;
+    const prev = prevActionableRef.current;
+    const now = actionableKeys;
+    prevActionableRef.current = now;
 
     const newOnes = now.filter((k) => !prev.includes(k));
+
     if (newOnes.length > 0) {
       const s = ranked.find((x) => stableSetupKey(x) === newOnes[0]);
       const text = s
-        ? `READY: ${symbol} • ${humanizeType(s.type)} • ${s.side} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}`
-        : `READY setup detected`;
+        ? `ACTION: ${symbol} • ${humanizeType(s.type)} • ${s.side} • ${String(s.execution?.state || "")} • RR ${Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"} • Conf ${fmtScore100(s.confidence?.score)}`
+        : "Actionable setup detected";
       setBanner({ active: true, text });
       try {
         if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
       } catch { }
     } else {
       if (now.length === 0 && banner.active) setBanner({ active: false, text: "" });
-      if (now.length > 0 && !banner.active) setBanner({ active: true, text: "READY setup available" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readyKeys.join("|")]);
+  }, [actionableKeys.join("|")]);
+
 
   // Market context
   const biasDir = useMemo(() => {
@@ -594,20 +926,85 @@ export default function Page() {
     return uniq.slice(0, 12);
   }, [features?.market_structure]);
   const keyLevelsView = showLevelsMore ? keyLevels : keyLevels.slice(0, 6);
+  function tfToMs(tf: string): number {
+    const s = String(tf || "").trim().toLowerCase();
+    if (!s) return 0;
+
+    // common aliases
+    if (s === "1d" || s === "d" || s === "1day") return 24 * 60 * 60 * 1000;
+
+    const m = s.match(/^(\d+)\s*([mhd])$/);
+    if (!m) return 0;
+    const n = Number(m[1]);
+    const u = m[2];
+    if (!Number.isFinite(n) || n <= 0) return 0;
+
+    if (u === "m") return n * 60 * 1000;
+    if (u === "h") return n * 60 * 60 * 1000;
+    if (u === "d") return n * 24 * 60 * 60 * 1000;
+    return 0;
+  }
+
+  function lastCandleTs(arr: any[]): number | null {
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    const last = arr[arr.length - 1];
+    const ts = Number(last?.ts);
+    return Number.isFinite(ts) ? ts : null;
+  }
 
   // A compact health summary for each TF from snap (stale/partial/availability)
   const tfHealth = useMemo(() => {
-    const tfs = (snap?.timeframes || []).map((x: any) => ({
-      tf: String(x?.tf || ""),
-      stale_ms: Number(x?.diagnostics?.stale_ms),
-      partial: Boolean(x?.diagnostics?.partial),
-      haveCandlesBybit: Array.isArray(x?.candles?.ohlcv) ? x.candles.ohlcv.length : 0,
-      haveCandlesBinance: Array.isArray(x?.candles_binance?.ohlcv) ? x.candles_binance.ohlcv.length : 0,
-      haveTrades: Array.isArray(x?.orderflow?.trades) ? x.orderflow.trades.length : 0,
-      haveOrderbook: Boolean(x?.orderflow?.orderbook),
-    }));
+    const now = Date.now();
+
+    const tfs = (snap?.timeframes || []).map((x: any) => {
+      const tf = String(x?.tf || "");
+
+      const bybitArr = Array.isArray(x?.candles?.ohlcv) ? x.candles.ohlcv : [];
+      const binanceArr = Array.isArray(x?.candles_binance?.ohlcv) ? x.candles_binance.ohlcv : [];
+
+      const haveCandlesBybit = bybitArr.length;
+      const haveCandlesBinance = binanceArr.length;
+
+      // Prefer bybit last candle; fallback to binance
+      const lastTs =
+        lastCandleTs(bybitArr) ??
+        lastCandleTs(binanceArr);
+
+      const tfMs = tfToMs(tf);
+      const ageMs = lastTs != null ? Math.max(0, now - lastTs) : NaN;
+
+      // staleBars = how many full TF intervals behind "now"
+      const staleBars =
+        Number.isFinite(ageMs) && tfMs > 0 ? Math.floor(ageMs / tfMs) : NaN;
+
+      // If backend provides diagnostics.stale_ms and it's > 0, you can keep it as reference,
+      // but we will prefer computed ageMs for display.
+      const backendStaleMs = Number(x?.diagnostics?.stale_ms);
+
+      const partial =
+        Boolean(x?.diagnostics?.partial) ||
+        (haveCandlesBybit === 0 && haveCandlesBinance === 0);
+
+      return {
+        tf,
+        // computed
+        tfMs,
+        lastTs,
+        ageMs,
+        staleBars,
+        // raw/backend
+        backendStaleMs,
+        partial,
+        haveCandlesBybit,
+        haveCandlesBinance,
+        haveTrades: Array.isArray(x?.orderflow?.trades) ? x.orderflow.trades.length : 0,
+        haveOrderbook: Boolean(x?.orderflow?.orderbook),
+      };
+    });
+
     return tfs.sort((a, b) => a.tf.localeCompare(b.tf));
   }, [snap?.timeframes]);
+
   const [showTfHealthMore, setShowTfHealthMore] = useState(false);
 
   const tfHealthPrimary = useMemo(() => {
@@ -619,15 +1016,8 @@ export default function Page() {
 
   const tfHealthView = showTfHealthMore ? tfHealth : tfHealthPrimary;
 
-  const appBlocked = useMemo(() => {
-    // hard block: DQ not ok, or feeds not ok, or stale too large
-    if (!features) return false;
-    if (!dqOk) return true;
-    if (!bybitOk) return true; // execution venue
-    if (staleSec != null && staleSec > 5) return true;
-    if (paused) return true;
-    return false;
-  }, [features, dqOk, bybitOk, staleSec, paused]);
+  const appBlocked = executionGlobal?.state === "BLOCKED";
+
 
   const onAnalyze = () => {
     const cleaned = String(inputSymbol || "").trim().toUpperCase();
@@ -638,32 +1028,6 @@ export default function Page() {
   const onEnterInput: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === "Enter") onAnalyze();
   };
-
-  const SelectedSetupCard = (
-    <Card
-      title="Selected Setup"
-      icon={<Crosshair className="h-5 w-5" />}
-      right={selected ? <Pill tone={statusTone(selected.status)}>{selected.status}</Pill> : null}
-    >
-      {!selected ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="text-sm font-bold text-zinc-100">No selection</div>
-          <div className="mt-1 text-xs text-zinc-400">Select a setup from the queue.</div>
-        </div>
-      ) : (
-        <SetupDetail
-          symbol={symbol}
-          mid={mid}
-          dqOk={dqOk}
-          bybitOk={bybitOk}
-          staleSec={staleSec}
-          paused={paused}
-          features={features}
-          setup={selected}
-        />
-      )}
-    </Card>
-  );
 
   return (
     <div className="min-h-screen bg-[#070A12] text-zinc-100">
@@ -681,7 +1045,7 @@ export default function Page() {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
-                  <Signal className="h-5 w-5" />
+                  <Sparkles className="h-5 w-5" />
                 </div>
                 <div className="text-base font-extrabold tracking-tight">Crypto Setup Analyzer</div>
               </div>
@@ -747,28 +1111,13 @@ export default function Page() {
             >
               Binance {binanceOk ? "OK" : "NOT OK"}
             </Pill>
-            <Pill
-              tone={
-                staleSec == null
-                  ? "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
-                  : staleSec <= 1.5
-                    ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                    : staleSec <= 5
-                      ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                      : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-              }
-              icon={<Clock className="h-4 w-4" />}
-              title="Staleness based on snap.price.ts"
-            >
-              Stale {staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`}
-            </Pill>
-            <Pill
-              tone="bg-white/5 text-zinc-100 ring-1 ring-white/10"
-              icon={<Gauge className="h-4 w-4" />}
-              title="Realtime mid price derived from orderbook"
-            >
-              Mid {Number.isFinite(mid) ? fmtPx(mid) : "—"}
-            </Pill>
+            <RealtimeSignal
+              staleSec={staleSec}
+              label="Realtime"
+              // Nếu bạn muốn vẫn thấy số giây nhỏ bên cạnh, bật true:
+              showSeconds={true}
+              title="Realtime price feed health (based on snap.price.ts)"
+            />
             <div className="ml-auto text-xs text-zinc-400">Updated {lastUpdated}</div>
           </div>
 
@@ -795,25 +1144,36 @@ export default function Page() {
         </div>
 
         {/* Main layout */}
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
+        <div className="mt-4 grid grid-cols-1 gap-4 min-[1440px]:grid-cols-[380px_1fr]">
           {/* LEFT: queue */}
           <div className="space-y-4">
             <Card
               title="Market Context"
               icon={<LineChart className="h-5 w-5" />}
               right={
-                <Pill
-                  tone={
-                    biasDir === "BULL"
-                      ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                      : biasDir === "BEAR"
-                        ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                        : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                  }
-                  icon={biasDir === "BULL" ? <TrendingUp className="h-4 w-4" /> : biasDir === "BEAR" ? <TrendingDown className="h-4 w-4" /> : <Waves className="h-4 w-4" />}
-                >
-                  {biasDir} • {String(features?.bias?.tf || "—")}
-                </Pill>
+                <div className="flex items-center gap-2">
+                  <MidBadge mid={mid} />
+                  <Pill
+                    tone={
+                      biasDir === "BULL"
+                        ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                        : biasDir === "BEAR"
+                          ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                          : biasDir === "SIDEWAYS"
+                            ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                            : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
+                    }
+                    icon={
+                      biasDir === "BULL"
+                        ? <TrendingUp className="h-4 w-4" />
+                        : biasDir === "BEAR"
+                          ? <TrendingDown className="h-4 w-4" />
+                          : <Waves className="h-4 w-4" />
+                    }
+                  >
+                    {biasDir}
+                  </Pill>
+                </div>
               }
             >
               <div className="space-y-3">
@@ -929,17 +1289,29 @@ export default function Page() {
               </div>
             </div>
             <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
-              {appBlocked ? (
+              {executionGlobal?.state === "BLOCKED" ? (
                 <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
                   <div className="flex items-start gap-3">
                     <div className="rounded-xl bg-rose-500/15 p-2 ring-1 ring-rose-500/25">
                       <ShieldAlert className="h-5 w-5 text-rose-200" />
                     </div>
-                    <div>
-                      <div className="text-sm font-extrabold text-rose-100">Execution gated</div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-extrabold text-rose-100">Execution blocked (system gate)</div>
                       <div className="mt-1 text-xs text-rose-100/90">
-                        DQ / Bybit feed / staleness / paused is blocking actionable execution signals. You can still review context, but do not enter trades until health returns.
+                        The system is running, but execution actions are blocked by policy/health gates. You may still review market context and monitor setups.
                       </div>
+
+                      {Array.isArray(executionGlobal.reasons) && executionGlobal.reasons.length > 0 ? (
+                        <div className="mt-3 space-y-1.5 text-xs">
+                          {executionGlobal.reasons.slice(0, 6).map((r) => (
+                            <div key={r} className="flex items-start gap-2">
+                              <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-rose-200/70" />
+                              <span className="min-w-0">{formatExecutionGlobalReason(r)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                         <Pill tone={dqTone(dq)} icon={<Database className="h-4 w-4" />}>
                           DQ {String(dq || "—")}
@@ -954,89 +1326,217 @@ export default function Page() {
                     </div>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {(() => {
+                    const publishedCount = ranked.length;
+                    const state = deriveFeedUiState(feedStatus, publishedCount);
 
-              <div className="mt-3 space-y-2">
-                {ranked.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="text-sm font-bold text-zinc-100">No setups</div>
-                    <div className="mt-1 text-xs text-zinc-400">Either the market has no valid patterns, or data is still filling.</div>
-                  </div>
-                ) : (
-                  ranked.map((s) => {
-                    const key = stableSetupKey(s);
-                    const sel = selectedKey === key;
+                    if (state === "HAS_SETUPS") {
+                      return ranked.map((s, idx) => {
+                        const keyStr = stableSetupKey(s);
+                        const reactKey = `${keyStr}::${idx}`;
+                        const accordionKey = idx;
+                        const isOpen = expandedKey === accordionKey;
 
-                    const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
-                    const pri01 = clamp01(pri / 100);
+                        const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
+                        const pri01 = clamp01(pri / 100);
 
-                    const chip = actionChip(s);
+                        const chip = actionChip(s, executionGlobal);
 
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setSelectedKey(key)}
-                        className={[
-                          "w-full text-left",
-                          "rounded-2xl border border-white/10 bg-white/5 p-3 ring-1 ring-white/10",
-                          "transition hover:bg-white/7 active:bg-white/10",
-                          sel ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-center gap-3">
-                          {/* LEFT: main info */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <div className="truncate text-sm font-extrabold text-zinc-50">
-                                {humanizeType(String(s.type))}
+                        return (
+                          <div
+                            key={reactKey}
+                            className={[
+                              "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
+                              isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
+                                  <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
+                                  {isMonitorOnlyGrade(s.confidence?.grade) ? (
+                                    <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
+                                      MONITOR-ONLY
+                                    </Pill>
+                                  ) : null}
+                                </div>
+
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                                  <span>Conf {fmtScore100(s.confidence?.score)}</span>
+                                  <span>•</span>
+                                  <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
+                                  <span>•</span>
+                                  <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                                </div>
+
+                                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                                  <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
+                                </div>
                               </div>
-                              <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>
-                                {s.side}
+
+                              <div className="flex shrink-0 flex-col items-end justify-center gap-2">
+                                <div className="grid justify-items-end gap-2">
+                                  <Pill tone={statusTone(s.status)} fullWidth>
+                                    {s.status}
+                                  </Pill>
+
+                                  <Pill tone={chip.tone} icon={chip.icon} fullWidth>
+                                    {chip.label}
+                                  </Pill>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpanded(accordionKey)}
+                                  className="
+                                    inline-flex items-center gap-1
+                                    text-[11px] font-medium
+                                    text-zinc-400
+                                    transition
+                                    hover:text-zinc-200
+                                    focus-visible:outline-none
+                                  "
+                                >
+                                  <span>{isOpen ? "Hide" : "Details"}</span>
+                                  <svg
+                                    className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""
+                                      }`}
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M6.293 4.293a1 1 0 011.414 0L13.414 10l-5.707 5.707a1 1 0 01-1.414-1.414L10.586 10 6.293 5.707a1 1 0 010-1.414z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </button>
+
                               </div>
+
                             </div>
 
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
-                              <span>Conf {fmtScore100(s.confidence?.score)}</span>
-                              <span>•</span>
-                              <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
-                              <span>•</span>
-                              <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
-                            </div>
-
-                            <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                              <div
-                                className="h-full rounded-full bg-sky-500/70"
-                                style={{ width: `${pri01 * 100}%` }}
-                              />
-                            </div>
+                            {isOpen ? (
+                              <div className="mt-3">
+                                <SetupDetail
+                                  symbol={symbol}
+                                  mid={mid}
+                                  dqOk={dqOk}
+                                  bybitOk={bybitOk}
+                                  staleSec={staleSec}
+                                  paused={paused}
+                                  features={features}
+                                  setup={s}
+                                  executionGlobal={executionGlobal}
+                                />
+                              </div>
+                            ) : null}
                           </div>
+                        );
+                      });
+                    }
 
-                          {/* RIGHT: pills */}
-                          <div className="flex shrink-0 flex-col items-end gap-1">
-                            <Pill tone={statusTone(s.status)}>{s.status}</Pill>
-                            <Pill tone={chip.tone} icon={chip.icon}>
-                              {chip.label}
-                            </Pill>
+                    // Empty states (policy-safe)
+                    if (state === "LOADING") {
+                      return (
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                              <RefreshCw className="h-5 w-5 text-zinc-200" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-zinc-100">Loading snapshots and evaluating setups…</div>
+                              <div className="mt-1 text-xs text-zinc-400">This may be normal during warm-up or when switching symbols/timeframes.</div>
+                            </div>
                           </div>
                         </div>
+                      );
+                    }
 
-                      </button>
+                    if (state === "NO_SIGNAL") {
+                      return (
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                              <Minus className="h-5 w-5 text-zinc-200" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-zinc-100">No setups (no-signal market)</div>
+                              <div className="mt-1 text-xs text-zinc-400">
+                                The engine evaluated the current market context and found no candidate patterns worth publishing.
+                              </div>
+                              {feedStatus?.lastEvaluationTs ? (
+                                <div className="mt-2 text-[11px] text-zinc-500">Last evaluation: {relTime(feedStatus.lastEvaluationTs)}</div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (state === "QUALITY_GATED") {
+                      const ce = feedStatus?.candidatesEvaluated;
+                      const rejected = feedStatus?.rejected;
+                      const top = topRejectionPairs(feedStatus?.rejectionByCode || null, 6);
+
+                      return (
+                        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-amber-500/15 p-2 ring-1 ring-amber-500/25">
+                              <ShieldAlert className="h-5 w-5 text-amber-200" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-extrabold text-amber-100">No setups published (quality gated)</div>
+                              <div className="mt-1 text-xs text-amber-100/90">
+                                Candidates were generated but rejected by quality gates (conflict checks, invariants, RR/TP tradeability, or publish constraints).
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Candidates {ce != null ? ce : "—"}</Pill>
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Rejected {rejected != null ? rejected : "—"}</Pill>
+                              </div>
+
+                              {top.length > 0 ? (
+                                <div className="mt-3">
+                                  <div className="text-[11px] font-bold text-amber-100">Top rejection reasons</div>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {top.map((p) => (
+                                      <Pill key={p.code} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                                        {p.code} • {p.count}
+                                      </Pill>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-3 text-[11px] text-amber-100/80">
+                                  Rejection breakdown not available yet (telemetry not provided by the engine). The empty feed is still a valid outcome.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // EMPTY_UNKNOWN
+                    return (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="text-sm font-bold text-zinc-100">No setups</div>
+                        <div className="mt-1 text-xs text-zinc-400">
+                          The system did not publish setups. This can be normal when conditions are not met or telemetry is not available yet.
+                        </div>
+                      </div>
                     );
-                  })
-                )}
-              </div>
+                  })()}
+                </div>
+              )}
             </Card>
-            <div className="md:hidden">
-              {SelectedSetupCard}
-            </div>
           </div>
 
           {/* RIGHT: details */}
           <div className="space-y-4">
-            <div className="hidden md:block">
-              {SelectedSetupCard}
-            </div>
-
             <Card
               title="Data Completeness"
               icon={<Database className="h-5 w-5" />}
@@ -1121,27 +1621,48 @@ export default function Page() {
                         <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
                       ) : (
                         tfHealthView.map((t) => {
-                          const staleMs = Number.isFinite(t.stale_ms) ? t.stale_ms : NaN;
+                          const bars = Number.isFinite(t.staleBars) ? t.staleBars : NaN;
+
+                          // Tone by bars behind (more meaningful than 1.5s/5s for candles)
                           const staleTone =
-                            Number.isFinite(staleMs) && staleMs <= 1500
+                            Number.isFinite(bars) && bars <= 0
                               ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                              : Number.isFinite(staleMs) && staleMs <= 5000
+                              : Number.isFinite(bars) && bars <= 1
                                 ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
                                 : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
 
+                          const staleLabel =
+                            Number.isFinite(bars)
+                              ? (bars === 0 ? "0 bars" : `${bars} bars`)
+                              : "—";
+
+                          const countLabel = `B:${t.haveCandlesBybit} / N:${t.haveCandlesBinance}`;
+
                           return (
-                            <div key={t.tf} className="flex items-center justify-between rounded-xl border border-white/10 bg-zinc-950/30 px-3 py-2">
-                              <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
+                            <div
+                              key={t.tf}
+                              className="flex items-center justify-between rounded-xl border border-white/10 bg-zinc-950/30 px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
+                                <div className="mt-1 text-[11px] text-zinc-400">
+                                  {countLabel}
+                                  {Number.isFinite(t.lastTs) ? ` • last ${relTime(t.lastTs)}` : ""}
+                                </div>
+                              </div>
+
                               <div className="flex items-center gap-2">
-                                <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />}>
-                                  {Number.isFinite(staleMs) ? `${fmtNum(staleMs / 1000, 1)}s` : "—"}
+                                <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />} title="Bars behind current time">
+                                  {staleLabel}
                                 </Pill>
+
                                 <Pill
                                   tone={
                                     t.partial
                                       ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
                                       : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
                                   }
+                                  title={t.partial ? "Data incomplete for this TF" : "Data complete"}
                                 >
                                   {t.partial ? "PARTIAL" : "OK"}
                                 </Pill>
@@ -1270,6 +1791,7 @@ function SetupDetail({
   paused,
   features,
   setup,
+  executionGlobal,
 }: {
   symbol: string;
   mid: number;
@@ -1279,14 +1801,13 @@ function SetupDetail({
   paused: boolean;
   features: any;
   setup: TradeSetup;
+  executionGlobal: ExecutionGlobal | null;
 }) {
-  const action = actionChip(setup);
+  const action = actionChip(setup, executionGlobal);
   const [showGuidanceDetails, setShowGuidanceDetails] = useState(false);
   const [showRiskMore, setShowRiskMore] = useState(false);
   useEffect(() => {
     setShowGuidanceDetails(false);
-    setShowReasons(false);
-
   }, [setup.id]);
 
   const entry = setup.entry;
@@ -1310,8 +1831,6 @@ function SetupDetail({
 
   const checklist = Array.isArray(entry?.trigger?.checklist) ? entry.trigger.checklist : [];
   const [showChecklistPassed, setShowChecklistPassed] = useState(false);
-  const [showReasons, setShowReasons] = useState(false);
-
 
   const checklistBad = useMemo(() => {
     // show only BLOCK + PENDING
@@ -1339,6 +1858,27 @@ function SetupDetail({
     // - If global gate not ok: show that first.
     // - Else show execution state and how to proceed.
     const ex = setup.execution;
+    // Hard policy: Grade C is monitor-only, regardless of local booleans
+    if (isMonitorOnlyGrade(setup?.confidence?.grade)) {
+      return {
+        headline: "Monitor-only (Grade C)",
+        tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
+        bullets: ["Policy enforced: this setup is for monitoring only. No market/limit entry actions are permitted."],
+      };
+    }
+
+    // Global execution gate overrides any local action suggestions
+    if (executionGlobal?.state === "BLOCKED") {
+      const primary = executionGlobal.reasons?.[0] ? formatExecutionGlobalReason(executionGlobal.reasons[0]) : "Execution blocked";
+      return {
+        headline: "Do not execute (system gate blocked)",
+        tone: "bg-rose-500/10 text-rose-100 ring-1 ring-rose-500/25",
+        bullets: [
+          primary,
+          ...(Array.isArray(executionGlobal.reasons) ? executionGlobal.reasons.slice(1, 4).map(formatExecutionGlobalReason) : []),
+        ].filter(Boolean),
+      };
+    }
 
     if (!globalGateOk) {
       const reasons: string[] = [];
@@ -1369,7 +1909,7 @@ function SetupDetail({
       };
     }
 
-    if (ex.canEnterMarket) {
+    if (ex.state === "ENTER_MARKET") {
       return {
         headline: "Enter market now",
         tone: "bg-emerald-500/10 text-emerald-100 ring-1 ring-emerald-500/25",
@@ -1380,7 +1920,7 @@ function SetupDetail({
       };
     }
 
-    if (ex.canPlaceLimit) {
+    if (ex.state === "PLACE_LIMIT") {
       return {
         headline: "Place limit order",
         tone: "bg-emerald-500/10 text-emerald-100 ring-1 ring-emerald-500/25",
@@ -1429,7 +1969,7 @@ function SetupDetail({
       tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
       bullets: [ex.reason || "Monitor conditions"],
     };
-  }, [setup.execution, globalGateOk, dqOk, bybitOk, paused, staleSec]);
+  }, [setup.execution, setup.confidence?.grade, executionGlobal, globalGateOk, dqOk, bybitOk, paused, staleSec]);
 
   return (
     <div className="space-y-4">
@@ -1478,7 +2018,7 @@ function SetupDetail({
         <div className="sticky top-2 z-20 space-y-3">
           <div className="rounded-xl border border-white/10 bg-zinc-950/80 backdrop-blur px-4 py-3">
             <div className="text-sm font-extrabold text-zinc-50">
-              {decisionSummary(setup)}
+              {decisionSummary(setup, executionGlobal)}
             </div>
           </div>
 
@@ -1814,121 +2354,108 @@ function SetupDetail({
             >
               Gate {globalGateOk ? "OK" : "BLOCKED"}
             </Pill>
-
-            <button
-              type="button"
-              onClick={() => setShowReasons((v) => !v)}
-              className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
-              title={showReasons ? "Hide explanation" : "Show explanation"}
-            >
-              {showReasons ? "Hide" : "Show"}
-            </button>
           </div>
         </div>
 
-        {showReasons ? (
-          <>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="text-xs font-extrabold text-zinc-100">Reasons</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(setup.confidence?.reasons || []).slice(0, 16).map((r, i) => (
-                    <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
-                      {r}
-                    </Pill>
-                  ))}
-                  {(setup.confidence?.reasons || []).length === 0 ? <div className="text-xs text-zinc-400">—</div> : null}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
-                <div className="mt-2 space-y-2 text-xs">
-                  <KV
-                    k="Imbalance"
-                    v={
-                      features?.orderflow?.imbalance
-                        ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top200), 2)}`
-                        : "—"
-                    }
-                  />
-                  <KV
-                    k="Aggression ratio"
-                    v={Number.isFinite(Number(features?.orderflow?.aggression_ratio)) ? fmtPct01(Number(features.orderflow.aggression_ratio)) : "—"}
-                  />
-                  <KV
-                    k="Delta dir"
-                    v={
-                      features?.orderflow?.delta?.delta_norm != null
-                        ? Number(features.orderflow.delta.delta_norm) > 0
-                          ? "BULL"
-                          : Number(features.orderflow.delta.delta_norm) < 0
-                            ? "BEAR"
-                            : "NEUTRAL"
-                        : "—"
-                    }
-                  />
-                  <KV
-                    k="Divergence"
-                    v={
-                      features?.orderflow?.delta
-                        ? `${String(features.orderflow.delta.divergence_dir)} • ${fmtPct01(Number(features.orderflow.delta.divergence_score))}`
-                        : "—"
-                    }
-                  />
-                  <KV
-                    k="Absorption"
-                    v={
-                      features?.orderflow?.delta
-                        ? `${String(features.orderflow.delta.absorption_dir)} • ${fmtPct01(Number(features.orderflow.delta.absorption_score))}`
-                        : "—"
-                    }
-                  />
-                </div>
-              </div>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="text-xs font-extrabold text-zinc-100">Reasons</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(setup.confidence?.reasons || []).slice(0, 16).map((r, i) => (
+                <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                  {r}
+                </Pill>
+              ))}
+              {(setup.confidence?.reasons || []).length === 0 ? <div className="text-xs text-zinc-400">—</div> : null}
             </div>
+          </div>
 
-            <Divider />
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-extrabold text-zinc-100">Entry zone check</div>
-                  <Pill
-                    tone={isInZone ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"}
-                  >
-                    {isInZone ? "IN ZONE" : "OUTSIDE"}
-                  </Pill>
-                </div>
-                <div className="mt-2 space-y-2 text-xs">
-                  <KV k="Mid" v={Number.isFinite(mid) ? fmtPx(mid) : "—"} />
-                  <KV k="Zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="text-xs font-extrabold text-zinc-100">Stop check</div>
-                <div className="mt-2 space-y-2 text-xs">
-                  <KV k="Stop" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
-                  <KV
-                    k="Distance to stop"
-                    v={Number.isFinite(mid) && Number.isFinite(stop) ? fmtPx(Math.abs(mid - (stop as number))) : "—"}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="text-xs font-extrabold text-zinc-100">Execution gate snapshot</div>
-                <div className="mt-2 space-y-2 text-xs">
-                  <KV k="DQ ok" v={dqOk ? "YES" : "NO"} />
-                  <KV k="Bybit ok" v={bybitOk ? "YES" : "NO"} />
-                  <KV k="Paused" v={paused ? "YES" : "NO"} />
-                  <KV k="Stale" v={staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`} />
-                </div>
-              </div>
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
+            <div className="mt-2 space-y-2 text-xs">
+              <KV
+                k="Imbalance"
+                v={
+                  features?.orderflow?.imbalance
+                    ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top200), 2)}`
+                    : "—"
+                }
+              />
+              <KV
+                k="Aggression ratio"
+                v={Number.isFinite(Number(features?.orderflow?.aggression_ratio)) ? fmtPct01(Number(features.orderflow.aggression_ratio)) : "—"}
+              />
+              <KV
+                k="Delta dir"
+                v={
+                  features?.orderflow?.delta?.delta_norm != null
+                    ? Number(features.orderflow.delta.delta_norm) > 0
+                      ? "BULL"
+                      : Number(features.orderflow.delta.delta_norm) < 0
+                        ? "BEAR"
+                        : "NEUTRAL"
+                    : "—"
+                }
+              />
+              <KV
+                k="Divergence"
+                v={
+                  features?.orderflow?.delta
+                    ? `${String(features.orderflow.delta.divergence_dir)} • ${fmtPct01(Number(features.orderflow.delta.divergence_score))}`
+                    : "—"
+                }
+              />
+              <KV
+                k="Absorption"
+                v={
+                  features?.orderflow?.delta
+                    ? `${String(features.orderflow.delta.absorption_dir)} • ${fmtPct01(Number(features.orderflow.delta.absorption_score))}`
+                    : "—"
+                }
+              />
             </div>
-          </>
-        ) : null}
+          </div>
+        </div>
+
+        <Divider />
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-extrabold text-zinc-100">Entry zone check</div>
+              <Pill
+                tone={isInZone ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"}
+              >
+                {isInZone ? "IN ZONE" : "OUTSIDE"}
+              </Pill>
+            </div>
+            <div className="mt-2 space-y-2 text-xs">
+              <KV k="Mid" v={Number.isFinite(mid) ? fmtPx(mid) : "—"} />
+              <KV k="Zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="text-xs font-extrabold text-zinc-100">Stop check</div>
+            <div className="mt-2 space-y-2 text-xs">
+              <KV k="Stop" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
+              <KV
+                k="Distance to stop"
+                v={Number.isFinite(mid) && Number.isFinite(stop) ? fmtPx(Math.abs(mid - (stop as number))) : "—"}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="text-xs font-extrabold text-zinc-100">Execution gate snapshot</div>
+            <div className="mt-2 space-y-2 text-xs">
+              <KV k="DQ ok" v={dqOk ? "YES" : "NO"} />
+              <KV k="Bybit ok" v={bybitOk ? "YES" : "NO"} />
+              <KV k="Paused" v={paused ? "YES" : "NO"} />
+              <KV k="Stale" v={staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`} />
+            </div>
+          </div>
+        </div>
 
       </div>
     </div>
