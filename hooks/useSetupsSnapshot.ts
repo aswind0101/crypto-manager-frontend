@@ -916,7 +916,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
           expiresTs > 0 ? (nowTs <= expiresTs + graceMs) : (nowTs - prev.ts <= 10 * 60_000);
 
         if (withinExpiry) {
-          // Re-derive execution with current ctx (DQ/paused/stale), and re-apply hard invalidation against current mid.
+          //. Re-derive execution with current ctx (DQ/paused/stale), and re-apply hard invalidation against current mid.
           let kept = { ...sPrev, execution: deriveExecutionDecision(sPrev, ctx) };
 
           // Apply hard invalidation intrabar against current mid/stop

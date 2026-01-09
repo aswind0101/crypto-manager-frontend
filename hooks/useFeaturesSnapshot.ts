@@ -79,7 +79,7 @@ export function useFeaturesSnapshot(symbol: string) {
   useEffect(() => {
     if (!input) return;
 
-    // key dựa trên ts của các TF quan trọng + orderbook ts để cache
+    //. key dựa trên ts của các TF quan trọng + orderbook ts để cache
     const k5 = input.candles["5m"]?.bybit?.slice(-1)?.[0]?.ts ?? 0;
     const k15 = input.candles["15m"]?.bybit?.slice(-1)?.[0]?.ts ?? 0;
     const k1h = input.candles["1h"]?.bybit?.slice(-1)?.[0]?.ts ?? 0;

@@ -28,7 +28,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-/**
+/**.
  * Crypto-Trading.tsx (Pages Router)
  * - Frontend-only.
  * - Consumes: useSetupsSnapshot(symbol, paused?)
