@@ -540,6 +540,74 @@ function RealtimeSignal({
     </span>
   );
 }
+function MidChip({
+  mid,
+  bid,
+  ask,
+  symbol,
+  title,
+}: {
+  mid: number;
+  bid?: number;
+  ask?: number;
+  symbol?: string;
+  title?: string;
+}) {
+  const ok = Number.isFinite(mid);
+  const midText = ok ? fmtPx(mid) : "—";
+
+  const spread =
+    Number.isFinite(bid as number) && Number.isFinite(ask as number)
+      ? (ask as number) - (bid as number)
+      : NaN;
+
+  const spreadText = Number.isFinite(spread) ? fmtPx(spread) : null;
+
+  // Fixed width to prevent header jitter when digits change
+  return (
+    <div
+      title={
+        title ||
+        (ok
+          ? `Realtime mid price${symbol ? ` • ${symbol}` : ""}${spreadText ? ` • spread ${spreadText}` : ""}`
+          : "Realtime mid price not available")
+      }
+      className={[
+        "flex items-center gap-3 rounded-2xl px-3 py-2",
+        "bg-white/5 ring-1 ring-white/10",
+        "backdrop-blur",
+      ].join(" ")}
+    >
+      <div className="flex flex-col leading-none">
+        <div className="text-[10px] font-semibold text-zinc-400">
+          Mid{symbol ? ` • ${symbol}` : ""}
+        </div>
+
+        <div
+          className={[
+            "mt-1 font-extrabold tracking-tight",
+            "tabular-nums",
+            // Stable width prevents layout shift
+            "min-w-[110px]",
+            ok ? "text-zinc-50" : "text-zinc-400",
+            // Make it slightly larger than other text but not huge
+            "text-[18px] md:text-[20px]",
+          ].join(" ")}
+        >
+          {midText}
+        </div>
+      </div>
+
+      {/* Optional micro-metrics */}
+      {spreadText ? (
+        <div className="hidden sm:flex flex-col items-end leading-none">
+          <div className="text-[10px] font-semibold text-zinc-400">Spread</div>
+          <div className="mt-1 text-[12px] font-bold text-zinc-200 tabular-nums">{spreadText}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /** ---------- Small UI atoms ---------- */
 function Pill({
@@ -1086,13 +1154,6 @@ export default function Page() {
               showSeconds={true}
               title="Realtime price feed health (based on snap.price.ts)"
             />
-            <Pill
-              tone="bg-white/5 text-zinc-100 ring-1 ring-white/10"
-              icon={<Gauge className="h-4 w-4" />}
-              title="Realtime mid price derived from orderbook"
-            >
-              Mid {Number.isFinite(mid) ? fmtPx(mid) : "—"}
-            </Pill>
             <div className="ml-auto text-xs text-zinc-400">Updated {lastUpdated}</div>
           </div>
 
@@ -1126,18 +1187,33 @@ export default function Page() {
               title="Market Context"
               icon={<LineChart className="h-5 w-5" />}
               right={
-                <Pill
-                  tone={
-                    biasDir === "BULL"
-                      ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                      : biasDir === "BEAR"
-                        ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                        : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                  }
-                  icon={biasDir === "BULL" ? <TrendingUp className="h-4 w-4" /> : biasDir === "BEAR" ? <TrendingDown className="h-4 w-4" /> : <Waves className="h-4 w-4" />}
-                >
-                  {biasDir} • {String(features?.bias?.tf || "—")}
-                </Pill>
+                <div className="flex items-center gap-2">
+                  <MidChip
+                    mid={mid}
+                    bid={Number(snap?.price?.bid)}
+                    ask={Number(snap?.price?.ask)}
+                    symbol={symbol}
+                    title="Realtime mid price derived from snap.price.mid or (bid+ask)/2"
+                  />
+                  {/* Giữ badge bias ở cạnh phải để không mất thông tin */}
+                  <Pill
+                    tone={
+                      biasDir === "BULL"
+                        ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                        : biasDir === "BEAR"
+                          ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                          : biasDir === "SIDEWAYS"
+                            ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                            : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
+                    }
+                    icon={
+                      biasDir === "BULL" ? <TrendingUp className="h-4 w-4" /> : biasDir === "BEAR" ? <TrendingDown className="h-4 w-4" /> : <Waves className="h-4 w-4" />
+                    }
+                    title="Trend bias"
+                  >
+                    {biasDir}
+                  </Pill>
+                </div>
               }
             >
               <div className="space-y-3">
