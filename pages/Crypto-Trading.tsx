@@ -540,75 +540,24 @@ function RealtimeSignal({
     </span>
   );
 }
-function MidChip({
-  mid,
-  bid,
-  ask,
-  symbol,
-  title,
-}: {
-  mid: number;
-  bid?: number;
-  ask?: number;
-  symbol?: string;
-  title?: string;
-}) {
-  const ok = Number.isFinite(mid);
-  const midText = ok ? fmtPx(mid) : "—";
+function MidBadge({ mid }: { mid: number }) {
+  const text = Number.isFinite(mid) ? `$${fmtPx(mid)}` : "—";
 
-  const spread =
-    Number.isFinite(bid as number) && Number.isFinite(ask as number)
-      ? (ask as number) - (bid as number)
-      : NaN;
-
-  const spreadText = Number.isFinite(spread) ? fmtPx(spread) : null;
-
-  // Fixed width to prevent header jitter when digits change
   return (
-    <div
-      title={
-        title ||
-        (ok
-          ? `Realtime mid price${symbol ? ` • ${symbol}` : ""}${spreadText ? ` • spread ${spreadText}` : ""}`
-          : "Realtime mid price not available")
-      }
+    <span
       className={[
-        "flex items-center gap-3 rounded-2xl px-3 py-2",
-        "bg-white/5 ring-1 ring-white/10",
-        "backdrop-blur",
+        // KÍCH THƯỚC = Pill (market bias)
+        "flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
+        // NỔI BẬT NHƯNG GỌN, KHÔNG GIẬT LAYOUT
+        "bg-sky-500/15 text-sky-200 ring-1 ring-sky-500/30",
+        "tabular-nums min-w-[96px] justify-center",
       ].join(" ")}
+      title="Realtime mid price"
     >
-      <div className="flex flex-col leading-none">
-        <div className="text-[10px] font-semibold text-zinc-400">
-          Mid{symbol ? ` • ${symbol}` : ""}
-        </div>
-
-        <div
-          className={[
-            "mt-1 font-extrabold tracking-tight",
-            "tabular-nums",
-            // Stable width prevents layout shift
-            "min-w-[110px]",
-            ok ? "text-zinc-50" : "text-zinc-400",
-            // Make it slightly larger than other text but not huge
-            "text-[18px] md:text-[20px]",
-          ].join(" ")}
-        >
-          {midText}
-        </div>
-      </div>
-
-      {/* Optional micro-metrics */}
-      {spreadText ? (
-        <div className="hidden sm:flex flex-col items-end leading-none">
-          <div className="text-[10px] font-semibold text-zinc-400">Spread</div>
-          <div className="mt-1 text-[12px] font-bold text-zinc-200 tabular-nums">{spreadText}</div>
-        </div>
-      ) : null}
-    </div>
+      {text}
+    </span>
   );
 }
-
 /** ---------- Small UI atoms ---------- */
 function Pill({
   children,
@@ -1188,14 +1137,7 @@ export default function Page() {
               icon={<LineChart className="h-5 w-5" />}
               right={
                 <div className="flex items-center gap-2">
-                  <MidChip
-                    mid={mid}
-                    bid={Number(snap?.price?.bid)}
-                    ask={Number(snap?.price?.ask)}
-                    symbol={symbol}
-                    title="Realtime mid price derived from snap.price.mid or (bid+ask)/2"
-                  />
-                  {/* Giữ badge bias ở cạnh phải để không mất thông tin */}
+                  <MidBadge mid={mid} />
                   <Pill
                     tone={
                       biasDir === "BULL"
@@ -1207,9 +1149,12 @@ export default function Page() {
                             : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
                     }
                     icon={
-                      biasDir === "BULL" ? <TrendingUp className="h-4 w-4" /> : biasDir === "BEAR" ? <TrendingDown className="h-4 w-4" /> : <Waves className="h-4 w-4" />
+                      biasDir === "BULL"
+                        ? <TrendingUp className="h-4 w-4" />
+                        : biasDir === "BEAR"
+                          ? <TrendingDown className="h-4 w-4" />
+                          : <Waves className="h-4 w-4" />
                     }
-                    title="Trend bias"
                   >
                     {biasDir}
                   </Pill>
