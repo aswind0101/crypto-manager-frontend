@@ -25,6 +25,7 @@ import {
   TrendingDown,
   TrendingUp,
   Waves,
+  Sparkles,
 } from "lucide-react";
 
 /**
@@ -524,10 +525,18 @@ function RealtimeSignal({
 
       {/* Optional seconds (small, secondary) */}
       {showSeconds ? (
-        <span className="ml-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-zinc-100 ring-1 ring-white/10">
+        <span
+          className={[
+            "ml-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-zinc-100 ring-1 ring-white/10",
+            "tabular-nums text-center",
+            // Reserve space so the pill never changes width (prevents page jitter)
+            "min-w-[46px]",
+          ].join(" ")}
+        >
           {secText}
         </span>
       ) : null}
+
     </span>
   );
 }
@@ -1004,7 +1013,7 @@ export default function Page() {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
-                  <Signal className="h-5 w-5" />
+                  <Sparkles className="h-5 w-5" />
                 </div>
                 <div className="text-base font-extrabold tracking-tight">Crypto Setup Analyzer</div>
               </div>
