@@ -96,6 +96,9 @@ const LSR_RR_MIN = 2.8;
 function isFiniteNum(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x);
 }
+function fmtNum(x: unknown, dp = 2, na = "n/a"): string {
+  return isFiniteNum(x) ? x.toFixed(dp) : na;
+}
 
 function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
@@ -410,7 +413,7 @@ function deltaOk(f: FeaturesSnapshot, side: SetupSide) {
   }
 
   // Absorption supporting same direction is a plus; opposite is mild negative but not hard block
-  return { ok: true, note: `div=${d.divergence_score.toFixed(2)} abs=${d.absorption_score.toFixed(2)}` };
+  return { ok: true, note: `div=${fmtNum(d.divergence_score, 2)} abs=${fmtNum(d.absorption_score, 2)}` };
 }
 
 function biasStrengthOk(f: FeaturesSnapshot) {
@@ -422,7 +425,7 @@ function biasStrengthOk(f: FeaturesSnapshot) {
   const okAdx = typeof adx !== "number" ? true : adx >= 18;
   const okSlope = typeof slope !== "number" ? true : Math.abs(slope) >= 1.0;
 
-  return { ok: okStrength && okAdx && okSlope, note: `s=${s.toFixed(2)} adx=${adx ?? "n/a"} slope=${slope ?? "n/a"}` };
+  return { ok: okStrength && okAdx && okSlope, note: `s=${fmtNum(s, 2)} adx=${fmtNum(adx, 0)} slope=${fmtNum(slope, 1)}bps` };
 }
 
 export function buildSetups(args: {
@@ -527,30 +530,32 @@ export function buildSetups(args: {
 
     const entryMid = (zone.lo + zone.hi) / 2;
     const rr1 = rr(entryMid, sl, tp1, biasSide);
-
-    const checklist = [
-      { key: "bias", ok: true, note: `Bias ${f.bias.trend_dir} (${f.bias.tf})` },
-      { key: "bias_strength", ok: biasStrengthOk(f).ok, note: `Bias strength: ${biasStrengthOk(f).note}` },
-
-      {
-        key: "orderflow",
-        ok: biasSide === "LONG" ? (f.orderflow.imbalance.top200 > -0.35) : (f.orderflow.imbalance.top200 < 0.35),
-        note: `Imb200=${f.orderflow.imbalance.top200.toFixed(2)}`,
-      },
-      {
-        key: "cross",
-        ok: typeof f.cross.consensus_score !== "number" ? true : f.cross.consensus_score >= 0.5,
-        note: f.cross.consensus_score != null ? `cons=${f.cross.consensus_score.toFixed(2)}` : "n/a",
-      },
-      { key: "delta", ok: deltaOk(f, biasSide).ok, note: `Delta: ${deltaOk(f, biasSide).note}` },
-      { key: "htf_ms", ok: htfConfirm(f, biasSide).ok, note: `HTF MS: ${htfConfirm(f, biasSide).note}` },
-
-    ];
-
     const bs = biasStrengthOk(f);
     const ht = htfConfirm(f, biasSide);
     const dOk = deltaOk(f, biasSide);
 
+    const imb200 = isFiniteNum(f.orderflow?.imbalance?.top200) ? f.orderflow.imbalance.top200 : undefined;
+    const cons = isFiniteNum(f.cross?.consensus_score) ? f.cross.consensus_score : undefined;
+
+
+    const checklist = [
+      { key: "bias", ok: true, note: `Bias ${f.bias.trend_dir} (${f.bias.tf})` },
+      { key: "bias_strength", ok: bs.ok, note: `Bias strength: ${bs.note}` },
+
+      {
+        key: "orderflow",
+        ok: imb200 == null ? true : (biasSide === "LONG" ? (imb200 > -0.35) : (imb200 < 0.35)),
+        note: imb200 == null ? "Imb200=n/a" : `Imb200=${fmtNum(imb200, 2)}`,
+      },
+      {
+        key: "cross",
+        ok: cons == null ? true : cons >= 0.5,
+        note: cons == null ? "cons=n/a" : `cons=${fmtNum(cons, 2)}`,
+      },
+      { key: "delta", ok: dOk.ok, note: `Delta: ${dOk.note}` },
+      { key: "htf_ms", ok: ht.ok, note: `HTF MS: ${ht.note}` },
+
+    ];
     const rrNeed = (!bs.ok || !ht.ok || !dOk.ok) ? 1.8 : 1.5;
     const ready = rr1 >= rrNeed && common.grade !== "D";
 
@@ -827,7 +832,7 @@ export function buildSetups(args: {
                   ? `HTF bias incomplete (${biasMeta.tf} ${biasMeta.count}/${biasMeta.need})`
                   : `Bias ${f.bias.trend_dir} (${f.bias.tf})`,
               },
-              { key: "squeeze", ok: true, note: `BBWidth15m=${width!.toFixed(4)}` },
+              { key: "squeeze", ok: true, note: `BBWidth15m=${fmtNum(width, 4)}` },
               { key: "level", ok: true, note: `Break ${dir === "LONG" ? "R" : "S"} @ ${brk.toFixed(2)}` },
             ],
             summary: "Breakout: wait for 5m close beyond level + follow-through",
