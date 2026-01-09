@@ -417,6 +417,120 @@ function structureTrendBadge(trend?: string) {
   if (t === "RANGE") return { label: "RANGE", icon: <Waves className="h-4 w-4" />, cls: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" };
   return { label: "UNKNOWN", icon: <Minus className="h-4 w-4" />, cls: "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30" };
 }
+function signalLevelFromStale(staleSec?: number): 0 | 1 | 2 | 3 | 4 {
+  // 0: unknown/no data
+  if (!Number.isFinite(staleSec as number)) return 0;
+  const s = staleSec as number;
+  // Keep thresholds consistent with existing UI gate:
+  // <= 1.5s (fresh), <= 5s (warn), > 5s (stale)
+  if (s <= 1.5) return 4;
+  if (s <= 5) return 3;
+  // make stale visibly worse
+  if (s <= 10) return 2;
+  return 1;
+}
+
+function signalToneFromLevel(level: 0 | 1 | 2 | 3 | 4): string {
+  // Tailwind classes (no inline colors)
+  switch (level) {
+    case 4:
+      return "text-emerald-200";
+    case 3:
+      return "text-amber-200";
+    case 2:
+    case 1:
+      return "text-rose-200";
+    default:
+      return "text-zinc-300";
+  }
+}
+
+function signalRingFromLevel(level: 0 | 1 | 2 | 3 | 4): string {
+  // background/ring consistent with your Pills
+  switch (level) {
+    case 4:
+      return "bg-emerald-500/10 ring-1 ring-emerald-500/30";
+    case 3:
+      return "bg-amber-500/10 ring-1 ring-amber-500/30";
+    case 2:
+    case 1:
+      return "bg-rose-500/10 ring-1 ring-rose-500/30";
+    default:
+      return "bg-zinc-500/10 ring-1 ring-zinc-500/30";
+  }
+}
+
+function RealtimeSignal({
+  staleSec,
+  label = "Realtime",
+  title,
+  showSeconds = false,
+}: {
+  staleSec?: number;
+  label?: string;
+  title?: string;
+  showSeconds?: boolean;
+}) {
+  const level = signalLevelFromStale(staleSec);
+  const tone = signalToneFromLevel(level);
+  const ring = signalRingFromLevel(level);
+
+  // Bars: 4 columns, fill based on level
+  // level=4 => all on; level=3 => first 3; level=2 => first 2; level=1 => first 1; level=0 => none
+  const on = (idx: number) => level >= idx;
+
+  const secText =
+    Number.isFinite(staleSec as number) ? `${(staleSec as number).toFixed(1)}s` : "—";
+
+  const tooltip =
+    title ||
+    (Number.isFinite(staleSec as number)
+      ? `Realtime price freshness • last update ${secText} ago`
+      : "Realtime price freshness • no timestamp");
+
+  return (
+    <span
+      title={tooltip}
+      className={[
+        "inline-flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
+        "ring-1 ring-white/10 bg-white/5 text-zinc-100",
+        ring,
+      ].join(" ")}
+      aria-label={`Realtime feed ${level === 0 ? "unknown" : level >= 3 ? "ok" : "stale"}`}
+    >
+      {/* Signal icon */}
+      <span className={["inline-flex items-center", tone].join(" ")}>
+        <svg
+          width="18"
+          height="14"
+          viewBox="0 0 18 14"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="block"
+          aria-hidden="true"
+        >
+          {/* baseline */}
+          <rect x="1" y="12" width="16" height="1" rx="0.5" fill="currentColor" opacity="0.35" />
+          {/* bars */}
+          <rect x="2" y="8" width="3" height="4" rx="1" fill="currentColor" opacity={on(1) ? 1 : 0.25} />
+          <rect x="6.5" y="6" width="3" height="6" rx="1" fill="currentColor" opacity={on(2) ? 1 : 0.25} />
+          <rect x="11" y="4" width="3" height="8" rx="1" fill="currentColor" opacity={on(3) ? 1 : 0.25} />
+          <rect x="15.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity={on(4) ? 1 : 0.25} />
+        </svg>
+      </span>
+
+      {/* Label */}
+      <span className="whitespace-nowrap">{label}</span>
+
+      {/* Optional seconds (small, secondary) */}
+      {showSeconds ? (
+        <span className="ml-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-zinc-100 ring-1 ring-white/10">
+          {secText}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 /** ---------- Small UI atoms ---------- */
 function Pill({
@@ -956,21 +1070,13 @@ export default function Page() {
             >
               Binance {binanceOk ? "OK" : "NOT OK"}
             </Pill>
-            <Pill
-              tone={
-                staleSec == null
-                  ? "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
-                  : staleSec <= 1.5
-                    ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                    : staleSec <= 5
-                      ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                      : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-              }
-              icon={<Clock className="h-4 w-4" />}
-              title="Staleness based on snap.price.ts"
-            >
-              Stale {staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`}
-            </Pill>
+            <RealtimeSignal
+              staleSec={staleSec}
+              label="Realtime"
+              // Nếu bạn muốn vẫn thấy số giây nhỏ bên cạnh, bật true:
+              showSeconds={true}
+              title="Realtime price feed health (based on snap.price.ts)"
+            />
             <Pill
               tone="bg-white/5 text-zinc-100 ring-1 ring-white/10"
               icon={<Gauge className="h-4 w-4" />}
