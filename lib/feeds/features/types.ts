@@ -168,4 +168,3 @@ export type MarketStructureTF = {
 };
 
 export type MarketStructureSnapshot = Record<string, MarketStructureTF>;
-
