@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSetupsSnapshot } from "../hooks/useSetupsSnapshot";
+import { readAllTrackedSetups, summarizeTrackedSetups } from "../hooks/setupTracking";
+
 import {
   Activity,
   AlertTriangle,
@@ -744,6 +746,38 @@ function TradingView({
 
   const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
   const out = (setups as unknown as SetupsOutput | null) ?? null;
+    // -----------------------------
+  // Tracking: log summary + last records (dev-only style)
+  // -----------------------------
+  const lastTrackLogRef = useRef<number>(0);
+
+  useEffect(() => {
+    // throttle logging to avoid console spam
+    const now = Date.now();
+    if (now - lastTrackLogRef.current < 5000) return; // log max every 5s
+    lastTrackLogRef.current = now;
+
+    const recs = readAllTrackedSetups().filter((r) => r.symbol === symbol);
+    const summary = summarizeTrackedSetups(recs);
+
+    // Print a compact summary + last 10 records
+    console.debug("[tracking:summary]", { symbol, ...summary });
+
+    const last10 = [...recs]
+      .sort((a, b) => (b.created_ts ?? 0) - (a.created_ts ?? 0))
+      .slice(0, 10)
+      .map((r) => ({
+        key: r.key,
+        outcome: r.outcome,
+        mfe_r: Number(r.mfe_r).toFixed(2),
+        mae_r: Number(r.mae_r).toFixed(2),
+        created: new Date(r.created_ts).toLocaleTimeString(),
+        closed: r.closed_ts ? new Date(r.closed_ts).toLocaleTimeString() : "",
+      }));
+
+    console.table(last10);
+  }, [symbol, out?.setups?.length, out?.ts]);
+
   const executionGlobal = useMemo(() => {
     // Prefer hook-level fields, fall back to out.* if present.
     return (

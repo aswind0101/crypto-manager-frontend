@@ -724,41 +724,23 @@ function relTime(ts?: number) {
   const v = Math.round(d);
   return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
 }
-
-/** ---------- Main Page ---------- */
-export default function Page() {
-  const [inputSymbol, setInputSymbol] = useState<string>(() => {
-    if (typeof window === "undefined") return "BTCUSDT";
-    return window.localStorage.getItem("ct_symbol_input") || "BTCUSDT";
-  });
-
-  const [symbol, setSymbol] = useState<string>(() => {
-    if (typeof window === "undefined") return "BTCUSDT";
-    return window.localStorage.getItem("ct_symbol_active") || "BTCUSDT";
-  });
-
-  const [paused, setPaused] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("ct_paused") === "1";
-  });
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("ct_symbol_input", inputSymbol);
-    } catch { }
-  }, [inputSymbol]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("ct_symbol_active", symbol);
-    } catch { }
-  }, [symbol]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("ct_paused", paused ? "1" : "0");
-    } catch { }
-  }, [paused]);
+function TradingView({
+  symbol,
+  paused,
+  inputSymbol,
+  setInputSymbol,
+  setPaused,
+  onAnalyze,
+  onEnterInput,
+}: {
+  symbol: string;
+  paused: boolean;
+  inputSymbol: string;
+  setInputSymbol: React.Dispatch<React.SetStateAction<string>>;
+  setPaused: React.Dispatch<React.SetStateAction<boolean>>;
+  onAnalyze: () => void;
+  onEnterInput: React.KeyboardEventHandler<HTMLInputElement>;
+}) {
 
   const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
   const out = (setups as unknown as SetupsOutput | null) ?? null;
@@ -1017,17 +999,6 @@ export default function Page() {
   const tfHealthView = showTfHealthMore ? tfHealth : tfHealthPrimary;
 
   const appBlocked = executionGlobal?.state === "BLOCKED";
-
-
-  const onAnalyze = () => {
-    const cleaned = String(inputSymbol || "").trim().toUpperCase();
-    if (!cleaned) return;
-    setSymbol(cleaned);
-  };
-
-  const onEnterInput: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
-    if (e.key === "Enter") onAnalyze();
-  };
 
   return (
     <div className="min-h-screen bg-[#070A12] text-zinc-100">
@@ -1780,6 +1751,68 @@ export default function Page() {
     </div>
   );
 }
+
+/** ---------- Main Page ---------- */
+export default function Page() {
+  const [inputSymbol, setInputSymbol] = useState<string>(() => {
+    if (typeof window === "undefined") return "BTCUSDT";
+    return window.localStorage.getItem("ct_symbol_input") || "BTCUSDT";
+  });
+
+  const [symbol, setSymbol] = useState<string>(() => {
+    if (typeof window === "undefined") return "BTCUSDT";
+    return window.localStorage.getItem("ct_symbol_active") || "BTCUSDT";
+  });
+
+  const [paused, setPaused] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("ct_paused") === "1";
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ct_symbol_input", inputSymbol);
+    } catch { }
+  }, [inputSymbol]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ct_symbol_active", symbol);
+    } catch { }
+  }, [symbol]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ct_paused", paused ? "1" : "0");
+    } catch { }
+  }, [paused]);
+
+
+  const onAnalyze = () => {
+    const cleaned = String(inputSymbol || "").trim().toUpperCase();
+    if (!cleaned) return;
+    setSymbol(cleaned);
+  };
+
+
+  const onEnterInput: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    if (e.key === "Enter") onAnalyze();
+  };
+
+  return (
+    <TradingView
+      key={symbol}
+      symbol={symbol}
+      paused={paused}
+      inputSymbol={inputSymbol}
+      setInputSymbol={setInputSymbol}
+      setPaused={setPaused}
+      onAnalyze={onAnalyze}
+      onEnterInput={onEnterInput}
+    />
+  );
+}
+
 
 /** ---------- Detail component ---------- */
 function SetupDetail({
