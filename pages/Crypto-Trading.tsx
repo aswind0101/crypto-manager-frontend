@@ -540,17 +540,32 @@ function RealtimeSignal({
     </span>
   );
 }
+function fmtPxWithSep(x?: number) {
+  if (!Number.isFinite(x as number)) return "—";
+  const v = x as number;
+
+  // Giữ logic decimal như fmtPx nhưng thêm thousands separator
+  let digits = 6;
+  if (v >= 10000) digits = 0;
+  else if (v >= 1000) digits = 1;
+  else if (v >= 100) digits = 2;
+  else if (v >= 1) digits = 4;
+
+  return new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  }).format(v);
+}
+
 function MidBadge({ mid }: { mid: number }) {
-  const text = Number.isFinite(mid) ? `$${fmtPx(mid)}` : "—";
+  const text = Number.isFinite(mid) ? `$${fmtPxWithSep(mid)}` : "—";
 
   return (
     <span
       className={[
-        // KÍCH THƯỚC = Pill (market bias)
         "flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
-        // NỔI BẬT NHƯNG GỌN, KHÔNG GIẬT LAYOUT
         "bg-sky-500/15 text-sky-200 ring-1 ring-sky-500/30",
-        "tabular-nums min-w-[96px] justify-center",
+        "tabular-nums min-w-[110px] justify-center",
       ].join(" ")}
       title="Realtime mid price"
     >
