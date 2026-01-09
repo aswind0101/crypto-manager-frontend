@@ -334,55 +334,25 @@ export function useBybitUnifiedSnapshot(symbol: string) {
       if (scheduled) return;
       scheduled = true;
       queueMicrotask(() => {
-        const t0 = performance.now();
-        const snap = build();
-        const t1 = performance.now();
-
-        console.debug("[snapshot:event]", {
-          build_ms: (t1 - t0).toFixed(1),
-          price_ts: snap?.price?.ts,
-        });
-
-
         scheduled = false;
-        setSnapshot(snap);
+        setSnapshot(build());
       });
+
     });
 
     const unsubBinance = binanceStore.events.on(() => {
       if (scheduled) return;
       scheduled = true;
       queueMicrotask(() => {
-        const t0 = performance.now();
-        const snap = build();
-        const t1 = performance.now();
-
-        console.debug("[snapshot:event]", {
-          build_ms: (t1 - t0).toFixed(1),
-          price_ts: snap?.price?.ts,
-        });
-
-
         scheduled = false;
-        setSnapshot(snap);
+        setSnapshot(build());
       });
     });
 
     // ✅ Periodic recompute tick (để DQ tụt khi WS im lặng)
     const intervalId = window.setInterval(() => {
-      const t0 = performance.now();
-      const snap = build();
-      const t1 = performance.now();
-
-      console.debug("[snapshot:interval]", {
-        build_ms: (t1 - t0).toFixed(1),
-        price_ts: snap?.price?.ts,
-      });
-
-
-      setSnapshot(snap);
+      setSnapshot(build());
     }, 1000);
-
 
     // Initial snapshot
     setSnapshot(build());
