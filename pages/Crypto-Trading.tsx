@@ -1571,8 +1571,6 @@ function SetupDetail({
   const [showRiskMore, setShowRiskMore] = useState(false);
   useEffect(() => {
     setShowGuidanceDetails(false);
-    setShowReasons(false);
-
   }, [setup.id]);
 
   const entry = setup.entry;
@@ -1596,8 +1594,6 @@ function SetupDetail({
 
   const checklist = Array.isArray(entry?.trigger?.checklist) ? entry.trigger.checklist : [];
   const [showChecklistPassed, setShowChecklistPassed] = useState(false);
-  const [showReasons, setShowReasons] = useState(false);
-
 
   const checklistBad = useMemo(() => {
     // show only BLOCK + PENDING
@@ -2121,121 +2117,108 @@ function SetupDetail({
             >
               Gate {globalGateOk ? "OK" : "BLOCKED"}
             </Pill>
-
-            <button
-              type="button"
-              onClick={() => setShowReasons((v) => !v)}
-              className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
-              title={showReasons ? "Hide explanation" : "Show explanation"}
-            >
-              {showReasons ? "Hide" : "Show"}
-            </button>
           </div>
         </div>
 
-        {showReasons ? (
-          <>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="text-xs font-extrabold text-zinc-100">Reasons</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(setup.confidence?.reasons || []).slice(0, 16).map((r, i) => (
-                    <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
-                      {r}
-                    </Pill>
-                  ))}
-                  {(setup.confidence?.reasons || []).length === 0 ? <div className="text-xs text-zinc-400">—</div> : null}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
-                <div className="mt-2 space-y-2 text-xs">
-                  <KV
-                    k="Imbalance"
-                    v={
-                      features?.orderflow?.imbalance
-                        ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top200), 2)}`
-                        : "—"
-                    }
-                  />
-                  <KV
-                    k="Aggression ratio"
-                    v={Number.isFinite(Number(features?.orderflow?.aggression_ratio)) ? fmtPct01(Number(features.orderflow.aggression_ratio)) : "—"}
-                  />
-                  <KV
-                    k="Delta dir"
-                    v={
-                      features?.orderflow?.delta?.delta_norm != null
-                        ? Number(features.orderflow.delta.delta_norm) > 0
-                          ? "BULL"
-                          : Number(features.orderflow.delta.delta_norm) < 0
-                            ? "BEAR"
-                            : "NEUTRAL"
-                        : "—"
-                    }
-                  />
-                  <KV
-                    k="Divergence"
-                    v={
-                      features?.orderflow?.delta
-                        ? `${String(features.orderflow.delta.divergence_dir)} • ${fmtPct01(Number(features.orderflow.delta.divergence_score))}`
-                        : "—"
-                    }
-                  />
-                  <KV
-                    k="Absorption"
-                    v={
-                      features?.orderflow?.delta
-                        ? `${String(features.orderflow.delta.absorption_dir)} • ${fmtPct01(Number(features.orderflow.delta.absorption_score))}`
-                        : "—"
-                    }
-                  />
-                </div>
-              </div>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="text-xs font-extrabold text-zinc-100">Reasons</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(setup.confidence?.reasons || []).slice(0, 16).map((r, i) => (
+                <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                  {r}
+                </Pill>
+              ))}
+              {(setup.confidence?.reasons || []).length === 0 ? <div className="text-xs text-zinc-400">—</div> : null}
             </div>
+          </div>
 
-            <Divider />
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-extrabold text-zinc-100">Entry zone check</div>
-                  <Pill
-                    tone={isInZone ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"}
-                  >
-                    {isInZone ? "IN ZONE" : "OUTSIDE"}
-                  </Pill>
-                </div>
-                <div className="mt-2 space-y-2 text-xs">
-                  <KV k="Mid" v={Number.isFinite(mid) ? fmtPx(mid) : "—"} />
-                  <KV k="Zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="text-xs font-extrabold text-zinc-100">Stop check</div>
-                <div className="mt-2 space-y-2 text-xs">
-                  <KV k="Stop" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
-                  <KV
-                    k="Distance to stop"
-                    v={Number.isFinite(mid) && Number.isFinite(stop) ? fmtPx(Math.abs(mid - (stop as number))) : "—"}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
-                <div className="text-xs font-extrabold text-zinc-100">Execution gate snapshot</div>
-                <div className="mt-2 space-y-2 text-xs">
-                  <KV k="DQ ok" v={dqOk ? "YES" : "NO"} />
-                  <KV k="Bybit ok" v={bybitOk ? "YES" : "NO"} />
-                  <KV k="Paused" v={paused ? "YES" : "NO"} />
-                  <KV k="Stale" v={staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`} />
-                </div>
-              </div>
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="text-xs font-extrabold text-zinc-100">Orderflow & context</div>
+            <div className="mt-2 space-y-2 text-xs">
+              <KV
+                k="Imbalance"
+                v={
+                  features?.orderflow?.imbalance
+                    ? `${fmtNum(Number(features.orderflow.imbalance.top10), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top50), 2)} / ${fmtNum(Number(features.orderflow.imbalance.top200), 2)}`
+                    : "—"
+                }
+              />
+              <KV
+                k="Aggression ratio"
+                v={Number.isFinite(Number(features?.orderflow?.aggression_ratio)) ? fmtPct01(Number(features.orderflow.aggression_ratio)) : "—"}
+              />
+              <KV
+                k="Delta dir"
+                v={
+                  features?.orderflow?.delta?.delta_norm != null
+                    ? Number(features.orderflow.delta.delta_norm) > 0
+                      ? "BULL"
+                      : Number(features.orderflow.delta.delta_norm) < 0
+                        ? "BEAR"
+                        : "NEUTRAL"
+                    : "—"
+                }
+              />
+              <KV
+                k="Divergence"
+                v={
+                  features?.orderflow?.delta
+                    ? `${String(features.orderflow.delta.divergence_dir)} • ${fmtPct01(Number(features.orderflow.delta.divergence_score))}`
+                    : "—"
+                }
+              />
+              <KV
+                k="Absorption"
+                v={
+                  features?.orderflow?.delta
+                    ? `${String(features.orderflow.delta.absorption_dir)} • ${fmtPct01(Number(features.orderflow.delta.absorption_score))}`
+                    : "—"
+                }
+              />
             </div>
-          </>
-        ) : null}
+          </div>
+        </div>
+
+        <Divider />
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-extrabold text-zinc-100">Entry zone check</div>
+              <Pill
+                tone={isInZone ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"}
+              >
+                {isInZone ? "IN ZONE" : "OUTSIDE"}
+              </Pill>
+            </div>
+            <div className="mt-2 space-y-2 text-xs">
+              <KV k="Mid" v={Number.isFinite(mid) ? fmtPx(mid) : "—"} />
+              <KV k="Zone" v={zone && Number.isFinite(zone.lo) && Number.isFinite(zone.hi) ? `${fmtPx(zone.lo)} → ${fmtPx(zone.hi)}` : "—"} />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="text-xs font-extrabold text-zinc-100">Stop check</div>
+            <div className="mt-2 space-y-2 text-xs">
+              <KV k="Stop" v={Number.isFinite(stop) ? fmtPx(stop) : "—"} />
+              <KV
+                k="Distance to stop"
+                v={Number.isFinite(mid) && Number.isFinite(stop) ? fmtPx(Math.abs(mid - (stop as number))) : "—"}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="text-xs font-extrabold text-zinc-100">Execution gate snapshot</div>
+            <div className="mt-2 space-y-2 text-xs">
+              <KV k="DQ ok" v={dqOk ? "YES" : "NO"} />
+              <KV k="Bybit ok" v={bybitOk ? "YES" : "NO"} />
+              <KV k="Paused" v={paused ? "YES" : "NO"} />
+              <KV k="Stale" v={staleSec == null ? "—" : `${fmtNum(staleSec, 1)}s`} />
+            </div>
+          </div>
+        </div>
 
       </div>
     </div>
