@@ -1,7 +1,8 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
 import type { ExecutionDecision } from "../lib/feeds/setups/types";
+import { trackSetupsTick } from "./setupTracking";
 
 
 type Candle = {
@@ -916,7 +917,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
           expiresTs > 0 ? (nowTs <= expiresTs + graceMs) : (nowTs - prev.ts <= 10 * 60_000);
 
         if (withinExpiry) {
-          //. Re-derive execution with current ctx (DQ/paused/stale), and re-apply hard invalidation against current mid.
+          // Re-derive execution with current ctx (DQ/paused/stale), and re-apply hard invalidation against current mid.
           let kept = { ...sPrev, execution: deriveExecutionDecision(sPrev, ctx) };
 
           // Apply hard invalidation intrabar against current mid/stop
@@ -940,6 +941,23 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     };
 
   }, [snap, features, paused, symbol]);
+  // -----------------------------
+  // Setup performance tracking (frontend-only)
+  // -----------------------------
+  useEffect(() => {
+    if (!snap || !setups || !Array.isArray((setups as any).setups)) return;
+
+    const mid = computeMidFromSnap(snap);
+    const priceTs = Number((snap as any)?.price?.ts);
+
+    trackSetupsTick({
+      symbol,
+      setups: (setups as any).setups,
+      mid,
+      now_ts: Date.now(),
+      price_ts: Number.isFinite(priceTs) ? priceTs : undefined,
+    });
+  }, [symbol, snap, setups]);
 
   return { snap, features, setups };
 }
