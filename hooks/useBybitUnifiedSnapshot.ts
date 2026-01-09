@@ -256,6 +256,24 @@ export function useBybitUnifiedSnapshot(symbol: string) {
 
     binanceWsRef.current = biWs;
     biWs.connect();
+    // -----------------------------
+    // Foreground/online recovery (frontend-only reliability)
+    // -----------------------------
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        // force reconnect attempt (connect() is idempotent in wsClient)
+        try { byWs.connect(); } catch { }
+        try { biWs.connect(); } catch { }
+      }
+    };
+
+    const onOnline = () => {
+      try { byWs.connect(); } catch { }
+      try { biWs.connect(); } catch { }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", onOnline);
 
     // -----------------------------
     // ✅ Bybit REST probe (hard truth)
@@ -286,9 +304,17 @@ export function useBybitUnifiedSnapshot(symbol: string) {
     })();
 
     // probe định kỳ
+    let probing = false;
+
     const probeId = window.setInterval(async () => {
-      const ok = await probeBybitOnce();
-      (bybitStore as any).setProbeAlive?.(ok);
+      if (probing) return;
+      probing = true;
+      try {
+        const ok = await probeBybitOnce();
+        (bybitStore as any).setProbeAlive?.(ok);
+      } finally {
+        probing = false;
+      }
     }, 5000);
 
     // -----------------------------
@@ -307,16 +333,17 @@ export function useBybitUnifiedSnapshot(symbol: string) {
     const unsubBybit = bybitStore.events.on(() => {
       if (scheduled) return;
       scheduled = true;
-      requestAnimationFrame(() => {
+      queueMicrotask(() => {
         scheduled = false;
         setSnapshot(build());
       });
+
     });
 
     const unsubBinance = binanceStore.events.on(() => {
       if (scheduled) return;
       scheduled = true;
-      requestAnimationFrame(() => {
+      queueMicrotask(() => {
         scheduled = false;
         setSnapshot(build());
       });
@@ -337,6 +364,9 @@ export function useBybitUnifiedSnapshot(symbol: string) {
 
       window.clearInterval(intervalId);
       window.clearInterval(probeId);
+
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
 
       byWs.close();
       bybitWsRef.current = null;

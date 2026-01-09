@@ -763,6 +763,7 @@ function deriveExecutionGlobal(ctx: { dqOk: boolean; bybitOk: boolean; staleSec?
  * - this hook enriches each setup with an execution decision separate from setup.status
  * - IMPORTANT: This hook does NOT auto-select. UI must handle user selection.
  */
+
 export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   const { snap, features } = useFeaturesSnapshot(symbol);
 
@@ -885,4 +886,3 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
   return { snap, features, setups };
 }
-
