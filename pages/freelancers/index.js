@@ -43,15 +43,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+} from "../../components/ui/dialog";
+
+import { Textarea } from "../../components/ui/textarea";
+import { Button } from "../../components/ui/button";
 
 
 export default function FreelancerDashboard() {

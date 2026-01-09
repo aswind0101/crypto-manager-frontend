@@ -15,9 +15,9 @@ import EmojiPicker from "emoji-picker-react";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Textarea } from "../../components/ui/textarea";
+import { Button } from "../../components/ui/button";
 import { toast } from "react-hot-toast";
 
 
