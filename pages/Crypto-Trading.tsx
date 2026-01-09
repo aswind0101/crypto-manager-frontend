@@ -371,15 +371,24 @@ function actionChip(
 }
 
 function stableSetupKey(s: TradeSetup): string {
-  if (s?.canon) return String(s.canon);
-  if (s?.id) return String(s.id);
-  const type = String(s?.type ?? "");
-  const side = String(s?.side ?? "");
-  const tf = String(s?.entry_tf ?? "");
-  const mode = String(s?.entry?.mode ?? "");
-  const zlo = Number.isFinite(s?.entry?.zone?.lo) ? (s.entry.zone.lo as number).toFixed(2) : "na";
-  const zhi = Number.isFinite(s?.entry?.zone?.hi) ? (s.entry.zone.hi as number).toFixed(2) : "na";
-  const sl = Number.isFinite(s?.stop?.price) ? (s.stop.price as number).toFixed(2) : "na";
+  const symbol = String((s as any)?.canon ?? "").trim();
+  const type = String((s as any)?.type ?? "").trim();
+  const side = String((s as any)?.side ?? "").trim();
+  const tf = String((s as any)?.entry_tf ?? "").trim();
+  const createdTs = Number((s as any)?.created_ts ?? 0);
+
+  if (symbol && type && side && tf && Number.isFinite(createdTs) && createdTs > 0) {
+    return `${symbol}|${type}|${side}|${tf}|${createdTs}`;
+  }
+
+  // fallback (older shapes)
+  if ((s as any)?.id) return String((s as any).id);
+  if (symbol) return symbol;
+
+  const mode = String((s as any)?.entry?.mode ?? "");
+  const zlo = Number.isFinite((s as any)?.entry?.zone?.lo) ? Number((s as any).entry.zone.lo).toFixed(2) : "na";
+  const zhi = Number.isFinite((s as any)?.entry?.zone?.hi) ? Number((s as any).entry.zone.hi).toFixed(2) : "na";
+  const sl = Number.isFinite((s as any)?.stop?.price) ? Number((s as any).stop.price).toFixed(2) : "na";
   return `${type}|${side}|${tf}|${mode}|z:${zlo}-${zhi}|sl:${sl}`;
 }
 
@@ -746,7 +755,85 @@ function TradingView({
 
   const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
   const out = (setups as unknown as SetupsOutput | null) ?? null;
-    // -----------------------------
+  // -----------------------------
+  // Tracking analytics (frontend-only)
+  // -----------------------------
+  const tracked = useMemo(() => {
+    try {
+      const all = readAllTrackedSetups();
+      return all.filter((r) => r.symbol === symbol);
+    } catch {
+      return [];
+    }
+  }, [symbol, (snap as any)?.price?.ts, out?.setups?.length]);
+
+  const trackedByKey = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const r of tracked) m.set(String(r.key), r);
+    return m;
+  }, [tracked]);
+
+  const trackingSummary = useMemo(() => {
+    const closed = tracked.filter((r) => r.outcome !== "OPEN");
+    const open = tracked.filter((r) => r.outcome === "OPEN");
+
+    const tp1 = closed.filter((r) => r.outcome === "TP1").length;
+    const stop = closed.filter((r) => r.outcome === "STOP").length;
+    const exp = closed.filter((r) => r.outcome === "EXPIRED").length;
+
+    const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+    const avgMfe = avg(closed.map((r) => Number(r.mfe_r) || 0));
+    const avgMae = avg(closed.map((r) => Number(r.mae_r) || 0));
+
+    return {
+      total: tracked.length,
+      open: open.length,
+      closed: closed.length,
+      tp1,
+      stop,
+      expired: exp,
+      tpRate: closed.length ? tp1 / closed.length : 0,
+      stopRate: closed.length ? stop / closed.length : 0,
+      avgMfeR: avgMfe,
+      avgMaeR: avgMae,
+      avgEdge: avgMfe - avgMae,
+    };
+  }, [tracked]);
+
+  const trackingByType = useMemo(() => {
+    const map = new Map<string, { total: number; closed: number; tp1: number; stop: number; expired: number; sumEdge: number }>();
+
+    for (const r of tracked) {
+      const type = String((r as any)?.type ?? "UNKNOWN");
+      const row = map.get(type) ?? { total: 0, closed: 0, tp1: 0, stop: 0, expired: 0, sumEdge: 0 };
+      row.total += 1;
+
+      if (r.outcome !== "OPEN") {
+        row.closed += 1;
+        if (r.outcome === "TP1") row.tp1 += 1;
+        if (r.outcome === "STOP") row.stop += 1;
+        if (r.outcome === "EXPIRED") row.expired += 1;
+
+        const mfe = Number((r as any).mfe_r) || 0;
+        const mae = Number((r as any).mae_r) || 0;
+        row.sumEdge += (mfe - mae);
+      }
+
+      map.set(type, row);
+    }
+
+    const rows = Array.from(map.entries()).map(([type, v]) => {
+      const edgeAvg = v.closed ? v.sumEdge / v.closed : 0;
+      const tpRate = v.closed ? v.tp1 / v.closed : 0;
+      const stopRate = v.closed ? v.stop / v.closed : 0;
+      return { type, ...v, edgeAvg, tpRate, stopRate };
+    });
+
+    rows.sort((a, b) => (b.edgeAvg - a.edgeAvg));
+    return rows;
+  }, [tracked]);
+
+  // -----------------------------
   // Tracking: log summary + last records (dev-only style)
   // -----------------------------
   const lastTrackLogRef = useRef<number>(0);
@@ -1348,6 +1435,26 @@ function TradingView({
                         const pri01 = clamp01(pri / 100);
 
                         const chip = actionChip(s, executionGlobal);
+                        const track = trackedByKey.get(keyStr);
+                        const mfe = track ? Number(track.mfe_r) : NaN;
+                        const mae = track ? Number(track.mae_r) : NaN;
+                        const edge = Number.isFinite(mfe) && Number.isFinite(mae) ? (mfe - mae) : null;
+
+                        const edgePill =
+                          edge == null ? null : edge >= 1.0 ? (
+                            <Pill tone="bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" title={`Edge=${edge.toFixed(2)}R (MFE-MAE)`}>
+                              EDGE +
+                            </Pill>
+                          ) : edge >= 0.3 ? (
+                            <Pill tone="bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30" title={`Edge=${edge.toFixed(2)}R (MFE-MAE)`}>
+                              EDGE OK
+                            </Pill>
+                          ) : (
+                            <Pill tone="bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30" title={`Edge=${edge.toFixed(2)}R (MFE-MAE)`}>
+                              EDGE −
+                            </Pill>
+                          );
+
 
                         return (
                           <div
@@ -1367,6 +1474,7 @@ function TradingView({
                                       MONITOR-ONLY
                                     </Pill>
                                   ) : null}
+                                  {edgePill}
                                 </div>
 
                                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
@@ -1375,6 +1483,15 @@ function TradingView({
                                   <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
                                   <span>•</span>
                                   <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                                  {track ? (
+                                    <>
+                                      <span>•</span>
+                                      <span>MFE {Number.isFinite(mfe) ? mfe.toFixed(2) : "—"}R</span>
+                                      <span>•</span>
+                                      <span>MAE {Number.isFinite(mae) ? mae.toFixed(2) : "—"}R</span>
+                                    </>
+                                  ) : null}
+
                                 </div>
 
                                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
