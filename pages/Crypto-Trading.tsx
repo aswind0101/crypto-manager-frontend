@@ -771,20 +771,85 @@ export default function Page() {
     return uniq.slice(0, 12);
   }, [features?.market_structure]);
   const keyLevelsView = showLevelsMore ? keyLevels : keyLevels.slice(0, 6);
+  function tfToMs(tf: string): number {
+    const s = String(tf || "").trim().toLowerCase();
+    if (!s) return 0;
+
+    // common aliases
+    if (s === "1d" || s === "d" || s === "1day") return 24 * 60 * 60 * 1000;
+
+    const m = s.match(/^(\d+)\s*([mhd])$/);
+    if (!m) return 0;
+    const n = Number(m[1]);
+    const u = m[2];
+    if (!Number.isFinite(n) || n <= 0) return 0;
+
+    if (u === "m") return n * 60 * 1000;
+    if (u === "h") return n * 60 * 60 * 1000;
+    if (u === "d") return n * 24 * 60 * 60 * 1000;
+    return 0;
+  }
+
+  function lastCandleTs(arr: any[]): number | null {
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    const last = arr[arr.length - 1];
+    const ts = Number(last?.ts);
+    return Number.isFinite(ts) ? ts : null;
+  }
 
   // A compact health summary for each TF from snap (stale/partial/availability)
   const tfHealth = useMemo(() => {
-    const tfs = (snap?.timeframes || []).map((x: any) => ({
-      tf: String(x?.tf || ""),
-      stale_ms: Number(x?.diagnostics?.stale_ms),
-      partial: Boolean(x?.diagnostics?.partial),
-      haveCandlesBybit: Array.isArray(x?.candles?.ohlcv) ? x.candles.ohlcv.length : 0,
-      haveCandlesBinance: Array.isArray(x?.candles_binance?.ohlcv) ? x.candles_binance.ohlcv.length : 0,
-      haveTrades: Array.isArray(x?.orderflow?.trades) ? x.orderflow.trades.length : 0,
-      haveOrderbook: Boolean(x?.orderflow?.orderbook),
-    }));
+    const now = Date.now();
+
+    const tfs = (snap?.timeframes || []).map((x: any) => {
+      const tf = String(x?.tf || "");
+
+      const bybitArr = Array.isArray(x?.candles?.ohlcv) ? x.candles.ohlcv : [];
+      const binanceArr = Array.isArray(x?.candles_binance?.ohlcv) ? x.candles_binance.ohlcv : [];
+
+      const haveCandlesBybit = bybitArr.length;
+      const haveCandlesBinance = binanceArr.length;
+
+      // Prefer bybit last candle; fallback to binance
+      const lastTs =
+        lastCandleTs(bybitArr) ??
+        lastCandleTs(binanceArr);
+
+      const tfMs = tfToMs(tf);
+      const ageMs = lastTs != null ? Math.max(0, now - lastTs) : NaN;
+
+      // staleBars = how many full TF intervals behind "now"
+      const staleBars =
+        Number.isFinite(ageMs) && tfMs > 0 ? Math.floor(ageMs / tfMs) : NaN;
+
+      // If backend provides diagnostics.stale_ms and it's > 0, you can keep it as reference,
+      // but we will prefer computed ageMs for display.
+      const backendStaleMs = Number(x?.diagnostics?.stale_ms);
+
+      const partial =
+        Boolean(x?.diagnostics?.partial) ||
+        (haveCandlesBybit === 0 && haveCandlesBinance === 0);
+
+      return {
+        tf,
+        // computed
+        tfMs,
+        lastTs,
+        ageMs,
+        staleBars,
+        // raw/backend
+        backendStaleMs,
+        partial,
+        haveCandlesBybit,
+        haveCandlesBinance,
+        haveTrades: Array.isArray(x?.orderflow?.trades) ? x.orderflow.trades.length : 0,
+        haveOrderbook: Boolean(x?.orderflow?.orderbook),
+      };
+    });
+
     return tfs.sort((a, b) => a.tf.localeCompare(b.tf));
   }, [snap?.timeframes]);
+
   const [showTfHealthMore, setShowTfHealthMore] = useState(false);
 
   const tfHealthPrimary = useMemo(() => {
@@ -1405,27 +1470,48 @@ export default function Page() {
                         <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
                       ) : (
                         tfHealthView.map((t) => {
-                          const staleMs = Number.isFinite(t.stale_ms) ? t.stale_ms : NaN;
+                          const bars = Number.isFinite(t.staleBars) ? t.staleBars : NaN;
+
+                          // Tone by bars behind (more meaningful than 1.5s/5s for candles)
                           const staleTone =
-                            Number.isFinite(staleMs) && staleMs <= 1500
+                            Number.isFinite(bars) && bars <= 0
                               ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                              : Number.isFinite(staleMs) && staleMs <= 5000
+                              : Number.isFinite(bars) && bars <= 1
                                 ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
                                 : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
 
+                          const staleLabel =
+                            Number.isFinite(bars)
+                              ? (bars === 0 ? "0 bars" : `${bars} bars`)
+                              : "—";
+
+                          const countLabel = `B:${t.haveCandlesBybit} / N:${t.haveCandlesBinance}`;
+
                           return (
-                            <div key={t.tf} className="flex items-center justify-between rounded-xl border border-white/10 bg-zinc-950/30 px-3 py-2">
-                              <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
+                            <div
+                              key={t.tf}
+                              className="flex items-center justify-between rounded-xl border border-white/10 bg-zinc-950/30 px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
+                                <div className="mt-1 text-[11px] text-zinc-400">
+                                  {countLabel}
+                                  {Number.isFinite(t.lastTs) ? ` • last ${relTime(t.lastTs)}` : ""}
+                                </div>
+                              </div>
+
                               <div className="flex items-center gap-2">
-                                <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />}>
-                                  {Number.isFinite(staleMs) ? `${fmtNum(staleMs / 1000, 1)}s` : "—"}
+                                <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />} title="Bars behind current time">
+                                  {staleLabel}
                                 </Pill>
+
                                 <Pill
                                   tone={
                                     t.partial
                                       ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
                                       : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
                                   }
+                                  title={t.partial ? "Data incomplete for this TF" : "Data complete"}
                                 >
                                   {t.partial ? "PARTIAL" : "OK"}
                                 </Pill>
