@@ -116,8 +116,19 @@ function writeStore(doc: StoreDoc) {
 }
 
 function setupKey(setup: any): string {
-  return String(setup?.canon ?? setup?.id ?? "").trim();
+  const symbol = String(setup?.canon ?? "").trim();
+  const type = String(setup?.type ?? "").trim();
+  const side = String(setup?.side ?? "").trim();
+  const tf = String(setup?.entry_tf ?? "").trim();
+  const entryTs = Number(setup?.entry?.ts ?? setup?.entry_ts ?? 0);
+
+  if (!symbol || !type || !side || !tf || !Number.isFinite(entryTs)) {
+    return "";
+  }
+
+  return `${symbol}|${type}|${side}|${tf}|${entryTs}`;
 }
+
 
 function extractEntryAnchor(setup: any): number | undefined {
   const zone = setup?.entry?.zone;
