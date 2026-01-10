@@ -732,6 +732,7 @@ function TradingView({
   setPaused,
   onAnalyze,
   onEnterInput,
+  exportReqId,
 }: {
   symbol: string;
   paused: boolean;
@@ -740,9 +741,60 @@ function TradingView({
   setPaused: React.Dispatch<React.SetStateAction<boolean>>;
   onAnalyze: () => void;
   onEnterInput: React.KeyboardEventHandler<HTMLInputElement>;
+  //Testing purposes only
+  exportReqId: number;
 }) {
 
   const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
+  // Debug export: allow capturing the exact inputs/outputs used for setup generation.
+  const lastExportedReqIdRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!exportReqId) return;
+    if (lastExportedReqIdRef.current === exportReqId) return;
+
+    // Wait until we have meaningful payload
+    if (!snap || !features) return;
+
+    const safeIso = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `ct-debug-${symbol}-${safeIso}.json`;
+
+    const payload = {
+      meta: {
+        kind: "ct_debug_export",
+        version: 1,
+        exported_at: new Date().toISOString(),
+        symbol,
+        paused,
+      },
+      // Raw unified snapshot (Bybit/Binance + cross exchange)
+      snap,
+      // Feature snapshot used by scoring/engine
+      features,
+      // Engine outputs as currently shown by UI
+      setups,
+    };
+
+    try {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      lastExportedReqIdRef.current = exportReqId;
+    } catch (e) {
+      // If download fails (e.g., blocked), avoid retrying in a tight loop
+      lastExportedReqIdRef.current = exportReqId;
+      // eslint-disable-next-line no-console
+      console.warn("[ct] debug export failed", e);
+    }
+  }, [exportReqId, snap, features, setups, symbol, paused]);
+
   const out = (setups as unknown as SetupsOutput | null) ?? null;
   const executionGlobal = useMemo(() => {
     // Prefer hook-level fields, fall back to out.* if present.
@@ -1768,6 +1820,7 @@ export default function Page() {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("ct_paused") === "1";
   });
+  const [exportReqId, setExportReqId] = useState<number>(0);
 
   useEffect(() => {
     try {
@@ -1787,18 +1840,38 @@ export default function Page() {
     } catch { }
   }, [paused]);
 
-
+  /*
+    const onAnalyze = () => {
+      const cleaned = String(inputSymbol || "").trim().toUpperCase();
+      if (!cleaned) return;
+      setSymbol(cleaned);
+    };
+  */
+  //New onAnalyze for testing
   const onAnalyze = () => {
     const cleaned = String(inputSymbol || "").trim().toUpperCase();
     if (!cleaned) return;
+    setExportReqId((x) => x + 1);
     setSymbol(cleaned);
   };
-
 
   const onEnterInput: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === "Enter") onAnalyze();
   };
-
+  /*Unlock this after testing
+    return (
+      <TradingView
+        key={symbol}
+        symbol={symbol}
+        paused={paused}
+        inputSymbol={inputSymbol}
+        setInputSymbol={setInputSymbol}
+        setPaused={setPaused}
+        onAnalyze={onAnalyze}
+        onEnterInput={onEnterInput}
+      />
+    );
+    */
   return (
     <TradingView
       key={symbol}
@@ -1809,6 +1882,7 @@ export default function Page() {
       setPaused={setPaused}
       onAnalyze={onAnalyze}
       onEnterInput={onEnterInput}
+      exportReqId={exportReqId}
     />
   );
 }
