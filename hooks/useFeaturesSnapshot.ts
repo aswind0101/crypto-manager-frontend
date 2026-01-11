@@ -3,22 +3,32 @@ import type { UnifiedSnapshot } from "../lib/feeds/snapshot/unifiedTypes";
 import type { FeaturesSnapshot, FeatureEngineInput } from "../lib/feeds/features/types";
 import { computeFeatures } from "../lib/feeds/features/engine";
 import { useBybitUnifiedSnapshot } from "./useBybitUnifiedSnapshot";
+import type { Candle } from "../lib/feeds/core/types";
+
 
 // Helper: lấy candles theo tf từ snapshot.timeframes
 function extractCandles(snap: UnifiedSnapshot, tf: any, src: "bybit" | "binance") {
   const tfNode: any = snap.timeframes.find((x: any) => x.tf === tf);
   if (!tfNode) return undefined;
 
-  if (src === "bybit") {
-    return tfNode?.candles?.ohlcv;
+  const raw: Candle[] | undefined =
+    src === "bybit"
+      ? tfNode?.candles?.ohlcv
+      : src === "binance"
+        ? tfNode?.candles_binance?.ohlcv
+        : undefined;
+
+  if (!Array.isArray(raw) || raw.length === 0) return raw;
+
+  // ✅ Only use closed candles for feature computation
+  const last = raw[raw.length - 1];
+  if (last && last.confirm === false) {
+    return raw.slice(0, -1);
   }
 
-  if (src === "binance") {
-    return tfNode?.candles_binance?.ohlcv;
-  }
-
-  return undefined;
+  return raw;
 }
+
 
 export function useFeaturesSnapshot(symbol: string) {
   const snap = useBybitUnifiedSnapshot(symbol);

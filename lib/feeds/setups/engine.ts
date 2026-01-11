@@ -292,42 +292,46 @@ function applyQualityGates(args: {
   f: FeaturesSnapshot;
   px: number;
   atrp: number;
-}): { ok: true; tagsAdd: string[]; reasonsAdd: string[] } | { ok: false; rejectCodes: string[]; rejectNotes: string[] } {
+}):
+  | { ok: true; tagsAdd: string[]; reasonsAdd: string[] }
+  | { ok: false; rejectCodes: string[]; rejectNotes: string[] } {
   const { setup, f, px, atrp } = args;
 
-  // Conflict kill-switch: kill if >=2 MAJOR conflicts
+  // Conflicts are NOT gates (soft context only)
   const conflicts = detectConflicts(f, setup.side);
   const major = conflicts.filter((c) => c.severity === "MAJOR");
-  if (major.length >= 2) {
+  const minor = conflicts.filter((c) => c.severity === "MINOR");
+
+  // Final invariants (this is a true gate: invalid setup mechanics)
+  const inv = validateSetupInvariant({ setup, px, atrp });
+  if (inv.ok === false) {
     return {
       ok: false,
-      rejectCodes: ["REJECT_CONFLICT_KILL", ...major.map((m) => m.code)],
-      rejectNotes: major.map((m) => m.note),
+      rejectCodes: ["REJECT_INVARIANT", ...inv.codes],
+      rejectNotes: inv.notes,
     };
   }
 
-  // Final invariants
-  const inv = validateSetupInvariant({ setup, px, atrp });
-  if (inv.ok === false) {
-    return { ok: false, rejectCodes: ["REJECT_INVARIANT", ...inv.codes], rejectNotes: inv.notes };
-  }
-
-  // If we have 1 MAJOR conflict, keep but mark as cautious (monitor bias)
   const tagsAdd: string[] = [];
   const reasonsAdd: string[] = [];
-  if (major.length === 1) {
+
+  // Major conflicts -> caution + explicit reasons (but never kill)
+  if (major.length > 0) {
     tagsAdd.push("caution");
-    reasonsAdd.push(`Caution: ${major[0].note}`);
+    tagsAdd.push("conflict_major");
+    // Keep reasons bounded to avoid UI overload
+    reasonsAdd.push(...major.slice(0, 2).map((m) => `Major conflict: ${m.note}`));
   }
 
   // Minor conflicts -> annotate only
-  const minor = conflicts.filter((c) => c.severity === "MINOR");
-  if (minor.length) {
+  if (minor.length > 0) {
+    tagsAdd.push("conflict_minor");
     reasonsAdd.push(...minor.slice(0, 2).map((m) => `Weakness: ${m.note}`));
   }
 
   return { ok: true, tagsAdd, reasonsAdd };
 }
+
 
 function pickPrimarySetup(setups: TradeSetup[]): TradeSetup | undefined {
   if (!setups.length) return undefined;
@@ -436,13 +440,28 @@ export function buildSetups(args: {
   const ts = now();
 
   const telemetry = {
-    gate: "OK" as "OK" | "DQ_NOT_OK" | "NO_PRICE",
+    gate: "OK" as "OK" | "DQ_NOT_OK" | "NO_PRICE" | "GRADE_D",
     candidates: 0,
     accepted: 0,
     rejected: 0,
     rejectByCode: {} as Record<string, number>,
     rejectNotesSample: [] as string[],
+
+    // readiness is populated only when candidates === 0 and gate === "OK"
+    readiness: undefined as undefined | { state: "NO_SIGNAL"; items: Array<{ key: string; note: string }> },
   };
+
+  // Readiness collector (pure telemetry; does not affect gating)
+  const readinessItems: Array<{ key: string; note: string }> = [];
+  const addReadiness = (key: string, note: string) => {
+    const k = String(key || "").trim();
+    const n = String(note || "").trim();
+    if (!k || !n) return;
+    // de-dup by (key + note) to avoid spam
+    if (readinessItems.some((x) => x.key === k && x.note === n)) return;
+    readinessItems.push({ key: k, note: n });
+  };
+
 
   const bumpReject = (codes: string[], notes: string[]) => {
     for (const c of codes) {
@@ -480,11 +499,27 @@ export function buildSetups(args: {
   const { below, above } = nearestLevels(levels, px);
   const atrp = atrProxyFromFeatures(f);
   const common = scoreCommon(f);
+  if (!below || !above) {
+    addReadiness("levels", "Insufficient nearby pivot levels (need both below and above) to form zones/targets");
+  }
+  // Global market-quality gate: scoring is the single source of truth.
+  // Grade D => do not publish any setup (engine must not produce monitor noise).
+  if (common.grade === "D") {
+    telemetry.gate = "GRADE_D";
+    return { ts, dq_ok: true, setups: [], preferred_id: undefined, telemetry };
+  }
+
 
   const setups: TradeSetup[] = [];
   const biasMeta = getBiasCompleteness(snap, f);
   const bias_incomplete = !biasMeta.complete;
   const biasSide = pickBiasSide(f);
+  if (!biasSide) {
+    addReadiness("trend_pullback", `Trend pullback skipped: bias side not available (trend_dir=${String(f.bias?.trend_dir ?? "n/a")})`);
+  } else if (bias_incomplete) {
+    addReadiness("trend_pullback", `Trend pullback skipped: HTF bias incomplete (${biasMeta.tf} ${biasMeta.count}/${biasMeta.need})`);
+  }
+
   const tryAccept = (s: TradeSetup) => {
     telemetry.candidates += 1;
 
@@ -557,12 +592,20 @@ export function buildSetups(args: {
 
     ];
     const rrNeed = (!bs.ok || !ht.ok || !dOk.ok) ? 1.8 : 1.5;
-    const ready = rr1 >= rrNeed && common.grade !== "D";
+    const ready = rr1 >= rrNeed;
 
+    // Setup-specific adjustments should be light; common.score already encodes most market-quality themes.
     let confScore = Math.min(100, common.score + (rr1 >= 2 ? 6 : 0) + 4);
-    if (!bs.ok) confScore = Math.max(0, confScore - 8);
-    if (!ht.ok) confScore = Math.max(0, confScore - 10);
-    if (!dOk.ok) confScore = Math.max(0, confScore - 6);
+
+    // Bias strength: mild penalty (trend theme already covers ADX/slope; this is a setup readiness nuance).
+    if (!bs.ok) confScore = Math.max(0, confScore - 4);
+
+    // HTF MS confirm: moderate penalty (scoring MS theme is soft; engine uses a stricter structural requirement).
+    if (!ht.ok) confScore = Math.max(0, confScore - 5);
+
+    // Strong opposite divergence is a real execution risk; keep meaningful penalty.
+    if (!dOk.ok) confScore = Math.max(0, confScore - 7);
+
 
     const s: TradeSetup = {
       id: stableSetupId({
@@ -610,8 +653,15 @@ export function buildSetups(args: {
       confidence: {
         score: confScore,
         grade: gradeFromScore(confScore),
-        reasons: [...common.reasons, "Trend pullback in bias direction"],
+        reasons: [
+          ...common.reasons,
+          "Trend pullback in bias direction",
+          ...(!bs.ok ? [`Weakness: Bias strength (${bs.note})`] : []),
+          ...(!ht.ok ? [`Weakness: HTF MS (${ht.note})`] : []),
+          ...(!dOk.ok ? [`Weakness: Delta (${dOk.note})`] : []),
+        ],
       },
+
 
       tags: ["intraday", "pullback", f.bias.trend_dir],
     };
@@ -668,9 +718,15 @@ export function buildSetups(args: {
     const ht = htfConfirm(f, dir);
     const dOk = deltaOk(f, dir);
 
+    // Setup-specific adjustments should be light; do not re-penalize what scoring already captured.
     let confScore = Math.min(100, common.score + 7);
-    if (!ht.ok) confScore = Math.max(0, confScore - 12);
-    if (!dOk.ok) confScore = Math.max(0, confScore - 6);
+
+    // HTF confirm is structural; moderate penalty.
+    if (!ht.ok) confScore = Math.max(0, confScore - 5);
+
+    // Strong opposite divergence is a real execution risk; keep meaningful penalty.
+    if (!dOk.ok) confScore = Math.max(0, confScore - 7);
+
 
     if (bias_incomplete) {
       confScore = Math.floor(confScore * 0.70);
@@ -679,7 +735,7 @@ export function buildSetups(args: {
 
     const rrNeedBase = bias_incomplete ? 1.8 : 1.5;
     const rrNeed = (!ht.ok || !dOk.ok) ? (rrNeedBase + 0.2) : rrNeedBase;
-    const ready = rr1 >= rrNeed && common.grade !== "D";
+    const ready = rr1 >= rrNeed;
 
 
     const s: TradeSetup = {
@@ -719,8 +775,8 @@ export function buildSetups(args: {
                 : `Bias ${f.bias.trend_dir} (${f.bias.tf})`,
             },
             { key: "bos", ok: true, note: `BOS ${bos.dir} @ ${level.toFixed(2)} (15m)` },
-            { key: "delta", ok: deltaOk(f, dir).ok, note: `Delta: ${deltaOk(f, dir).note}` },
-            { key: "htf_ms", ok: htfConfirm(f, dir).ok, note: `HTF MS: ${htfConfirm(f, dir).note}` },
+            { key: "delta", ok: dOk.ok, note: `Delta: ${dOk.note}` },
+            { key: "htf_ms", ok: ht.ok, note: `HTF MS: ${ht.note}` },
             { key: "level", ok: true, note: `Break ${dir === "LONG" ? "R" : "S"} @ ${level.toFixed(2)}` },
             { key: "retest", ok: false, note: `Wait retest zone [${zone.lo.toFixed(2)}–${zone.hi.toFixed(2)}]` },
           ],
@@ -746,6 +802,8 @@ export function buildSetups(args: {
           "BOS detected (15m)",
           "Retest-based breakout plan",
           ...(bias_incomplete ? [`HTF bias incomplete (${biasMeta.tf})`] : []),
+          ...(!ht.ok ? [`Weakness: HTF MS (${ht.note})`] : []),
+          ...(!dOk.ok ? [`Weakness: Delta (${dOk.note})`] : []),
         ],
       },
 
@@ -757,8 +815,16 @@ export function buildSetups(args: {
 
 
     createdStructureBreakout = true;
+  } else {
+    if (!bos) {
+      addReadiness("breakout_retest", "Breakout+Retest skipped: no 15m BOS available");
+    } else if (typeof bos.level !== "number" || typeof bos.ts !== "number") {
+      addReadiness("breakout_retest", "Breakout+Retest skipped: 15m BOS invalid (missing level/ts)");
+    } else {
+      const ageMin = Math.round((ts - Number(bos.ts)) / 60000);
+      addReadiness("breakout_retest", `Breakout+Retest skipped: 15m BOS stale (age ${ageMin}m > 90m)`);
+    }
   }
-
   /**
    * 2b) BREAKOUT (legacy: squeeze → expansion)
    * - Keep as fallback when structure BOS is not available/fresh.
@@ -767,7 +833,12 @@ export function buildSetups(args: {
     // Need squeeze: BB width very low
     const width = f.entry.volatility.bbWidth_15m;
     const squeeze = typeof width === "number" ? width < 0.02 : false;
-
+    if (!squeeze) {
+      addReadiness("breakout_squeeze", `Breakout(squeeze) skipped: no squeeze (bbWidth15m=${fmtNum(width, 4)})`);
+    }
+    if (squeeze && (!below || !above)) {
+      addReadiness("breakout_squeeze", "Breakout(squeeze) skipped: missing below/above levels for break selection");
+    }
     if (squeeze && below && above) {
       // pick direction: bias if present else mean cross
       let dir: SetupSide = "LONG";
@@ -794,7 +865,7 @@ export function buildSetups(args: {
         confScore = Math.min(confScore, 84);
       }
 
-      const ready = rr1 >= (bias_incomplete ? 1.8 : 1.5) && common.grade !== "D";
+      const ready = rr1 >= (bias_incomplete ? 1.8 : 1.5);
 
       const s: TradeSetup = {
         id: stableSetupId({
@@ -863,6 +934,7 @@ export function buildSetups(args: {
 
     }
   }
+
   /**
    * 2c) LIQUIDITY_SWEEP_REVERSAL (Task 3.4c)
    * - New archetype (does NOT override RANGE_MEAN_REVERT)
@@ -888,7 +960,9 @@ export function buildSetups(args: {
     if (ok1h) return { ms: ms1h, sweep: sweep1h };
     return null;
   })();
-
+  if (!sweepPick) {
+    addReadiness("lsr", "LSR skipped: no fresh sweep on 15m/1h within freshness windows");
+  }
   if (sweepPick) {
     const { ms: msSrc, sweep } = sweepPick;
 
@@ -903,11 +977,17 @@ export function buildSetups(args: {
 
     // TP at opposite swing if available
     const oppSwing = side === "LONG" ? msSrc?.lastSwingHigh : msSrc?.lastSwingLow;
+    if (!oppSwing || typeof oppSwing.price !== "number") {
+      addReadiness("lsr", "LSR skipped: opposite swing target not available (need lastSwingHigh/Low)");
+    }
     if (oppSwing && typeof oppSwing.price === "number") {
       const tp1 = oppSwing.price;
 
       const entryMid = (zone.lo + zone.hi) / 2;
       const rr1 = rr(entryMid, sl, tp1, side);
+      if (rr1 < LSR_RR_MIN) {
+        addReadiness("lsr", `LSR skipped: RR ${rr1.toFixed(2)} < ${LSR_RR_MIN.toFixed(2)}`);
+      }
 
       if (rr1 >= LSR_RR_MIN) {
         // READY only when current price is back in entry zone (using px close; intrabar mid is handled elsewhere)
@@ -1019,7 +1099,9 @@ export function buildSetups(args: {
           }
         }
       }
-
+      if (!hasDisplacement) {
+        addReadiness("failed_sweep_cont", "Failed-sweep continuation skipped: no displacement wick through BOS level in recent confirmed candles");
+      }
       if (hasDisplacement && wickExtreme != null) {
         const zone = makeRetestZone(level, atrp, dir);
 
@@ -1042,7 +1124,7 @@ export function buildSetups(args: {
 
         // Continuation should have decent RR, but not as strict as LSR
         const rrNeed = bias_incomplete ? 2.1 : 2.0;
-        const ready = rr1 >= rrNeed && common.grade !== "D" && (px >= zone.lo && px <= zone.hi);
+        const ready = rr1 >= rrNeed && (px >= zone.lo && px <= zone.hi);
 
         // Confidence: breakout + displacement premium; cap if HTF bias incomplete
         let confScore = Math.min(100, common.score + 8);
@@ -1070,7 +1152,10 @@ export function buildSetups(args: {
           bias_tf: f.bias.tf,
           trigger_tf: "5m",
 
-          status: (rr1 >= rrNeed && common.grade !== "D") ? (ready ? "READY" : "FORMING") : "FORMING",
+          status: rr1 >= rrNeed
+            ? (ready ? "READY" : "FORMING")
+            : "FORMING",
+
           created_ts: ts,
           expires_ts: ts + 1000 * 60 * 60,
 
@@ -1124,8 +1209,16 @@ export function buildSetups(args: {
 
       }
     }
+  } else {
+    addReadiness("failed_sweep_cont", "Failed-sweep continuation skipped: no valid 15m BOS (missing level/ts)");
   }
+
+
+
   // 3) RANGE_MEAN_REVERT (bias sideways) — B+ policy: allowed even when HTF bias incomplete (with stricter RR)
+  if (f.bias.trend_dir !== "sideways") {
+    addReadiness("range_mr", `Range MR skipped: bias not sideways (trend_dir=${String(f.bias?.trend_dir ?? "n/a")})`);
+  }
   if (f.bias.trend_dir === "sideways" && below && above) {
     const nearSupport = Math.abs(px - below.price) / px < 0.002;
     const nearRes = Math.abs(px - above.price) / px < 0.002;
@@ -1224,6 +1317,17 @@ export function buildSetups(args: {
   const primary = pickPrimarySetup(setups);
 
   if (!primary) {
+    // Only publish readiness when there were no candidates at all (true no-signal case)
+    if (telemetry.gate === "OK" && telemetry.candidates === 0) {
+      if (readinessItems.length === 0) {
+        addReadiness("no_signal", "No candidate patterns matched the current market structure and regime");
+      }
+      telemetry.readiness = {
+        state: "NO_SIGNAL",
+        items: readinessItems.slice(0, 10), // bounded for UI
+      };
+    }
+
     return { ts, dq_ok: true, preferred_id: undefined, setups: [], telemetry };
   }
 

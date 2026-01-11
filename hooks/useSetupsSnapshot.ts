@@ -1,7 +1,8 @@
 import { useMemo, useRef } from "react";
 import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
-import type { ExecutionDecision } from "../lib/feeds/setups/types";
+import { gradeFromScore } from "../lib/feeds/setups/scoring";
+import type { ExecutionDecision, SetupTelemetry } from "../lib/feeds/setups/types";
 
 
 type Candle = {
@@ -743,6 +744,254 @@ function deriveExecutionDecision(
     reason: "No execution action",
   };
 }
+function deriveSetupTelemetry(setup: any, execution: ExecutionDecision | undefined): SetupTelemetry {
+  const checklist = Array.isArray(setup?.entry?.trigger?.checklist)
+    ? (setup.entry.trigger.checklist as Array<{ key?: unknown; ok?: unknown }>)
+    : [];
+
+  const keys = checklist
+    .map((x) => String(x?.key ?? "").trim())
+    .filter((k) => k.length > 0);
+
+  // Stable unique keys (preserve checklist order, de-dupe)
+  const seen = new Set<string>();
+  const orderedKeys = keys.filter((k) => {
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  const total = orderedKeys.length;
+
+  const passed = new Set<string>();
+  const blocked = new Set<string>();
+
+  for (const item of checklist) {
+    const key = String(item?.key ?? "").trim();
+    if (!key) continue;
+    if (item?.ok === true) passed.add(key);
+    if (item?.ok === false) blocked.add(key);
+  }
+
+  // Keep stable ordering (checklist order), but de-duped.
+  const passedTriggers = orderedKeys.filter((k) => passed.has(k) && !blocked.has(k));
+  const triggerBlockers = orderedKeys.filter((k) => blocked.has(k));
+
+  let progressPct = 0;
+  if (total > 0) {
+    progressPct = Math.round((passedTriggers.length / total) * 100);
+  } else {
+    const st = String(setup?.status ?? "");
+    // If a setup is READY/TRIGGERED with no checklist, treat as complete.
+    if (st === "READY" || st === "TRIGGERED") progressPct = 100;
+  }
+
+  const execBlockers = Array.isArray(execution?.blockers)
+    ? (execution!.blockers as string[])
+    : undefined;
+
+  return {
+    totalTriggers: total,
+    passedTriggers,
+    triggerBlockers,
+    progressPct,
+    executionState: execution?.state,
+    executionBlockers: execBlockers,
+  };
+}
+function withTemporalTelemetry(
+  key: string,
+  setupStatus: string,
+  base: SetupTelemetry,
+  nowTs: number,
+  history: Map<
+    string,
+    {
+      firstSeenTs: number;
+      lastSeenTs: number;
+      lastProgressPct: number;
+      lastChangeTs: number;
+      lastStatus: string;
+    }
+  >
+): SetupTelemetry {
+  if (!key) return base;
+
+  const prev = history.get(key);
+  const progressPct = Number.isFinite(base?.progressPct) ? Number(base.progressPct) : 0;
+
+  if (!prev) {
+    const init = {
+      firstSeenTs: nowTs,
+      lastSeenTs: nowTs,
+      lastProgressPct: progressPct,
+      lastChangeTs: nowTs,
+      lastStatus: String(setupStatus ?? ""),
+    };
+    history.set(key, init);
+
+    return {
+      ...base,
+      firstSeenTs: init.firstSeenTs,
+      lastSeenTs: init.lastSeenTs,
+      ageMs: 0,
+      lastProgressPct: init.lastProgressPct,
+      progressDeltaPct: 0,
+      lastChangeTs: init.lastChangeTs,
+      stalledMs: String(setupStatus ?? "") === "FORMING" ? 0 : 0,
+    };
+  }
+
+  const nextLastSeen = nowTs;
+
+  const statusNow = String(setupStatus ?? "");
+  const statusPrev = String(prev.lastStatus ?? "");
+
+  const progressPrev = Number.isFinite(prev.lastProgressPct) ? prev.lastProgressPct : progressPct;
+  const progressDeltaPct = progressPct - progressPrev;
+
+  // Define "change" as: status changed OR progress changed (integer pct)
+  const progressChanged = Math.round(progressPct) !== Math.round(progressPrev);
+  const statusChanged = statusNow !== statusPrev;
+
+  const lastChangeTs = (progressChanged || statusChanged) ? nowTs : prev.lastChangeTs;
+
+  const ageMs = Math.max(0, nextLastSeen - prev.firstSeenTs);
+  const stalledMs = statusNow === "FORMING" ? Math.max(0, nextLastSeen - lastChangeTs) : 0;
+
+  history.set(key, {
+    firstSeenTs: prev.firstSeenTs,
+    lastSeenTs: nextLastSeen,
+    lastProgressPct: progressPct,
+    lastChangeTs,
+    lastStatus: statusNow,
+  });
+
+  return {
+    ...base,
+    firstSeenTs: prev.firstSeenTs,
+    lastSeenTs: nextLastSeen,
+    ageMs,
+    lastProgressPct: progressPrev,
+    progressDeltaPct,
+    lastChangeTs,
+    stalledMs,
+  };
+}
+
+function scaleConfidenceForReadiness(setup: any, execution: any, telemetry?: SetupTelemetry) {
+  const raw = Number(setup?.confidence?.score ?? 0);
+  const status = String(setup?.status ?? "");
+  const state = String(execution?.state ?? "");
+  const blockers = Array.isArray(execution?.blockers) ? execution.blockers : [];
+
+  // Preserve engine score as-is for READY/TRIGGERED; scale only in FORMING (execution-readiness phase).
+  if (status !== "FORMING") {
+    return {
+      confidence: setup?.confidence,
+      confidence_raw: setup?.confidence, // keep a reference for export/debug
+    };
+  }
+
+  // Derive trigger progress from the setup's trigger checklist (if present).
+  // Do not infer from text; rely on checklist's ok flags.
+  // Prefer telemetry progress (single source of truth). Fallback to checklist if missing.
+  let progress01 = Number.isFinite(telemetry?.progressPct)
+    ? Math.max(0, Math.min(1, (telemetry!.progressPct as number) / 100))
+    : NaN;
+
+  let total = 0;
+  let passed = 0;
+
+  if (!Number.isFinite(progress01)) {
+    const checklist = Array.isArray(setup?.entry?.trigger?.checklist) ? setup.entry.trigger.checklist : [];
+    const keyed = checklist
+      .filter((c: any) => c && typeof c.key === "string" && c.key.trim().length > 0)
+      .map((c: any) => ({ key: c.key.trim(), ok: c.ok }));
+
+    total = keyed.length;
+    passed = keyed.filter((c: any) => c.ok === true).length;
+    progress01 = total > 0 ? passed / total : NaN;
+  } else {
+    total = Number(telemetry?.totalTriggers ?? 0);
+    passed = Array.isArray(telemetry?.passedTriggers) ? telemetry!.passedTriggers.length : 0;
+  }
+
+  let adj = raw;
+
+  if (Number.isFinite(progress01)) {
+    // Progress-based scaling:
+    // - FORMING always has some penalty (not execution-ready).
+    // - The closer to completion, the smaller the penalty.
+    // - Keep the scale soft; do not collapse confidence to zero.
+    const remaining = 1 - progress01; // 0..1
+    const basePenalty = 4; // constant for any FORMING
+    const progressPenalty = Math.round(16 * remaining); // 0..16
+
+    adj -= basePenalty + progressPenalty;
+
+    // Blockers (explicit unmet conditions) — keep small to avoid double-counting with progress.
+    if (blockers.length > 0) {
+      adj -= Math.min(6, blockers.length * 2);
+    }
+
+    // Execution state nuance (only when FORMING)
+    if (state === "WAIT_ZONE") adj -= 2;
+    else if (
+      state === "WAIT_CLOSE" ||
+      state === "WAIT_RECLAIM" ||
+      state === "WAIT_TOUCH" ||
+      state === "WAIT_RETEST"
+    ) {
+      adj -= 3;
+    }
+  } else {
+    // Fallback: checklist absent/unusable — use the previous conservative heuristic.
+    // Base penalty: FORMING means not structurally/execution-ready yet.
+    adj -= 8;
+
+    // Checklist blockers: each blocker is an explicit unmet condition.
+    if (blockers.length > 0) {
+      adj -= Math.min(12, blockers.length * 4);
+    }
+
+    // Execution state nuance (only when FORMING)
+    if (state === "WAIT_ZONE") adj -= 4;
+    else if (
+      state === "WAIT_CLOSE" ||
+      state === "WAIT_RECLAIM" ||
+      state === "WAIT_TOUCH" ||
+      state === "WAIT_RETEST"
+    )
+      adj -= 6;
+  }
+
+  // Clamp
+  const score = Math.max(0, Math.min(100, Math.round(adj)));
+
+  // Keep reasons minimal; do not spam.
+  const reasonsBase: string[] = Array.isArray(setup?.confidence?.reasons) ? setup.confidence.reasons : [];
+  const reasons = [...reasonsBase];
+
+  const delta = score - raw;
+
+  // Add at most 1 readiness note (progress-aware when possible)
+  if (Number.isFinite(progress01)) {
+    const pct = Math.round(progress01 * 100);
+    reasons.push(`Readiness: FORMING ${pct}% (${passed}/${total}) (${delta >= 0 ? "+" : ""}${delta})`);
+  } else {
+    reasons.push(`Readiness: FORMING (${delta >= 0 ? "+" : ""}${delta})`);
+  }
+
+  const confidence = {
+    ...setup.confidence,
+    score,
+    grade: gradeFromScore(score),
+    reasons,
+  };
+
+  return { confidence, confidence_raw: setup?.confidence };
+}
 
 function deriveExecutionGlobal(ctx: { dqOk: boolean; bybitOk: boolean; staleSec?: number; paused: boolean }) {
   const reasons: string[] = [];
@@ -832,6 +1081,19 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     ts: number;
   } | null>(null);
   const engineCacheRef = useRef<{ key: string; base: any } | null>(null);
+  // Temporal readiness history (client-side): track age/stall/progress deltas
+  const telemetryHistoryRef = useRef<
+    Map<
+      string,
+      {
+        firstSeenTs: number;
+        lastSeenTs: number;
+        lastProgressPct: number;
+        lastChangeTs: number;
+        lastStatus: string;
+      }
+    >
+  >(new Map());
 
   const setups = useMemo(() => {
     if (!snap || !features) return null;
@@ -840,6 +1102,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     if (prevSymbolRef.current !== symbol) {
       prevSymbolRef.current = symbol;
       statusCacheRef.current.clear();
+      telemetryHistoryRef.current.clear();
     }
 
     const base = buildSetups({ snap, features });
@@ -881,10 +1144,28 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     };
 
     const enriched = Array.isArray(scored?.setups)
-      ? scored.setups.map((s: any) => ({
-        ...s,
-        execution: deriveExecutionDecision(s, ctx),
-      }))
+      ? scored.setups.map((s: any) => {
+        const execution = deriveExecutionDecision(s, ctx);
+        const { confidence, confidence_raw } = scaleConfidenceForReadiness(s, execution);
+
+        const baseTelemetry = deriveSetupTelemetry(s, execution);
+        const tKey = String(s?.canon ?? s?.id ?? "");
+        const telemetry = withTemporalTelemetry(
+          tKey,
+          String(s?.status ?? ""),
+          baseTelemetry,
+          Date.now(),
+          telemetryHistoryRef.current
+        );
+
+        return {
+          ...s,
+          execution,
+          telemetry,
+          confidence,        // UI uses this (scaled for FORMING)
+          confidence_raw,    // keep engine score for debug/export
+        };
+      })
       : scored?.setups;
 
     const arr = Array.isArray(enriched) ? enriched : [];
@@ -917,7 +1198,24 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
         if (withinExpiry) {
           //. Re-derive execution with current ctx (DQ/paused/stale), and re-apply hard invalidation against current mid.
-          let kept = { ...sPrev, execution: deriveExecutionDecision(sPrev, ctx) };
+          const execution = deriveExecutionDecision(sPrev, ctx);
+          const baseTelemetry = deriveSetupTelemetry(sPrev, execution);
+          const tKey = String(sPrev?.canon ?? sPrev?.id ?? "");
+          const telemetry = withTemporalTelemetry(
+            tKey,
+            String(sPrev?.status ?? ""),
+            baseTelemetry,
+            nowTs,
+            telemetryHistoryRef.current
+          );
+          const { confidence, confidence_raw } = scaleConfidenceForReadiness(sPrev, execution, telemetry);
+          let kept = {
+            ...sPrev,
+            execution,
+            telemetry,
+            confidence,
+            confidence_raw,
+          };
 
           // Apply hard invalidation intrabar against current mid/stop
           const stopPx = kept?.stop?.price;

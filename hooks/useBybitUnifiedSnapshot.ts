@@ -98,11 +98,11 @@ export function useBybitUnifiedSnapshot(symbol: string) {
       if (!Array.isArray(list)) return [];
 
       // Bybit returns newest-first; normalize to oldest-first
-      const out: Candle[] = [];
-      for (const row of list) {
-        // Common format: [startTime, open, high, low, close, volume, turnover]
-        if (!Array.isArray(row) || row.length < 6) continue;
+      const rows = [...list].filter((row: any) => Array.isArray(row) && row.length >= 6);
 
+      const tmp: Array<Omit<Candle, "confirm">> = [];
+      for (const row of rows) {
+        // Common format: [startTime, open, high, low, close, volume, turnover]
         const ts = Number(row[0]);
         const o = Number(row[1]);
         const h = Number(row[2]);
@@ -110,18 +110,34 @@ export function useBybitUnifiedSnapshot(symbol: string) {
         const c = Number(row[4]);
         const v = Number(row[5]);
 
-        if (!Number.isFinite(ts) || !Number.isFinite(o) || !Number.isFinite(h) ||
-          !Number.isFinite(l) || !Number.isFinite(c) || !Number.isFinite(v)) {
+        if (
+          !Number.isFinite(ts) ||
+          !Number.isFinite(o) ||
+          !Number.isFinite(h) ||
+          !Number.isFinite(l) ||
+          !Number.isFinite(c) ||
+          !Number.isFinite(v)
+        ) {
           continue;
         }
 
-        // If Candle has other fields (e.g., confirm), extra fields are harmless.
-        out.push({ ts, o, h, l, c, v } as Candle);
+        tmp.push({ ts, o, h, l, c, v });
       }
 
-      out.sort((a, b) => a.ts - b.ts);
+      tmp.sort((a, b) => a.ts - b.ts);
+
+      // ✅ Confirm policy for REST seed:
+      // - All candles except the last are treated as closed (confirm=true)
+      // - The last candle is conservatively treated as unconfirmed (confirm=false)
+      //   (This avoids accidental "fake close" in backfill.)
+      const out: Candle[] = tmp.map((c, i) => ({
+        ...c,
+        confirm: i < tmp.length - 1,
+      }));
+
       return out;
     }
+
 
     const backfillAbort = new AbortController();
     async function fetchBybitKlinesPaged(args: {

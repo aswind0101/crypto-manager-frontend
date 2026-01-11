@@ -36,6 +36,31 @@ export type SetupConfidence = {
   reasons: string[];
 };
 
+// Setup-level telemetry (analytics / replay)
+// - Derived from trigger checklist + execution decision.
+// - Does not affect scoring or setup selection.
+export type SetupTelemetry = {
+  // Trigger checklist progress (setup-internal readiness)
+  totalTriggers: number;
+  passedTriggers: string[];
+  triggerBlockers: string[];
+  progressPct: number; // 0..100
+
+  // Execution layer (operator readiness). Includes global gates.
+  executionState?: ExecutionState;
+  executionBlockers?: string[];
+  // --- Temporal readiness (analytics / replay) ---
+  firstSeenTs?: number;        // first time this setup was observed (client-side)
+  lastSeenTs?: number;         // last time observed (client-side)
+  ageMs?: number;              // lastSeenTs - firstSeenTs
+
+  lastProgressPct?: number;    // progress at previous observation
+  progressDeltaPct?: number;   // progressPct - lastProgressPct
+
+  lastChangeTs?: number;       // last time progress/status changed (client-side)
+  stalledMs?: number;          // if FORMING: lastSeenTs - lastChangeTs else 0
+};
+
 export type TradeSetup = {
   id: string;
   canon: string;
@@ -60,11 +85,24 @@ export type TradeSetup = {
 
   confidence: SetupConfidence;
   tags: string[];
+
+  // Optional, UI/analytics-facing. Engine does not depend on it.
+  telemetry?: SetupTelemetry;
+};
+
+export type SetupReadinessItem = {
+  key: string;   // short stable key (for UI grouping)
+  note: string;  // human-readable reason
+};
+
+export type SetupReadinessTelemetry = {
+  state: "NO_SIGNAL";
+  items: SetupReadinessItem[]; // bounded list
 };
 
 export type SetupEngineTelemetry = {
   // Global gates (engine-level)
-  gate?: "OK" | "DQ_NOT_OK" | "NO_PRICE";
+  gate?: "OK" | "DQ_NOT_OK" | "NO_PRICE" | "GRADE_D";
 
   // Candidate accounting (quality gates)
   candidates: number;
@@ -74,7 +112,11 @@ export type SetupEngineTelemetry = {
   // Reject breakdown
   rejectByCode: Record<string, number>;
   rejectNotesSample: string[]; // small sample for UI/debug (bounded)
+
+  // NEW: readiness (only meaningful when candidates==0 and gate==OK)
+  readiness?: SetupReadinessTelemetry;
 };
+
 
 export type SetupEngineOutput = {
   ts: number;

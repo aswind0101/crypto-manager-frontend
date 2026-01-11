@@ -30,21 +30,7 @@ function tfMs(tf: string): number {
 // ---------------------------
 // Helpers: Cross-Exchange
 // ---------------------------
-function lastClose(candles?: Candle[]) {
-  if (!candles || candles.length === 0) return null;
-  return candles[candles.length - 1].c;
-}
 
-function computeDeviationBps(bybit1m?: Candle[], binance1m?: Candle[]) {
-  const b = lastClose(bybit1m);
-  const n = lastClose(binance1m);
-  if (b == null || n == null) return undefined;
-
-  const mid = (b + n) / 2;
-  if (mid === 0) return undefined;
-
-  return ((b - n) / mid) * 10000;
-}
 function bestBidAsk(ob?: { bids: Array<[number, number]>; asks: Array<[number, number]> }) {
   if (!ob?.bids?.length || !ob?.asks?.length) return undefined;
 
@@ -60,14 +46,94 @@ function bestBidAsk(ob?: { bids: Array<[number, number]>; asks: Array<[number, n
 
   return { bid, ask, mid: (bid + ask) / 2 };
 }
-function returns1m(candles: Candle[], windowBars: number): number[] {
-  const xs = candles.slice(-windowBars - 1);
-  const out: number[] = [];
-  for (let i = 1; i < xs.length; i++) {
-    const prev = xs[i - 1].c;
-    const cur = xs[i].c;
-    if (prev > 0 && cur > 0) out.push(Math.log(cur / prev));
+
+function stripUnconfirmed(candles?: Candle[]) {
+  if (!candles || candles.length === 0) return candles;
+  const last = candles[candles.length - 1];
+  if (last && last.confirm === false) return candles.slice(0, -1);
+  return candles;
+}
+
+function lastCommonClose(args: { bybit?: Candle[]; binance?: Candle[] }) {
+  const by = stripUnconfirmed(args.bybit);
+  const bn = stripUnconfirmed(args.binance);
+  if (!by?.length || !bn?.length) return null;
+
+  const bnMap = new Map<number, number>();
+  for (const c of bn) {
+    if (Number.isFinite(c.ts) && Number.isFinite(c.c)) bnMap.set(c.ts, c.c);
   }
+
+  // Walk from latest bybit candle backwards to find the latest common timestamp
+  for (let i = by.length - 1; i >= 0; i--) {
+    const c1 = by[i];
+    const c2 = bnMap.get(c1.ts);
+    if (!Number.isFinite(c1.c) || !Number.isFinite(c2 as number)) continue;
+    return { ts: c1.ts, bybitClose: c1.c, binanceClose: c2 as number };
+  }
+
+  return null;
+}
+
+function computeDeviationBps(bybit1m?: Candle[], binance1m?: Candle[]) {
+  const x = lastCommonClose({ bybit: bybit1m, binance: binance1m });
+  if (!x) return undefined;
+
+  const mid = (x.bybitClose + x.binanceClose) / 2;
+  if (mid === 0) return undefined;
+
+  return ((x.bybitClose - x.binanceClose) / mid) * 10000;
+}
+
+// Build aligned return series by timestamp intersection
+function alignedReturns(args: { bybit: Candle[]; binance: Candle[]; windowBars: number }): number[] {
+  const by = stripUnconfirmed(args.bybit) ?? [];
+  const bn = stripUnconfirmed(args.binance) ?? [];
+
+  // Wider tail to ensure we can find enough intersections
+  const byTail = by.slice(-args.windowBars * 3);
+  const bnTail = bn.slice(-args.windowBars * 3);
+
+  const bnMap = new Map<number, number>();
+  for (const c of bnTail) {
+    if (Number.isFinite(c.ts) && Number.isFinite(c.c)) bnMap.set(c.ts, c.c);
+  }
+
+  // Collect aligned closes (chronological) for common timestamps
+  const closesBy: number[] = [];
+  const closesBn: number[] = [];
+
+  for (const c of byTail) {
+    const p2 = bnMap.get(c.ts);
+    if (!Number.isFinite(c.c) || !Number.isFinite(p2 as number)) continue;
+    closesBy.push(c.c);
+    closesBn.push(p2 as number);
+  }
+
+  // Keep only the last windowBars+1 closes to compute windowBars returns
+  const need = args.windowBars + 1;
+  const n = Math.min(closesBy.length, closesBn.length);
+  if (n < 30) return [];
+
+  const a = closesBy.slice(-need);
+  const b = closesBn.slice(-need);
+
+  const out: number[] = [];
+  const m = Math.min(a.length, b.length);
+  for (let i = 1; i < m; i++) {
+    const prevA = a[i - 1];
+    const curA = a[i];
+    const prevB = b[i - 1];
+    const curB = b[i];
+
+    // Use average of venue returns to reduce single-venue micro-noise
+    if (prevA > 0 && curA > 0 && prevB > 0 && curB > 0) {
+      const ra = Math.log(curA / prevA);
+      const rb = Math.log(curB / prevB);
+      out.push((ra + rb) / 2);
+    }
+  }
+
   return out;
 }
 
@@ -75,8 +141,7 @@ function corr(a: number[], b: number[]): number {
   const n = Math.min(a.length, b.length);
   if (n < 20) return 0;
 
-  let ma = 0,
-    mb = 0;
+  let ma = 0, mb = 0;
   for (let i = 0; i < n; i++) {
     ma += a[i];
     mb += b[i];
@@ -84,9 +149,7 @@ function corr(a: number[], b: number[]): number {
   ma /= n;
   mb /= n;
 
-  let num = 0,
-    da = 0,
-    db = 0;
+  let num = 0, da = 0, db = 0;
   for (let i = 0; i < n; i++) {
     const xa = a[i] - ma;
     const xb = b[i] - mb;
@@ -112,8 +175,49 @@ function computeLeadLag(args: {
     return { leader: "none" as const, lag_bars: 0, score: 0, window_bars: windowBars };
   }
 
-  const rb = returns1m(args.bybit1m, windowBars);
-  const rn = returns1m(args.binance1m, windowBars);
+  // Aligned return series (intersection by timestamp)
+  const r = alignedReturns({ bybit: args.bybit1m, binance: args.binance1m, windowBars });
+  if (r.length < 30) {
+    return { leader: "none" as const, lag_bars: 0, score: 0, window_bars: windowBars };
+  }
+
+  // We only have one aligned series here (avg return). Lead/lag is inferred by comparing
+  // venue-specific series, so rebuild two aligned series explicitly for lag test.
+  const by = stripUnconfirmed(args.bybit1m) ?? [];
+  const bn = stripUnconfirmed(args.binance1m) ?? [];
+
+  const byTail = by.slice(-windowBars * 3);
+  const bnTail = bn.slice(-windowBars * 3);
+
+  const bnMap = new Map<number, number>();
+  for (const c of bnTail) {
+    if (Number.isFinite(c.ts) && Number.isFinite(c.c)) bnMap.set(c.ts, c.c);
+  }
+
+  const closesBy: number[] = [];
+  const closesBn: number[] = [];
+
+  for (const c of byTail) {
+    const p2 = bnMap.get(c.ts);
+    if (!Number.isFinite(c.c) || !Number.isFinite(p2 as number)) continue;
+    closesBy.push(c.c);
+    closesBn.push(p2 as number);
+  }
+
+  const need = windowBars + 1;
+  const a = closesBy.slice(-need);
+  const b = closesBn.slice(-need);
+
+  const rb: number[] = [];
+  const rn: number[] = [];
+  const m = Math.min(a.length, b.length);
+
+  for (let i = 1; i < m; i++) {
+    const pA0 = a[i - 1], pA1 = a[i];
+    const pB0 = b[i - 1], pB1 = b[i];
+    if (pA0 > 0 && pA1 > 0) rb.push(Math.log(pA1 / pA0));
+    if (pB0 > 0 && pB1 > 0) rn.push(Math.log(pB1 / pB0));
+  }
 
   if (rb.length < 30 || rn.length < 30) {
     return { leader: "none" as const, lag_bars: 0, score: 0, window_bars: windowBars };
@@ -122,22 +226,22 @@ function computeLeadLag(args: {
   let best = { lag: 0, c: -1 };
 
   for (let lag = -maxLag; lag <= maxLag; lag++) {
-    let a = rb;
-    let b = rn;
+    let aa = rb;
+    let bb = rn;
 
     // lag < 0 => Bybit leads
     // lag > 0 => Binance leads
     if (lag < 0) {
       const k = -lag;
-      a = rb.slice(0, rb.length - k);
-      b = rn.slice(k);
+      aa = rb.slice(0, rb.length - k);
+      bb = rn.slice(k);
     } else if (lag > 0) {
       const k = lag;
-      a = rb.slice(k);
-      b = rn.slice(0, rn.length - k);
+      aa = rb.slice(k);
+      bb = rn.slice(0, rn.length - k);
     }
 
-    const c = corr(a, b);
+    const c = corr(aa, bb);
     if (c > best.c) best = { lag, c };
   }
 
@@ -155,6 +259,10 @@ function computeLeadLag(args: {
     window_bars: windowBars,
   };
 }
+
+
+
+
 
 // ---------------------------
 // Bybit-only snapshot

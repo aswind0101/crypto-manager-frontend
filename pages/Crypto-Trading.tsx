@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSetupsSnapshot } from "../hooks/useSetupsSnapshot";
+import { useMultiSymbolScan } from "../hooks/useMultiSymbolScan";
+
 import {
   Activity,
   AlertTriangle,
@@ -107,12 +109,21 @@ type ExecutionGlobal = {
 
 type FeedStatus = {
   evaluated: boolean;
+
   candidatesEvaluated: number | null;
   published: number;
   rejected: number | null;
+
   rejectionByCode: Record<string, number> | null;
+
+  // NEW (optional): richer engine telemetry
+  rejectNotesSample?: string[] | null;
+  gate?: string | null;
+  readiness?: { state: string; items: Array<{ key: string; note: string }> } | null;
+
   lastEvaluationTs: number;
 };
+
 
 type SetupsOutput = {
   ts: number;
@@ -123,8 +134,6 @@ type SetupsOutput = {
   executionGlobal?: ExecutionGlobal | null;
   feedStatus?: FeedStatus | null;
 };
-
-
 /** ---------- Formatting helpers ---------- */
 function clamp01(x: number) {
   if (!Number.isFinite(x)) return 0;
@@ -170,10 +179,61 @@ function normalizeExecutionGlobal(x: any): ExecutionGlobal | null {
 
 function normalizeFeedStatus(x: any): FeedStatus | null {
   if (!x) return null;
+
+  // Prefer engine output shape: { telemetry: {...}, ts }
+  const t = x?.telemetry;
+  if (t && typeof t === "object" && !Array.isArray(t)) {
+    const candidatesEvaluated = Number.isFinite(Number(t.candidates)) ? Number(t.candidates) : null;
+    const published = Number.isFinite(Number(t.accepted)) ? Number(t.accepted) : 0;
+
+    const rejected = t.rejected == null ? null : Number.isFinite(Number(t.rejected)) ? Number(t.rejected) : null;
+
+    const rb = t.rejectByCode;
+    const rejectionByCode =
+      rb && typeof rb === "object" && !Array.isArray(rb)
+        ? (Object.fromEntries(Object.entries(rb).map(([k, v]) => [String(k), Number(v)])) as Record<string, number>)
+        : null;
+
+    const rejectNotesSample =
+      Array.isArray(t.rejectNotesSample) ? t.rejectNotesSample.map((s: any) => String(s)) : null;
+
+    const gate = t.gate != null ? String(t.gate) : null;
+
+    const readinessRaw = t.readiness;
+    const readiness =
+      readinessRaw && typeof readinessRaw === "object" && !Array.isArray(readinessRaw)
+        ? {
+          state: String((readinessRaw as any).state ?? ""),
+          items: Array.isArray((readinessRaw as any).items)
+            ? (readinessRaw as any).items
+              .map((it: any) => ({ key: String(it?.key ?? ""), note: String(it?.note ?? "") }))
+              .filter((it: any) => it.key && it.note)
+            : [],
+        }
+        : null;
+
+    const lastEvaluationTs = Number.isFinite(Number(x.ts)) ? Number(x.ts) : Date.now();
+
+    return {
+      evaluated: true,
+      candidatesEvaluated,
+      published,
+      rejected,
+      rejectionByCode,
+      rejectNotesSample,
+      gate,
+      readiness,
+      lastEvaluationTs,
+    };
+  }
+
+  // Backward compatible feedStatus shape (older UI contract)
   const evaluated = x.evaluated === true;
   const published = Number.isFinite(Number(x.published)) ? Number(x.published) : 0;
+
   const candidatesEvaluated =
     x.candidatesEvaluated == null ? null : Number.isFinite(Number(x.candidatesEvaluated)) ? Number(x.candidatesEvaluated) : null;
+
   const rejected = x.rejected == null ? null : Number.isFinite(Number(x.rejected)) ? Number(x.rejected) : null;
 
   const rb = x.rejectionByCode;
@@ -182,9 +242,37 @@ function normalizeFeedStatus(x: any): FeedStatus | null {
       ? (Object.fromEntries(Object.entries(rb).map(([k, v]) => [String(k), Number(v)])) as Record<string, number>)
       : null;
 
+  const rejectNotesSample =
+    Array.isArray(x.rejectNotesSample) ? x.rejectNotesSample.map((s: any) => String(s)) : null;
+
+  const gate = x.gate != null ? String(x.gate) : null;
+
+  const readinessRaw = x.readiness;
+  const readiness =
+    readinessRaw && typeof readinessRaw === "object" && !Array.isArray(readinessRaw)
+      ? {
+        state: String((readinessRaw as any).state ?? ""),
+        items: Array.isArray((readinessRaw as any).items)
+          ? (readinessRaw as any).items
+            .map((it: any) => ({ key: String(it?.key ?? ""), note: String(it?.note ?? "") }))
+            .filter((it: any) => it.key && it.note)
+          : [],
+      }
+      : null;
+
   const lastEvaluationTs = Number.isFinite(Number(x.lastEvaluationTs)) ? Number(x.lastEvaluationTs) : Date.now();
 
-  return { evaluated, candidatesEvaluated, published, rejected, rejectionByCode, lastEvaluationTs };
+  return {
+    evaluated,
+    candidatesEvaluated,
+    published,
+    rejected,
+    rejectionByCode,
+    rejectNotesSample,
+    gate,
+    readiness,
+    lastEvaluationTs,
+  };
 }
 
 function deriveFeedUiState(feedStatus: FeedStatus | null, publishedCount: number): FeedUiState {
@@ -270,6 +358,43 @@ function decisionSummary(s: TradeSetup, executionGlobal: ExecutionGlobal | null)
     default:
       return "Monitor setup";
   }
+}
+
+function formatSetupWaitReason(setup: TradeSetup): string | null {
+  const checklist = Array.isArray(setup.entry?.trigger?.checklist) ? setup.entry.trigger.checklist : [];
+
+  // 1) Preferred: explicit blockers from engine execution
+  const blockers = setup.execution?.blockers;
+  if (Array.isArray(blockers) && blockers.length > 0) {
+    const notes: string[] = [];
+    for (const key of blockers.slice(0, 2)) {
+      const item = checklist.find(
+        (c) => c && c.key === key && c.ok === false && typeof c.note === "string" && c.note.trim().length > 0
+      );
+      notes.push(item?.note?.trim() ? item.note.trim() : String(key));
+    }
+    const uniq = Array.from(new Set(notes)).filter(Boolean);
+    if (uniq.length === 1) return `Waiting for: ${uniq[0]}`;
+    if (uniq.length === 2) return `Waiting for: ${uniq[0]} and ${uniq[1]}`;
+    if (uniq.length > 2) return `Waiting for: ${uniq.slice(0, 2).join(", ")}…`;
+  }
+
+  // 2) Fallback A: derive blockers from checklist unmet items (ok === false)
+  const unmet = checklist
+    .filter((c: any) => c && c.ok === false)
+    .map((c: any) => (typeof c.note === "string" && c.note.trim() ? c.note.trim() : String(c.key ?? "")))
+    .filter((s: string) => s);
+
+  if (unmet.length === 1) return `Waiting for: ${unmet[0]}`;
+  if (unmet.length >= 2) return `Waiting for: ${unmet[0]} and ${unmet[1]}`;
+
+  // 3) Fallback B: use trigger summary (still actionable)
+  const summary = setup.entry?.trigger?.summary;
+  if (typeof summary === "string" && summary.trim().length > 0) {
+    return `Waiting for: ${summary.trim()}`;
+  }
+
+  return null;
 }
 
 
@@ -733,6 +858,8 @@ function TradingView({
   onAnalyze,
   onEnterInput,
   exportReqId,
+  // NEW
+  symbolInputEnabled,
 }: {
   symbol: string;
   paused: boolean;
@@ -743,6 +870,9 @@ function TradingView({
   onEnterInput: React.KeyboardEventHandler<HTMLInputElement>;
   //Testing purposes only
   exportReqId: number;
+  // NEW: input is enabled only when Scan is OFF, or Scan is paused
+  symbolInputEnabled: boolean;
+
 }) {
 
   const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
@@ -809,9 +939,10 @@ function TradingView({
     return (
       normalizeFeedStatus(feedStatusRaw) ||
       normalizeFeedStatus(out?.feedStatus) ||
+      normalizeFeedStatus(out) || // allow normalizeFeedStatus to read out.telemetry
       null
     );
-  }, [feedStatusRaw, out?.feedStatus]);
+  }, [feedStatusRaw, out?.feedStatus, out]);
 
   // Live derived metrics (best-effort)
   const mid = useMemo(() => {
@@ -1078,14 +1209,32 @@ function TradingView({
             </div>
 
             <div className="grid w-full grid-cols-1 gap-2 md:w-[520px] md:grid-cols-[1fr_auto_auto]">
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                <Database className="h-4 w-4 text-zinc-300" />
+              <div
+                className={[
+                  "flex items-center gap-2 rounded-xl border px-3 py-2",
+                  symbolInputEnabled
+                    ? "border-white/10 bg-white/5"
+                    : "border-white/5 bg-white/[0.03] opacity-80",
+                ].join(" ")}
+                title={
+                  symbolInputEnabled
+                    ? "Enter a symbol to analyze"
+                    : "Disabled while scanning. Pause scan or turn Scan OFF to enter a symbol."
+                }
+              >
+                <Database className={["h-4 w-4", symbolInputEnabled ? "text-zinc-300" : "text-zinc-600"].join(" ")} />
                 <input
                   value={inputSymbol}
-                  onChange={(e) => setInputSymbol(e.target.value)}
+                  onChange={(e) => setInputSymbol(String(e.target.value || "").toUpperCase())}
                   onKeyDown={onEnterInput}
+                  disabled={!symbolInputEnabled}
                   placeholder="BTCUSDT"
-                  className="w-full bg-transparent text-sm font-semibold text-zinc-50 placeholder:text-zinc-500 outline-none"
+                  className={[
+                    "w-full bg-transparent text-sm font-semibold outline-none",
+                    symbolInputEnabled
+                      ? "text-zinc-50 placeholder:text-zinc-500"
+                      : "text-zinc-500 placeholder:text-zinc-700 cursor-not-allowed",
+                  ].join(" ")}
                   autoCapitalize="characters"
                   spellCheck={false}
                 />
@@ -1093,7 +1242,18 @@ function TradingView({
 
               <button
                 onClick={onAnalyze}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500/20 px-4 py-2 text-sm font-bold text-sky-100 ring-1 ring-sky-500/30 hover:bg-sky-500/25 active:bg-sky-500/30"
+                disabled={!symbolInputEnabled}
+                className={[
+                  "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ring-1",
+                  symbolInputEnabled
+                    ? "bg-sky-500/20 text-sky-100 ring-sky-500/30 hover:bg-sky-500/25 active:bg-sky-500/30"
+                    : "bg-zinc-800 text-zinc-500 ring-zinc-700 cursor-not-allowed",
+                ].join(" ")}
+                title={
+                  symbolInputEnabled
+                    ? "Analyze input symbol"
+                    : "Disabled while scanning. Pause scan or turn Scan OFF to analyze a symbol."
+                }
               >
                 <RefreshCw className="h-4 w-4" />
                 Analyze
@@ -1113,6 +1273,7 @@ function TradingView({
                 {paused ? "Paused" : "Live"}
               </button>
             </div>
+
           </div>
 
           {/* status row */}
@@ -1477,7 +1638,7 @@ function TradingView({
                         </div>
                       );
                     }
-
+                    const readinessItems = Array.isArray(feedStatus?.readiness?.items) ? feedStatus!.readiness!.items : [];
                     if (state === "NO_SIGNAL") {
                       return (
                         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -1485,15 +1646,19 @@ function TradingView({
                             <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
                               <Minus className="h-5 w-5 text-zinc-200" />
                             </div>
-                            <div>
-                              <div className="text-sm font-bold text-zinc-100">No setups (no-signal market)</div>
-                              <div className="mt-1 text-xs text-zinc-400">
-                                The engine evaluated the current market context and found no candidate patterns worth publishing.
+                            {readinessItems.length > 0 ? (
+                              <div className="mt-3">
+                                <div className="text-[11px] font-bold text-zinc-200">Readiness notes</div>
+                                <div className="mt-2 space-y-1.5 text-xs text-zinc-300/90">
+                                  {readinessItems.slice(0, 6).map((it, i) => (
+                                    <div key={`${it.key}-${i}`} className="flex items-start gap-2">
+                                      <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300/60" />
+                                      <span className="min-w-0">{it.note}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                              {feedStatus?.lastEvaluationTs ? (
-                                <div className="mt-2 text-[11px] text-zinc-500">Last evaluation: {relTime(feedStatus.lastEvaluationTs)}</div>
-                              ) : null}
-                            </div>
+                            ) : null}
                           </div>
                         </div>
                       );
@@ -1503,7 +1668,8 @@ function TradingView({
                       const ce = feedStatus?.candidatesEvaluated;
                       const rejected = feedStatus?.rejected;
                       const top = topRejectionPairs(feedStatus?.rejectionByCode || null, 6);
-
+                      const hasNotes = Array.isArray(feedStatus?.rejectNotesSample) && (feedStatus?.rejectNotesSample?.length ?? 0) > 0;
+                      const hasBreakdown = top.length > 0;
                       return (
                         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
                           <div className="flex items-start gap-3">
@@ -1521,7 +1687,7 @@ function TradingView({
                                 <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Rejected {rejected != null ? rejected : "—"}</Pill>
                               </div>
 
-                              {top.length > 0 ? (
+                              {hasBreakdown ? (
                                 <div className="mt-3">
                                   <div className="text-[11px] font-bold text-amber-100">Top rejection reasons</div>
                                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1532,11 +1698,29 @@ function TradingView({
                                     ))}
                                   </div>
                                 </div>
-                              ) : (
+                              ) : !hasNotes ? (
                                 <div className="mt-3 text-[11px] text-amber-100/80">
                                   Rejection breakdown not available yet (telemetry not provided by the engine). The empty feed is still a valid outcome.
                                 </div>
-                              )}
+                              ) : null}
+
+                              {hasNotes ? (
+                                <div className="mt-3">
+                                  <div className="text-[11px] font-bold text-amber-100">Sample rejection notes</div>
+                                  <div className="mt-2 space-y-1.5 text-xs text-amber-100/90">
+                                    {feedStatus!.rejectNotesSample!.slice(0, 3).map((n, i) => (
+                                      <div key={i} className="flex items-start gap-2">
+                                        <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-200/70" />
+                                        <span className="min-w-0">{n}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {feedStatus?.gate ? (
+                                <div className="mt-2 text-[11px] text-amber-100/80">Engine gate: {feedStatus.gate}</div>
+                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -1821,6 +2005,93 @@ export default function Page() {
     return window.localStorage.getItem("ct_paused") === "1";
   });
   const [exportReqId, setExportReqId] = useState<number>(0);
+  const [scanEnabled, setScanEnabled] = useState<boolean>(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+    try {
+      const v = window.localStorage.getItem("ct_scan_enabled");
+      setScanEnabled(v === "1");
+    } catch { }
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return; // do not write during first hydration
+    try {
+      window.localStorage.setItem("ct_scan_enabled", scanEnabled ? "1" : "0");
+    } catch { }
+  }, [scanEnabled, hydrated]);
+
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ct_scan_enabled", scanEnabled ? "1" : "0");
+    } catch { }
+  }, [scanEnabled]);
+  const SCAN_TOP_N = 60;
+  const SCAN_SETTLE_MS = 2_500;
+  const SCAN_DWELL_MS = 18_000;
+
+  const scan = useMultiSymbolScan({
+    enabled: scanEnabled,
+    topN: SCAN_TOP_N,
+    minTurnover24h: 0,
+    dwellMs: SCAN_DWELL_MS,
+    settleMs: SCAN_SETTLE_MS,
+    maxFound: 20,
+    universeRefreshMs: 60_000,
+  });
+
+
+  const effectiveSymbol = scanEnabled
+    ? (scan.selectedSymbol || scan.live.symbol || symbol)
+    : symbol;
+  const symbolInputEnabled = !scanEnabled || !!scan.scanPaused;
+  const scanCountText =
+    hydrated && scanEnabled && scan.state.universeCount
+      ? `${Math.min(scan.state.cursor + 1, scan.state.universeCount)}/${scan.state.universeCount}`
+      : "";
+
+  const scanPhase =
+    !hydrated || !scanEnabled
+      ? "IDLE"
+      : scan.state.settleLeftMs > 0
+        ? "SETTLING"
+        : "SCANNING";
+
+  const phaseTotalMs =
+    scanPhase === "SETTLING" ? SCAN_SETTLE_MS :
+      scanPhase === "SCANNING" ? SCAN_DWELL_MS :
+        1;
+
+  const phaseLeftMs =
+    scanPhase === "SETTLING" ? scan.state.settleLeftMs :
+      scanPhase === "SCANNING" ? scan.state.dwellLeftMs :
+        0;
+
+  const phaseProgressPct =
+    !hydrated || !scanEnabled
+      ? 0
+      : Math.max(0, Math.min(100, Math.round((1 - phaseLeftMs / phaseTotalMs) * 100)));
+
+  useEffect(() => {
+    // While scanning AND not paused, the symbol input is display-only.
+    // Keep it synced to the active scanning symbol so the user always knows what is being scanned.
+    if (!scanEnabled) return;
+    if (scan.scanPaused) return;
+
+    const liveSym = scan.live?.symbol || "";
+    if (!liveSym) return;
+
+    setInputSymbol((prev) => (prev === liveSym ? prev : liveSym));
+  }, [scanEnabled, scan.scanPaused, scan.live?.symbol, setInputSymbol]);
+
+  useEffect(() => {
+    if (scanEnabled) return;
+
+    setInputSymbol((prev) => (prev ? prev : symbol));
+  }, [scanEnabled, symbol, setInputSymbol]);
 
   useEffect(() => {
     try {
@@ -1829,10 +2100,13 @@ export default function Page() {
   }, [inputSymbol]);
 
   useEffect(() => {
+    if (scanEnabled) return; // do not persist while scan is switching symbols
     try {
       window.localStorage.setItem("ct_symbol_active", symbol);
     } catch { }
-  }, [symbol]);
+  }, [symbol, scanEnabled]);
+
+
 
   useEffect(() => {
     try {
@@ -1873,21 +2147,174 @@ export default function Page() {
     );
     */
   return (
-    <TradingView
-      key={symbol}
-      symbol={symbol}
-      paused={paused}
-      inputSymbol={inputSymbol}
-      setInputSymbol={setInputSymbol}
-      setPaused={setPaused}
-      onAnalyze={onAnalyze}
-      onEnterInput={onEnterInput}
-      exportReqId={exportReqId}
-    />
+    <div>
+      {/* Scan bar (page-level orchestration, does not touch engine/scoring) */}
+      <div className="sticky top-0 z-40 border-b border-zinc-800 bg-black/70 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2">
+          <div className="flex items-center gap-2">
+            <button
+              className={`rounded-md px-3 py-1.5 text-xs font-medium ${scanEnabled ? "bg-emerald-600/20 text-emerald-200" : "bg-zinc-800 text-zinc-200"
+                }`}
+              onClick={() => setScanEnabled((v) => !v)}
+              title="Multi-symbol scan (attention routing)"
+            >
+              {scanEnabled ? "Scan: ON" : "Scan: OFF"}
+            </button>
+
+            {scanEnabled ? (
+              <div className="flex items-center gap-2 text-xs text-zinc-300">
+                <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
+                  <span className="text-zinc-500">Universe:</span>{" "}
+                  <span className="text-zinc-200">{scan.state.universeCount || "—"}</span>
+                </div>
+
+                {hydrated ? (
+                  <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
+                    <span className="text-zinc-500">Scanned:</span>{" "}
+                    <span className="text-zinc-200">{scanCountText || "—"}</span>
+                  </div>
+                ) : null}
+
+                <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
+                  <span className="text-zinc-500">Active:</span>{" "}
+                  <span className="text-zinc-200">{scan.state.activeSymbol || "—"}</span>
+                </div>
+
+                <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
+                  <span className="text-zinc-500">Found:</span>{" "}
+                  <span className="text-zinc-200">{scan.state.foundCount}</span>
+                </div>
+
+                {hydrated ? (
+                  <div
+                    className={[
+                      "rounded-md px-2 py-1 ring-1",
+                      scanPhase === "SETTLING"
+                        ? "bg-amber-500/10 text-amber-200 ring-amber-500/20"
+                        : scanPhase === "SCANNING"
+                          ? "bg-sky-500/10 text-sky-200 ring-sky-500/20"
+                          : "bg-zinc-900/50 text-zinc-300 ring-zinc-800",
+                    ].join(" ")}
+                    title={scanPhase === "SETTLING" ? "Settling (warm-up)" : scanPhase === "SCANNING" ? "Scanning (dwell)" : ""}
+                  >
+                    {scanPhase === "SETTLING" ? "SETTLING" : scanPhase === "SCANNING" ? "SCANNING" : "—"}{" "}
+                    <span className="text-zinc-500">{phaseProgressPct}%</span>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="text-xs text-zinc-500">
+                Manual symbol mode (Analyze uses the input below).
+              </div>
+            )}
+
+          </div>
+
+          {scanEnabled ? (
+            <div className="flex items-center gap-2">
+              <button
+                className={[
+                  "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium ring-1 transition",
+                  scan.scanPaused
+                    ? "bg-emerald-600/20 text-emerald-200 ring-emerald-500/30 hover:bg-emerald-600/25"
+                    : "bg-zinc-900/60 text-zinc-200 ring-zinc-800 hover:bg-zinc-900",
+                ].join(" ")}
+                onClick={() => (scan.scanPaused ? scan.resumeScan() : scan.pauseScan())}
+                title={scan.scanPaused ? "Resume scanning" : "Pause scanning"}
+                disabled={!hydrated}
+              >
+                {scan.scanPaused ? (
+                  <>
+                    <Activity className="h-4 w-4" />
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4" />
+                    Pause
+                  </>
+                )}
+              </button>
+
+              <button
+                className="inline-flex items-center gap-2 rounded-md bg-zinc-900/60 px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-800 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => scan.refreshUniverse()}
+                title="Refresh liquidity universe"
+                disabled={!hydrated}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh universe
+              </button>
+            </div>
+          ) : null}
+
+        </div>
+        {scanEnabled && hydrated ? (
+          <div className="mx-auto max-w-6xl px-4 pb-2">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-900 ring-1 ring-zinc-800">
+              <div
+                className={[
+                  "h-full transition-[width] duration-200",
+                  scanPhase === "SETTLING" ? "bg-amber-400/60" : "bg-sky-400/60",
+                  scan.scanPaused ? "opacity-30" : "opacity-100",
+                ].join(" ")}
+                style={{ width: `${scan.scanPaused ? 0 : phaseProgressPct}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {scanEnabled && scan.found.length ? (
+          <div className="mx-auto max-w-6xl px-4 pb-2">
+            <div className="flex gap-2 overflow-x-auto py-1">
+              {scan.found.map((f) => {
+                const active = f.key === scan.selectedKey;
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => {
+                      scan.setSelectedKey(f.key);
+                      scan.pauseScan();          // pause scan when user focuses a found setup
+                      setInputSymbol(f.symbol);  // reflect selected symbol in the input box
+                    }}
+
+                    className={`whitespace-nowrap rounded-md border px-3 py-1 text-xs ${active
+                      ? "border-emerald-500/40 bg-emerald-600/15 text-emerald-100"
+                      : "border-zinc-800 bg-zinc-900/40 text-zinc-200 hover:bg-zinc-900"
+                      }`}
+                    title={f.title || f.symbol}
+                  >
+                    <span className="text-zinc-500">{f.symbol}</span>
+                    <span className="mx-2 text-zinc-700">|</span>
+                    <span>{f.title || "Setup"}</span>
+                    {f.grade ? <span className="ml-2 text-zinc-500">({f.grade})</span> : null}
+                    {typeof f.confidenceScore === "number" ? (
+                      <span className="ml-2 text-zinc-500">{Math.round(f.confidenceScore)}%</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <TradingView
+        key={effectiveSymbol}
+        symbol={effectiveSymbol}
+        paused={paused}
+        inputSymbol={inputSymbol}
+        setInputSymbol={setInputSymbol}
+        setPaused={setPaused}
+        onAnalyze={onAnalyze}
+        onEnterInput={onEnterInput}
+        exportReqId={exportReqId}
+        symbolInputEnabled={symbolInputEnabled}
+      />
+    </div>
   );
+
 }
-
-
 /** ---------- Detail component ---------- */
 function SetupDetail({
   symbol,
@@ -1937,6 +2364,8 @@ function SetupDetail({
   const crossConsensus01 = Number.isFinite(Number(features?.cross?.consensus_score)) ? clamp01(Number(features.cross.consensus_score)) : undefined;
 
   const checklist = Array.isArray(entry?.trigger?.checklist) ? entry.trigger.checklist : [];
+  const waitReason = useMemo(() => formatSetupWaitReason(setup), [setup]);
+
   const [showChecklistPassed, setShowChecklistPassed] = useState(false);
 
   const checklistBad = useMemo(() => {
@@ -2174,7 +2603,12 @@ function SetupDetail({
               </button>
 
               {/* ENGINE NOTE */}
-              {setup.execution?.reason ? (
+              {/* WAIT REASON (prefer blockers/checklist note for UX) */}
+              {waitReason ? (
+                <div className="mt-3 text-[11px] font-semibold text-zinc-100/90">
+                  {waitReason}
+                </div>
+              ) : setup.execution?.reason ? (
                 <div className="mt-3 text-[11px] text-zinc-100/80">
                   Engine note: {setup.execution.reason}
                 </div>
