@@ -2150,8 +2150,8 @@ export default function Page() {
     <div>
       {/* Scan bar (page-level orchestration, does not touch engine/scoring) */}
       <div className="sticky top-0 z-40 border-b border-zinc-800 bg-black/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
             <button
               className={`rounded-md px-3 py-1.5 text-xs font-medium ${scanEnabled ? "bg-emerald-600/20 text-emerald-200" : "bg-zinc-800 text-zinc-200"
                 }`}
@@ -2162,46 +2162,49 @@ export default function Page() {
             </button>
 
             {scanEnabled ? (
-              <div className="flex items-center gap-2 text-xs text-zinc-300">
-                <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
-                  <span className="text-zinc-500">Universe:</span>{" "}
-                  <span className="text-zinc-200">{scan.state.universeCount || "—"}</span>
-                </div>
-
-                {hydrated ? (
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pr-1 text-xs text-zinc-300 [-webkit-overflow-scrolling:touch]">
                   <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
-                    <span className="text-zinc-500">Scanned:</span>{" "}
-                    <span className="text-zinc-200">{scanCountText || "—"}</span>
+                    <span className="text-zinc-500">Universe:</span>{" "}
+                    <span className="text-zinc-200">{scan.state.universeCount || "—"}</span>
                   </div>
-                ) : null}
 
-                <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
-                  <span className="text-zinc-500">Active:</span>{" "}
-                  <span className="text-zinc-200">{scan.state.activeSymbol || "—"}</span>
-                </div>
+                  {hydrated ? (
+                    <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
+                      <span className="text-zinc-500">Scanned:</span>{" "}
+                      <span className="text-zinc-200">{scanCountText || "—"}</span>
+                    </div>
+                  ) : null}
 
-                <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
-                  <span className="text-zinc-500">Found:</span>{" "}
-                  <span className="text-zinc-200">{scan.state.foundCount}</span>
-                </div>
-
-                {hydrated ? (
-                  <div
-                    className={[
-                      "rounded-md px-2 py-1 ring-1",
-                      scanPhase === "SETTLING"
-                        ? "bg-amber-500/10 text-amber-200 ring-amber-500/20"
-                        : scanPhase === "SCANNING"
-                          ? "bg-sky-500/10 text-sky-200 ring-sky-500/20"
-                          : "bg-zinc-900/50 text-zinc-300 ring-zinc-800",
-                    ].join(" ")}
-                    title={scanPhase === "SETTLING" ? "Settling (warm-up)" : scanPhase === "SCANNING" ? "Scanning (dwell)" : ""}
-                  >
-                    {scanPhase === "SETTLING" ? "SETTLING" : scanPhase === "SCANNING" ? "SCANNING" : "—"}{" "}
-                    <span className="text-zinc-500">{phaseProgressPct}%</span>
+                  <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
+                    <span className="text-zinc-500">Active:</span>{" "}
+                    <span className="text-zinc-200">{scan.state.activeSymbol || "—"}</span>
                   </div>
-                ) : null}
+
+                  <div className="rounded-md bg-zinc-900/50 px-2 py-1 ring-1 ring-zinc-800">
+                    <span className="text-zinc-500">Found:</span>{" "}
+                    <span className="text-zinc-200">{scan.state.foundCount}</span>
+                  </div>
+
+                  {hydrated ? (
+                    <div
+                      className={[
+                        "rounded-md px-2 py-1 ring-1",
+                        scanPhase === "SETTLING"
+                          ? "bg-amber-500/10 text-amber-200 ring-amber-500/20"
+                          : scanPhase === "SCANNING"
+                            ? "bg-sky-500/10 text-sky-200 ring-sky-500/20"
+                            : "bg-zinc-900/50 text-zinc-300 ring-zinc-800",
+                      ].join(" ")}
+                      title={scanPhase === "SETTLING" ? "Settling (warm-up)" : scanPhase === "SCANNING" ? "Scanning (dwell)" : ""}
+                    >
+                      {scanPhase === "SETTLING" ? "SETTLING" : scanPhase === "SCANNING" ? "SCANNING" : "—"}{" "}
+                      <span className="text-zinc-500">{phaseProgressPct}%</span>
+                    </div>
+                  ) : null}
+                </div>
               </div>
+
             ) : (
               <div className="text-xs text-zinc-500">
                 Manual symbol mode (Analyze uses the input below).
@@ -2211,7 +2214,7 @@ export default function Page() {
           </div>
 
           {scanEnabled ? (
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
               <button
                 className={[
                   "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium ring-1 transition",
@@ -2266,7 +2269,7 @@ export default function Page() {
 
         {scanEnabled && scan.found.length ? (
           <div className="mx-auto max-w-6xl px-4 pb-2">
-            <div className="flex gap-2 overflow-x-auto py-1">
+            <div className="flex max-w-full gap-2 overflow-x-auto py-1 [-webkit-overflow-scrolling:touch]">
               {scan.found.map((f) => {
                 const active = f.key === scan.selectedKey;
                 return (
