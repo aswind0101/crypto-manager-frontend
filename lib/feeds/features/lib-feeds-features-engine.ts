@@ -75,7 +75,7 @@ function volRegimeFromAtr(candles: Candle[]) {
 
   return { reg, atrp };
 }
-function computeBiasForTf(tf: "15m" | "1h" | "4h" | "1d", candles?: Candle[]): BiasTfSnapshot {
+function computeBiasForTf(tf: "15m" | "1h" | "4h" | "1D", candles?: Candle[]): BiasTfSnapshot {
   const have = candles?.length ?? 0;
   const need = 210;
   const complete = have >= need;
@@ -130,6 +130,53 @@ function computeBiasForTf(tf: "15m" | "1h" | "4h" | "1d", candles?: Candle[]): B
     need,
   };
 }
+function sanitizeNonFiniteDeep<T>(input: T, notes: string[], maxPathSamples = 8): T {
+  let replaced = 0;
+  const samples: string[] = [];
+
+  const walk = (v: any, path: string): any => {
+    if (typeof v === "number") {
+      if (!Number.isFinite(v)) {
+        replaced++;
+        if (samples.length < maxPathSamples) samples.push(path || "(root)");
+        return 0;
+      }
+      return v;
+    }
+
+    if (Array.isArray(v)) {
+      let changed = false;
+      const out = v.map((item, i) => {
+        const next = walk(item, path ? `${path}[${i}]` : `[${i}]`);
+        if (next !== item) changed = true;
+        return next;
+      });
+      return changed ? out : v;
+    }
+
+    if (v && typeof v === "object") {
+      let changed = false;
+      const out: any = { ...v };
+      for (const [k, val] of Object.entries(v)) {
+        const next = walk(val, path ? `${path}.${k}` : k);
+        if (next !== val) changed = true;
+        out[k] = next;
+      }
+      return changed ? out : v;
+    }
+
+    return v;
+  };
+
+  const sanitized = walk(input, "") as T;
+
+  if (replaced > 0) {
+    const detail = samples.length ? ` (e.g. ${samples.join(", ")})` : "";
+    notes.push(`Sanitized ${replaced} non-finite numeric value(s) in FeaturesSnapshot${detail}`);
+  }
+
+  return sanitized;
+}
 
 export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
   const notes: string[] = [];
@@ -139,7 +186,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
   const c15 = pickCandles(input, "15m");
   const c1h = pickCandles(input, "1h");
   const c4h = pickCandles(input, "4h");
-  const c1d = pickCandles(input, "1d");
+  const c1D = pickCandles(input, "1D");
 
   const b5 = pickBinanceCandles(input, "5m");
   const b15 = pickBinanceCandles(input, "15m");
@@ -334,8 +381,9 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
   });
 
   const market_structure = computeMarketStructureSnapshot({
-    tfs: ["15m", "1h", "4h"], // NEW: add 4h
+    tfs: ["5m", "15m", "1h", "4h"],
     candlesByTf: {
+      "5m": c5,
       "15m": c15,
       "1h": c1h,
       "4h": c4h,
@@ -343,6 +391,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
     pivotWindow: 2,
     swingsCap: 20,
   });
+
 
 
   // log chỉ khi có event (để không spam)
@@ -359,7 +408,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
     });
   }*/
 
-  return {
+  const out = {
     canon: input.canon,
     ts: input.ts,
 
@@ -382,10 +431,10 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
       "15m": computeBiasForTf("15m", c15),
       "1h": computeBiasForTf("1h", c1h),
       "4h": computeBiasForTf("4h", c4h),
-      "1d": computeBiasForTf("1d", c1d),
+      "1D": computeBiasForTf("1D", c1D),
     },
     entry: {
-      tfs: ["5m", "15m"],
+      tfs: ["5m", "15m"] as ("5m" | "15m")[],
       momentum: {
         rsi14_5m,
         rsi14_15m,
@@ -401,7 +450,6 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
         bbWidth_1h,
         bbWidth_4h,
       },
-
     },
 
     orderflow: {
@@ -422,4 +470,8 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
       notes: notes.length ? notes : undefined,
     },
   };
+
+  // Final hardening: prevent NaN/Infinity from reaching setups/scoring/UI
+  return sanitizeNonFiniteDeep(out, notes);
+
 }
