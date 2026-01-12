@@ -460,8 +460,22 @@ function applyCloseConfirm(out: any, snap: any): any {
     }
 
     // ---------- Ensure trigger object + checklist ----------
-    const trg = s?.entry?.trigger ?? { confirmed: false, checklist: [], summary: "" };
-    const checklist0 = Array.isArray(trg?.checklist) ? trg.checklist : [];
+    const trg0 = s?.entry?.trigger ?? { confirmed: false, checklist: [], summary: "" };
+
+    /**
+     * IMPORTANT:
+     * Reset close-confirm baseline when setup is NOT READY.
+     * Otherwise a stale _cc_base_ts from a previous READY cycle can cause false early "close_confirm" pass.
+     */
+    let trg = trg0 as any;
+    if (s.status !== "READY" && typeof (trg as any)?._cc_base_ts === "number") {
+      trg = { ...(trg as any) };
+      delete (trg as any)._cc_base_ts;
+    }
+
+    const checklist0 = Array.isArray((trg as any)?.checklist) ? (trg as any).checklist : [];
+    // Use one checklist variable for the entire function scope (prevents TS "cannot find name checklist")
+    let checklistNow = checklist0;
 
     /**
      * close_confirm policy (fully deterministic, no guessing):
@@ -472,11 +486,15 @@ function applyCloseConfirm(out: any, snap: any): any {
      *
      * Stored in: entry.trigger._cc_base_ts (internal runtime field; TS allows extra fields).
      */
-    const baseTs: number = typeof trg?._cc_base_ts === "number" ? trg._cc_base_ts : NaN;
+    const baseTs: number | undefined =
+      typeof (trg as any)?._cc_base_ts === "number" && Number.isFinite((trg as any)._cc_base_ts)
+        ? (trg as any)._cc_base_ts
+        : undefined;
 
-    // If we don't even have confirmed candles for that tf, we must block on close_confirm.
-    if ((s.status === "READY" || s.status === "FORMING") && !last) {
-      const checklist = upsertChecklist(checklist0, {
+    // If we don't even have confirmed candles for that tf, we must block on close_confirm,
+    // but ONLY when the setup is READY and not yet confirmed.
+    if (s.status === "READY" && trg?.confirmed !== true && !last) {
+      checklistNow = upsertChecklist(checklistNow, {
         key: "close_confirm",
         ok: false,
         note: `Missing confirmed candle for tf=${tf || "(none)"}`,
@@ -486,7 +504,7 @@ function applyCloseConfirm(out: any, snap: any): any {
         ...s,
         entry: {
           ...s.entry,
-          trigger: { ...trg, checklist },
+          trigger: { ...trg, checklist: checklistNow },
         },
       };
     }
@@ -496,8 +514,8 @@ function applyCloseConfirm(out: any, snap: any): any {
 
     // When setup first becomes READY, set baseline and require the NEXT confirmed candle.
     // This prevents triggering off a candle that closed before the setup was READY.
-    if (s.status === "READY" && trg?.confirmed !== true && !Number.isFinite(baseTs)) {
-      const checklist = upsertChecklist(checklist0, {
+    if (s.status === "READY" && trg?.confirmed !== true && baseTs == null) {
+      checklistNow = upsertChecklist(checklistNow, {
         key: "close_confirm",
         ok: false,
         note: `Baseline set to last_confirmed ts=${lastTs} for tf=${tf}; waiting next close`,
@@ -507,19 +525,19 @@ function applyCloseConfirm(out: any, snap: any): any {
         ...s,
         entry: {
           ...s.entry,
-          trigger: { ...trg, checklist, _cc_base_ts: lastTs },
+          trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs },
         },
       };
     }
 
     // If baseline exists, require a NEW candle close (ts advanced).
     let closeOk = true;
-    if (s.status === "READY" && trg?.confirmed !== true && Number.isFinite(baseTs)) {
+    if (s.status === "READY" && trg?.confirmed !== true && baseTs != null) {
       closeOk = typeof lastTs === "number" && lastTs > baseTs;
     }
 
     // Upsert close_confirm checklist so ExecutionDecision can gate WAIT_CLOSE.
-    let checklist = upsertChecklist(checklist0, {
+    checklistNow = upsertChecklist(checklistNow, {
       key: "close_confirm",
       ok: closeOk,
       note: closeOk
@@ -533,7 +551,7 @@ function applyCloseConfirm(out: any, snap: any): any {
         ...s,
         entry: {
           ...s.entry,
-          trigger: { ...trg, checklist },
+          trigger: { ...trg, checklist: checklistNow },
         },
       };
     }
@@ -545,14 +563,14 @@ function applyCloseConfirm(out: any, snap: any): any {
         return {
           ...s,
           status: "INVALIDATED",
-          entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
         };
       }
       if (s.side === "SHORT" && last.c >= stopPx) {
         return {
           ...s,
           status: "INVALIDATED",
-          entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
         };
       }
     }
@@ -561,7 +579,7 @@ function applyCloseConfirm(out: any, snap: any): any {
     // Helper: transition to TRIGGERED with consistent bookkeeping.
     const markTriggered = (setupX: any) => {
       const trgX = setupX?.entry?.trigger ?? trg;
-      const checklistX0 = Array.isArray(trgX?.checklist) ? trgX.checklist : checklist;
+      const checklistX0 = Array.isArray(trgX?.checklist) ? trgX.checklist : checklistNow;
 
       const checklistX = upsertChecklist(checklistX0, {
         key: "close_confirm",
@@ -590,7 +608,7 @@ function applyCloseConfirm(out: any, snap: any): any {
       if (!brk) {
         return {
           ...s,
-          entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
         };
       }
 
@@ -605,44 +623,47 @@ function applyCloseConfirm(out: any, snap: any): any {
         if (s.side === "LONG") {
           const touched = last.l <= z.hi; // retest touch
           const reclaimed = last.c > brk + buffer && passStrength;
-          if (touched && reclaimed) return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist } } });
+          if (touched && reclaimed)
+            return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
         } else {
           const touched = last.h >= z.lo;
           const broke = last.c < brk - buffer && passStrength;
-          if (touched && broke) return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist } } });
+          if (touched && broke)
+            return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
         }
 
         // Not triggered yet; just persist bookkeeping.
         return {
           ...s,
-          entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
         };
       }
 
       // If no zone is present, use simple strength-based close beyond level.
       const passStrength = strength >= 0.7;
       if (s.side === "LONG") {
-        if (last.c > brk && passStrength) return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist } } });
+        if (last.c > brk && passStrength)
+          return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
       } else {
-        if (last.c < brk && passStrength) return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist } } });
+        if (last.c < brk && passStrength)
+          return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
       }
 
       return {
         ...s,
-        entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+        entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
       };
     }
 
     // Default: persist checklist/base
     return {
       ...s,
-      entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs ?? baseTs } },
+      entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs ?? baseTs } },
     };
   });
 
   return { ...out, setups: updated };
 }
-
 
 function deriveExecutionDecision(
   setup: any,

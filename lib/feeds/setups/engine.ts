@@ -58,6 +58,18 @@ function lastClose(candles?: Candle[]) {
   if (!candles || !candles.length) return undefined;
   return candles[candles.length - 1].c;
 }
+function lastConfirmedClose(candles?: Candle[]) {
+  if (!candles || !candles.length) return undefined;
+  for (let i = candles.length - 1; i >= 0; i--) {
+    if (candles[i]?.confirm) return candles[i].c;
+  }
+  return undefined;
+}
+
+function confirmedOnly(candles?: Candle[]) {
+  if (!candles || !candles.length) return [];
+  return candles.filter((c) => Boolean((c as any)?.confirm));
+}
 
 function atrProxyFromFeatures(f: FeaturesSnapshot) {
   // atrp_* are in %
@@ -484,16 +496,21 @@ export function buildSetups(args: {
   // Bybit execution candles
   const tf15 = (snap.timeframes.find((x: any) => x.tf === "15m")?.candles?.ohlcv ?? []) as Candle[];
   const tf1h = (snap.timeframes.find((x: any) => x.tf === "1h")?.candles?.ohlcv ?? []) as Candle[];
-  const px = lastClose(tf15) ?? lastClose(tf1h) ?? 0;
+
+  // Use confirmed candles for all structural calculations to avoid intrabar drift / repaint
+  const tf15c = confirmedOnly(tf15);
+  const tf1hc = confirmedOnly(tf1h);
+
+  // Price anchor should be last CONFIRMED close (never the running candle close)
+  const px = lastConfirmedClose(tf15c) ?? lastConfirmedClose(tf1hc) ?? 0;
   if (!px) {
     telemetry.gate = "NO_PRICE";
     return { ts, dq_ok: true, setups: [], preferred_id: undefined, telemetry };
   }
 
-
-  // Levels
-  const lv15 = computePivotLevels(tf15, 2, 10);
-  const lv1h = computePivotLevels(tf1h, 2, 10);
+  // Levels (confirmed-only to avoid pivots repainting from the running candle)
+  const lv15 = computePivotLevels(tf15c, 2, 10);
+  const lv1h = computePivotLevels(tf1hc, 2, 10);
   const levels = [...lv15, ...lv1h].sort((a, b) => a.price - b.price);
 
   const { below, above } = nearestLevels(levels, px);

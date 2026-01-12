@@ -75,7 +75,7 @@ function volRegimeFromAtr(candles: Candle[]) {
 
   return { reg, atrp };
 }
-function computeBiasForTf(tf: "15m" | "1h" | "4h" | "1d", candles?: Candle[]): BiasTfSnapshot {
+function computeBiasForTf(tf: "15m" | "1h" | "4h" | "1D", candles?: Candle[]): BiasTfSnapshot {
   const have = candles?.length ?? 0;
   const need = 210;
   const complete = have >= need;
@@ -186,7 +186,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
   const c15 = pickCandles(input, "15m");
   const c1h = pickCandles(input, "1h");
   const c4h = pickCandles(input, "4h");
-  const c1d = pickCandles(input, "1d");
+  const c1D = pickCandles(input, "1D");
 
   const b5 = pickBinanceCandles(input, "5m");
   const b15 = pickBinanceCandles(input, "15m");
@@ -431,7 +431,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
       "15m": computeBiasForTf("15m", c15),
       "1h": computeBiasForTf("1h", c1h),
       "4h": computeBiasForTf("4h", c4h),
-      "1d": computeBiasForTf("1d", c1d),
+      "1D": computeBiasForTf("1D", c1D),
     },
     entry: {
       tfs: ["5m", "15m"] as ("5m" | "15m")[],

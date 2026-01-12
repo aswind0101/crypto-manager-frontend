@@ -48,6 +48,7 @@ export function useFeaturesSnapshot(symbol: string) {
     const c15 = extractCandles(snap, "15m", "bybit");
     const c1h = extractCandles(snap, "1h", "bybit");
     const c4h = extractCandles(snap, "4h", "bybit");
+    const c1D = extractCandles(snap, "1D", "bybit");
 
     // ✅ Binance candles (5m/15m) từ timeframes (Task 3.1.1)
     const b5 = extractCandles(snap, "5m", "binance");
@@ -74,6 +75,7 @@ export function useFeaturesSnapshot(symbol: string) {
         "15m": { bybit: c15, binance: b15 },
         "1h": { bybit: c1h },
         "4h": { bybit: c4h },
+        "1D": { bybit: c1D },
       },
 
       orderbook: orderbook ? { bids: orderbook.bids, asks: orderbook.asks } : undefined,
