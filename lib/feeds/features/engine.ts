@@ -381,8 +381,9 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
   });
 
   const market_structure = computeMarketStructureSnapshot({
-    tfs: ["15m", "1h", "4h"], // NEW: add 4h
+    tfs: ["5m", "15m", "1h", "4h"],
     candlesByTf: {
+      "5m": c5,
       "15m": c15,
       "1h": c1h,
       "4h": c4h,
@@ -390,6 +391,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
     pivotWindow: 2,
     swingsCap: 20,
   });
+
 
 
   // log chỉ khi có event (để không spam)
@@ -406,7 +408,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
     });
   }*/
 
-    const out = {
+  const out = {
     canon: input.canon,
     ts: input.ts,
 

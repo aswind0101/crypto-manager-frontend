@@ -155,6 +155,28 @@ function pickTriggerTf(snap: any): string {
   if (tfs.has("15m")) return "15m";
   return "";
 }
+/**
+ * Select the close-confirm timeframe for a specific setup.
+ *
+ * IMPORTANT:
+ * - The engine publishes per-setup `trigger_tf`.
+ * - The trigger evaluation MUST respect that, otherwise a setup defined to
+ *   trigger on 15m could incorrectly trigger on 5m (or vice versa).
+ */
+function pickTriggerTfForSetup(snap: any, setup: any): string {
+  const wanted = String(setup?.trigger_tf ?? "").trim();
+  const tfs = new Set<string>((snap?.timeframes ?? []).map((x: any) => String(x?.tf ?? "")));
+
+  // 1) Strict: use the setup-defined trigger_tf if present in snapshot.
+  if (wanted && tfs.has(wanted)) return wanted;
+
+  // 2) Fallback: some setups may want to trigger on entry_tf if trigger_tf is missing.
+  const entryTf = String(setup?.entry_tf ?? "").trim();
+  if (entryTf && tfs.has(entryTf)) return entryTf;
+
+  // 3) Last resort: preserve legacy behavior (prefer 5m then 15m).
+  return pickTriggerTf(snap);
+}
 
 function lastConfirmedCandle(candles: Candle[]): Candle | undefined {
   for (let i = candles.length - 1; i >= 0; i--) {
@@ -410,35 +432,167 @@ function applyPreTrigger(out: any, snap: any): any {
 function applyCloseConfirm(out: any, snap: any): any {
   if (!out || !Array.isArray(out.setups) || !snap) return out;
 
-  const tf = pickTriggerTf(snap);
-  if (!tf) return out;
+  // Precompute last confirmed candle per timeframe once per evaluation.
+  // This allows per-setup trigger_tf evaluation without repeatedly scanning arrays.
+  const lastByTf: Record<string, Candle | undefined> = {};
+  const tfs: string[] = Array.isArray(snap?.timeframes)
+    ? snap.timeframes.map((x: any) => String(x?.tf ?? "")).filter((x: string) => x)
+    : [];
 
-  const candles = getTimeframeCandles(snap, tf);
-  const last = lastConfirmedCandle(candles);
-  if (!last) return out;
+  for (const tf of tfs) {
+    const candles = getTimeframeCandles(snap, tf);
+    const last = lastConfirmedCandle(candles);
+    if (last) lastByTf[tf] = last;
+  }
 
   const tnow = Date.now();
 
   const updated = out.setups.map((s: any) => {
     if (!s) return s;
 
-    // Expiry
+    // Per-setup trigger timeframe selection (MUST respect engine trigger_tf).
+    const tf = pickTriggerTfForSetup(snap, s);
+    const last = tf ? lastByTf[tf] : undefined;
+
+    // ---------- Expiry ----------
     if (typeof s.expires_ts === "number" && tnow > s.expires_ts) {
       return { ...s, status: "EXPIRED" };
     }
 
-    // Hard invalidation by stop on close-confirm candle
-    const stopPx = s?.stop?.price;
-    if (typeof stopPx === "number") {
-      if (s.side === "LONG" && last.c <= stopPx) return { ...s, status: "INVALIDATED" };
-      if (s.side === "SHORT" && last.c >= stopPx) return { ...s, status: "INVALIDATED" };
+    // ---------- Ensure trigger object + checklist ----------
+    const trg = s?.entry?.trigger ?? { confirmed: false, checklist: [], summary: "" };
+    const checklist0 = Array.isArray(trg?.checklist) ? trg.checklist : [];
+
+    /**
+     * close_confirm policy (fully deterministic, no guessing):
+     * - When a setup is READY and not confirmed, we require one NEW confirmed candle close
+     *   on the setup's trigger timeframe (setup.trigger_tf).
+     * - We store a baseline candle timestamp the first time we see READY (per setup) and then wait
+     *   for a newer confirmed candle.
+     *
+     * Stored in: entry.trigger._cc_base_ts (internal runtime field; TS allows extra fields).
+     */
+    const baseTs: number = typeof trg?._cc_base_ts === "number" ? trg._cc_base_ts : NaN;
+
+    // If we don't even have confirmed candles for that tf, we must block on close_confirm.
+    if ((s.status === "READY" || s.status === "FORMING") && !last) {
+      const checklist = upsertChecklist(checklist0, {
+        key: "close_confirm",
+        ok: false,
+        note: `Missing confirmed candle for tf=${tf || "(none)"}`,
+      });
+
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: { ...trg, checklist },
+        },
+      };
     }
 
-    if (s.status !== "READY") return s;
+    // From here, last exists (confirmed candle) when tf is valid.
+    const lastTs = last?.ts;
 
-    if (s.type === "BREAKOUT") {
+    // When setup first becomes READY, set baseline and require the NEXT confirmed candle.
+    // This prevents triggering off a candle that closed before the setup was READY.
+    if (s.status === "READY" && trg?.confirmed !== true && !Number.isFinite(baseTs)) {
+      const checklist = upsertChecklist(checklist0, {
+        key: "close_confirm",
+        ok: false,
+        note: `Baseline set to last_confirmed ts=${lastTs} for tf=${tf}; waiting next close`,
+      });
+
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: { ...trg, checklist, _cc_base_ts: lastTs },
+        },
+      };
+    }
+
+    // If baseline exists, require a NEW candle close (ts advanced).
+    let closeOk = true;
+    if (s.status === "READY" && trg?.confirmed !== true && Number.isFinite(baseTs)) {
+      closeOk = typeof lastTs === "number" && lastTs > baseTs;
+    }
+
+    // Upsert close_confirm checklist so ExecutionDecision can gate WAIT_CLOSE.
+    let checklist = upsertChecklist(checklist0, {
+      key: "close_confirm",
+      ok: closeOk,
+      note: closeOk
+        ? `New confirmed candle close ts=${lastTs} > base=${baseTs} (tf=${tf})`
+        : `Waiting next confirmed close (last ts=${lastTs}, base=${baseTs}, tf=${tf})`,
+    });
+
+    // If we are READY and still waiting for a new close, do not proceed to trigger/invalidate-on-close.
+    if (s.status === "READY" && trg?.confirmed !== true && closeOk === false) {
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: { ...trg, checklist },
+        },
+      };
+    }
+
+    // ---------- Hard invalidation by stop on close-confirm candle ----------
+    const stopPx = s?.stop?.price;
+    if (typeof stopPx === "number" && last) {
+      if (s.side === "LONG" && last.c <= stopPx) {
+        return {
+          ...s,
+          status: "INVALIDATED",
+          entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+        };
+      }
+      if (s.side === "SHORT" && last.c >= stopPx) {
+        return {
+          ...s,
+          status: "INVALIDATED",
+          entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+        };
+      }
+    }
+
+    // ---------- Trigger (close-confirm) ----------
+    // Helper: transition to TRIGGERED with consistent bookkeeping.
+    const markTriggered = (setupX: any) => {
+      const trgX = setupX?.entry?.trigger ?? trg;
+      const checklistX0 = Array.isArray(trgX?.checklist) ? trgX.checklist : checklist;
+
+      const checklistX = upsertChecklist(checklistX0, {
+        key: "close_confirm",
+        ok: true,
+        note: `Triggered on close-confirm (${tf}) @ ts=${lastTs}`,
+      });
+
+      return {
+        ...setupX,
+        status: "TRIGGERED",
+        entry: {
+          ...setupX.entry,
+          trigger: {
+            ...trgX,
+            confirmed: true,
+            checklist: checklistX,
+            _cc_base_ts: lastTs, // advance baseline
+          },
+        },
+      };
+    };
+
+    // BREAKOUT trigger logic (existing behavior, but now strictly per-setup tf and close-confirm gated)
+    if (s.status === "READY" && s.type === "BREAKOUT" && trg?.confirmed !== true && last) {
       const brk = parseBreakLevelFromChecklist(s);
-      if (!brk) return s;
+      if (!brk) {
+        return {
+          ...s,
+          entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+        };
+      }
 
       const strength = candleCloseStrengthPct(last, s.side);
 
@@ -450,109 +604,45 @@ function applyCloseConfirm(out: any, snap: any): any {
 
         if (s.side === "LONG") {
           const touched = last.l <= z.hi; // retest touch
-          const passPrice = last.c > brk + buffer; // close beyond level
-          if (touched && passPrice && passStrength) {
-            return {
-              ...s,
-              status: "TRIGGERED",
-              entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-            };
-          }
-          return s;
+          const reclaimed = last.c > brk + buffer && passStrength;
+          if (touched && reclaimed) return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist } } });
+        } else {
+          const touched = last.h >= z.lo;
+          const broke = last.c < brk - buffer && passStrength;
+          if (touched && broke) return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist } } });
         }
 
-        const touched = last.h >= z.lo;
-        const passPrice = last.c < brk - buffer;
-        if (touched && passPrice && passStrength) {
-          return {
-            ...s,
-            status: "TRIGGERED",
-            entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-          };
-        }
-        return s;
+        // Not triggered yet; just persist bookkeeping.
+        return {
+          ...s,
+          entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+        };
       }
 
-      // Legacy breakout (no retest zone)
-      const buffer = brk * 0.001; // 0.10% buffer
-      const passPrice = s.side === "LONG" ? last.c > brk + buffer : last.c < brk - buffer;
+      // If no zone is present, use simple strength-based close beyond level.
       const passStrength = strength >= 0.7;
-
-      if (passPrice && passStrength) {
-        return {
-          ...s,
-          status: "TRIGGERED",
-          entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-        };
-      }
-      return s;
-    }
-
-    if (s.type === "RANGE_MEAN_REVERT") {
-      const zone = s?.entry?.zone;
-      if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
-
       if (s.side === "LONG") {
-        const touched = last.l <= zone.hi;
-        const reclaimed = last.c >= zone.hi;
-        const hasRejection = last.l < last.c;
-        if (touched && reclaimed && hasRejection) {
-          return {
-            ...s,
-            status: "TRIGGERED",
-            entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-          };
-        }
-        return s;
+        if (last.c > brk && passStrength) return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist } } });
+      } else {
+        if (last.c < brk && passStrength) return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist } } });
       }
 
-      const touched = last.h >= zone.lo;
-      const reclaimed = last.c <= zone.lo;
-      const hasRejection = last.h > last.c;
-      if (touched && reclaimed && hasRejection) {
-        return {
-          ...s,
-          status: "TRIGGERED",
-          entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-        };
-      }
-      return s;
+      return {
+        ...s,
+        entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs } },
+      };
     }
 
-    if (s.type === "TREND_PULLBACK") {
-      const zone = s?.entry?.zone;
-      if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
-
-      if (s.side === "LONG") {
-        const touched = last.l <= zone.hi;
-        const reclaimed = last.c >= zone.hi;
-        if (touched && reclaimed) {
-          return {
-            ...s,
-            status: "TRIGGERED",
-            entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-          };
-        }
-        return s;
-      }
-
-      const touched = last.h >= zone.lo;
-      const reclaimed = last.c <= zone.lo;
-      if (touched && reclaimed) {
-        return {
-          ...s,
-          status: "TRIGGERED",
-          entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-        };
-      }
-      return s;
-    }
-
-    return s;
+    // Default: persist checklist/base
+    return {
+      ...s,
+      entry: { ...s.entry, trigger: { ...trg, checklist, _cc_base_ts: lastTs ?? baseTs } },
+    };
   });
 
   return { ...out, setups: updated };
 }
+
 
 function deriveExecutionDecision(
   setup: any,
