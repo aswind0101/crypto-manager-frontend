@@ -1179,9 +1179,49 @@ function engineInputKey(snap: any, features: any): string {
   const fKey = featureKeySubset(features);
   return `c15=${c15}|c1h=${c1h}|c4h=${c4h}|c5m=${c5m}|f=${fKey}`;
 }
+function snapshotRevision(snap: any): string {
+  if (!snap || !Array.isArray(snap.timeframes)) return "nosnap";
+
+  // Build a stable primitive key from "latest candle ts" per TF and per venue.
+  // This avoids stale useMemo results when upstream mutates objects/arrays in place
+  // or reuses snapshot references.
+  const parts: string[] = [];
+
+  for (const tfNode of snap.timeframes as any[]) {
+    const tf = String(tfNode?.tf ?? "");
+    if (!tf) continue;
+
+    const a = tfNode?.candles?.ohlcv;
+    const b = tfNode?.candles_binance?.ohlcv;
+
+    const lastA = Array.isArray(a) && a.length ? a[a.length - 1]?.ts : undefined;
+    const lastB = Array.isArray(b) && b.length ? b[b.length - 1]?.ts : undefined;
+
+    // include confirmed-bar timestamp as well if present (helps status_tf stabilization)
+    const confA =
+      Array.isArray(a) && a.length
+        ? (() => {
+          for (let i = a.length - 1; i >= 0; i--) {
+            if (a[i]?.confirm) return a[i]?.ts;
+          }
+          return undefined;
+        })()
+        : undefined;
+
+    parts.push(`${tf}:${lastA ?? 0}:${confA ?? 0}:${lastB ?? 0}`);
+  }
+
+  // Also include availability heartbeat/probe gates if present (keeps DQ gating responsive)
+  const hbBybit = snap?.availability?.bybit?.ok ? 1 : 0;
+  const hbBinance = snap?.availability?.binance?.ok ? 1 : 0;
+  parts.push(`ab:${hbBybit}:an:${hbBinance}`);
+
+  return parts.join("|");
+}
 
 export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   const { snap, features } = useFeaturesSnapshot(symbol);
+  const snapRev = snapshotRevision(snap);
 
   // Persisted per-hook instance cache to stabilize FORMING/READY status
   const statusCacheRef = useRef<Map<string, { status: SetupStatus; barTs: number }>>(new Map());
@@ -1348,7 +1388,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
       setups: finalArr,
     };
 
-  }, [snap, features, paused, symbol]);
+  }, [snapRev, snap, features, paused, symbol]);
 
   return { snap, features, setups };
 }
