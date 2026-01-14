@@ -190,12 +190,46 @@ function upsertChecklist(
   list: Array<{ key: string; ok: boolean; note?: string }>,
   item: { key: string; ok: boolean; note?: string }
 ) {
-  const out = Array.isArray(list) ? [...list] : [];
-  const idx = out.findIndex((x) => x?.key === item.key);
-  if (idx >= 0) out[idx] = item;
-  else out.push(item);
+  // Keep the same array/object references when nothing meaningfully changed.
+  // This prevents UI churn when note contains volatile values (mid, ts, etc.).
+  const src = Array.isArray(list) ? list : [];
+  const idx = src.findIndex((x) => x?.key === item.key);
+
+  // New item
+  if (idx < 0) return [...src, item];
+
+  const prev = src[idx];
+  if (!prev) {
+    const out = [...src];
+    out[idx] = item;
+    return out;
+  }
+
+  // If ok didn't change, preserve previous note unless the new note is intentionally different.
+  // Also preserve the previous object reference when fully unchanged.
+  const nextOk = item.ok;
+  const prevOk = prev.ok;
+
+  // Prefer stable note to avoid continuous updates when ok is unchanged.
+  const nextNote =
+    prevOk === nextOk
+      ? (prev.note ?? item.note) // keep old note if present
+      : item.note;               // ok changed => allow note change
+
+  const prevNote = prev.note;
+
+  const okUnchanged = prevOk === nextOk;
+  const noteUnchanged = (prevNote ?? "") === (nextNote ?? "");
+
+  // Nothing changed => return original list for referential stability
+  if (okUnchanged && noteUnchanged) return src;
+
+  // Something changed => copy minimal
+  const out = [...src];
+  out[idx] = noteUnchanged ? { ...prev, ok: nextOk } : { ...prev, ok: nextOk, note: nextNote };
   return out;
 }
+
 
 function parseBreakLevelFromChecklist(setup: any): number | undefined {
   const items = setup?.entry?.trigger?.checklist;

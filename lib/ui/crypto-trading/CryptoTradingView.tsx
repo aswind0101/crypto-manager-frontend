@@ -384,6 +384,114 @@ function formatSetupWaitReason(setup: TradeSetup): string | null {
 
   return null;
 }
+type ChecklistItem = { key: string; ok: boolean; note?: string };
+
+type ChecklistCategory = "HARD" | "REALTIME" | "CONTEXT";
+
+const CHECKLIST_META: Record<
+  string,
+  { label: string; category: ChecklistCategory }
+> = {
+  pre_trigger: { label: "Pre-trigger", category: "HARD" },
+  level: { label: "Level", category: "HARD" },
+  retest: { label: "Retest", category: "HARD" },
+  close_confirm: { label: "Close confirm", category: "HARD" },
+  bos: { label: "BOS / structure", category: "HARD" },
+  sweep: { label: "Sweep", category: "HARD" },
+  displacement: { label: "Displacement", category: "HARD" },
+  squeeze: { label: "Squeeze", category: "HARD" },
+  edge: { label: "Edge", category: "HARD" },
+  range: { label: "Range", category: "HARD" },
+
+  orderflow: { label: "Orderflow", category: "REALTIME" },
+  delta: { label: "Delta", category: "REALTIME" },
+  cross: { label: "Cross (consensus)", category: "REALTIME" },
+
+  bias: { label: "Bias", category: "CONTEXT" },
+  bias_strength: { label: "Bias strength", category: "CONTEXT" },
+  htf_ms: { label: "HTF market structure", category: "CONTEXT" },
+};
+
+function checklistLabel(key: string): string {
+  const k = String(key || "");
+  return CHECKLIST_META[k]?.label ?? k;
+}
+
+function checklistCategory(key: string): ChecklistCategory {
+  const k = String(key || "");
+  return CHECKLIST_META[k]?.category ?? "HARD";
+}
+
+function buildDerivedTriggerSummary(args: {
+  checklist: ChecklistItem[];
+  blockers: string[];
+}) {
+  const checklist = Array.isArray(args.checklist) ? args.checklist : [];
+  const blockers = Array.isArray(args.blockers) ? args.blockers : [];
+
+  const total = checklist.length;
+  const passed = checklist.filter((c) => c && c.ok === true).length;
+
+  const byKey = new Map<string, ChecklistItem>();
+  for (const c of checklist) {
+    if (c && typeof c.key === "string") byKey.set(c.key, c);
+  }
+
+  // Prioritize engine-provided blockers (state machine truth), but only those that exist in checklist.
+  const blockerItems: ChecklistItem[] = [];
+  for (const b of blockers) {
+    const item = byKey.get(String(b));
+    if (item) blockerItems.push(item);
+  }
+
+  // Fallback: unmet checklist items (ok !== true)
+  const unmetItems =
+    blockerItems.length > 0
+      ? blockerItems
+      : checklist.filter((c) => c && c.ok !== true);
+
+  const hard = unmetItems.filter((c) => checklistCategory(c.key) === "HARD");
+  const realtime = unmetItems.filter(
+    (c) => checklistCategory(c.key) === "REALTIME"
+  );
+  const context = unmetItems.filter(
+    (c) => checklistCategory(c.key) === "CONTEXT"
+  );
+
+  const pick2 = (items: ChecklistItem[]) =>
+    items
+      .slice(0, 2)
+      .map((c) => {
+        const note = typeof c.note === "string" ? c.note.trim() : "";
+        return note.length > 0 ? note : checklistLabel(c.key);
+      })
+      .filter(Boolean);
+
+  // Text summary:
+  // Prefer HARD blockers; then REALTIME; then CONTEXT; but keep it short.
+  const parts =
+    hard.length > 0
+      ? pick2(hard)
+      : realtime.length > 0
+        ? pick2(realtime)
+        : pick2(context);
+
+  const text =
+    parts.length === 0
+      ? "All trigger checks passed"
+      : parts.length === 1
+        ? `Waiting for: ${parts[0]}`
+        : `Waiting for: ${parts[0]} and ${parts[1]}`;
+
+  return {
+    text,
+    total,
+    passed,
+    hard,
+    realtime,
+    context,
+  };
+}
 
 
 function sideTone(side: SetupSide) {
@@ -848,7 +956,7 @@ export function TradingView({
   onEnterInput,
   // NEW
   symbolInputEnabled,
-    }: {
+}: {
   symbol: string;
   paused: boolean;
   inputSymbol: string;
@@ -860,7 +968,7 @@ export function TradingView({
   // NEW: input is enabled only when Scan is OFF, or Scan is paused
   symbolInputEnabled: boolean;
 
-    }) {
+}) {
 
   const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
 
@@ -1937,7 +2045,7 @@ function SetupDetail({
   features,
   setup,
   executionGlobal,
-  }: {
+}: {
   symbol: string;
   mid: number;
   dqOk: boolean;
@@ -1947,7 +2055,7 @@ function SetupDetail({
   features: any;
   setup: TradeSetup;
   executionGlobal: ExecutionGlobal | null;
-  }) {
+}) {
   const action = actionChip(setup, executionGlobal);
   const [showGuidanceDetails, setShowGuidanceDetails] = useState(false);
   const [showRiskMore, setShowRiskMore] = useState(false);
@@ -1989,6 +2097,10 @@ function SetupDetail({
   }, [checklist]);
 
   const blockers = Array.isArray(setup.execution?.blockers) ? setup.execution!.blockers : [];
+  const derivedSummary = useMemo(
+    () => buildDerivedTriggerSummary({ checklist, blockers }),
+    [checklist, blockers]
+  );
 
   const isInZone =
     Number.isFinite(mid) &&
@@ -2262,7 +2374,11 @@ function SetupDetail({
             />
             <KV
               k="Trigger summary"
-              v={entry?.trigger?.summary ? entry.trigger.summary : "—"}
+              v={
+                entry?.trigger?.summary && String(entry.trigger.summary).trim().length > 0
+                  ? String(entry.trigger.summary).trim()
+                  : derivedSummary.text
+              }
             />
           </div>
 
@@ -2270,6 +2386,50 @@ function SetupDetail({
 
           <div className="space-y-2">
             <div className="text-xs font-bold text-zinc-100">Trigger checklist</div>
+            <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs font-semibold text-zinc-100">Summary</div>
+                <div className="text-[11px] text-zinc-400 tabular-nums">
+                  {derivedSummary.passed}/{derivedSummary.total} passed
+                </div>
+              </div>
+
+              <div className="mt-2 space-y-2">
+                {derivedSummary.hard.length > 0 ? (
+                  <div>
+                    <div className="text-[11px] font-semibold text-zinc-200">Next (hard)</div>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {derivedSummary.hard.slice(0, 4).map((c) => (
+                        <span
+                          key={`hard-${c.key}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-1 text-[10px] text-rose-100 ring-1 ring-rose-500/20"
+                          title={typeof c.note === "string" ? c.note : c.key}
+                        >
+                          {checklistLabel(c.key)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {derivedSummary.realtime.length > 0 ? (
+                  <div>
+                    <div className="text-[11px] font-semibold text-zinc-200">Realtime signals</div>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {derivedSummary.realtime.slice(0, 4).map((c) => (
+                        <span
+                          key={`rt-${c.key}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[10px] text-amber-100 ring-1 ring-amber-500/20"
+                          title={typeof c.note === "string" ? c.note : c.key}
+                        >
+                          {checklistLabel(c.key)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
             {checklist.length === 0 ? (
               <div className="text-xs text-zinc-400">—</div>
             ) : (
