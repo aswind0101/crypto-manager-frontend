@@ -640,7 +640,7 @@ function applyCloseConfirm(out: any, snap: any): any {
     const lastTs = last?.ts;
 
     // When setup first becomes READY, set baseline and require the NEXT confirmed candle.
-    // This prevents triggering off a candle that closed before the setup was READY.
+    // This prevents triggering off a candle that closed before the setup was READY..
     if (s.status === "READY" && trg?.confirmed !== true && baseTs == null) {
       const tfMs = tfToMs(tf);
 

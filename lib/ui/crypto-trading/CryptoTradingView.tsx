@@ -1527,13 +1527,18 @@ export function TradingView({
 
                   return (
                     <TrendStructureCard
+                      key={tf}   // 👈 FIX: thêm key
                       tf={tf}
                       badge={badge}
                       kind={e.kind}
                       dir={e.dir}
                       level={e.level}
                       ts={e.ts}
-                      confirmedCount={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"}
+                      confirmedCount={
+                        Number.isFinite(Number(node?.confirmed_count))
+                          ? fmtNum(Number(node?.confirmed_count), 0)
+                          : "—"
+                      }
                     />
                   );
                 })}
