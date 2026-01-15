@@ -639,47 +639,6 @@ function structureTrendBadge(trend?: string) {
   if (t === "RANGE") return { label: "RANGE", icon: <Waves className="h-4 w-4" />, cls: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" };
   return { label: "UNKNOWN", icon: <Minus className="h-4 w-4" />, cls: "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30" };
 }
-function TrendStructureCard({
-  tf,
-  badge,
-  kind,
-  dir,
-  level,
-  ts,
-  confirmedCount,
-}: {
-  tf: string;
-  badge: { label: string; icon: React.ReactNode; cls: string };
-  kind: "BOS" | "CHOCH" | null;
-  dir: "UP" | "DOWN" | null;
-  level?: number;
-  ts?: number;
-  confirmedCount: string;
-}) {
-  const title = kind && dir ? `${kind} ${dir}` : "—";
-  const price = Number.isFinite(level as number) ? `@ ${fmtPx(Number(level))}` : "";
-  const ago = Number.isFinite(ts as number) ? relTime(Number(ts)) : "—";
-
-  return (
-    <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-extrabold text-zinc-100">{String(tf).toUpperCase()}</div>
-        <span className={["inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold", badge.cls].join(" ")}>
-          {badge.icon}
-          {badge.label}
-        </span>
-      </div>
-
-      <div className="mt-2">
-        <div className="text-sm font-extrabold leading-tight text-zinc-50">{title}</div>
-        <div className="mt-0.5 text-xs text-zinc-200">{price || "\u00A0"}</div>
-      </div>
-
-      <div className="mt-2 text-[11px] text-zinc-400">Confirmed · {ago} · {confirmedCount}</div>
-    </div>
-  );
-}
-
 function signalLevelFromStale(staleSec?: number): 0 | 1 | 2 | 3 | 4 {
   // 0: unknown/no data
   if (!Number.isFinite(staleSec as number)) return 0;
@@ -1526,15 +1485,36 @@ export function TradingView({
                   const e = pickLatestStructureEvent(node);
 
                   return (
-                    <TrendStructureCard
-                      tf={tf}
-                      badge={badge}
-                      kind={e.kind}
-                      dir={e.dir}
-                      level={e.level}
-                      ts={e.ts}
-                      confirmedCount={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"}
-                    />
+                    <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-extrabold text-zinc-100">{tf}</div>
+                        <span
+                          className={[
+                            "inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold",
+                            badge.cls,
+                          ].join(" ")}
+                        >
+                          {badge.icon}
+                          {badge.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 space-y-1.5 text-xs">
+                        <KV
+                          k="Confirmed"
+                          v={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"}
+                        />
+                        <KV
+                          k="Latest event"
+                          v={
+                            e.kind && e.dir
+                              ? `${e.kind} ${e.dir}${Number.isFinite(e.level) ? ` @ ${fmtPx(e.level)}` : ""}${Number.isFinite(e.ts) ? ` • ${relTime(e.ts)}` : ""
+                              }`
+                              : "—"
+                          }
+                        />
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -1664,8 +1644,11 @@ export function TradingView({
                                     />
                                   </svg>
                                 </button>
+
                               </div>
+
                             </div>
+
                             {isOpen ? (
                               <div className="mt-3">
                                 <SetupDetail
@@ -1682,7 +1665,6 @@ export function TradingView({
                               </div>
                             ) : null}
                           </div>
-
                         );
                       });
                     }

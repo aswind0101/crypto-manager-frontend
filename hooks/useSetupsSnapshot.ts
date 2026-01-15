@@ -155,6 +155,24 @@ function pickTriggerTf(snap: any): string {
   if (tfs.has("15m")) return "15m";
   return "";
 }
+function tfToMs(tf?: string): number | undefined {
+  if (!tf) return;
+  const m = tf.trim().toLowerCase().match(/^(\d+)(m|h|d)$/);
+  if (!m) return;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return;
+  if (m[2] === "m") return n * 60_000;
+  if (m[2] === "h") return n * 60 * 60_000;
+  if (m[2] === "d") return n * 24 * 60 * 60_000;
+}
+function formatRemainingMMSS(totalSeconds?: number): string | undefined {
+  if (typeof totalSeconds !== "number" || !Number.isFinite(totalSeconds)) return;
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${mm}:${ss.toString().padStart(2, "0")}`;
+}
+
 /**
  * Select the close-confirm timeframe for a specific setup.
  *
@@ -176,6 +194,56 @@ function pickTriggerTfForSetup(snap: any, setup: any): string {
 
   // 3) Last resort: preserve legacy behavior (prefer 5m then 15m).
   return pickTriggerTf(snap);
+}
+function pickTriggerTfForSetupRuntime(
+  snap: any,
+  setup: any,
+  lastByTf: Record<string, Candle | undefined>,
+  nowMs: number
+): { tf?: string; stale: boolean; staleReason?: string } {
+  const tfs: string[] = Array.isArray(snap?.timeframes)
+    ? snap.timeframes.map((x: any) => String(x?.tf ?? "")).filter((x: string) => x)
+    : [];
+  const tfSet = new Set<string>(tfs);
+
+  const tfToMinutes = (tf?: string): number | undefined => {
+    if (!tf) return undefined;
+    const m = tf.trim().toLowerCase().match(/^(\d+)(m|h|d)$/);
+    if (!m) return undefined;
+    const n = Number(m[1]);
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    if (m[2] === "m") return n;
+    if (m[2] === "h") return n * 60;
+    if (m[2] === "d") return n * 60 * 24;
+    return undefined;
+  };
+
+  const isFresh = (tf: string) => {
+    const last = lastByTf[tf];
+    if (!last || typeof last.ts !== "number") return { ok: false as const, reason: "no_confirmed_candle" };
+    const mins = tfToMinutes(tf);
+    if (mins == null) return { ok: true as const };
+    // allow up to ~2 bars + 10s grace before declaring stale
+    const allowMs = mins * 60_000 * 2 + 10_000;
+    const ageMs = nowMs - last.ts;
+    if (ageMs <= allowMs) return { ok: true as const };
+    return { ok: false as const, reason: `stale_last_confirmed ageMs=${Math.round(ageMs)} allowMs=${allowMs}` };
+  };
+
+  const wanted = String(setup?.trigger_tf ?? "").trim();
+  const entryTf = String(setup?.entry_tf ?? "").trim();
+  const legacy = pickTriggerTf(snap);
+
+  const candidates = [wanted, entryTf, legacy].filter((tf) => tf && tfSet.has(tf));
+
+  for (const tf of candidates) {
+    const chk = isFresh(tf);
+    if (chk.ok) return { tf, stale: false };
+  }
+
+  // If none are fresh, return strict selection + stale flag
+  const strict = pickTriggerTfForSetup(snap, setup);
+  return { tf: strict, stale: true, staleReason: "no_fresh_tf" };
 }
 
 function lastConfirmedCandle(candles: Candle[]): Candle | undefined {
@@ -485,8 +553,10 @@ function applyCloseConfirm(out: any, snap: any): any {
     if (!s) return s;
 
     // Per-setup trigger timeframe selection (MUST respect engine trigger_tf).
-    const tf = pickTriggerTfForSetup(snap, s);
+    const tfSel = pickTriggerTfForSetupRuntime(snap, s, lastByTf, tnow);
+    const tf = tfSel.tf;
     const last = tf ? lastByTf[tf] : undefined;
+
 
     // ---------- Expiry ----------
     if (typeof s.expires_ts === "number" && tnow > s.expires_ts) {
@@ -525,6 +595,30 @@ function applyCloseConfirm(out: any, snap: any): any {
         ? (trg as any)._cc_base_ts
         : undefined;
 
+
+    // HARD FIX: if trigger TF candles are stale, do NOT set/keep baseline and do NOT "wait next close" forever.
+    if (s.status === "READY" && (trg as any)?.confirmed !== true && tfSel.stale) {
+      // remove any previously stored baseline to prevent sticky lock
+      const trgNext = { ...(trg as any) };
+      delete trgNext._cc_base_ts;
+
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "tf_candles_stale",
+        ok: false,
+        note: `Trigger TF candles stale (tf=${tf ?? "unknown"}; ${tfSel.staleReason ?? "no reason"})`,
+      });
+
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "close_confirm",
+        ok: false,
+        note: `Blocked: trigger TF candles stale (tf=${tf ?? "unknown"})`,
+      });
+
+      return {
+        ...s,
+        entry: { ...s.entry, trigger: { ...trgNext, checklist: checklistNow } },
+      };
+    }
     // If we don't even have confirmed candles for that tf, we must block on close_confirm,
     // but ONLY when the setup is READY and not yet confirmed.
     if (s.status === "READY" && trg?.confirmed !== true && !last) {
@@ -542,17 +636,37 @@ function applyCloseConfirm(out: any, snap: any): any {
         },
       };
     }
-
     // From here, last exists (confirmed candle) when tf is valid.
     const lastTs = last?.ts;
 
     // When setup first becomes READY, set baseline and require the NEXT confirmed candle.
     // This prevents triggering off a candle that closed before the setup was READY.
     if (s.status === "READY" && trg?.confirmed !== true && baseTs == null) {
+      const tfMs = tfToMs(tf);
+
+      let nextCloseTs: number | undefined =
+        typeof lastTs === "number" && typeof tfMs === "number"
+          ? lastTs + tfMs
+          : undefined;
+
+      // IMPORTANT FIX: ensure nextCloseTs is strictly in the future
+      if (typeof nextCloseTs === "number") {
+        while (nextCloseTs <= tnow) {
+          nextCloseTs += tfMs!;
+        }
+      }
+
+      const remainingSec =
+        typeof nextCloseTs === "number"
+          ? Math.max(0, Math.ceil((nextCloseTs - tnow) / 1000))
+          : undefined;
+      const remainingMMSS = formatRemainingMMSS(remainingSec);
+
       checklistNow = upsertChecklist(checklistNow, {
         key: "close_confirm",
         ok: false,
-        note: `Baseline set to last_confirmed ts=${lastTs} for tf=${tf}; waiting next close`,
+        note: `Waiting next ${tf} close at ${nextCloseTs ? new Date(nextCloseTs).toLocaleTimeString() : "?"
+          } (${remainingMMSS ?? "countdown unavailable"} remaining)`,
       });
 
       return {
@@ -563,6 +677,7 @@ function applyCloseConfirm(out: any, snap: any): any {
         },
       };
     }
+
 
     // If baseline exists, require a NEW candle close (ts advanced).
     let closeOk = true;
@@ -794,6 +909,16 @@ function deriveExecutionDecision(
   // ---------- Collect checklist blockers ----------
   for (const item of checklist) {
     if (item?.ok === false) blockers.push(item.key);
+  }
+  // HARD BLOCK: trigger TF candles stale => do not pretend we're "waiting next close"
+  if (blockers.includes("tf_candles_stale")) {
+    return {
+      state: "BLOCKED",
+      canEnterMarket: false,
+      canPlaceLimit: false,
+      blockers: ["TF_CANDLES_STALE"],
+      reason: "Trigger timeframe candles are stale (no new confirmed closes)",
+    };
   }
 
   // ---------- FORMING ----------
