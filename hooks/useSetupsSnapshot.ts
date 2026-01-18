@@ -15,21 +15,53 @@ type Candle = {
   confirm: boolean;
 };
 type SetupStatus = "FORMING" | "READY" | "TRIGGERED" | "INVALIDATED" | "EXPIRED";
+type StatusTf = "5m" | "15m" | "1h" | "4h";
+
 
 /**
- * Status timeframe policy:
- * - If bias_tf is 4h => swing status_tf = 4h
- * - Else => intraday status_tf = 1h
- *
- * This matches your chosen rule:
- * - intraday status_tf = 1h
- * - swing status_tf = 4h
+ * Status timeframe policy (used ONLY for stabilizing FORMING/READY transitions):
+ * - Scalp setups (type starts with "SCALP_") must NOT be stabilized on 1h/4h,
+ *   otherwise the UI can freeze READY/FORMING for up to an hour.
+ *   For scalps we stabilize on the setup's fast timeframe:
+ *     - Prefer entry_tf if available ("5m" or "15m")
+ *     - Else prefer trigger_tf
+ *     - Else fallback to "15m" (or "5m" if only that exists)
+ * - Non-scalp:
+ *     - If bias_tf is 4h => swing status_tf = 4h
+ *     - Else => intraday status_tf = 1h
  */
-function inferStatusTf(setup: any): "1h" | "4h" {
+function inferStatusTf(setup: any, snap?: any): StatusTf {
+  const type = String(setup?.type ?? "").toUpperCase();
+
+  // Scalp setups stabilize on fast TFs.
+  if (type.startsWith("SCALP_")) {
+    const entryTf = String(setup?.entry_tf ?? "").trim();
+    const triggerTf = String(setup?.trigger_tf ?? "").trim();
+
+    const tfs: string[] = Array.isArray(snap?.timeframes)
+      ? snap.timeframes.map((x: any) => String(x?.tf ?? "")).filter((x: string) => x)
+      : [];
+    const tfSet = new Set<string>(tfs);
+
+    const isFast = (tf: string) => tf === "5m" || tf === "15m";
+
+    if (isFast(entryTf) && (!snap || tfSet.has(entryTf))) return entryTf as StatusTf;
+    if (isFast(triggerTf) && (!snap || tfSet.has(triggerTf))) return triggerTf as StatusTf;
+
+    // Fallbacks preserve legacy preference when available in snapshot.
+    if (!snap) return "15m";
+    if (tfSet.has("15m")) return "15m";
+    if (tfSet.has("5m")) return "5m";
+    // If neither is available, fall back to intraday 1h to avoid undefined.
+    return "1h";
+  }
+
+  // Default (non-scalp): 4h swing, else 1h intraday.
   const biasTf = String(setup?.bias_tf ?? "").toLowerCase().trim();
   if (biasTf === "4h") return "4h";
   return "1h";
 }
+
 
 function computeMidFromSnap(snap: any): number {
   const m = Number(snap?.price?.mid);
@@ -84,13 +116,18 @@ function stabilizeStatusByConfirmedBar(
 ): any {
   if (!out || !Array.isArray(out.setups) || !snap) return out;
 
+  const last5m = lastConfirmedCandle(getTimeframeCandles(snap, "5m"));
+  const last15m = lastConfirmedCandle(getTimeframeCandles(snap, "15m"));
   const last1h = lastConfirmedCandle(getTimeframeCandles(snap, "1h"));
   const last4h = lastConfirmedCandle(getTimeframeCandles(snap, "4h"));
 
-  const barTsByTf: Record<"1h" | "4h", number> = {
+  const barTsByTf: Record<StatusTf, number> = {
+    "5m": Number.isFinite(last5m?.ts as number) ? (last5m!.ts as number) : 0,
+    "15m": Number.isFinite(last15m?.ts as number) ? (last15m!.ts as number) : 0,
     "1h": Number.isFinite(last1h?.ts as number) ? (last1h!.ts as number) : 0,
     "4h": Number.isFinite(last4h?.ts as number) ? (last4h!.ts as number) : 0,
   };
+
 
   const updated = out.setups.map((s: any) => {
     if (!s) return s;
@@ -98,7 +135,7 @@ function stabilizeStatusByConfirmedBar(
     const key = String(s?.canon ?? s?.id ?? "");
     if (!key) return s;
 
-    const statusTf = inferStatusTf(s);
+    const statusTf = inferStatusTf(s, snap);
     const barTs = barTsByTf[statusTf];
 
     const incoming = String(s?.status ?? "") as SetupStatus | string;

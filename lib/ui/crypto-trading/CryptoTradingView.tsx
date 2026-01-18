@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { useSetupsSnapshot } from "../../../hooks/useSetupsSnapshot";
+import { useLocalStorageState } from "../../../hooks/useLocalStorageState";
 
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
-  ChevronRight,
+  SearchIcon,
   CircleDashed,
   Clock,
   Crosshair,
@@ -21,7 +23,6 @@ import {
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
-  Signal,
   Target,
   TrendingDown,
   TrendingUp,
@@ -162,6 +163,38 @@ function fmtPx(x?: number) {
   if (v >= 100) return v.toFixed(2);
   if (v >= 1) return v.toFixed(4);
   return v.toFixed(6);
+}
+function fmtEntryZone(zone?: { lo: number; hi: number }) {
+  const lo = zone?.lo;
+  const hi = zone?.hi;
+  if (!Number.isFinite(lo as number) || !Number.isFinite(hi as number)) return "—";
+
+  const a = lo as number;
+  const b = hi as number;
+
+  // If nearly equal, show single price
+  const eps = 1e-12;
+  if (Math.abs(a - b) <= eps) return fmtPx(a);
+
+  // Keep natural order (lo-hi), but still handle reversed data safely
+  const lo2 = Math.min(a, b);
+  const hi2 = Math.max(a, b);
+  return `${fmtPx(lo2)}–${fmtPx(hi2)}`;
+}
+
+function fmtTpSummary(tp?: Array<{ price: number; size_pct: number }>) {
+  const arr = Array.isArray(tp) ? tp : [];
+  const prices = arr
+    .map((x) => x?.price)
+    .filter((p) => Number.isFinite(p as number))
+    .map((p) => fmtPx(p as number));
+
+  if (prices.length === 0) return "—";
+  if (prices.length <= 2) return prices.join(" / ");
+
+  const head = prices.slice(0, 2).join(" / ");
+  const rest = prices.length - 2;
+  return `${head} +${rest}`;
 }
 
 function fmtPct01(x?: number) {
@@ -909,7 +942,76 @@ function MidBadge({ mid }: { mid: number }) {
     </span>
   );
 }
+function MidAssistButton({ mid }: { mid: number }) {
+  const text = Number.isFinite(mid) ? `$${fmtPxWithSep(mid)}` : "—";
+
+  return (
+    <span
+      className={[
+        // iOS AssistiveTouch-ish: blurred, subtle ring, soft shadow
+        "inline-flex items-center justify-center",
+        "h-8 rounded-full px-3",
+        "bg-white/10 backdrop-blur-md",
+        "ring-1 ring-white/20",
+        "shadow-[0_10px_24px_rgba(0,0,0,0.35)]",
+        "text-[11px] font-semibold tabular-nums",
+        "text-zinc-100/90",
+        "select-none",
+      ].join(" ")}
+      title="Realtime mid price"
+    >
+      {text}
+    </span>
+  );
+}
 /** ---------- Small UI atoms ---------- */
+function SideIcon({ side }: { side: string }) {
+  if (side === "LONG") {
+    return <span className="text-emerald-400">↑</span>;
+  }
+  if (side === "SHORT") {
+    return <span className="text-rose-400">↓</span>;
+  }
+  return <span className="text-zinc-400">⇅</span>; // ALL
+}
+
+function StatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case "FORMING":
+      return <span className="text-zinc-400">⏳</span>;
+    case "READY":
+      return <span className="text-emerald-400">✔︎</span>;
+    case "TRIGGERED":
+      return <span className="text-sky-400">⚡</span>;
+    case "INVALIDATED":
+      return <span className="text-rose-400">✖︎</span>;
+    case "EXPIRED":
+      return <span className="text-amber-400">⏰</span>;
+    default:
+      return <span className="text-zinc-400">◯</span>; // ALL
+  }
+}
+
+function SelectCaret() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      width="16"
+      height="16"
+      aria-hidden="true"
+      className="pointer-events-none text-zinc-300"
+    >
+      <path
+        fill="currentColor"
+        d="M5.5 7.5L10 12l4.5-4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 function Pill({
   children,
   tone,
@@ -1060,74 +1162,6 @@ function relTime(ts?: number) {
   const v = Math.round(d);
   return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
 }
-function ActionHeader({ setup }: { setup: TradeSetup | null }) {
-  if (!setup || !setup.execution) return null;
-
-  const ex = setup.execution;
-  const n = ex.narrative;
-
-  const state = String(ex.state || "—");
-  const grade = uiGrade(setup);
-
-  const headline = String(n?.headline ?? ex.reason ?? "");
-  const bullets = Array.isArray(n?.bullets) ? n!.bullets : [];
-  const nextAction = String(n?.next_action ?? "");
-
-  const nextCloseTs = typeof n?.timing?.next_close_ts === "number" ? n.timing.next_close_ts : undefined;
-  const secsLeft =
-    typeof nextCloseTs === "number" ? Math.max(0, Math.round((nextCloseTs - Date.now()) / 1000)) : null;
-
-  const badgeTone =
-    state === "ENTER_MARKET"
-      ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-      : state === "PLACE_LIMIT"
-        ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
-        : state === "WAIT_CLOSE" || state === "WAIT_ZONE" || state === "WAIT_RETEST" || state === "WAIT_FILL"
-          ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-          : state === "BLOCKED"
-            ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-            : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
-
-  return (
-    <div className="mt-3">
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill tone={badgeTone} icon={<Sparkles className="h-4 w-4" />}>
-            {state}
-          </Pill>
-
-          {grade ? (
-            <Pill tone={gradeTone(grade)}>
-              Grade {grade}
-            </Pill>
-          ) : null}
-
-          {secsLeft != null ? (
-            <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Clock className="h-4 w-4" />}>
-              Close in ~{secsLeft}s
-            </Pill>
-          ) : null}
-
-        </div>
-        <Divider />
-        {headline ? (
-          <div className="mt-2 text-sm font-extrabold text-zinc-50">👉 {nextAction}</div>
-        ) : null}
-
-        {bullets.length > 0 ? (
-          <div className="mt-2 space-y-1.5 text-xs text-zinc-300/90">
-            {bullets.slice(0, 4).map((b, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300/60" />
-                <span className="min-w-0">{b}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 export function TradingView({
 
@@ -1213,14 +1247,60 @@ export function TradingView({
   const rankedWithIndex = useMemo(() => {
     return (ranked || []).map((s, idx) => ({ s, idx }));
   }, [ranked]);
+  // ---------- Queue Controls (persisted) ----------
+
+  const [qSide, setQSide] = useLocalStorageState<"ALL" | "LONG" | "SHORT">("ct_ui_q_side", "ALL", {
+    serialize: (v) => String(v),
+    deserialize: (raw) => {
+      const r = String(raw || "ALL").toUpperCase();
+      return (r === "LONG" || r === "SHORT" || r === "ALL") ? (r as any) : "ALL";
+    },
+  });
+
+  const [qStatus, setQStatus] = useLocalStorageState<"ALL" | SetupStatus>("ct_ui_q_status", "ALL", {
+    serialize: (v) => String(v),
+    deserialize: (raw) => {
+      const r = String(raw || "ALL").toUpperCase();
+      const ok =
+        r === "ALL" ||
+        r === "FORMING" ||
+        r === "READY" ||
+        r === "TRIGGERED" ||
+        r === "INVALIDATED" ||
+        r === "EXPIRED";
+      return ok ? (r as any) : "ALL";
+    },
+  });
+
+  const applyQueueFilters = useCallback(
+    (items: Array<{ s: TradeSetup; idx: number }>) => {
+      let arr = items;
+
+      if (qSide !== "ALL") {
+        arr = arr.filter(({ s }) => String(s.side) === qSide);
+      }
+
+      if (qStatus !== "ALL") {
+        arr = arr.filter(({ s }) => String(s.status) === qStatus);
+      }
+
+      // Keep upstream order (ranked order) to avoid breaking View/accordion behavior.
+      return arr;
+    },
+    [qSide, qStatus]
+  );
+
 
   const scalpRanked = useMemo(() => {
-    return rankedWithIndex.filter(({ s }) => isScalpSetupUi(s));
-  }, [rankedWithIndex]);
+    const base = rankedWithIndex.filter(({ s }) => isScalpSetupUi(s));
+    return applyQueueFilters(base);
+  }, [rankedWithIndex, applyQueueFilters]);
 
   const nonScalpRanked = useMemo(() => {
-    return rankedWithIndex.filter(({ s }) => !isScalpSetupUi(s));
-  }, [rankedWithIndex]);
+    const base = rankedWithIndex.filter(({ s }) => !isScalpSetupUi(s));
+    return applyQueueFilters(base);
+  }, [rankedWithIndex, applyQueueFilters]);
+
 
   const [expandedKey, setExpandedKey] = useState<number | null>(null);
   const focusedSetup: TradeSetup | null = useMemo(() => {
@@ -1575,7 +1655,6 @@ export function TradingView({
             </div>
           ) : null}
         </div>
-        <ActionHeader setup={focusedSetup} />
         {/* Main layout */}
         <div className="mt-4 grid grid-cols-1 gap-4 min-[1440px]:grid-cols-[380px_1fr]">
           {/* LEFT: queue */}
@@ -1706,6 +1785,56 @@ export function TradingView({
               </div>
             </div>
             <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
+              {/* Queue filters */}
+              <div className="mb-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="relative mt-1">
+                    <div className="pointer-events-none absolute left-2 inset-y-0 flex items-center">
+                      <SideIcon side={qSide} />
+                    </div>
+
+                    <select
+                      className="w-full appearance-none bg-transparent pl-7 pr-8 text-sm font-semibold text-zinc-100 outline-none"
+                      value={qSide}
+                      onChange={(e) => setQSide(e.target.value as any)}
+                    >
+                      <option value="ALL">All Sides</option>
+                      <option value="LONG">Long only</option>
+                      <option value="SHORT">Short only</option>
+                    </select>
+
+                    <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                      <SelectCaret />
+                    </div>
+                  </div>
+
+                  <div className="relative mt-1">
+                    <div className="pointer-events-none absolute left-2 inset-y-0 flex items-center">
+                      <StatusIcon status={qStatus} />
+                    </div>
+
+                    <select
+                      className="w-full appearance-none bg-transparent pl-7 pr-8 text-sm font-semibold text-zinc-100 outline-none"
+                      value={qStatus}
+                      onChange={(e) => setQStatus(e.target.value as any)}
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="FORMING">Forming</option>
+                      <option value="READY">Ready</option>
+                      <option value="TRIGGERED">Triggered</option>
+                      <option value="INVALIDATED">Invalidated</option>
+                      <option value="EXPIRED">Expired</option>
+                    </select>
+
+                    <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                      <SelectCaret />
+                    </div>
+                  </div>
+
+
+                </div>
+              </div>
+
               {executionGlobal?.state === "BLOCKED" ? (
                 <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
                   <div className="flex items-start gap-3">
@@ -1769,6 +1898,9 @@ export function TradingView({
                           const pri01 = clamp01(pri / 100);
 
                           const chip = actionChip(s, executionGlobal);
+                          const entryText = fmtEntryZone(s.entry?.zone);
+                          const slText = fmtPx(s.stop?.price);
+                          const tpText = fmtTpSummary(s.tp);
 
                           return (
                             <div
@@ -1791,11 +1923,11 @@ export function TradingView({
                                   </div>
 
                                   <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
-                                    <span>Conf {fmtScore100(s.confidence?.score)}</span>
+                                    <span>C: {fmtScore100(s.confidence?.score)}</span>
                                     <span>•</span>
-                                    <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
+                                    <span>RR: {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
                                     <span>•</span>
-                                    <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                                    <span>P: {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
                                     <span>•</span>
                                     <span>[{uiGrade(s)}]</span>
                                   </div>
@@ -1803,6 +1935,7 @@ export function TradingView({
                                   <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
                                     <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
                                   </div>
+
                                 </div>
 
                                 <div className="flex shrink-0 flex-col items-end justify-center gap-2">
@@ -1815,24 +1948,54 @@ export function TradingView({
                                     ) : null}
                                   </div>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleExpanded(accordionKey)}
-                                    className="inline-flex items-center gap-1 rounded-xl bg-white/5 px-3 py-2 text-xs font-bold text-zinc-100 ring-1 ring-white/10 hover:bg-white/10"
-                                  >
-                                    {isOpen ? (
-                                      <>
-                                        <Minus className="h-4 w-4" />
-                                        Hide
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Plus className="h-4 w-4" />
-                                        View
-                                      </>
-                                    )}
-                                  </button>
                                 </div>
+                              </div>
+                              {/* Bottom bar: Entry / TP / SL (anchored at the bottom of the setup card) */}
+
+                              {/* Bottom bar: Entry / TP / SL + View (anchored at the bottom of the setup card) */}
+                              <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-2 text-[11px] font-semibold">
+                                {/* Left: Entry / TP / SL */}
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className="tabular-nums text-sky-300">
+                                    <span className="font-bold text-sky-200">E:</span> {entryText}
+                                  </span>
+
+                                  <span className="tabular-nums text-emerald-300">
+                                    <span className="font-bold text-emerald-200">TP:</span> {tpText}
+                                  </span>
+
+                                  <span className="tabular-nums text-rose-300">
+                                    <span className="font-bold text-rose-200">SL:</span> {slText}
+                                  </span>
+                                </div>
+
+                                {/* Right: View / Hide */}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpanded(accordionKey)}
+                                  className={[
+                                    "ml-2 inline-flex items-center gap-1",
+                                    "rounded-md px-1.5 py-0.5",
+                                    "text-[10px] font-bold",
+                                    "text-zinc-300 hover:text-zinc-100",
+                                    "ring-1 ring-white/10 hover:ring-white/20",
+                                    "transition",
+                                  ].join(" ")}
+                                  aria-label={isOpen ? "Hide setup details" : "View setup details"}
+                                  title={isOpen ? "Hide details" : "View details"}
+                                >
+                                  {isOpen ? (
+                                    <>
+                                      <Minus className="h-3 w-3" />
+                                      <span className="hidden sm:inline">Hide</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="h-3 w-3" />
+                                      <span className="hidden sm:inline">View</span>
+                                    </>
+                                  )}
+                                </button>
                               </div>
 
                               {isOpen ? (
