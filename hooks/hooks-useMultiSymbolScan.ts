@@ -32,89 +32,6 @@ function inferTitle(setup: any): string | undefined {
     const parts = [type, side, tf].filter(Boolean);
     return parts.length ? parts.join(" · ") : undefined;
 }
-function normGrade(setup: any): string {
-    const gp = String(setup?.confidence?.grade_plus ?? "").toUpperCase();
-    if (gp === "A+" || gp === "A" || gp === "B" || gp === "C") return gp;
-    const g = String(setup?.confidence?.grade ?? "").toUpperCase();
-    return g;
-}
-
-function gradeRank(g: string): number {
-    const gg = String(g ?? "").toUpperCase();
-    if (gg === "A+") return 4;
-    if (gg === "A") return 3;
-    if (gg === "B") return 2;
-    if (gg === "C") return 1;
-    if (gg === "D") return 0;
-    return 0;
-}
-
-function execRank(setup: any): number {
-    const st = String(setup?.execution?.state ?? "");
-    // Best: actionable now
-    if (st === "ENTER_MARKET") return 6;
-    if (st === "PLACE_LIMIT") return 5;
-
-    // Next best: close to action
-    if (st === "WAIT_FILL") return 4;
-    if (st === "WAIT_CLOSE") return 3;
-    if (st === "WAIT_ZONE") return 2;
-    if (st === "WAIT_RETEST") return 2;
-
-    // Neutral / weak
-    if (st === "FORMING") return 1;
-    if (st === "MONITOR") return 0;
-    if (st === "NO_TRADE") return 0;
-    if (st === "BLOCKED") return -1;
-
-    return 0;
-}
-
-function statusRank(setup: any): number {
-    const st = String(setup?.status ?? "");
-    if (st === "READY") return 5;
-    if (st === "TRIGGERED") return 4;
-    if (st === "FORMING") return 3;
-    if (st === "INVALIDATED") return 1;
-    if (st === "EXPIRED") return 0;
-    return 2;
-}
-
-function pickBestSetup(arr: any[]): any | null {
-    if (!Array.isArray(arr) || arr.length === 0) return null;
-
-    const num = (x: any, fallback = 0) => {
-        const n = Number(x);
-        return Number.isFinite(n) ? n : fallback;
-    };
-
-    const sorted = arr.slice().sort((a, b) => {
-        // 1) execution actionability
-        const er = execRank(b) - execRank(a);
-        if (er !== 0) return er;
-
-        // 2) grade_plus / grade
-        const gr = gradeRank(normGrade(b)) - gradeRank(normGrade(a));
-        if (gr !== 0) return gr;
-
-        // 3) priority_score (from hook)
-        const pr = num(b?.priority_score) - num(a?.priority_score);
-        if (pr !== 0) return pr;
-
-        // 4) confidence score
-        const cs = num(b?.confidence?.score) - num(a?.confidence?.score);
-        if (cs !== 0) return cs;
-
-        // 5) status fallback
-        const sr = statusRank(b) - statusRank(a);
-        if (sr !== 0) return sr;
-
-        // stable tie-break
-        return String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
-    });
-
-    return sorted[0] ?? null;
-}
 
 export function useMultiSymbolScan(args?: {
     enabled?: boolean;
@@ -247,7 +164,7 @@ export function useMultiSymbolScan(args?: {
         }, 250);
 
         return () => clearInterval(t);
-    }, [enabled, scanPaused, activeSymbol, symbols.length]);
+     }, [enabled, scanPaused, activeSymbol, symbols.length]);
 
     const selected = useMemo(() => {
         if (!selectedKey) return null;
@@ -279,7 +196,7 @@ export function useMultiSymbolScan(args?: {
             selectedKey,
             selectedSymbol,
         };
-    }, [enabled, scanPaused, uniLoading, uniError, refreshedAt, symbols.length, activeSymbol, cursor, found.length, selectedKey, selectedSymbol]);
+      }, [enabled, scanPaused, uniLoading, uniError, refreshedAt, symbols.length, activeSymbol, cursor, found.length, selectedKey, selectedSymbol]);
 
     return {
         universe,

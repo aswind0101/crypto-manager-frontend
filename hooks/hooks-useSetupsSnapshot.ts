@@ -1,7 +1,8 @@
 import { useMemo, useRef } from "react";
 import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
-import type { ExecutionDecision } from "../lib/feeds/setups/types";
+import { gradeFromScore } from "../lib/feeds/setups/scoring";
+import type { ExecutionDecision, SetupTelemetry, DecisionNarrative, DecisionCode } from "../lib/feeds/setups/types";
 
 
 type Candle = {
@@ -154,6 +155,96 @@ function pickTriggerTf(snap: any): string {
   if (tfs.has("15m")) return "15m";
   return "";
 }
+function tfToMs(tf?: string): number | undefined {
+  if (!tf) return;
+  const m = tf.trim().toLowerCase().match(/^(\d+)(m|h|d)$/);
+  if (!m) return;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return;
+  if (m[2] === "m") return n * 60_000;
+  if (m[2] === "h") return n * 60 * 60_000;
+  if (m[2] === "d") return n * 24 * 60 * 60_000;
+}
+function formatRemainingMMSS(totalSeconds?: number): string | undefined {
+  if (typeof totalSeconds !== "number" || !Number.isFinite(totalSeconds)) return;
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${mm}:${ss.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Select the close-confirm timeframe for a specific setup.
+ *
+ * IMPORTANT:
+ * - The engine publishes per-setup `trigger_tf`.
+ * - The trigger evaluation MUST respect that, otherwise a setup defined to
+ *   trigger on 15m could incorrectly trigger on 5m (or vice versa).
+ */
+function pickTriggerTfForSetup(snap: any, setup: any): string {
+  const wanted = String(setup?.trigger_tf ?? "").trim();
+  const tfs = new Set<string>((snap?.timeframes ?? []).map((x: any) => String(x?.tf ?? "")));
+
+  // 1) Strict: use the setup-defined trigger_tf if present in snapshot.
+  if (wanted && tfs.has(wanted)) return wanted;
+
+  // 2) Fallback: some setups may want to trigger on entry_tf if trigger_tf is missing.
+  const entryTf = String(setup?.entry_tf ?? "").trim();
+  if (entryTf && tfs.has(entryTf)) return entryTf;
+
+  // 3) Last resort: preserve legacy behavior (prefer 5m then 15m).
+  return pickTriggerTf(snap);
+}
+function pickTriggerTfForSetupRuntime(
+  snap: any,
+  setup: any,
+  lastByTf: Record<string, Candle | undefined>,
+  nowMs: number
+): { tf?: string; stale: boolean; staleReason?: string } {
+  const tfs: string[] = Array.isArray(snap?.timeframes)
+    ? snap.timeframes.map((x: any) => String(x?.tf ?? "")).filter((x: string) => x)
+    : [];
+  const tfSet = new Set<string>(tfs);
+
+  const tfToMinutes = (tf?: string): number | undefined => {
+    if (!tf) return undefined;
+    const m = tf.trim().toLowerCase().match(/^(\d+)(m|h|d)$/);
+    if (!m) return undefined;
+    const n = Number(m[1]);
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    if (m[2] === "m") return n;
+    if (m[2] === "h") return n * 60;
+    if (m[2] === "d") return n * 60 * 24;
+    return undefined;
+  };
+
+  const isFresh = (tf: string) => {
+    const last = lastByTf[tf];
+    if (!last || typeof last.ts !== "number") return { ok: false as const, reason: "no_confirmed_candle" };
+    const mins = tfToMinutes(tf);
+    if (mins == null) return { ok: true as const };
+    // allow up to ~2 bars + 10s grace before declaring stale
+    const allowMs = mins * 60_000 * 2 + 10_000;
+    const ageMs = nowMs - last.ts;
+    if (ageMs <= allowMs) return { ok: true as const };
+    return { ok: false as const, reason: `stale_last_confirmed ageMs=${Math.round(ageMs)} allowMs=${allowMs}` };
+  };
+
+  const wanted = String(setup?.trigger_tf ?? "").trim();
+  const entryTf = String(setup?.entry_tf ?? "").trim();
+  const legacy = pickTriggerTf(snap);
+
+  const candidates = [wanted, entryTf, legacy].filter((tf) => tf && tfSet.has(tf));
+
+  for (const tf of candidates) {
+    const chk = isFresh(tf);
+    if (chk.ok) return { tf, stale: false };
+  }
+
+  // If none are fresh, return strict selection + stale flag
+  const strict = pickTriggerTfForSetup(snap, setup);
+  return { tf: strict, stale: true, staleReason: "no_fresh_tf" };
+}
 
 function lastConfirmedCandle(candles: Candle[]): Candle | undefined {
   for (let i = candles.length - 1; i >= 0; i--) {
@@ -167,20 +258,90 @@ function upsertChecklist(
   list: Array<{ key: string; ok: boolean; note?: string }>,
   item: { key: string; ok: boolean; note?: string }
 ) {
-  const out = Array.isArray(list) ? [...list] : [];
-  const idx = out.findIndex((x) => x?.key === item.key);
-  if (idx >= 0) out[idx] = item;
-  else out.push(item);
+  // Keep the same array/object references when nothing meaningfully changed.
+  // This prevents UI churn when note contains volatile values (mid, ts, etc.).
+  const src = Array.isArray(list) ? list : [];
+  const idx = src.findIndex((x) => x?.key === item.key);
+
+  // New item
+  if (idx < 0) return [...src, item];
+
+  const prev = src[idx];
+  if (!prev) {
+    const out = [...src];
+    out[idx] = item;
+    return out;
+  }
+
+  // If ok didn't change, preserve previous note unless the new note is intentionally different.
+  // Also preserve the previous object reference when fully unchanged.
+  const nextOk = item.ok;
+  const prevOk = prev.ok;
+
+  // Prefer stable note to avoid continuous updates when ok is unchanged.
+  const nextNote =
+    prevOk === nextOk
+      ? (prev.note ?? item.note) // keep old note if present
+      : item.note;               // ok changed => allow note change
+
+  const prevNote = prev.note;
+
+  const okUnchanged = prevOk === nextOk;
+  const noteUnchanged = (prevNote ?? "") === (nextNote ?? "");
+
+  // Nothing changed => return original list for referential stability
+  if (okUnchanged && noteUnchanged) return src;
+
+  // Something changed => copy minimal
+  const out = [...src];
+  out[idx] = noteUnchanged ? { ...prev, ok: nextOk } : { ...prev, ok: nextOk, note: nextNote };
   return out;
 }
+
 
 function parseBreakLevelFromChecklist(setup: any): number | undefined {
   const items = setup?.entry?.trigger?.checklist;
   if (!Array.isArray(items)) return undefined;
 
-  for (const it of items) {
-    const note = String(it?.note ?? "");
+  const parseFromNote = (noteRaw: unknown): number | undefined => {
+    const note = String(noteRaw ?? "");
     // engine note format: "... @ 1234.56"
+    const m = note.match(/@\s*([0-9]+(?:\.[0-9]+)?)/);
+    if (!m) return undefined;
+    const v = Number(m[1]);
+    return Number.isFinite(v) ? v : undefined;
+  };
+
+  // 1) Prefer explicit "level" key (engine: { key: "level", note: `Break ... @ ${level}` })
+  for (const it of items) {
+    if (String(it?.key ?? "") !== "level") continue;
+    const v = parseFromNote(it?.note);
+    if (v != null) return v;
+  }
+
+  // 2) Fallback to "bos" key (engine: { key: "bos", note: `BOS ... @ ${level} (15m)` })
+  for (const it of items) {
+    if (String(it?.key ?? "") !== "bos") continue;
+    const v = parseFromNote(it?.note);
+    if (v != null) return v;
+  }
+
+  // 3) Last resort: scan all notes (kept for backward compatibility)
+  for (const it of items) {
+    const v = parseFromNote(it?.note);
+    if (v != null) return v;
+  }
+
+  return undefined;
+}
+
+function parseLevelFromChecklistKey(setup: any, key: string): number | undefined {
+  const items = setup?.entry?.trigger?.checklist;
+  if (!Array.isArray(items)) return undefined;
+
+  for (const it of items) {
+    if (String(it?.key ?? "") !== key) continue;
+    const note = String(it?.note ?? "");
     const m = note.match(/@\s*([0-9]+(?:\.[0-9]+)?)/);
     if (m) {
       const v = Number(m[1]);
@@ -188,6 +349,79 @@ function parseBreakLevelFromChecklist(setup: any): number | undefined {
     }
   }
   return undefined;
+}
+
+function candleTouchesZone(c: Candle, z?: { lo: number; hi: number }): boolean {
+  if (!c || !z || typeof z.lo !== "number" || typeof z.hi !== "number") return false;
+  // overlap between candle range and zone
+  return c.l <= z.hi && c.h >= z.lo;
+}
+// ---- Stable touch helpers (prevents oscillation when zone shifts slightly due to float/rounding) ----
+function normalizeZone(z: { lo: number; hi: number }) {
+  const lo = Number(z.lo);
+  const hi = Number(z.hi);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return undefined;
+  const a = Math.min(lo, hi);
+  const b = Math.max(lo, hi);
+  // Round to reduce float jitter; 6 decimals is safe for crypto prices
+  return { lo: Number(a.toFixed(6)), hi: Number(b.toFixed(6)) };
+}
+
+function midInZoneStable(
+  mid: number,
+  zone: { lo: number; hi: number },
+  wasTouched: boolean,
+  hysteresisBps: number = 2, // 2 bps hysteresis prevents flip-flop near edges
+) {
+  if (!Number.isFinite(mid) || mid <= 0) return false;
+  const z = normalizeZone(zone);
+  if (!z) return false;
+
+  if (!wasTouched) {
+    // Strict when not touched yet
+    return mid >= z.lo && mid <= z.hi;
+  }
+
+  // When already touched, apply hysteresis band to avoid rapid toggling
+  const buf = (mid * hysteresisBps) / 10000;
+  return mid >= z.lo - buf && mid <= z.hi + buf;
+}
+
+function getEffectiveTouchZone(setup: any, trg: any) {
+  const locked = (trg as any)?._touch_zone;
+  const z0 = setup?.entry?.zone;
+  const z =
+    locked && typeof locked.lo === "number" && typeof locked.hi === "number"
+      ? locked
+      : (z0 && typeof z0.lo === "number" && typeof z0.hi === "number" ? z0 : undefined);
+
+  return z ? normalizeZone(z) : undefined;
+}
+// ---- Tier monotonicity helpers ----
+// We enforce a simple monotonic order so that tier cannot downgrade due to transient conditions.
+// APPROACHING < TOUCHED < CONFIRMED
+function normalizeTier(t: unknown): "APPROACHING" | "TOUCHED" | "CONFIRMED" {
+  const s = String(t ?? "").toUpperCase();
+  if (s === "CONFIRMED") return "CONFIRMED";
+  if (s === "TOUCHED") return "TOUCHED";
+  return "APPROACHING";
+}
+
+function maxTier(a: unknown, b: unknown, confirmedFlag?: boolean): "APPROACHING" | "TOUCHED" | "CONFIRMED" {
+  if (confirmedFlag) return "CONFIRMED";
+  const ta = normalizeTier(a);
+  const tb = normalizeTier(b);
+  if (ta === "CONFIRMED" || tb === "CONFIRMED") return "CONFIRMED";
+  if (ta === "TOUCHED" || tb === "TOUCHED") return "TOUCHED";
+  return "APPROACHING";
+}
+
+function mergeTier(
+  prevTier: unknown,
+  candidateTier: unknown,
+  confirmedFlag?: boolean
+): "APPROACHING" | "TOUCHED" | "CONFIRMED" {
+  return maxTier(prevTier, candidateTier, confirmedFlag);
 }
 
 function candleCloseStrengthPct(c: Candle, side: "LONG" | "SHORT") {
@@ -318,6 +552,10 @@ function applyPreTrigger(out: any, snap: any): any {
   if (!out || !Array.isArray(out.setups) || !snap?.price?.mid) return out;
 
   const mid = snap.price.mid as number;
+  // Use a single timestamp per evaluation cycle to avoid churn from multiple Date.now() calls
+  // and to make touched_ts stable within the same snapshot processing pass.
+  const tnow = Date.now();
+
 
   const updated = out.setups.map((s: any) => {
     if (!s || s.status !== "READY") return s;
@@ -334,27 +572,45 @@ function applyPreTrigger(out: any, snap: any): any {
 
       // If we have a retest zone, use in-zone as “retest ok”
       if (z && typeof z.lo === "number" && typeof z.hi === "number") {
-        const inZone = mid >= z.lo && mid <= z.hi;
+        const wasTouched = String((trg as any)?.tier ?? "") === "TOUCHED";
+        const zEff = getEffectiveTouchZone(s, trg) ?? normalizeZone(z)!;
+        const inZone = midInZoneStable(mid, zEff, wasTouched || Boolean((trg as any)?._touch_zone));
 
         checklist = upsertChecklist(checklist, {
           key: "retest",
           ok: inZone,
           note:
-            `mid=${mid.toFixed(2)} | zone=[${z.lo.toFixed(2)}, ${z.hi.toFixed(2)}]` +
+            `mid=${mid.toFixed(2)} | zone=[${zEff.lo.toFixed(2)}, ${zEff.hi.toFixed(2)}]` +
             (brk ? ` | lvl=${brk.toFixed(2)}` : ""),
         });
 
         checklist = upsertChecklist(checklist, {
           key: "pre_trigger",
           ok: inZone,
-          note: `mid=${mid.toFixed(2)} | zone=[${z.lo.toFixed(2)}, ${z.hi.toFixed(2)}]`,
+          note: `mid=${mid.toFixed(2)} | zone=[${zEff.lo.toFixed(2)}, ${zEff.hi.toFixed(2)}]`,
         });
 
         if (inZone) summary = "PRE-TRIGGER: price is retesting BOS level (await close-confirm breakout)";
+
+        const prevTier = String((trg as any)?.tier ?? "");
+        const candTier = inZone ? "TOUCHED" : (prevTier || "APPROACHING");
+        const nextTier = mergeTier(prevTier, candTier, (trg as any)?.confirmed === true);
+
         return {
           ...s,
-          entry: { ...s.entry, trigger: { ...trg, checklist, summary } },
+          entry: {
+            ...s.entry,
+            trigger: {
+              ...trg,
+              checklist,
+              summary,
+              tier: nextTier,
+              touched_ts: inZone ? (Number((trg as any)?.touched_ts) || tnow) : (trg as any)?.touched_ts,
+              _touch_zone: (trg as any)?._touch_zone ?? (inZone ? zEff : undefined),
+            },
+          },
         };
+
       }
 
       // Legacy fallback (no zone): “testing level” tight band
@@ -370,21 +626,102 @@ function applyPreTrigger(out: any, snap: any): any {
       });
 
       if (ok) summary = "PRE-TRIGGER: price is testing breakout level (await close-confirm)";
+
+      const prevTier = String((trg as any)?.tier ?? "");
+      const candTier = ok ? "TOUCHED" : (prevTier || "APPROACHING");
+      const nextTier = mergeTier(prevTier, candTier, (trg as any)?.confirmed === true);
+
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: {
+            ...trg,
+            checklist,
+            summary,
+            tier: nextTier,
+            touched_ts: ok ? (Number((trg as any)?.touched_ts) || tnow) : (trg as any)?.touched_ts,
+          },
+        },
+      };
+
+    }
+    if (s.type === "LIQUIDITY_SWEEP_REVERSAL" || s.type === "FAILED_SWEEP_CONTINUATION") {
+      const zone = s?.entry?.zone;
+      if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
+      const wasTouched = String((trg as any)?.tier ?? "") === "TOUCHED";
+      const zEff = getEffectiveTouchZone(s, trg) ?? normalizeZone(zone)!;
+      const inZone = midInZoneStable(mid, zEff, wasTouched || Boolean((trg as any)?._touch_zone));
+
+      // Keep checklist keys aligned with engine (retest + close_confirm)
+      checklist = upsertChecklist(checklist, {
+        key: "retest",
+        ok: inZone,
+        note: `mid=${mid.toFixed(2)} | zone=[${zEff.lo.toFixed(2)}, ${zEff.hi.toFixed(2)}]`,
+      });
+
+      checklist = upsertChecklist(checklist, {
+        key: "pre_trigger",
+        ok: inZone,
+        note: `mid=${mid.toFixed(2)} | zone=[${zEff.lo.toFixed(2)}, ${zEff.hi.toFixed(2)}]`,
+      });
+
+      if (inZone) summary = "PRE-TRIGGER: price is in retest zone (await close-confirm)";
+
+      const prevTier = String((trg as any)?.tier ?? "");
+      const candTier = inZone ? "TOUCHED" : (prevTier || "APPROACHING");
+      const nextTier = mergeTier(prevTier, candTier, (trg as any)?.confirmed === true);
+
+
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: {
+            ...trg,
+            checklist,
+            summary,
+            tier: nextTier,
+            touched_ts: inZone ? (Number((trg as any)?.touched_ts) || tnow) : (trg as any)?.touched_ts,
+            _touch_zone: (trg as any)?._touch_zone ?? (inZone ? zEff : undefined),
+          },
+        },
+      };
     }
 
     if (s.type === "RANGE_MEAN_REVERT" || s.type === "TREND_PULLBACK") {
       const zone = s?.entry?.zone;
       if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
-
-      const inZone = mid >= zone.lo && mid <= zone.hi;
+      const wasTouched = String((trg as any)?.tier ?? "") === "TOUCHED";
+      const zEff = getEffectiveTouchZone(s, trg) ?? normalizeZone(zone)!;
+      const inZone = midInZoneStable(mid, zEff, wasTouched || Boolean((trg as any)?._touch_zone));
 
       checklist = upsertChecklist(checklist, {
         key: "pre_trigger",
         ok: inZone,
-        note: `mid=${mid.toFixed(2)} | zone=[${zone.lo.toFixed(2)}, ${zone.hi.toFixed(2)}]`,
+        note: `mid=${mid.toFixed(2)} | zone=[${zEff.lo.toFixed(2)}, ${zEff.hi.toFixed(2)}]`,
       });
 
       if (inZone) summary = "PRE-TRIGGER: price is inside entry zone (await close-confirm)";
+      const prevTier = String((trg as any)?.tier ?? "");
+      const candTier = inZone ? "TOUCHED" : (prevTier || "APPROACHING");
+      const nextTier = mergeTier(prevTier, candTier, (trg as any)?.confirmed === true);
+
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: {
+            ...trg,
+            checklist,
+            summary,
+            tier: nextTier,
+            touched_ts: inZone ? (Number((trg as any)?.touched_ts) || tnow) : (trg as any)?.touched_ts,
+            _touch_zone: (trg as any)?._touch_zone ?? (inZone ? zEff : undefined),
+          },
+        },
+      };
+
     }
 
     return {
@@ -409,145 +746,443 @@ function applyPreTrigger(out: any, snap: any): any {
 function applyCloseConfirm(out: any, snap: any): any {
   if (!out || !Array.isArray(out.setups) || !snap) return out;
 
-  const tf = pickTriggerTf(snap);
-  if (!tf) return out;
+  // Precompute last confirmed candle per timeframe once per evaluation.
+  // This allows per-setup trigger_tf evaluation without repeatedly scanning arrays.
+  const lastByTf: Record<string, Candle | undefined> = {};
+  const tfs: string[] = Array.isArray(snap?.timeframes)
+    ? snap.timeframes.map((x: any) => String(x?.tf ?? "")).filter((x: string) => x)
+    : [];
 
-  const candles = getTimeframeCandles(snap, tf);
-  const last = lastConfirmedCandle(candles);
-  if (!last) return out;
+  for (const tf of tfs) {
+    const candles = getTimeframeCandles(snap, tf);
+    const last = lastConfirmedCandle(candles);
+    if (last) lastByTf[tf] = last;
+  }
 
   const tnow = Date.now();
 
   const updated = out.setups.map((s: any) => {
     if (!s) return s;
 
-    // Expiry
+    // Per-setup trigger timeframe selection (MUST respect engine trigger_tf).
+    const tfSel = pickTriggerTfForSetupRuntime(snap, s, lastByTf, tnow);
+    const tf = tfSel.tf;
+    const last = tf ? lastByTf[tf] : undefined;
+
+
+    // ---------- Expiry ----------
     if (typeof s.expires_ts === "number" && tnow > s.expires_ts) {
       return { ...s, status: "EXPIRED" };
     }
 
-    // Hard invalidation by stop on close-confirm candle
-    const stopPx = s?.stop?.price;
-    if (typeof stopPx === "number") {
-      if (s.side === "LONG" && last.c <= stopPx) return { ...s, status: "INVALIDATED" };
-      if (s.side === "SHORT" && last.c >= stopPx) return { ...s, status: "INVALIDATED" };
+    // ---------- Ensure trigger object + checklist ----------
+    const trg0 = s?.entry?.trigger ?? { confirmed: false, checklist: [], summary: "" };
+
+    /**
+     * IMPORTANT:
+     * Reset close-confirm baseline when setup is NOT READY.
+     * Otherwise a stale _cc_base_ts from a previous READY cycle can cause false early "close_confirm" pass.
+     */
+    let trg = trg0 as any;
+
+    // IMPORTANT:
+    // Reset runtime-only fields when setup is NOT READY to prevent stale state carry-over
+    // across READY cycles (prevents false close_confirm and touch oscillation due to zone rebuilds).
+    if (s.status !== "READY") {
+      const hasRuntime =
+        typeof (trg as any)?._cc_base_ts === "number" ||
+        typeof (trg as any)?._cc_next_close_ts === "number" ||
+        typeof (trg as any)?._cc_tf === "string" ||
+        ((trg as any)?._touch_zone && typeof (trg as any)?._touch_zone === "object");
+
+      if (hasRuntime) {
+        trg = { ...(trg as any) };
+        delete (trg as any)._cc_base_ts;
+        delete (trg as any)._cc_next_close_ts;
+        delete (trg as any)._cc_tf;
+        delete (trg as any)._touch_zone;
+      }
     }
 
-    if (s.status !== "READY") return s;
+    const checklist0 = Array.isArray((trg as any)?.checklist) ? (trg as any).checklist : [];
+    // Use one checklist variable for the entire function scope (prevents TS "cannot find name checklist")
+    let checklistNow = checklist0;
 
-    if (s.type === "BREAKOUT") {
+    /**
+     * close_confirm policy (fully deterministic, no guessing):
+     * - When a setup is READY and not confirmed, we require one NEW confirmed candle close
+     *   on the setup's trigger timeframe (setup.trigger_tf).
+     * - We store a baseline candle timestamp the first time we see READY (per setup) and then wait
+     *   for a newer confirmed candle.
+     *
+     * Stored in: entry.trigger._cc_base_ts (internal runtime field; TS allows extra fields).
+     */
+    const baseTs: number | undefined =
+      typeof (trg as any)?._cc_base_ts === "number" && Number.isFinite((trg as any)._cc_base_ts)
+        ? (trg as any)._cc_base_ts
+        : undefined;
+
+
+    // HARD FIX: if trigger TF candles are stale, do NOT set/keep baseline and do NOT "wait next close" forever.
+    if (s.status === "READY" && (trg as any)?.confirmed !== true && tfSel.stale) {
+      // remove any previously stored baseline to prevent sticky lock
+      const trgNext = { ...(trg as any) };
+      delete trgNext._cc_base_ts;
+      delete trgNext._cc_next_close_ts;
+      delete trgNext._cc_tf;
+      if (trgNext.tier !== "CONFIRMED") trgNext.tier = String(trgNext.tier ?? "") || "APPROACHING";
+
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "tf_candles_stale",
+        ok: false,
+        note: `Trigger TF candles stale (tf=${tf ?? "unknown"}; ${tfSel.staleReason ?? "no reason"})`,
+      });
+
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "close_confirm",
+        ok: false,
+        note: `Blocked: trigger TF candles stale (tf=${tf ?? "unknown"})`,
+      });
+
+      return {
+        ...s,
+        entry: { ...s.entry, trigger: { ...trgNext, checklist: checklistNow } },
+      };
+    }
+    // If we don't even have confirmed candles for that tf, we must block on close_confirm,
+    // but ONLY when the setup is READY and not yet confirmed.
+    if (s.status === "READY" && trg?.confirmed !== true && !last) {
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "close_confirm",
+        ok: false,
+        note: `Missing confirmed candle for tf=${tf || "(none)"}`,
+      });
+
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: { ...trg, checklist: checklistNow },
+        },
+      };
+    }
+    // From here, last exists (confirmed candle) when tf is valid.
+    const lastTs = last?.ts;
+
+    // When setup first becomes READY, set baseline and require the NEXT confirmed candle.
+    // This prevents triggering off a candle that closed before the setup was READY..
+    if (s.status === "READY" && trg?.confirmed !== true && baseTs == null) {
+      const tfMs = tfToMs(tf);
+
+      let nextCloseTs: number | undefined =
+        typeof lastTs === "number" && typeof tfMs === "number"
+          ? lastTs + tfMs
+          : undefined;
+
+      // IMPORTANT FIX: ensure nextCloseTs is strictly in the future
+      if (typeof nextCloseTs === "number") {
+        while (nextCloseTs <= tnow) {
+          nextCloseTs += tfMs!;
+        }
+      }
+
+      const remainingSec =
+        typeof nextCloseTs === "number"
+          ? Math.max(0, Math.ceil((nextCloseTs - tnow) / 1000))
+          : undefined;
+      const remainingMMSS = formatRemainingMMSS(remainingSec);
+
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "close_confirm",
+        ok: false,
+        note: `Waiting next ${tf} close at ${nextCloseTs ? new Date(nextCloseTs).toLocaleTimeString() : "?"
+          } (${remainingMMSS ?? "countdown unavailable"} remaining)`,
+      });
+
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: {
+            ...trg,
+            checklist: checklistNow,
+            _cc_base_ts: lastTs,
+            _cc_next_close_ts: typeof nextCloseTs === "number" ? nextCloseTs : undefined,
+            _cc_tf: (tf === "5m" || tf === "15m") ? tf : undefined,
+            tier: String((trg as any)?.tier ?? "") || "APPROACHING",
+          },
+        },
+      };
+    }
+
+
+    // If baseline exists, require a NEW candle close (ts advanced).
+    let closeOk = true;
+    if (s.status === "READY" && trg?.confirmed !== true && baseTs != null) {
+      closeOk = typeof lastTs === "number" && lastTs > baseTs;
+    }
+    let nextCloseTs2: number | undefined = undefined;
+    if (s.status === "READY" && trg?.confirmed !== true && closeOk === false) {
+      const tfMs = tfToMs(tf);
+      if (typeof lastTs === "number" && typeof tfMs === "number") {
+        nextCloseTs2 = lastTs + tfMs;
+        while (nextCloseTs2 <= tnow) nextCloseTs2 += tfMs;
+      }
+    }
+    // Upsert close_confirm checklist so ExecutionDecision can gate WAIT_CLOSE.
+    checklistNow = upsertChecklist(checklistNow, {
+      key: "close_confirm",
+      ok: closeOk,
+      note: closeOk
+        ? `New confirmed candle close ts=${lastTs} > base=${baseTs} (tf=${tf})`
+        : `Waiting next confirmed close (last ts=${lastTs}, base=${baseTs}, tf=${tf})`,
+    });
+
+    // If we are READY and still waiting for a new close, do not proceed to trigger/invalidate-on-close.
+    if (s.status === "READY" && trg?.confirmed !== true && closeOk === false) {
+      return {
+        ...s,
+        entry: {
+          ...s.entry,
+          trigger: {
+            ...trg,
+            checklist: checklistNow,
+            _cc_next_close_ts: typeof nextCloseTs2 === "number" ? nextCloseTs2 : (trg as any)?._cc_next_close_ts,
+            _cc_tf: (tf === "5m" || tf === "15m") ? tf : (trg as any)?._cc_tf,
+            tier: String((trg as any)?.tier ?? "") || "APPROACHING",
+          },
+        },
+      };
+    }
+
+    // ---------- Hard invalidation by stop on close-confirm candle ----------
+    const stopPx = s?.stop?.price;
+    if (typeof stopPx === "number" && last) {
+      if (s.side === "LONG" && last.c <= stopPx) {
+        return {
+          ...s,
+          status: "INVALIDATED",
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+        };
+      }
+      if (s.side === "SHORT" && last.c >= stopPx) {
+        return {
+          ...s,
+          status: "INVALIDATED",
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+        };
+      }
+    }
+
+    // ---------- Trigger (close-confirm) ----------
+    // Helper: transition to TRIGGERED with consistent bookkeeping.
+    const markTriggered = (setupX: any) => {
+      const trgX = setupX?.entry?.trigger ?? trg;
+      const checklistX0 = Array.isArray(trgX?.checklist) ? trgX.checklist : checklistNow;
+
+      const checklistX = upsertChecklist(checklistX0, {
+        key: "close_confirm",
+        ok: true,
+        note: `Triggered on close-confirm (${tf}) @ ts=${lastTs}`,
+      });
+
+      return {
+        ...setupX,
+        status: "TRIGGERED",
+        entry: {
+          ...setupX.entry,
+          trigger: {
+            ...trgX,
+            confirmed: true,
+            checklist: checklistX,
+            _cc_base_ts: lastTs, // advance baseline
+            _cc_next_close_ts: undefined,
+            _cc_tf: (tf === "5m" || tf === "15m") ? tf : (trgX as any)?._cc_tf,
+            tier: "CONFIRMED",
+            confirmed_ts: typeof lastTs === "number" ? lastTs : Date.now(),
+          },
+        },
+      };
+    };
+
+    // BREAKOUT trigger logic (existing behavior, but now strictly per-setup tf and close-confirm gated)
+    if (s.status === "READY" && s.type === "BREAKOUT" && trg?.confirmed !== true && last) {
       const brk = parseBreakLevelFromChecklist(s);
-      if (!brk) return s;
+      if (!brk) {
+        return {
+          ...s,
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+        };
+      }
 
       const strength = candleCloseStrengthPct(last, s.side);
 
       // If breakout has a retest zone, require “touch retest + close beyond level”
-      const z = s?.entry?.zone;
+      const z0 = s?.entry?.zone;
+      const z = getEffectiveTouchZone(s, trg) ?? z0;
       if (z && typeof z.lo === "number" && typeof z.hi === "number") {
         const buffer = brk * 0.0008; // 8 bps buffer after reclaim/break
         const passStrength = strength >= 0.7;
 
         if (s.side === "LONG") {
-          const touched = last.l <= z.hi; // retest touch
-          const passPrice = last.c > brk + buffer; // close beyond level
-          if (touched && passPrice && passStrength) {
-            return {
-              ...s,
-              status: "TRIGGERED",
-              entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-            };
-          }
-          return s;
+          // Require actual candle-range overlap with the retest zone (not just "low <= zone.hi")
+          const touched = candleTouchesZone(last, z);
+          const reclaimed = last.c > brk + buffer && passStrength;
+          if (touched && reclaimed)
+            return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
+        } else {
+          // Require actual candle-range overlap with the retest zone (not just "high >= zone.lo")
+          const touched = candleTouchesZone(last, z);
+          const broke = last.c < brk - buffer && passStrength;
+          if (touched && broke)
+            return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
         }
 
-        const touched = last.h >= z.lo;
-        const passPrice = last.c < brk - buffer;
-        if (touched && passPrice && passStrength) {
-          return {
-            ...s,
-            status: "TRIGGERED",
-            entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-          };
-        }
-        return s;
+        // Not triggered yet; just persist bookkeeping.
+        return {
+          ...s,
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+        };
       }
 
-      // Legacy breakout (no retest zone)
-      const buffer = brk * 0.001; // 0.10% buffer
-      const passPrice = s.side === "LONG" ? last.c > brk + buffer : last.c < brk - buffer;
+      // If no zone is present, use simple strength-based close beyond level.
       const passStrength = strength >= 0.7;
-
-      if (passPrice && passStrength) {
-        return {
-          ...s,
-          status: "TRIGGERED",
-          entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-        };
-      }
-      return s;
-    }
-
-    if (s.type === "RANGE_MEAN_REVERT") {
-      const zone = s?.entry?.zone;
-      if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
-
       if (s.side === "LONG") {
-        const touched = last.l <= zone.hi;
-        const reclaimed = last.c >= zone.hi;
-        const hasRejection = last.l < last.c;
-        if (touched && reclaimed && hasRejection) {
-          return {
-            ...s,
-            status: "TRIGGERED",
-            entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-          };
-        }
-        return s;
+        if (last.c > brk && passStrength)
+          return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
+      } else {
+        if (last.c < brk && passStrength)
+          return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
       }
 
-      const touched = last.h >= zone.lo;
-      const reclaimed = last.c <= zone.lo;
-      const hasRejection = last.h > last.c;
-      if (touched && reclaimed && hasRejection) {
+      return {
+        ...s,
+        entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+      };
+    }
+    // TREND_PULLBACK / RANGE_MEAN_REVERT trigger logic (zone touch + reclaim on close-confirm)
+    if (
+      s.status === "READY" &&
+      (s.type === "TREND_PULLBACK" || s.type === "RANGE_MEAN_REVERT") &&
+      trg?.confirmed !== true &&
+      last
+    ) {
+      const z0 = s?.entry?.zone;
+      const z = getEffectiveTouchZone(s, trg) ?? z0;
+      if (!z || typeof z.lo !== "number" || typeof z.hi !== "number") {
         return {
           ...s,
-          status: "TRIGGERED",
-          entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
         };
       }
-      return s;
-    }
 
-    if (s.type === "TREND_PULLBACK") {
-      const zone = s?.entry?.zone;
-      if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
+      const strength = candleCloseStrengthPct(last, s.side);
+      const passStrength = strength >= 0.7;
+      const touched = candleTouchesZone(last, z);
 
-      if (s.side === "LONG") {
-        const touched = last.l <= zone.hi;
-        const reclaimed = last.c >= zone.hi;
-        if (touched && reclaimed) {
-          return {
-            ...s,
-            status: "TRIGGERED",
-            entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
-          };
-        }
-        return s;
+      const bufRef = s.side === "LONG" ? z.hi : z.lo;
+      const buffer = bufRef * 0.0008; // 8 bps buffer
+
+      const reclaimed =
+        s.side === "LONG" ? (last.c > z.hi + buffer) : (last.c < z.lo - buffer);
+
+      // Keep checklist aligned with runtime gate keys
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "pre_trigger",
+        ok: touched,
+        note: `candleTouch=${touched} | zone=[${z.lo.toFixed(2)}, ${z.hi.toFixed(2)}]`,
+      });
+
+      if (touched && reclaimed && passStrength) {
+        return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
       }
 
-      const touched = last.h >= zone.lo;
-      const reclaimed = last.c <= zone.lo;
-      if (touched && reclaimed) {
+      return {
+        ...s,
+        entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+      };
+    }
+
+    // LIQUIDITY_SWEEP_REVERSAL trigger logic
+    // - Requires: retest zone touch + close-confirm reclaim of swept level
+    if (s.status === "READY" && s.type === "LIQUIDITY_SWEEP_REVERSAL" && trg?.confirmed !== true && last) {
+      const level = parseLevelFromChecklistKey(s, "sweep");
+      const z0 = s?.entry?.zone;
+      const z = getEffectiveTouchZone(s, trg) ?? z0;
+
+      if (!Number.isFinite(level) || !z || typeof z.lo !== "number" || typeof z.hi !== "number") {
         return {
           ...s,
-          status: "TRIGGERED",
-          entry: { ...s.entry, trigger: { ...s.entry.trigger, confirmed: true } },
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
         };
       }
-      return s;
+
+      const strength = candleCloseStrengthPct(last, s.side);
+      const passStrength = strength >= 0.7;
+      const touched = candleTouchesZone(last, z);
+
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "retest",
+        ok: touched,
+        note: `candleTouch=${touched} | zone=[${z.lo.toFixed(2)}, ${z.hi.toFixed(2)}] | lvl=${Number(level).toFixed(2)}`,
+      });
+
+      const buffer = Number(level) * 0.0008; // 8 bps buffer
+      const reclaimed =
+        s.side === "LONG" ? (last.c > Number(level) + buffer) : (last.c < Number(level) - buffer);
+
+      if (touched && reclaimed && passStrength) {
+        return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
+      }
+
+      return {
+        ...s,
+        entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+      };
     }
 
-    return s;
+    // FAILED_SWEEP_CONTINUATION trigger logic
+    // - Requires: retest zone touch + close-confirm continuation beyond BOS level
+    if (s.status === "READY" && s.type === "FAILED_SWEEP_CONTINUATION" && trg?.confirmed !== true && last) {
+      const level = parseLevelFromChecklistKey(s, "bos");
+      const z0 = s?.entry?.zone;
+      const z = getEffectiveTouchZone(s, trg) ?? z0;
+      if (!Number.isFinite(level) || !z || typeof z.lo !== "number" || typeof z.hi !== "number") {
+        return {
+          ...s,
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+        };
+      }
+
+      const strength = candleCloseStrengthPct(last, s.side);
+      const passStrength = strength >= 0.7;
+      const touched = candleTouchesZone(last, z);
+
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "retest",
+        ok: touched,
+        note: `candleTouch=${touched} | zone=[${z.lo.toFixed(2)}, ${z.hi.toFixed(2)}] | lvl=${Number(level).toFixed(2)}`,
+      });
+
+      const buffer = Number(level) * 0.0008; // 8 bps buffer
+      const continued =
+        s.side === "LONG" ? (last.c > Number(level) + buffer) : (last.c < Number(level) - buffer);
+
+      if (touched && continued && passStrength) {
+        return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
+      }
+
+      return {
+        ...s,
+        entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+      };
+    }
+
+    // Default: persist checklist/base
+    return {
+      ...s,
+      entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs ?? baseTs } },
+    };
   });
 
   return { ...out, setups: updated };
@@ -599,13 +1234,21 @@ function deriveExecutionDecision(
   // Requirement from you: grade C must never allow canEnterMarket.
   // We also treat grade D as monitor-only to prevent low-confidence execution.
   const grade = String(setup?.confidence?.grade ?? "").toUpperCase();
-  if (grade === "C" || grade === "D") {
+  const gradePlus = String(setup?.confidence?.grade_plus ?? "").toUpperCase(); // "A+"|"A"|"B"|"C"
+  const gp = (gradePlus === "A+" || gradePlus === "A" || gradePlus === "B" || gradePlus === "C") ? gradePlus : "";
+
+  // ---------- Quality gate: grade_plus C (or legacy grade C/D) are monitor-only ----------
+  // Priority:
+  // - If grade_plus is present: use it.
+  // - Else: fall back to legacy grade.
+  if (gp === "C" || (gp === "" && (grade === "C" || grade === "D"))) {
+    const label = gp ? `grade_plus ${gp}` : `Confidence ${grade}`;
     return {
       state: "MONITOR",
       canEnterMarket: false,
       canPlaceLimit: false,
       blockers: ["CONFIDENCE_MONITOR_ONLY"],
-      reason: `Confidence ${grade}: monitor only`,
+      reason: `${label}: monitor only`,
     };
   }
 
@@ -648,6 +1291,16 @@ function deriveExecutionDecision(
   // ---------- Collect checklist blockers ----------
   for (const item of checklist) {
     if (item?.ok === false) blockers.push(item.key);
+  }
+  // HARD BLOCK: trigger TF candles stale => do not pretend we're "waiting next close"
+  if (blockers.includes("tf_candles_stale")) {
+    return {
+      state: "BLOCKED",
+      canEnterMarket: false,
+      canPlaceLimit: false,
+      blockers: ["TF_CANDLES_STALE"],
+      reason: "Trigger timeframe candles are stale (no new confirmed closes)",
+    };
   }
 
   // ---------- FORMING ----------
@@ -694,25 +1347,62 @@ function deriveExecutionDecision(
         };
       }
 
+      // Tier-based execution policy (logic-first; UI later can show tier explicitly)
+      const grade2 = String(setup?.confidence?.grade ?? "").toUpperCase();
+      const trg = setup?.entry?.trigger ?? {};
+      const tier =
+        String((trg as any)?.tier ?? "") ||
+        ((trg as any)?.confirmed === true ? "CONFIRMED" : "");
+
+      // If grade B: require CONFIRMED to place limit (more conservative)
+      if ((gp === "B" || (gp === "" && grade2 === "B")) && tier !== "CONFIRMED") {
+        return {
+          state: "WAIT_CLOSE",
+          canEnterMarket: false,
+          canPlaceLimit: false,
+          blockers: Array.isArray(blockers) ? Array.from(new Set([...blockers, "close_confirm"])) : ["close_confirm"],
+          reason: "Grade B: require close-confirm before placing limit",
+        };
+      }
+
+      // Grade A: allow placing limit when TOUCHED or CONFIRMED (faster, still controlled)
+      // If tier is empty, fall back to existing close_confirm gating via checklist.
       return {
         state: "PLACE_LIMIT",
         canEnterMarket: false,
         canPlaceLimit: true,
         blockers,
-        reason: "Limit entry available",
+        reason: tier === "TOUCHED" ? "Limit entry available (touched zone)" : "Limit entry available",
       };
+
     }
 
     // MARKET
+    const trgM = setup?.entry?.trigger ?? {};
+    const tierM =
+      String((trgM as any)?.tier ?? "") ||
+      ((trgM as any)?.confirmed === true ? "CONFIRMED" : "");
+
+    // Conservative: only allow market entry on CONFIRMED tier
+    if (tierM !== "CONFIRMED") {
+      return {
+        state: "WAIT_CLOSE",
+        canEnterMarket: false,
+        canPlaceLimit: false,
+        blockers: Array.isArray(blockers) ? Array.from(new Set([...blockers, "close_confirm"])) : ["close_confirm"],
+        reason: "Market entry requires close-confirm (CONFIRMED tier)",
+      };
+    }
+
     return {
       state: "ENTER_MARKET",
       canEnterMarket: true,
       canPlaceLimit: false,
       blockers,
-      reason: "Market entry allowed",
+      reason: "Market entry allowed (confirmed)",
     };
-  }
 
+  }
   // ---------- TRIGGERED ----------
   if (status === "TRIGGERED") {
     if (mode === "LIMIT") {
@@ -742,6 +1432,351 @@ function deriveExecutionDecision(
     blockers,
     reason: "No execution action",
   };
+}
+function buildDecisionNarrative(
+  setup: any,
+  decision: ExecutionDecision,
+  ctx: { mid: number; dqOk: boolean; bybitOk: boolean; staleSec?: number; paused: boolean; },
+): DecisionNarrative {
+  const grade = String(setup?.confidence?.grade ?? "").toUpperCase();
+  const mode = String(setup?.entry?.mode ?? "");
+  const status = String(setup?.status ?? "");
+  const trg = setup?.entry?.trigger ?? {};
+  const tier = String((trg as any)?.tier ?? (trg as any)?.confirmed ? "CONFIRMED" : "") || "APPROACHING";
+
+  const bullets: string[] = [];
+
+  // Always include core blockers (bounded)
+  const bl = Array.isArray(decision?.blockers) ? decision.blockers : [];
+  for (const b of bl) {
+    if (bullets.length >= 4) break;
+    bullets.push(String(b));
+  }
+
+  // Helpful context bullets (bounded)
+  const z = setup?.entry?.zone;
+  if (mode === "LIMIT" && z && Number.isFinite(Number(z.lo)) && Number.isFinite(Number(z.hi))) {
+    bullets.push(`zone=[${Number(z.lo).toFixed(2)}, ${Number(z.hi).toFixed(2)}]`);
+  }
+  const stopPx = setup?.stop?.price;
+  if (Number.isFinite(Number(stopPx))) bullets.push(`SL=${Number(stopPx).toFixed(2)}`);
+
+  const invalidationRule =
+    Number.isFinite(Number(stopPx))
+      ? (setup?.side === "LONG" ? `Invalid if mid <= ${Number(stopPx).toFixed(2)}` : `Invalid if mid >= ${Number(stopPx).toFixed(2)}`)
+      : "Invalidation: n/a";
+
+  const nextCloseTs = Number((trg as any)?._cc_next_close_ts);
+  const tf = (String((trg as any)?._cc_tf ?? "") === "5m" || String((trg as any)?._cc_tf ?? "") === "15m")
+    ? String((trg as any)?._cc_tf)
+    : undefined;
+
+  const mk = (code: DecisionCode, headline: string, next_action: string): DecisionNarrative => ({
+    code,
+    headline,
+    bullets: bullets.slice(0, 5),
+    next_action,
+    timing: (tf || Number.isFinite(nextCloseTs)) ? { tf: tf as any, next_close_ts: Number.isFinite(nextCloseTs) ? nextCloseTs : undefined } : undefined,
+    invalidation: { rule: invalidationRule },
+  });
+
+  // BLOCKED
+  if (decision.state === "BLOCKED") {
+    if (!ctx.dqOk) return mk("BLOCKED_DQ", "Blocked: data quality not OK", "Wait for DQ to recover (A/B).");
+    if (!ctx.bybitOk) return mk("BLOCKED_BYBIT_DOWN", "Blocked: Bybit feed not OK", "Wait for Bybit feed to recover.");
+    if (ctx.paused) return mk("BLOCKED_PAUSED", "Blocked: updates paused", "Resume updates to continue.");
+    if (bl.includes("TF_CANDLES_STALE") || bl.includes("tf_candles_stale")) return mk("BLOCKED_TF_STALE", "Blocked: trigger timeframe candles stale", "Wait for a new confirmed candle close.");
+    if (ctx.staleSec != null) return mk("BLOCKED_FEED_STALE", "Blocked: price feed stale", "Wait for live price feed to update.");
+    return mk("BLOCKED_FEED_STALE", "Blocked: execution gated", "Resolve execution gates, then reassess.");
+  }
+
+  // MONITOR
+  if (decision.state === "MONITOR") {
+    if (grade === "C") return mk("NO_TRADE_GRADE_C", "Monitor only (Grade C)", "Wait for higher-quality setup (A/B).");
+    if (grade === "D") return mk("NO_TRADE_GRADE_D", "Monitor only (Grade D)", "Avoid trading; wait for market to improve.");
+    return mk("NO_TRADE_SETUP_NOT_READY", "Monitor only", "Observe; do not execute.");
+  }
+
+  // NO_TRADE
+  if (decision.state === "NO_TRADE") {
+    if (status === "EXPIRED") return mk("NO_TRADE_EXPIRED", "No trade: setup expired", "Wait for a new setup.");
+    if (status === "INVALIDATED") return mk("NO_TRADE_INVALIDATED", "No trade: setup invalidated", "Wait for a new setup.");
+    return mk("NO_TRADE_SETUP_NOT_READY", "No trade", "Wait for a valid setup.");
+  }
+
+  // WAIT states
+  if (decision.state === "WAIT_CLOSE") {
+    const ta = (tf && Number.isFinite(nextCloseTs))
+      ? `Wait for ${tf} close-confirm (next close at ${new Date(nextCloseTs).toLocaleTimeString()}).`
+      : "Wait for close-confirm.";
+    return mk("WAIT_CLOSE_CONFIRM", `Waiting close-confirm (tier=${tier})`, ta);
+  }
+  if (decision.state === "WAIT_ZONE") {
+    return mk("WAIT_PRICE_IN_ZONE", `Waiting price into entry zone (tier=${tier})`, "Wait for price to enter the zone, then place limit.");
+  }
+  if (decision.state === "WAIT_RETEST") {
+    return mk("WAIT_RETEST", `Waiting retest (tier=${tier})`, "Wait for retest condition to be satisfied.");
+  }
+
+  // OK states
+  if (decision.state === "PLACE_LIMIT") {
+    return mk("OK_PLACE_LIMIT", `Place limit now (tier=${tier})`, "Place the limit order within the entry zone.");
+  }
+  if (decision.state === "ENTER_MARKET") {
+    return mk("OK_ENTER_MARKET", `Enter market now (tier=${tier})`, "Enter at market per playbook.");
+  }
+
+  // Fallback
+  return mk("NO_TRADE_SETUP_NOT_READY", `State: ${decision.state}`, "Follow the decision state.");
+}
+
+function deriveSetupTelemetry(setup: any, execution: ExecutionDecision | undefined): SetupTelemetry {
+  const checklist = Array.isArray(setup?.entry?.trigger?.checklist)
+    ? (setup.entry.trigger.checklist as Array<{ key?: unknown; ok?: unknown }>)
+    : [];
+
+  const keys = checklist
+    .map((x) => String(x?.key ?? "").trim())
+    .filter((k) => k.length > 0);
+
+  // Stable unique keys (preserve checklist order, de-dupe)
+  const seen = new Set<string>();
+  const orderedKeys = keys.filter((k) => {
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  const total = orderedKeys.length;
+
+  const passed = new Set<string>();
+  const blocked = new Set<string>();
+
+  for (const item of checklist) {
+    const key = String(item?.key ?? "").trim();
+    if (!key) continue;
+    if (item?.ok === true) passed.add(key);
+    if (item?.ok === false) blocked.add(key);
+  }
+
+  // Keep stable ordering (checklist order), but de-duped.
+  const passedTriggers = orderedKeys.filter((k) => passed.has(k) && !blocked.has(k));
+  const triggerBlockers = orderedKeys.filter((k) => blocked.has(k));
+
+  let progressPct = 0;
+  if (total > 0) {
+    progressPct = Math.round((passedTriggers.length / total) * 100);
+  } else {
+    const st = String(setup?.status ?? "");
+    // If a setup is READY/TRIGGERED with no checklist, treat as complete.
+    if (st === "READY" || st === "TRIGGERED") progressPct = 100;
+  }
+
+  const execBlockers = Array.isArray(execution?.blockers)
+    ? (execution!.blockers as string[])
+    : undefined;
+
+  return {
+    totalTriggers: total,
+    passedTriggers,
+    triggerBlockers,
+    progressPct,
+    executionState: execution?.state,
+    executionBlockers: execBlockers,
+  };
+}
+function withTemporalTelemetry(
+  key: string,
+  setupStatus: string,
+  base: SetupTelemetry,
+  nowTs: number,
+  history: Map<
+    string,
+    {
+      firstSeenTs: number;
+      lastSeenTs: number;
+      lastProgressPct: number;
+      lastChangeTs: number;
+      lastStatus: string;
+    }
+  >
+): SetupTelemetry {
+  if (!key) return base;
+
+  const prev = history.get(key);
+  const progressPct = Number.isFinite(base?.progressPct) ? Number(base.progressPct) : 0;
+
+  if (!prev) {
+    const init = {
+      firstSeenTs: nowTs,
+      lastSeenTs: nowTs,
+      lastProgressPct: progressPct,
+      lastChangeTs: nowTs,
+      lastStatus: String(setupStatus ?? ""),
+    };
+    history.set(key, init);
+
+    return {
+      ...base,
+      firstSeenTs: init.firstSeenTs,
+      lastSeenTs: init.lastSeenTs,
+      ageMs: 0,
+      lastProgressPct: init.lastProgressPct,
+      progressDeltaPct: 0,
+      lastChangeTs: init.lastChangeTs,
+      stalledMs: String(setupStatus ?? "") === "FORMING" ? 0 : 0,
+    };
+  }
+
+  const nextLastSeen = nowTs;
+
+  const statusNow = String(setupStatus ?? "");
+  const statusPrev = String(prev.lastStatus ?? "");
+
+  const progressPrev = Number.isFinite(prev.lastProgressPct) ? prev.lastProgressPct : progressPct;
+  const progressDeltaPct = progressPct - progressPrev;
+
+  // Define "change" as: status changed OR progress changed (integer pct)
+  const progressChanged = Math.round(progressPct) !== Math.round(progressPrev);
+  const statusChanged = statusNow !== statusPrev;
+
+  const lastChangeTs = (progressChanged || statusChanged) ? nowTs : prev.lastChangeTs;
+
+  const ageMs = Math.max(0, nextLastSeen - prev.firstSeenTs);
+  const stalledMs = statusNow === "FORMING" ? Math.max(0, nextLastSeen - lastChangeTs) : 0;
+
+  history.set(key, {
+    firstSeenTs: prev.firstSeenTs,
+    lastSeenTs: nextLastSeen,
+    lastProgressPct: progressPct,
+    lastChangeTs,
+    lastStatus: statusNow,
+  });
+
+  return {
+    ...base,
+    firstSeenTs: prev.firstSeenTs,
+    lastSeenTs: nextLastSeen,
+    ageMs,
+    lastProgressPct: progressPrev,
+    progressDeltaPct,
+    lastChangeTs,
+    stalledMs,
+  };
+}
+
+function scaleConfidenceForReadiness(setup: any, execution: any, telemetry?: SetupTelemetry) {
+  const raw = Number(setup?.confidence?.score ?? 0);
+  const status = String(setup?.status ?? "");
+  const state = String(execution?.state ?? "");
+  const blockers = Array.isArray(execution?.blockers) ? execution.blockers : [];
+
+  // Preserve engine score as-is for READY/TRIGGERED; scale only in FORMING (execution-readiness phase).
+  if (status !== "FORMING") {
+    return {
+      confidence: setup?.confidence,
+      confidence_raw: setup?.confidence, // keep a reference for export/debug
+    };
+  }
+
+  // Derive trigger progress from the setup's trigger checklist (if present).
+  // Do not infer from text; rely on checklist's ok flags.
+  // Prefer telemetry progress (single source of truth). Fallback to checklist if missing.
+  let progress01 = Number.isFinite(telemetry?.progressPct)
+    ? Math.max(0, Math.min(1, (telemetry!.progressPct as number) / 100))
+    : NaN;
+
+  let total = 0;
+  let passed = 0;
+
+  if (!Number.isFinite(progress01)) {
+    const checklist = Array.isArray(setup?.entry?.trigger?.checklist) ? setup.entry.trigger.checklist : [];
+    const keyed = checklist
+      .filter((c: any) => c && typeof c.key === "string" && c.key.trim().length > 0)
+      .map((c: any) => ({ key: c.key.trim(), ok: c.ok }));
+
+    total = keyed.length;
+    passed = keyed.filter((c: any) => c.ok === true).length;
+    progress01 = total > 0 ? passed / total : NaN;
+  } else {
+    total = Number(telemetry?.totalTriggers ?? 0);
+    passed = Array.isArray(telemetry?.passedTriggers) ? telemetry!.passedTriggers.length : 0;
+  }
+
+  let adj = raw;
+
+  if (Number.isFinite(progress01)) {
+    // Progress-based scaling:
+    // - FORMING always has some penalty (not execution-ready).
+    // - The closer to completion, the smaller the penalty.
+    // - Keep the scale soft; do not collapse confidence to zero.
+    const remaining = 1 - progress01; // 0..1
+    const basePenalty = 4; // constant for any FORMING
+    const progressPenalty = Math.round(16 * remaining); // 0..16
+
+    adj -= basePenalty + progressPenalty;
+
+    // Blockers (explicit unmet conditions) — keep small to avoid double-counting with progress.
+    if (blockers.length > 0) {
+      adj -= Math.min(6, blockers.length * 2);
+    }
+
+    // Execution state nuance (only when FORMING)
+    if (state === "WAIT_ZONE") adj -= 2;
+    else if (
+      state === "WAIT_CLOSE" ||
+      state === "WAIT_RECLAIM" ||
+      state === "WAIT_TOUCH" ||
+      state === "WAIT_RETEST"
+    ) {
+      adj -= 3;
+    }
+  } else {
+    // Fallback: checklist absent/unusable — use the previous conservative heuristic.
+    // Base penalty: FORMING means not structurally/execution-ready yet.
+    adj -= 8;
+
+    // Checklist blockers: each blocker is an explicit unmet condition.
+    if (blockers.length > 0) {
+      adj -= Math.min(12, blockers.length * 4);
+    }
+
+    // Execution state nuance (only when FORMING)
+    if (state === "WAIT_ZONE") adj -= 4;
+    else if (
+      state === "WAIT_CLOSE" ||
+      state === "WAIT_RECLAIM" ||
+      state === "WAIT_TOUCH" ||
+      state === "WAIT_RETEST"
+    )
+      adj -= 6;
+  }
+
+  // Clamp
+  const score = Math.max(0, Math.min(100, Math.round(adj)));
+
+  // Keep reasons minimal; do not spam.
+  const reasonsBase: string[] = Array.isArray(setup?.confidence?.reasons) ? setup.confidence.reasons : [];
+  const reasons = [...reasonsBase];
+
+  const delta = score - raw;
+
+  // Add at most 1 readiness note (progress-aware when possible)
+  if (Number.isFinite(progress01)) {
+    const pct = Math.round(progress01 * 100);
+    reasons.push(`Readiness: FORMING ${pct}% (${passed}/${total}) (${delta >= 0 ? "+" : ""}${delta})`);
+  } else {
+    reasons.push(`Readiness: FORMING (${delta >= 0 ? "+" : ""}${delta})`);
+  }
+
+  const confidence = {
+    ...setup.confidence,
+    score,
+    grade: gradeFromScore(score),
+    reasons,
+  };
+
+  return { confidence, confidence_raw: setup?.confidence };
 }
 
 function deriveExecutionGlobal(ctx: { dqOk: boolean; bybitOk: boolean; staleSec?: number; paused: boolean }) {
@@ -819,9 +1854,49 @@ function engineInputKey(snap: any, features: any): string {
   const fKey = featureKeySubset(features);
   return `c15=${c15}|c1h=${c1h}|c4h=${c4h}|c5m=${c5m}|f=${fKey}`;
 }
+function snapshotRevision(snap: any): string {
+  if (!snap || !Array.isArray(snap.timeframes)) return "nosnap";
+
+  // Build a stable primitive key from "latest candle ts" per TF and per venue.
+  // This avoids stale useMemo results when upstream mutates objects/arrays in place
+  // or reuses snapshot references.
+  const parts: string[] = [];
+
+  for (const tfNode of snap.timeframes as any[]) {
+    const tf = String(tfNode?.tf ?? "");
+    if (!tf) continue;
+
+    const a = tfNode?.candles?.ohlcv;
+    const b = tfNode?.candles_binance?.ohlcv;
+
+    const lastA = Array.isArray(a) && a.length ? a[a.length - 1]?.ts : undefined;
+    const lastB = Array.isArray(b) && b.length ? b[b.length - 1]?.ts : undefined;
+
+    // include confirmed-bar timestamp as well if present (helps status_tf stabilization)
+    const confA =
+      Array.isArray(a) && a.length
+        ? (() => {
+          for (let i = a.length - 1; i >= 0; i--) {
+            if (a[i]?.confirm) return a[i]?.ts;
+          }
+          return undefined;
+        })()
+        : undefined;
+
+    parts.push(`${tf}:${lastA ?? 0}:${confA ?? 0}:${lastB ?? 0}`);
+  }
+
+  // Also include availability heartbeat/probe gates if present (keeps DQ gating responsive)
+  const hbBybit = snap?.availability?.bybit?.ok ? 1 : 0;
+  const hbBinance = snap?.availability?.binance?.ok ? 1 : 0;
+  parts.push(`ab:${hbBybit}:an:${hbBinance}`);
+
+  return parts.join("|");
+}
 
 export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
   const { snap, features } = useFeaturesSnapshot(symbol);
+  const snapRev = snapshotRevision(snap);
 
   // Persisted per-hook instance cache to stabilize FORMING/READY status
   const statusCacheRef = useRef<Map<string, { status: SetupStatus; barTs: number }>>(new Map());
@@ -832,6 +1907,19 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     ts: number;
   } | null>(null);
   const engineCacheRef = useRef<{ key: string; base: any } | null>(null);
+  // Temporal readiness history (client-side): track age/stall/progress deltas
+  const telemetryHistoryRef = useRef<
+    Map<
+      string,
+      {
+        firstSeenTs: number;
+        lastSeenTs: number;
+        lastProgressPct: number;
+        lastChangeTs: number;
+        lastStatus: string;
+      }
+    >
+  >(new Map());
 
   const setups = useMemo(() => {
     if (!snap || !features) return null;
@@ -840,6 +1928,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     if (prevSymbolRef.current !== symbol) {
       prevSymbolRef.current = symbol;
       statusCacheRef.current.clear();
+      telemetryHistoryRef.current.clear();
     }
 
     const base = buildSetups({ snap, features });
@@ -881,10 +1970,29 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
     };
 
     const enriched = Array.isArray(scored?.setups)
-      ? scored.setups.map((s: any) => ({
-        ...s,
-        execution: deriveExecutionDecision(s, ctx),
-      }))
+      ? scored.setups.map((s: any) => {
+        const execution0 = deriveExecutionDecision(s, ctx);
+        const execution: ExecutionDecision = { ...execution0, narrative: buildDecisionNarrative(s, execution0, ctx) };
+        const { confidence, confidence_raw } = scaleConfidenceForReadiness(s, execution);
+
+        const baseTelemetry = deriveSetupTelemetry(s, execution);
+        const tKey = String(s?.canon ?? s?.id ?? "");
+        const telemetry = withTemporalTelemetry(
+          tKey,
+          String(s?.status ?? ""),
+          baseTelemetry,
+          Date.now(),
+          telemetryHistoryRef.current
+        );
+
+        return {
+          ...s,
+          execution,
+          telemetry,
+          confidence,        // UI uses this (scaled for FORMING)
+          confidence_raw,    // keep engine score for debug/export
+        };
+      })
       : scored?.setups;
 
     const arr = Array.isArray(enriched) ? enriched : [];
@@ -916,8 +2024,26 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
           expiresTs > 0 ? (nowTs <= expiresTs + graceMs) : (nowTs - prev.ts <= 10 * 60_000);
 
         if (withinExpiry) {
-          // Re-derive execution with current ctx (DQ/paused/stale), and re-apply hard invalidation against current mid.
-          let kept = { ...sPrev, execution: deriveExecutionDecision(sPrev, ctx) };
+          //. Re-derive execution with current ctx (DQ/paused/stale), and re-apply hard invalidation against current mid.
+          const execution0 = deriveExecutionDecision(sPrev, ctx);
+          const execution: ExecutionDecision = { ...execution0, narrative: buildDecisionNarrative(sPrev, execution0, ctx) };
+          const baseTelemetry = deriveSetupTelemetry(sPrev, execution);
+          const tKey = String(sPrev?.canon ?? sPrev?.id ?? "");
+          const telemetry = withTemporalTelemetry(
+            tKey,
+            String(sPrev?.status ?? ""),
+            baseTelemetry,
+            nowTs,
+            telemetryHistoryRef.current
+          );
+          const { confidence, confidence_raw } = scaleConfidenceForReadiness(sPrev, execution, telemetry);
+          let kept = {
+            ...sPrev,
+            execution,
+            telemetry,
+            confidence,
+            confidence_raw,
+          };
 
           // Apply hard invalidation intrabar against current mid/stop
           const stopPx = kept?.stop?.price;
@@ -939,7 +2065,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
       setups: finalArr,
     };
 
-  }, [snap, features, paused, symbol]);
+  }, [snapRev, snap, features, paused, symbol]);
 
   return { snap, features, setups };
 }

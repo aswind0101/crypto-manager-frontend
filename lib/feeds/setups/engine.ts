@@ -2,10 +2,12 @@ import type { Candle } from "../core/types";
 import type { FeaturesSnapshot } from "../features/types";
 import type { UnifiedSnapshot } from "../snapshot/unifiedTypes";
 import { computePivotLevels, nearestLevels } from "./levels";
-import { scoreCommon, gradeFromScore } from "./scoring";
+import { scoreCommon, gradeFromScore, gradePlusFromScore } from "./scoring";
 import type { SetupEngineOutput, TradeSetup, SetupSide } from "./types";
 
 function now() { return Date.now(); }
+const TOP_N_SETUPS = 3;
+
 function uid(prefix: string) { return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`; }
 
 // Stable IDs prevent UI flicker / status-cache misses when the same structural setup persists across ticks.
@@ -194,9 +196,24 @@ function zoneKMultiplierByType(type: TradeSetup["type"]): number {
       return 0.80;
     case "LIQUIDITY_SWEEP_REVERSAL":
       return 0.40;
+    case "SCALP_RANGE_FADE":
+      return 0.75;
+    case "SCALP_LIQUIDITY_SNAPBACK":
+      return 0.45;
+    case "SCALP_MOMENTUM_PULLBACK":
+      return 0.55;
+    case "SCALP_1H_REACTION":
+      return 0.65;
     default:
       return 0.60;
   }
+}
+
+function isScalpSetup(setup: TradeSetup): boolean {
+  const t = String((setup as any)?.type ?? "");
+  if (t.startsWith("SCALP_")) return true;
+  const tags = (setup as any)?.tags;
+  return Array.isArray(tags) && tags.includes("scalp");
 }
 
 function validateSetupInvariant(args: {
@@ -205,6 +222,33 @@ function validateSetupInvariant(args: {
   atrp: number; // percent as fraction (0.007 = 0.7%)
 }): InvariantResult {
   const { setup, px, atrp } = args;
+
+  const scalp = isScalpSetup(setup);
+
+  // Invariant profiles:
+  // - Scalp: allow tighter stops / closer TPs / slightly wider zones to avoid over-rejecting valid 5m/15m ideas.
+  // - Intraday/Swing: keep stricter constraints for tradeability.
+  const INV = scalp
+    ? {
+      rrMin: 0.9,
+      zoneKMin: 0.50,
+      minRiskPxK: 0.00035,
+      minRiskAtrK: 0.15,
+      minRewardPxK: 0.00035,
+      minRewardAtrK: 0.22,
+      stopEdgeTolPxK: 0.00002,
+      stopEdgeTolAtrK: 0.02,
+    }
+    : {
+      rrMin: 1.2,
+      zoneKMin: 0.00,
+      minRiskPxK: 0.0006,
+      minRiskAtrK: 0.25,
+      minRewardPxK: 0.0008,
+      minRewardAtrK: 0.35,
+      stopEdgeTolPxK: 0.0,
+      stopEdgeTolAtrK: 0.0,
+    };
 
   const codes: string[] = [];
   const notes: string[] = [];
@@ -238,31 +282,39 @@ function validateSetupInvariant(args: {
 
   // Zone width ATR constraint
   const atrAbs = px * atrp;
-  const k = zoneKMultiplierByType(setup.type);
+  const kBase = zoneKMultiplierByType(setup.type);
+  const k = scalp ? Math.max(kBase, INV.zoneKMin) : kBase;
   const maxW = Math.max(px * 0.0001, atrAbs * k); // floor 1bp-equivalent-ish, but safe
   const w = hi - lo;
   if (w > maxW) {
     codes.push("INV_ZONE_TOO_WIDE");
-    notes.push(`Zone width ${w.toFixed(6)} > max ${maxW.toFixed(6)} (k=${k})`);
+    notes.push(
+      `Zone width ${w.toFixed(6)} > max ${maxW.toFixed(6)} (k=${k}) [type=${String((setup as any)?.type ?? "")} scalp=${scalp}]`
+    );
+
   }
 
   // Stop must be outside zone in the correct direction
+  // For scalp we allow a tiny tolerance to avoid rejecting due to rounding/anchor drift.
+  const stopEdgeTol = Math.max(px * INV.stopEdgeTolPxK, atrAbs * INV.stopEdgeTolAtrK);
   if (setup.side === "LONG") {
-    if (!(st < lo)) {
+    // Accept stop slightly above zone.lo (within tolerance) to prevent false rejections from float rounding.
+    if (!(st < (lo + stopEdgeTol))) {
       codes.push("INV_STOP_NOT_BELOW_ZONE");
-      notes.push("LONG stop must be below zone.lo");
+      notes.push(`LONG stop must be below zone.lo (tol=${stopEdgeTol.toFixed(6)})`);
     }
   } else {
-    if (!(st > hi)) {
+    // Accept stop slightly below zone.hi (within tolerance) to prevent false rejections from float rounding.
+    if (!(st > (hi - stopEdgeTol))) {
       codes.push("INV_STOP_NOT_ABOVE_ZONE");
-      notes.push("SHORT stop must be above zone.hi");
+      notes.push(`SHORT stop must be above zone.hi (tol=${stopEdgeTol.toFixed(6)})`);
     }
   }
 
   // Stop distance bounds (noise vs absurd)
   const entryAnchor = (lo + hi) / 2;
   const risk = setup.side === "LONG" ? (entryAnchor - st) : (st - entryAnchor);
-  const minRisk = Math.max(px * 0.0006, atrAbs * 0.25); // min(60 bps floor, 0.25*ATRabs) — conservative
+  const minRisk = Math.max(px * INV.minRiskPxK, atrAbs * INV.minRiskAtrK);
   const maxRisk = atrAbs * 2.5; // intraday constraint; swing still acceptable because atrp uses max of 15m/1h/4h
   if (risk < minRisk) {
     codes.push("INV_STOP_TOO_TIGHT");
@@ -280,20 +332,26 @@ function validateSetupInvariant(args: {
   } else {
     const tp1 = Number(tps[0].price);
     const reward = setup.side === "LONG" ? (tp1 - entryAnchor) : (entryAnchor - tp1);
-    const minReward = Math.max(px * 0.0008, atrAbs * 0.35); // avoid TP too close (fees/slippage)
+    const minReward = Math.max(px * INV.minRewardPxK, atrAbs * INV.minRewardAtrK);
     if (reward <= 0) {
       codes.push("INV_TP_WRONG_SIDE");
       notes.push("TP1 is on wrong side of entry");
     } else if (reward < minReward) {
       codes.push("INV_TP_TOO_CLOSE");
-      notes.push(`Reward ${reward.toFixed(6)} < min ${minReward.toFixed(6)}`);
+      notes.push(
+        `Reward ${reward.toFixed(6)} < min ${minReward.toFixed(6)} [type=${String((setup as any)?.type ?? "")} scalp=${scalp}]`
+      );
     }
   }
 
   // RR sanity (keep lightweight; exact RR policy can still be type-specific elsewhere)
-  if (isFiniteNum(setup.rr_min) && setup.rr_min < 1.2) {
+  const rrFloor = INV.rrMin;
+  if (isFiniteNum(setup.rr_min) && setup.rr_min < rrFloor) {
     codes.push("INV_RR_TOO_LOW");
-    notes.push(`rr_min ${setup.rr_min.toFixed(2)} < 1.20`);
+    notes.push(
+      `rr_min ${setup.rr_min.toFixed(2)} < ${rrFloor.toFixed(2)} [type=${String((setup as any)?.type ?? "")} scalp=${scalp}]`
+    );
+
   }
 
   return codes.length ? { ok: false, codes, notes } : { ok: true };
@@ -364,6 +422,45 @@ function pickPrimarySetup(setups: TradeSetup[]): TradeSetup | undefined {
   });
 
   return scored[0];
+}
+function rankSetups(setups: TradeSetup[]): TradeSetup[] {
+  const arr = Array.isArray(setups) ? setups.slice() : [];
+
+  const statusRank = (s: TradeSetup): number => {
+    const st = String((s as any)?.status ?? "");
+    // Prefer actionable/near-actionable first
+    if (st === "READY") return 5;
+    if (st === "TRIGGERED") return 4;
+    if (st === "FORMING") return 3;
+    if (st === "INVALIDATED") return 1;
+    if (st === "EXPIRED") return 0;
+    return 2;
+  };
+
+  const num = (x: any, fallback = 0) => (typeof x === "number" && Number.isFinite(x) ? x : fallback);
+
+  // Confidence score is 0..100 in your system.
+  // rr_min is typically >= 1.2 for valid setups.
+  arr.sort((a, b) => {
+    const sr = statusRank(b) - statusRank(a);
+    if (sr !== 0) return sr;
+
+    const cs = num((b as any)?.confidence?.score) - num((a as any)?.confidence?.score);
+    if (cs !== 0) return cs;
+
+    const rr = num((b as any)?.rr_min) - num((a as any)?.rr_min);
+    if (rr !== 0) return rr;
+
+    // Tiebreak: prefer tighter zones (smaller width) if available
+    const aw = num((a as any)?.entry?.zone?.hi) - num((a as any)?.entry?.zone?.lo);
+    const bw = num((b as any)?.entry?.zone?.hi) - num((b as any)?.entry?.zone?.lo);
+    if (Number.isFinite(aw) && Number.isFinite(bw) && aw !== bw) return aw - bw;
+
+    // Stable fallback: id
+    return String((a as any)?.id ?? "").localeCompare(String((b as any)?.id ?? ""));
+  });
+
+  return arr;
 }
 
 // Freshness window (ms): 6 candles
@@ -538,32 +635,54 @@ export function buildSetups(args: {
   }
 
   const tryAccept = (s: TradeSetup) => {
-    telemetry.candidates += 1;
+  telemetry.candidates += 1;
 
-    const g = applyQualityGates({ setup: s, f, px, atrp });
+  // IMPORTANT: use scalp sizing for quality gates when setup is scalp
+  const scalp = isScalpSetup(s);
+  const atrpForGate = scalp ? atrpScalp : atrp;
 
-    if (g.ok === false) {
-      telemetry.rejected += 1;
+  const g = applyQualityGates({ setup: s, f, px, atrp: atrpForGate });
 
-      const codes = ("rejectCodes" in g && Array.isArray(g.rejectCodes)) ? g.rejectCodes : [];
-      const notes = ("rejectNotes" in g && Array.isArray(g.rejectNotes)) ? g.rejectNotes : [];
+  if (g.ok === false) {
+    telemetry.rejected += 1;
 
-      bumpReject(codes, notes);
-      return false;
-    }
+    const codes = ("rejectCodes" in g && Array.isArray(g.rejectCodes)) ? g.rejectCodes : [];
+    const notes = ("rejectNotes" in g && Array.isArray(g.rejectNotes)) ? g.rejectNotes : [];
 
-    telemetry.accepted += 1;
+    bumpReject(codes, notes);
+    return false;
+  }
 
-    const tagsAdd = ("tagsAdd" in g && Array.isArray(g.tagsAdd)) ? g.tagsAdd : [];
-    const reasonsAdd = ("reasonsAdd" in g && Array.isArray(g.reasonsAdd)) ? g.reasonsAdd : [];
+  telemetry.accepted += 1;
 
-    s.tags = Array.from(new Set([...(s.tags || []), ...tagsAdd]));
-    s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...reasonsAdd]));
+  const tagsAdd = ("tagsAdd" in g && Array.isArray(g.tagsAdd)) ? g.tagsAdd : [];
+  const reasonsAdd = ("reasonsAdd" in g && Array.isArray(g.reasonsAdd)) ? g.reasonsAdd : [];
 
-    setups.push(s);
-    return true;
+  s.tags = Array.from(new Set([...(s.tags || []), ...tagsAdd]));
+  s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...reasonsAdd]));
 
-  };
+  // NEW: derive grade_plus (A+/A/B/C) centrally at accept-time (no need to touch each setup builder)
+  // We compute conflicts here to avoid relying on fields that are not stored on the setup.
+  const conflictsNow = detectConflicts(f, s.side);
+  const conflictsMajor = conflictsNow.filter((c) => c.severity === "MAJOR").length;
+
+  const gp = gradePlusFromScore({
+    scoreCommon: isFiniteNum(s.confidence?.score) ? Number(s.confidence.score) : 0,
+    rrMin: isFiniteNum((s as any)?.rr_min) ? Number((s as any).rr_min) : undefined,
+    conflictsMajor,
+    dqGrade: String((f as any)?.quality?.dq_grade ?? ""),
+    biasComplete: !bias_incomplete,
+    triggerTf: String((s as any)?.trigger_tf ?? ""),
+  });
+
+  // Attach to confidence (non-breaking; optional fields)
+  (s.confidence as any).grade_plus = gp.grade_plus;
+  (s.confidence as any).grade_plus_reasons = gp.reasons;
+
+  setups.push(s);
+  return true;
+};
+
 
 
   // 1) TREND_PULLBACK (ưu tiên) — B+ policy: only when HTF bias is complete
@@ -1237,8 +1356,11 @@ export function buildSetups(args: {
     addReadiness("range_mr", `Range MR skipped: bias not sideways (trend_dir=${String(f.bias?.trend_dir ?? "n/a")})`);
   }
   if (f.bias.trend_dir === "sideways" && below && above) {
-    const nearSupport = Math.abs(px - below.price) / px < 0.002;
-    const nearRes = Math.abs(px - above.price) / px < 0.002;
+    // Edge proximity threshold: adapt to volatility so we don't miss valid range edges
+    // in higher-ATR regimes, while still keeping a reasonable floor in low-ATR regimes.
+    const edgeThresh = Math.max(0.0015, atrp * 0.35); // fraction of price (0.0015 = 0.15%)
+    const nearSupport = Math.abs(px - below.price) / px < edgeThresh;
+    const nearRes = Math.abs(px - above.price) / px < edgeThresh;
 
     if (nearSupport || nearRes) {
       const dir: SetupSide = nearSupport ? "LONG" : "SHORT";
@@ -1329,9 +1451,443 @@ export function buildSetups(args: {
     }
   }
 
+  // ------------------------------------------------------------
+  // 6) SCALP setups (5m / 15m / 1h)
+  // Goal: higher win-rate while still producing enough trades.
+  // - Short TTL (time-stop)
+  // - Strong microstructure filters (regime + proximity)
+  // - Close-confirm remains enforced by hook (applyCloseConfirm)
+  // ------------------------------------------------------------
+
+  const tf5 = (snap.timeframes.find((x: any) => x.tf === "5m")?.candles?.ohlcv ?? []) as Candle[];
+  const tf5c = confirmedOnly(tf5);
+  const last5 = tf5c[tf5c.length - 1];
+  const px5 = lastConfirmedClose(tf5c) ?? px;
+
+  // ATR% proxy for scalp sizing (prefer 15m ATR% if present; fallback to global proxy)
+  const atrp15mPct = isFiniteNum((f as any)?.entry?.volatility?.atrp_15m) ? Number((f as any).entry.volatility.atrp_15m) / 100 : undefined;
+  const atrpScalp = atrp15mPct && atrp15mPct > 0 ? atrp15mPct : atrp;
+
+  // Small helper: bps proximity
+  const distBps = (a: number, b: number) => ((a - b) / b) * 10000;
+  const abs = (x: number) => Math.abs(x);
+
+  // ---- 6.1 SCALP_RANGE_FADE (5m)
+  // Use 5m market-structure swings as range edges.
+  const ms5 = (f as any).market_structure?.["5m"];
+  const swingHi5 = ms5?.lastSwingHigh;
+  const swingLo5 = ms5?.lastSwingLow;
+  if (isFiniteNum(px5) && px5 > 0 && swingHi5?.price && swingLo5?.price) {
+    const hi = Number(swingHi5.price);
+    const lo = Number(swingLo5.price);
+    if (isFiniteNum(hi) && isFiniteNum(lo) && hi > lo) {
+      const widthFrac = (hi - lo) / px5;
+      const vr = String((f as any)?.bias?.vol_regime ?? "");
+      const trendDir = String((f as any)?.bias?.trend_dir ?? "");
+
+      // Range conditions: not in high-vol, and width is meaningful relative to ATR.
+      const rangeOk = vr !== "high" && widthFrac >= (atrpScalp * 0.8);
+      if (rangeOk) {
+        // Proximity to an edge: within ~25% of range width OR within ~0.25*ATR.
+        const dHi = abs(px5 - hi);
+        const dLo = abs(px5 - lo);
+        const nearEdge = Math.min(dHi, dLo) <= Math.max((hi - lo) * 0.25, px5 * atrpScalp * 0.25);
+
+        // Choose which edge to fade.
+        const side: SetupSide = dHi <= dLo ? "SHORT" : "LONG";
+        const edge = side === "SHORT" ? hi : lo;
+
+        // Entry zone around the edge (tight; win-rate focus).
+        const w = Math.max(edge * 0.0007, edge * atrpScalp * 0.18); // max(7 bps, 0.18*ATR)
+        const zone = side === "SHORT"
+          ? { lo: edge - w * 0.55, hi: edge + w }
+          : { lo: edge - w, hi: edge + w * 0.55 };
+
+        // Stop just outside the edge with small buffer.
+        const sl = side === "SHORT" ? (edge + w * 1.25) : (edge - w * 1.25);
+
+        // Target: mid-range (high probability).
+        const midRange = (hi + lo) / 2;
+        const tp1 = midRange;
+        const entryMid = (zone.lo + zone.hi) / 2;
+        const rr1 = rr(entryMid, sl, tp1, side);
+
+        // Timeliness: only publish READY when near edge (avoid early signals).
+        const ready = nearEdge && rr1 >= 1.05;
+
+        // Confidence adjustments for range fade (common scoring penalizes sideways; we compensate lightly).
+        let confScore = common.score;
+        if (trendDir === "sideways") confScore += 6;
+        else confScore += 2;
+        if (vr === "low") confScore += 3;
+        if (vr === "high") confScore -= 6;
+        if (!nearEdge) confScore -= 6;
+        // RR too small is still risky even for fade.
+        if (rr1 < 1.05) confScore -= 8;
+        confScore = Math.max(0, Math.min(100, confScore));
+
+        const s: TradeSetup = {
+          id: stableSetupId({
+            prefix: "sc_rf",
+            canon: snap.canon,
+            type: "SCALP_RANGE_FADE",
+            side,
+            bias_tf: f.bias.tf,
+            entry_tf: "5m",
+            trigger_tf: "5m",
+            anchor_price: edge,
+          }),
+
+          canon: snap.canon,
+          type: "SCALP_RANGE_FADE",
+          side,
+          entry_tf: "5m",
+          bias_tf: f.bias.tf,
+          trigger_tf: "5m",
+
+          status: ready ? "READY" : "FORMING",
+          created_ts: ts,
+          // TTL: 2 candles 5m (+small buffer)
+          expires_ts: ts + 1000 * 60 * 12,
+
+          entry: {
+            mode: "LIMIT",
+            zone,
+            trigger: {
+              confirmed: false,
+              checklist: [
+                { key: "range", ok: true, note: "5m swing range fade" },
+                { key: "range_hi", ok: true, note: `RangeHi @ ${hi.toFixed(2)} (5m)` },
+                { key: "range_lo", ok: true, note: `RangeLo @ ${lo.toFixed(2)} (5m)` },
+                { key: "vol", ok: vr !== "high", note: `vol_regime=${vr || "n/a"}` },
+                { key: "proximity", ok: nearEdge, note: `dist_edge=${Math.min(dHi, dLo).toFixed(2)}` },
+              ],
+              summary: "Scalp range fade: wait touch zone + close-confirm re-entry",
+            },
+          },
+
+          stop: { price: sl, basis: "STRUCTURE", note: "Outside range edge + buffer" },
+
+          tp: [
+            { price: tp1, size_pct: 100, basis: "LEVEL", note: "Mid-range" },
+          ],
+
+          rr_min: rr1,
+          rr_est: rr1,
+
+          confidence: {
+            score: confScore,
+            grade: gradeFromScore(confScore),
+            reasons: [
+              ...common.reasons,
+              "Scalp range fade (5m) with mid-range target",
+              ...(nearEdge ? [] : ["Not yet near range edge"]),
+            ],
+          },
+
+          tags: ["scalp", "range", side === "LONG" ? "support" : "resistance"],
+        };
+
+        tryAccept(s);
+      } else {
+        addReadiness("scalp_range_fade", "Scalp range fade skipped: regime/width not suitable");
+      }
+    }
+  }
+
+  // ---- 6.2 SCALP_LIQUIDITY_SNAPBACK (5m)
+  // Use last 5m sweep event (confirmed) for snapback reversal.
+  if (last5 && ms5?.lastSweep) {
+    const sw = ms5.lastSweep;
+    const swLevel = Number(sw?.level);
+    const swTs = Number(sw?.ts);
+    const recentOk = isFiniteNum(swTs) && isFiniteNum(last5.ts)
+      ? (last5.ts - swTs) <= 3 * 5 * 60 * 1000
+      : true;
+
+    if (isFiniteNum(swLevel) && swLevel > 0 && recentOk) {
+      const side: SetupSide = String(sw.dir) === "UP" ? "SHORT" : "LONG";
+      const zone = makeRetestZone(swLevel, atrpScalp, side);
+      const entryMid = (zone.lo + zone.hi) / 2;
+
+      const swHigh = isFiniteNum(sw?.high) ? Number(sw.high) : undefined;
+      const swLow = isFiniteNum(sw?.low) ? Number(sw.low) : undefined;
+      const w = Math.max(swLevel * 0.0007, swLevel * atrpScalp * 0.18);
+      const sl = side === "LONG"
+        ? (swLow != null ? (swLow - w * 0.6) : (swLevel - w * 1.25))
+        : (swHigh != null ? (swHigh + w * 0.6) : (swLevel + w * 1.25));
+
+      // Target: 1.2R (high probability, not greedy)
+      const tp1 = side === "LONG" ? (entryMid + (entryMid - sl) * 1.2) : (entryMid - (sl - entryMid) * 1.2);
+      const rr1 = rr(entryMid, sl, tp1, side);
+
+      // Require proximity to level (timely)
+      const nearLvl = abs(distBps(px5, swLevel)) <= 35;
+      const ready = nearLvl && rr1 >= 1.05;
+
+      // Confidence: reward reclaim-style setups when divergence isn't strongly opposing.
+      let confScore = common.score + 4;
+      if (!nearLvl) confScore -= 6;
+      if (rr1 < 1.05) confScore -= 8;
+      confScore = Math.max(0, Math.min(100, confScore));
+
+      const s: TradeSetup = {
+        id: stableSetupId({
+          prefix: "sc_ls",
+          canon: snap.canon,
+          type: "SCALP_LIQUIDITY_SNAPBACK",
+          side,
+          bias_tf: f.bias.tf,
+          entry_tf: "5m",
+          trigger_tf: "5m",
+          anchor_price: swLevel,
+        }),
+
+        canon: snap.canon,
+        type: "SCALP_LIQUIDITY_SNAPBACK",
+        side,
+        entry_tf: "5m",
+        bias_tf: f.bias.tf,
+        trigger_tf: "5m",
+
+        status: ready ? "READY" : "FORMING",
+        created_ts: ts,
+        // TTL: 2 candles 5m
+        expires_ts: ts + 1000 * 60 * 10,
+
+        entry: {
+          mode: "LIMIT",
+          zone,
+          trigger: {
+            confirmed: false,
+            checklist: [
+              { key: "sweep", ok: true, note: `Sweep @ ${swLevel.toFixed(2)} (5m)` },
+              { key: "retest", ok: true, note: "Retest sweep level zone" },
+              { key: "proximity", ok: nearLvl, note: `dist=${distBps(px5, swLevel).toFixed(1)}bps` },
+            ],
+            summary: "Scalp snapback: wait retest zone touch + close-confirm reclaim",
+          },
+        },
+
+        stop: { price: sl, basis: "LIQUIDITY", note: "Beyond sweep wick + buffer" },
+
+        tp: [
+          { price: tp1, size_pct: 100, basis: "R_MULTIPLE", note: "1.2R" },
+        ],
+
+        rr_min: rr1,
+        rr_est: rr1,
+
+        confidence: {
+          score: confScore,
+          grade: gradeFromScore(confScore),
+          reasons: [
+            ...common.reasons,
+            "Scalp liquidity snapback (5m) after confirmed sweep",
+          ],
+        },
+
+        tags: ["scalp", "sweep", "snapback"],
+      };
+
+      tryAccept(s);
+    } else {
+      addReadiness("scalp_snapback", "Scalp snapback skipped: sweep not recent/valid");
+    }
+  }
+
+  // ---- 6.3 SCALP_MOMENTUM_PULLBACK (5m)
+  // Trend-following scalp using 15m structure + 5m pullback proximity.
+  const ms15Trend = (f as any).market_structure?.["15m"];
+  const trend15 = String(ms15Trend?.trend ?? "");
+  if (ms15Trend && (trend15 === "BULL" || trend15 === "BEAR") && isFiniteNum(px5) && px5 > 0) {
+    const side: SetupSide = trend15 === "BULL" ? "LONG" : "SHORT";
+    const swing = side === "LONG" ? ms5?.lastSwingLow : ms5?.lastSwingHigh;
+    const ref = isFiniteNum(swing?.price) ? Number(swing.price) : undefined;
+
+    // Momentum confirmation from 5m RSI/MACD (if present)
+    const rsi5 = isFiniteNum((f as any)?.entry?.momentum?.rsi14_5m) ? Number((f as any).entry.momentum.rsi14_5m) : undefined;
+    const macd5 = isFiniteNum((f as any)?.entry?.momentum?.macdHist_5m) ? Number((f as any).entry.momentum.macdHist_5m) : undefined;
+    const momOk = side === "LONG"
+      ? ((rsi5 == null || rsi5 >= 48) && (macd5 == null || macd5 >= 0))
+      : ((rsi5 == null || rsi5 <= 52) && (macd5 == null || macd5 <= 0));
+
+    if (ref != null && ref > 0 && momOk) {
+      // Require price to be in pullback vicinity of the reference swing.
+      const pullbackNear = side === "LONG"
+        ? (px5 <= ref * (1 + atrpScalp * 0.35))
+        : (px5 >= ref * (1 - atrpScalp * 0.35));
+
+      const zone = makeEntryZone(ref, atrpScalp, side);
+      const w = Math.max(ref * 0.0007, ref * atrpScalp * 0.18);
+      const sl = side === "LONG" ? (ref - w * 1.35) : (ref + w * 1.35);
+
+      // Target: nearest pivot in trend direction (fallback to 1.25R)
+      const tpLvl = side === "LONG" ? (above?.price ?? (px5 + px5 * atrpScalp * 0.9)) : (below?.price ?? (px5 - px5 * atrpScalp * 0.9));
+      const entryMid = (zone.lo + zone.hi) / 2;
+      const rr1 = rr(entryMid, sl, tpLvl, side);
+
+      const ready = pullbackNear && rr1 >= 1.12;
+
+      let confScore = common.score + 3;
+      if (!pullbackNear) confScore -= 6;
+      if (!momOk) confScore -= 6;
+      if (rr1 < 1.12) confScore -= 8;
+      confScore = Math.max(0, Math.min(100, confScore));
+
+      const s: TradeSetup = {
+        id: stableSetupId({
+          prefix: "sc_mp",
+          canon: snap.canon,
+          type: "SCALP_MOMENTUM_PULLBACK",
+          side,
+          bias_tf: f.bias.tf,
+          entry_tf: "5m",
+          trigger_tf: "5m",
+          anchor_price: ref,
+        }),
+
+        canon: snap.canon,
+        type: "SCALP_MOMENTUM_PULLBACK",
+        side,
+        entry_tf: "5m",
+        bias_tf: f.bias.tf,
+        trigger_tf: "5m",
+
+        status: ready ? "READY" : "FORMING",
+        created_ts: ts,
+        // TTL: 3 candles 5m
+        expires_ts: ts + 1000 * 60 * 15,
+
+        entry: {
+          mode: "LIMIT",
+          zone,
+          trigger: {
+            confirmed: false,
+            checklist: [
+              { key: "trend", ok: true, note: `15m trend=${trend15}` },
+              { key: "pullback", ok: pullbackNear, note: `ref @ ${ref.toFixed(2)} (5m swing)` },
+              { key: "momentum", ok: momOk, note: `rsi5=${fmtNum(rsi5, 1)} macd5=${fmtNum(macd5, 4)}` },
+            ],
+            summary: "Scalp momentum pullback: wait zone touch + close-confirm reclaim",
+          },
+        },
+
+        stop: { price: sl, basis: "STRUCTURE", note: "Beyond pullback swing + buffer" },
+
+        tp: [
+          { price: tpLvl, size_pct: 100, basis: "LEVEL", note: "Nearest pivot" },
+        ],
+
+        rr_min: rr1,
+        rr_est: rr1,
+
+        confidence: {
+          score: confScore,
+          grade: gradeFromScore(confScore),
+          reasons: [
+            ...common.reasons,
+            "Scalp momentum pullback aligned with 15m structure trend",
+          ],
+        },
+
+        tags: ["scalp", "trend", "pullback"],
+      };
+
+      tryAccept(s);
+    } else {
+      addReadiness("scalp_momentum_pullback", "Scalp momentum pullback skipped: missing swing ref or momentum not OK");
+    }
+  }
+
+  // ---- 6.4 SCALP_1H_REACTION (15m trigger)
+  // Reaction scalp at nearest 1h pivot level when price is already at/near the level.
+  if (isFiniteNum(px5) && px5 > 0) {
+    const nearBelowBps = below ? abs(distBps(px5, below.price)) : Infinity;
+    const nearAboveBps = above ? abs(distBps(px5, above.price)) : Infinity;
+    const pickSide: SetupSide | null = nearBelowBps <= 22 ? "LONG" : (nearAboveBps <= 22 ? "SHORT" : null);
+    const lvl = pickSide === "LONG" ? below?.price : (pickSide === "SHORT" ? above?.price : undefined);
+    if (pickSide && isFiniteNum(lvl) && lvl! > 0) {
+      const level = Number(lvl);
+      const w = Math.max(level * 0.0008, level * atrpScalp * 0.22);
+      const zone = pickSide === "LONG" ? { lo: level - w, hi: level + w * 0.55 } : { lo: level - w * 0.55, hi: level + w };
+      const sl = pickSide === "LONG" ? (level - w * 1.25) : (level + w * 1.25);
+      const entryMid = (zone.lo + zone.hi) / 2;
+      const tp1 = pickSide === "LONG" ? (entryMid + (entryMid - sl) * 1.15) : (entryMid - (sl - entryMid) * 1.15);
+      const rr1 = rr(entryMid, sl, tp1, pickSide);
+
+      const ready = rr1 >= 1.05;
+      let confScore = common.score + 2;
+      if (rr1 < 1.05) confScore -= 8;
+      confScore = Math.max(0, Math.min(100, confScore));
+
+      const s: TradeSetup = {
+        id: stableSetupId({
+          prefix: "sc_1h",
+          canon: snap.canon,
+          type: "SCALP_1H_REACTION",
+          side: pickSide,
+          bias_tf: f.bias.tf,
+          entry_tf: "15m",
+          trigger_tf: "15m",
+          anchor_price: level,
+        }),
+
+        canon: snap.canon,
+        type: "SCALP_1H_REACTION",
+        side: pickSide,
+        entry_tf: "15m",
+        bias_tf: f.bias.tf,
+        trigger_tf: "15m",
+
+        status: ready ? "READY" : "FORMING",
+        created_ts: ts,
+        // TTL: 2 candles 15m
+        expires_ts: ts + 1000 * 60 * 32,
+
+        entry: {
+          mode: "LIMIT",
+          zone,
+          trigger: {
+            confirmed: false,
+            checklist: [
+              { key: "level", ok: true, note: `1h pivot @ ${level.toFixed(2)} (15m trigger)` },
+              { key: "proximity", ok: true, note: `dist=${pickSide === "LONG" ? nearBelowBps.toFixed(1) : nearAboveBps.toFixed(1)}bps` },
+            ],
+            summary: "Scalp 1h reaction: wait zone touch + close-confirm rejection",
+          },
+        },
+
+        stop: { price: sl, basis: "STRUCTURE", note: "Beyond 1h pivot + buffer" },
+
+        tp: [
+          { price: tp1, size_pct: 100, basis: "R_MULTIPLE", note: "1.15R" },
+        ],
+
+        rr_min: rr1,
+        rr_est: rr1,
+
+        confidence: {
+          score: confScore,
+          grade: gradeFromScore(confScore),
+          reasons: [
+            ...common.reasons,
+            "Scalp reaction at nearby 1h pivot level",
+          ],
+        },
+
+        tags: ["scalp", "reaction", "1h"],
+      };
+
+      tryAccept(s);
+    }
+  }
+
   // Publish only ONE primary setup per symbol (quality-first).
   // Priority: READY > confidence > rr_min. If none READY, we still publish the best FORMING as monitor.
-  const primary = pickPrimarySetup(setups);
+  const ranked = rankSetups(setups);
+  const top = ranked.slice(0, TOP_N_SETUPS);
+  const primary = top[0];
 
   if (!primary) {
     // Only publish readiness when there were no candidates at all (true no-signal case)
@@ -1352,7 +1908,7 @@ export function buildSetups(args: {
     ts,
     dq_ok: true,
     preferred_id: primary.id,
-    setups: [primary],
+    setups: top,
     telemetry,
   };
 
