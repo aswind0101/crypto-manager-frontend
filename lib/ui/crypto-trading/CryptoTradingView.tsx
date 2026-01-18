@@ -667,6 +667,18 @@ function stableSetupKey(s: TradeSetup): string {
 function humanizeType(x: string) {
   return (x || "").replace(/_/g, " ");
 }
+function isScalpSetupUi(s: TradeSetup): boolean {
+  const type = String(s?.type ?? "").toUpperCase();
+
+  // Primary signal: explicit tags (engine already uses tags on setups)
+  const tags = Array.isArray(s?.tags) ? s.tags : [];
+  const hasScalpTag = tags.some((t) => String(t ?? "").toLowerCase() === "scalp");
+
+  // Secondary signal: type prefix (SCALP_*)
+  const hasScalpType = type.startsWith("SCALP_");
+
+  return hasScalpTag || hasScalpType;
+}
 
 function normDir(x: any): "bull" | "bear" | "sideways" | null {
   const s = String(x ?? "").toLowerCase();
@@ -1198,6 +1210,17 @@ export function TradingView({
       return cb - ca;
     });
   }, [out?.setups]);
+  const rankedWithIndex = useMemo(() => {
+    return (ranked || []).map((s, idx) => ({ s, idx }));
+  }, [ranked]);
+
+  const scalpRanked = useMemo(() => {
+    return rankedWithIndex.filter(({ s }) => isScalpSetupUi(s));
+  }, [rankedWithIndex]);
+
+  const nonScalpRanked = useMemo(() => {
+    return rankedWithIndex.filter(({ s }) => !isScalpSetupUi(s));
+  }, [rankedWithIndex]);
 
   const [expandedKey, setExpandedKey] = useState<number | null>(null);
   const focusedSetup: TradeSetup | null = useMemo(() => {
@@ -1727,110 +1750,142 @@ export function TradingView({
                     const state = deriveFeedUiState(feedStatus, publishedCount);
 
                     if (state === "HAS_SETUPS") {
-                      return ranked.map((s, idx) => {
-                        const keyStr = stableSetupKey(s);
-                        const reactKey = `${keyStr}::${idx}`;
-                        const accordionKey = idx;
-                        const isOpen = expandedKey === accordionKey;
-
-                        const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
-                        const pri01 = clamp01(pri / 100);
-
-                        const chip = actionChip(s, executionGlobal);
-
-                        return (
-                          <div
-                            key={reactKey}
-                            className={[
-                              "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
-                              isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
-                            ].join(" ")}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
-                                  <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
-                                  {isMonitorOnlySetup(s) ? (
-                                    <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
-                                      MONITOR-ONLY
-                                    </Pill>
-                                  ) : null}
-                                </div>
-
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
-                                  <span>Conf {fmtScore100(s.confidence?.score)}</span>
-                                  <span>•</span>
-                                  <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
-                                  <span>•</span>
-                                  <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
-                                  <span>•</span>
-                                  <span>[{uiGrade(s)}]</span>
-                                </div>
-
-                                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                                  <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
-                                </div>
-                              </div>
-
-                              <div className="flex shrink-0 flex-col items-end justify-center gap-2">
-                                <div className="grid justify-items-end gap-2">
-                                  <Pill tone={statusTone(s.status)} fullWidth>
-                                    {s.status}
-                                  </Pill>
-
-                                  <Pill tone={chip.tone} icon={chip.icon} fullWidth>
-                                    {chip.label}
-                                  </Pill>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleExpanded(accordionKey)}
-                                  className="
-                                    inline-flex items-center gap-1
-                                    text-[11px] font-medium
-                                    text-zinc-400
-                                    transition
-                                    hover:text-zinc-200
-                                    focus-visible:outline-none
-                                  "
-                                >
-                                  <span>{isOpen ? "Hide" : "Details"}</span>
-                                  <svg
-                                    className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""
-                                      }`}
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M6.293 4.293a1 1 0 011.414 0L13.414 10l-5.707 5.707a1 1 0 01-1.414-1.414L10.586 10 6.293 5.707a1 1 0 010-1.414z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
+                      const renderList = (items: Array<{ s: TradeSetup; idx: number }>) => {
+                        if (!items || items.length === 0) {
+                          return (
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-zinc-400">
+                              No setups in this category right now.
                             </div>
-                            {isOpen ? (
-                              <div className="mt-3">
-                                <SetupDetail
-                                  symbol={symbol}
-                                  mid={mid}
-                                  dqOk={dqOk}
-                                  bybitOk={bybitOk}
-                                  staleSec={staleSec}
-                                  paused={paused}
-                                  features={features}
-                                  setup={s}
-                                  executionGlobal={executionGlobal}
-                                />
+                          );
+                        }
+
+                        return items.map(({ s, idx }) => {
+                          const keyStr = stableSetupKey(s);
+                          const reactKey = `${keyStr}::${idx}`;
+                          const accordionKey = idx;
+                          const isOpen = expandedKey === accordionKey;
+
+                          const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
+                          const pri01 = clamp01(pri / 100);
+
+                          const chip = actionChip(s, executionGlobal);
+
+                          return (
+                            <div
+                              key={reactKey}
+                              className={[
+                                "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
+                                isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
+                              ].join(" ")}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
+                                    <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
+                                    {isMonitorOnlySetup(s) ? (
+                                      <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
+                                        MONITOR-ONLY
+                                      </Pill>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                                    <span>Conf {fmtScore100(s.confidence?.score)}</span>
+                                    <span>•</span>
+                                    <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
+                                    <span>•</span>
+                                    <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                                    <span>•</span>
+                                    <span>[{uiGrade(s)}]</span>
+                                  </div>
+
+                                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                                    <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
+                                  </div>
+                                </div>
+
+                                <div className="flex shrink-0 flex-col items-end justify-center gap-2">
+                                  <div className="grid justify-items-end gap-2">
+                                    <Pill tone={statusTone(s.status)}>{s.status}</Pill>
+                                    {chip ? (
+                                      <Pill tone={chip.tone} icon={chip.icon}>
+                                        {chip.label}
+                                      </Pill>
+                                    ) : null}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpanded(accordionKey)}
+                                    className="inline-flex items-center gap-1 rounded-xl bg-white/5 px-3 py-2 text-xs font-bold text-zinc-100 ring-1 ring-white/10 hover:bg-white/10"
+                                  >
+                                    {isOpen ? (
+                                      <>
+                                        <Minus className="h-4 w-4" />
+                                        Hide
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="h-4 w-4" />
+                                        View
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
                               </div>
-                            ) : null}
+
+                              {isOpen ? (
+                                <div className="mt-3">
+                                  <Divider />
+                                  <SetupDetail
+                                    setup={s}
+                                    symbol={symbol}
+                                    mid={mid}
+                                    dqOk={dqOk}
+                                    bybitOk={bybitOk}
+                                    staleSec={staleSec}
+                                    paused={paused}
+                                    features={features}
+                                    executionGlobal={executionGlobal}
+                                  />
+
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        });
+                      };
+
+                      return (
+                        <div className="space-y-4">
+                          {/* SCALP panel */}
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 ring-1 ring-white/10">
+                            <div className="mb-3 flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
+                                <Sparkles className="h-4 w-4 text-zinc-300" />
+                                SCALP
+                              </div>
+                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{scalpRanked.length} setups</Pill>
+                            </div>
+                            <div className="space-y-2">{renderList(scalpRanked)}</div>
                           </div>
 
-                        );
-                      });
+                          {/* NON-SCALP panel */}
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 ring-1 ring-white/10">
+                            <div className="mb-3 flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
+                                <Layers className="h-4 w-4 text-zinc-300" />
+                                NON-SCALP
+                              </div>
+                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{nonScalpRanked.length} setups</Pill>
+                            </div>
+                            <div className="space-y-2">{renderList(nonScalpRanked)}</div>
+                          </div>
+                        </div>
+                      );
                     }
+
 
                     // Empty states (policy-safe)
                     if (state === "LOADING") {

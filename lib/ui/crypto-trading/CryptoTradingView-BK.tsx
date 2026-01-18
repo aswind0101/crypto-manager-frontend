@@ -51,7 +51,18 @@ type ExecutionDecision = {
   canPlaceLimit: boolean;
   blockers: string[];
   reason: string;
+
+  // NEW (optional): narrative from hook/engine (UI will use this first)
+  narrative?: {
+    code?: string;
+    headline?: string;
+    bullets?: string[];
+    next_action?: string;
+    timing?: { next_close_ts?: number; tf?: string; stale_reason?: string };
+    invalidation?: { rule?: string };
+  };
 };
+
 
 type TradeSetup = {
   id: string;
@@ -70,6 +81,15 @@ type TradeSetup = {
     zone: { lo: number; hi: number };
     trigger: {
       confirmed: boolean;
+
+      // NEW (optional): trigger tiers + metadata
+      tier?: "APPROACHING" | "TOUCHED" | "CONFIRMED";
+      touched_ts?: number;
+      confirmed_ts?: number;
+      _cc_base_ts?: number;
+      _cc_next_close_ts?: number;
+      _cc_tf?: string;
+
       checklist: Array<{ key: string; ok: boolean; note?: string }>;
       summary: string;
     };
@@ -81,7 +101,7 @@ type TradeSetup = {
   rr_min: number;
   rr_est: number;
 
-  confidence: { score: number; grade: string; reasons: string[] };
+  confidence: { score: number; grade: string; reasons: string[]; grade_plus?: string; grade_plus_reasons?: string[] };
   tags?: string[];
 
   priority_score?: number;
@@ -302,7 +322,7 @@ function isMonitorOnlyGrade(grade?: string) {
 
 function isSetupActionableNow(setup: TradeSetup, executionGlobal: ExecutionGlobal | null): boolean {
   // Hard policy: grade C is always monitor-only
-  if (isMonitorOnlyGrade(setup?.confidence?.grade)) return false;
+  if (isMonitorOnlySetup(setup)) return false;
   if (executionGlobal?.state === "BLOCKED") return false;
   const ex = setup.execution;
   if (!ex) return false;
@@ -314,7 +334,7 @@ function isSetupActionableNow(setup: TradeSetup, executionGlobal: ExecutionGloba
 
 /** ---------- Domain helpers (best-effort, no guessing) ---------- */
 function decisionSummary(s: TradeSetup, executionGlobal: ExecutionGlobal | null): string {
-  if (isMonitorOnlyGrade(s?.confidence?.grade)) {
+  if (isMonitorOnlySetup(s)) {
     return "Monitor-only (Grade C policy): no execution actions permitted";
   }
 
@@ -506,6 +526,15 @@ function dqTone(dq?: string) {
   if (g === "D") return "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
   return "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
 }
+function uiGrade(setup: TradeSetup): string {
+  const gp = String((setup as any)?.confidence?.grade_plus ?? "").toUpperCase();
+  if (gp === "A+" || gp === "A" || gp === "B" || gp === "C") return gp;
+  return String((setup as any)?.confidence?.grade ?? "").toUpperCase();
+}
+
+function isMonitorOnlySetup(setup: TradeSetup) {
+  return uiGrade(setup) === "C";
+}
 
 function gradeTone(grade?: string) {
   const g = String(grade || "").toUpperCase();
@@ -530,7 +559,7 @@ function actionChip(
   executionGlobal: ExecutionGlobal | null
 ): { label: string; tone: string; icon: React.ReactNode } {
   // Hard policy first
-  if (isMonitorOnlyGrade(s?.confidence?.grade)) {
+  if (isMonitorOnlySetup(s)) {
     return {
       label: "MONITOR ONLY",
       tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
@@ -581,12 +610,45 @@ function actionChip(
     };
   }
 
-  // waiting states
+  // waiting states — show intent (WAIT) instead of a generic MONITOR
+  if (ex.state === "WAIT_FILL") {
+    return {
+      label: "WAIT FILL",
+      tone: "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30",
+      icon: <Clock className="h-4 w-4" />,
+    };
+  }
+
+  if (ex.state === "WAIT_CLOSE") {
+    return {
+      label: "WAIT CLOSE",
+      tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+      icon: <Clock className="h-4 w-4" />,
+    };
+  }
+
+  if (ex.state === "WAIT_ZONE") {
+    return {
+      label: "WAIT ZONE",
+      tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+      icon: <Clock className="h-4 w-4" />,
+    };
+  }
+
+  if (ex.state === "WAIT_RETEST") {
+    return {
+      label: "WAIT RETEST",
+      tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
+      icon: <Clock className="h-4 w-4" />,
+    };
+  }
+
   return {
-    label: "MONITOR",
+    label: "WAIT",
     tone: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30",
     icon: <Clock className="h-4 w-4" />,
   };
+
 }
 
 function stableSetupKey(s: TradeSetup): string {
@@ -639,6 +701,47 @@ function structureTrendBadge(trend?: string) {
   if (t === "RANGE") return { label: "RANGE", icon: <Waves className="h-4 w-4" />, cls: "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" };
   return { label: "UNKNOWN", icon: <Minus className="h-4 w-4" />, cls: "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30" };
 }
+function TrendStructureCard({
+  tf,
+  badge,
+  kind,
+  dir,
+  level,
+  ts,
+  confirmedCount,
+}: {
+  tf: string;
+  badge: { label: string; icon: React.ReactNode; cls: string };
+  kind: "BOS" | "CHOCH" | null;
+  dir: "UP" | "DOWN" | null;
+  level?: number;
+  ts?: number;
+  confirmedCount: string;
+}) {
+  const title = kind && dir ? `${kind} ${dir}` : "—";
+  const price = Number.isFinite(level as number) ? `@ ${fmtPx(Number(level))}` : "";
+  const ago = Number.isFinite(ts as number) ? relTime(Number(ts)) : "—";
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-extrabold text-zinc-100">{String(tf).toUpperCase()}</div>
+        <span className={["inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold", badge.cls].join(" ")}>
+          {badge.icon}
+          {badge.label}
+        </span>
+      </div>
+
+      <div className="mt-2">
+        <div className="text-sm font-extrabold leading-tight text-zinc-50">{title}</div>
+        <div className="mt-0.5 text-xs text-zinc-200">{price || "\u00A0"}</div>
+      </div>
+
+      <div className="mt-2 text-[11px] text-zinc-400">Confirmed · {ago} · {confirmedCount}</div>
+    </div>
+  );
+}
+
 function signalLevelFromStale(staleSec?: number): 0 | 1 | 2 | 3 | 4 {
   // 0: unknown/no data
   if (!Number.isFinite(staleSec as number)) return 0;
@@ -945,6 +1048,75 @@ function relTime(ts?: number) {
   const v = Math.round(d);
   return diffSec > 0 ? `in ${fmt(v, "d")}` : `${fmt(v, "d")} ago`;
 }
+function ActionHeader({ setup }: { setup: TradeSetup | null }) {
+  if (!setup || !setup.execution) return null;
+
+  const ex = setup.execution;
+  const n = ex.narrative;
+
+  const state = String(ex.state || "—");
+  const grade = uiGrade(setup);
+
+  const headline = String(n?.headline ?? ex.reason ?? "");
+  const bullets = Array.isArray(n?.bullets) ? n!.bullets : [];
+  const nextAction = String(n?.next_action ?? "");
+
+  const nextCloseTs = typeof n?.timing?.next_close_ts === "number" ? n.timing.next_close_ts : undefined;
+  const secsLeft =
+    typeof nextCloseTs === "number" ? Math.max(0, Math.round((nextCloseTs - Date.now()) / 1000)) : null;
+
+  const badgeTone =
+    state === "ENTER_MARKET"
+      ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+      : state === "PLACE_LIMIT"
+        ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
+        : state === "WAIT_CLOSE" || state === "WAIT_ZONE" || state === "WAIT_RETEST" || state === "WAIT_FILL"
+          ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+          : state === "BLOCKED"
+            ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+            : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
+
+  return (
+    <div className="mt-3">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Pill tone={badgeTone} icon={<Sparkles className="h-4 w-4" />}>
+            {state}
+          </Pill>
+
+          {grade ? (
+            <Pill tone={gradeTone(grade)}>
+              Grade {grade}
+            </Pill>
+          ) : null}
+
+          {secsLeft != null ? (
+            <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" icon={<Clock className="h-4 w-4" />}>
+              Close in ~{secsLeft}s
+            </Pill>
+          ) : null}
+
+        </div>
+        <Divider />
+        {headline ? (
+          <div className="mt-2 text-sm font-extrabold text-zinc-50">👉 {nextAction}</div>
+        ) : null}
+
+        {bullets.length > 0 ? (
+          <div className="mt-2 space-y-1.5 text-xs text-zinc-300/90">
+            {bullets.slice(0, 4).map((b, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300/60" />
+                <span className="min-w-0">{b}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function TradingView({
 
   symbol,
@@ -1028,6 +1200,13 @@ export function TradingView({
   }, [out?.setups]);
 
   const [expandedKey, setExpandedKey] = useState<number | null>(null);
+  const focusedSetup: TradeSetup | null = useMemo(() => {
+    if (!ranked || ranked.length === 0) return null;
+    if (expandedKey != null && expandedKey >= 0 && expandedKey < ranked.length) {
+      return ranked[expandedKey] as any;
+    }
+    return ranked[0] as any;
+  }, [ranked, expandedKey]);
 
   const [showLevelsMore, setShowLevelsMore] = useState(false);
   const [showDataCompleteness, setShowDataCompleteness] = useState(false);
@@ -1373,7 +1552,7 @@ export function TradingView({
             </div>
           ) : null}
         </div>
-
+        <ActionHeader setup={focusedSetup} />
         {/* Main layout */}
         <div className="mt-4 grid grid-cols-1 gap-4 min-[1440px]:grid-cols-[380px_1fr]">
           {/* LEFT: queue */}
@@ -1485,36 +1664,20 @@ export function TradingView({
                   const e = pickLatestStructureEvent(node);
 
                   return (
-                    <div key={tf} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs font-extrabold text-zinc-100">{tf}</div>
-                        <span
-                          className={[
-                            "inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-bold",
-                            badge.cls,
-                          ].join(" ")}
-                        >
-                          {badge.icon}
-                          {badge.label}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 space-y-1.5 text-xs">
-                        <KV
-                          k="Confirmed"
-                          v={Number.isFinite(Number(node?.confirmed_count)) ? fmtNum(Number(node?.confirmed_count), 0) : "—"}
-                        />
-                        <KV
-                          k="Latest event"
-                          v={
-                            e.kind && e.dir
-                              ? `${e.kind} ${e.dir}${Number.isFinite(e.level) ? ` @ ${fmtPx(e.level)}` : ""}${Number.isFinite(e.ts) ? ` • ${relTime(e.ts)}` : ""
-                              }`
-                              : "—"
-                          }
-                        />
-                      </div>
-                    </div>
+                    <TrendStructureCard
+                      key={tf}   // 👈 FIX: thêm key
+                      tf={tf}
+                      badge={badge}
+                      kind={e.kind}
+                      dir={e.dir}
+                      level={e.level}
+                      ts={e.ts}
+                      confirmedCount={
+                        Number.isFinite(Number(node?.confirmed_count))
+                          ? fmtNum(Number(node?.confirmed_count), 0)
+                          : "—"
+                      }
+                    />
                   );
                 })}
               </div>
@@ -1588,7 +1751,7 @@ export function TradingView({
                                 <div className="flex items-center gap-2">
                                   <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
                                   <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
-                                  {isMonitorOnlyGrade(s.confidence?.grade) ? (
+                                  {isMonitorOnlySetup(s) ? (
                                     <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
                                       MONITOR-ONLY
                                     </Pill>
@@ -1601,6 +1764,8 @@ export function TradingView({
                                   <span>RR {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
                                   <span>•</span>
                                   <span>Pri {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                                  <span>•</span>
+                                  <span>[{uiGrade(s)}]</span>
                                 </div>
 
                                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
@@ -1644,11 +1809,8 @@ export function TradingView({
                                     />
                                   </svg>
                                 </button>
-
                               </div>
-
                             </div>
-
                             {isOpen ? (
                               <div className="mt-3">
                                 <SetupDetail
@@ -1665,6 +1827,7 @@ export function TradingView({
                               </div>
                             ) : null}
                           </div>
+
                         );
                       });
                     }
@@ -1964,49 +2127,75 @@ export function TradingView({
                     <Target className="h-4 w-4 text-zinc-300" />
                     Key levels (events & swings)
                   </div>
-
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-1 text-[11px] text-zinc-400">
+                    Showing {keyLevelsView.length} of {keyLevels.length} levels • Sorted by TF priority (4h → 5m)
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                     {keyLevelsView.length === 0 ? (
                       <div className="text-xs text-zinc-400">No market structure levels yet.</div>
                     ) : (
-                      keyLevelsView.map((l, i) => (
-                        <div key={`${l.tf}-${l.kind}-${i}`} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.tf}</Pill>
-                                <Pill
-                                  tone={
-                                    l.kind === "BOS"
-                                      ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
-                                      : l.kind === "CHOCH"
-                                        ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                                        : l.kind === "SWING_HIGH"
-                                          ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                                          : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                                  }
-                                >
-                                  {l.kind}
-                                </Pill>
+                      keyLevelsView.map((l, i) => {
+                        const lvl = Number.isFinite(l.level) ? (l.level as number) : NaN;
+                        const haveMid = Number.isFinite(mid);
+                        const haveLvl = Number.isFinite(lvl);
+                        const deltaAbs = haveMid && haveLvl ? Math.abs(mid - lvl) : NaN;
 
-                                {l.dir && l.dir !== "—" ? (
-                                  <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill>
+                        const dirLabel =
+                          haveMid && haveLvl
+                            ? lvl > mid
+                              ? "ABOVE"
+                              : lvl < mid
+                                ? "BELOW"
+                                : "AT"
+                            : "";
+
+                        const kindTone =
+                          l.kind === "BOS"
+                            ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
+                            : l.kind === "CHOCH"
+                              ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                              : l.kind === "SWING_HIGH"
+                                ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                                : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
+
+                        return (
+                          <div
+                            key={`${l.tf}-${l.kind}-${i}`}
+                            className="rounded-xl border border-white/10 bg-zinc-950/30 p-3"
+                          >
+                            {/* Top row: TF + Kind + optional dir */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.tf}</Pill>
+                              <Pill tone={kindTone}>{l.kind}</Pill>
+                              {l.dir && l.dir !== "—" ? (
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill>
+                              ) : null}
+
+                              {/* Right-side mini meta */}
+                              <div className="ml-auto flex items-center gap-2">
+                                {haveMid && haveLvl ? (
+                                  <Pill
+                                    tone="bg-white/5 text-zinc-100 ring-1 ring-white/10"
+                                    title="Relative to realtime mid"
+                                  >
+                                    {dirLabel} · Δ {fmtPx(deltaAbs)}
+                                  </Pill>
                                 ) : null}
-                              </div>
-
-                              <div className="mt-2 text-sm font-extrabold text-zinc-50">
-                                {Number.isFinite(l.level) ? fmtPx(l.level) : "—"}
                               </div>
                             </div>
 
-                            {Number.isFinite(mid) && Number.isFinite(l.level) ? (
-                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10" title="Distance from mid (absolute)">
-                                Δ {fmtPx(Math.abs(mid - (l.level as number)))}
-                              </Pill>
-                            ) : null}
+                            {/* Price row: big number + timestamp */}
+                            <div className="mt-2 flex items-end justify-between gap-3">
+                              <div className="text-base font-extrabold text-zinc-50 tabular-nums">
+                                {haveLvl ? fmtPx(lvl) : "—"}
+                              </div>
+                              <div className="text-[11px] text-zinc-400">
+                                {Number.isFinite(l.ts) ? relTime(l.ts) : ""}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 
@@ -2118,7 +2307,7 @@ function SetupDetail({
     // - Else show execution state and how to proceed.
     const ex = setup.execution;
     // Hard policy: Grade C is monitor-only, regardless of local booleans
-    if (isMonitorOnlyGrade(setup?.confidence?.grade)) {
+    if (isMonitorOnlySetup(setup)) {
       return {
         headline: "Monitor-only (Grade C)",
         tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
@@ -2193,28 +2382,36 @@ function SetupDetail({
     // waiting / monitoring states
     if (ex.state === "WAIT_ZONE") {
       return {
-        headline: "Wait for price to enter the zone",
+        headline: "Do NOT enter — wait for price to reach the entry zone",
         tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
         bullets: [
-          "Do not force entry outside the zone.",
-          "Monitor until mid price reaches the entry zone, then re-check conditions.",
+          "Action: wait until price is inside the zone, then re-check trigger checklist.",
+          "Do not chase outside the zone. Let the trade come to you.",
         ],
       };
     }
     if (ex.state === "WAIT_CLOSE") {
       return {
-        headline: "Wait for candle close-confirm",
+        headline: "Do NOT enter yet — wait for candle close confirmation",
         tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
-        bullets: ["This setup requires a close-confirm trigger before entering."],
+        bullets: [
+          "Action: do nothing until the next candle close confirms the trigger.",
+          "If the close-confirm fails, skip this setup and wait for a new signal.",
+        ],
       };
     }
+
     if (ex.state === "WAIT_RETEST") {
       return {
-        headline: "Wait for retest",
+        headline: "Do NOT enter — wait for the retest condition",
         tone: "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
-        bullets: ["Breakout setup is forming; wait for retest condition."],
+        bullets: [
+          "Action: wait for the retest to complete; do not enter on the first impulse.",
+          "If retest does not occur within the setup window, skip.",
+        ],
       };
     }
+
     if (ex.state === "WAIT_FILL") {
       return {
         headline: "Triggered; waiting for limit fill",
@@ -2239,7 +2436,7 @@ function SetupDetail({
             <div className="flex flex-wrap items-baseline gap-2">
               <div className="text-base font-extrabold text-zinc-50">{humanizeType(String(setup.type))}</div>
               <div className={["text-base font-extrabold", sideTone(setup.side)].join(" ")}>{setup.side}</div>
-              <Pill tone={gradeTone(setup.confidence?.grade)}>Grade {String(setup.confidence?.grade || "—").toUpperCase()}</Pill>
+              <Pill tone={gradeTone(setup.confidence?.grade)}>Grade {String(uiGrade(setup) || "—").toUpperCase()}</Pill>
             </div>
 
             <div className="mt-2 flex flex-wrap gap-2">
@@ -2274,15 +2471,7 @@ function SetupDetail({
             </div>
           </div>
         </div>
-        <div className="sticky top-2 z-20 space-y-3">
-          <div className="rounded-xl border border-white/10 bg-zinc-950/80 backdrop-blur px-4 py-3">
-            <div className="text-sm font-extrabold text-zinc-50">
-              {decisionSummary(setup, executionGlobal)}
-            </div>
-          </div>
-
-          <Divider />
-        </div>
+        <Divider />
 
         {/* Guidance */}
         {/* Guidance */}
