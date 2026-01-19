@@ -15,21 +15,53 @@ type Candle = {
   confirm: boolean;
 };
 type SetupStatus = "FORMING" | "READY" | "TRIGGERED" | "INVALIDATED" | "EXPIRED";
+type StatusTf = "5m" | "15m" | "1h" | "4h";
+
 
 /**
- * Status timeframe policy:
- * - If bias_tf is 4h => swing status_tf = 4h
- * - Else => intraday status_tf = 1h
- *
- * This matches your chosen rule:
- * - intraday status_tf = 1h
- * - swing status_tf = 4h
+ * Status timeframe policy (used ONLY for stabilizing FORMING/READY transitions):
+ * - Scalp setups (type starts with "SCALP_") must NOT be stabilized on 1h/4h,
+ *   otherwise the UI can freeze READY/FORMING for up to an hour.
+ *   For scalps we stabilize on the setup's fast timeframe:
+ *     - Prefer entry_tf if available ("5m" or "15m")
+ *     - Else prefer trigger_tf
+ *     - Else fallback to "15m" (or "5m" if only that exists)
+ * - Non-scalp:
+ *     - If bias_tf is 4h => swing status_tf = 4h
+ *     - Else => intraday status_tf = 1h
  */
-function inferStatusTf(setup: any): "1h" | "4h" {
+function inferStatusTf(setup: any, snap?: any): StatusTf {
+  const type = String(setup?.type ?? "").toUpperCase();
+
+  // Scalp setups stabilize on fast TFs.
+  if (type.startsWith("SCALP_")) {
+    const entryTf = String(setup?.entry_tf ?? "").trim();
+    const triggerTf = String(setup?.trigger_tf ?? "").trim();
+
+    const tfs: string[] = Array.isArray(snap?.timeframes)
+      ? snap.timeframes.map((x: any) => String(x?.tf ?? "")).filter((x: string) => x)
+      : [];
+    const tfSet = new Set<string>(tfs);
+
+    const isFast = (tf: string) => tf === "5m" || tf === "15m";
+
+    if (isFast(entryTf) && (!snap || tfSet.has(entryTf))) return entryTf as StatusTf;
+    if (isFast(triggerTf) && (!snap || tfSet.has(triggerTf))) return triggerTf as StatusTf;
+
+    // Fallbacks preserve legacy preference when available in snapshot.
+    if (!snap) return "15m";
+    if (tfSet.has("15m")) return "15m";
+    if (tfSet.has("5m")) return "5m";
+    // If neither is available, fall back to intraday 1h to avoid undefined.
+    return "1h";
+  }
+
+  // Default (non-scalp): 4h swing, else 1h intraday.
   const biasTf = String(setup?.bias_tf ?? "").toLowerCase().trim();
   if (biasTf === "4h") return "4h";
   return "1h";
 }
+
 
 function computeMidFromSnap(snap: any): number {
   const m = Number(snap?.price?.mid);
@@ -84,13 +116,18 @@ function stabilizeStatusByConfirmedBar(
 ): any {
   if (!out || !Array.isArray(out.setups) || !snap) return out;
 
+  const last5m = lastConfirmedCandle(getTimeframeCandles(snap, "5m"));
+  const last15m = lastConfirmedCandle(getTimeframeCandles(snap, "15m"));
   const last1h = lastConfirmedCandle(getTimeframeCandles(snap, "1h"));
   const last4h = lastConfirmedCandle(getTimeframeCandles(snap, "4h"));
 
-  const barTsByTf: Record<"1h" | "4h", number> = {
+  const barTsByTf: Record<StatusTf, number> = {
+    "5m": Number.isFinite(last5m?.ts as number) ? (last5m!.ts as number) : 0,
+    "15m": Number.isFinite(last15m?.ts as number) ? (last15m!.ts as number) : 0,
     "1h": Number.isFinite(last1h?.ts as number) ? (last1h!.ts as number) : 0,
     "4h": Number.isFinite(last4h?.ts as number) ? (last4h!.ts as number) : 0,
   };
+
 
   const updated = out.setups.map((s: any) => {
     if (!s) return s;
@@ -98,7 +135,7 @@ function stabilizeStatusByConfirmedBar(
     const key = String(s?.canon ?? s?.id ?? "");
     if (!key) return s;
 
-    const statusTf = inferStatusTf(s);
+    const statusTf = inferStatusTf(s, snap);
     const barTs = barTsByTf[statusTf];
 
     const incoming = String(s?.status ?? "") as SetupStatus | string;
@@ -646,7 +683,11 @@ function applyPreTrigger(out: any, snap: any): any {
       };
 
     }
-    if (s.type === "LIQUIDITY_SWEEP_REVERSAL" || s.type === "FAILED_SWEEP_CONTINUATION") {
+    if (
+      s.type === "LIQUIDITY_SWEEP_REVERSAL" ||
+      s.type === "FAILED_SWEEP_CONTINUATION" ||
+      s.type === "SCALP_LIQUIDITY_SNAPBACK"
+    ) {
       const zone = s?.entry?.zone;
       if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
       const wasTouched = String((trg as any)?.tier ?? "") === "TOUCHED";
@@ -689,7 +730,13 @@ function applyPreTrigger(out: any, snap: any): any {
       };
     }
 
-    if (s.type === "RANGE_MEAN_REVERT" || s.type === "TREND_PULLBACK") {
+    if (
+      s.type === "RANGE_MEAN_REVERT" ||
+      s.type === "TREND_PULLBACK" ||
+      s.type === "SCALP_RANGE_FADE" ||
+      s.type === "SCALP_MOMENTUM_PULLBACK" ||
+      s.type === "SCALP_1H_REACTION"
+    ) {
       const zone = s?.entry?.zone;
       if (!zone || typeof zone.lo !== "number" || typeof zone.hi !== "number") return s;
       const wasTouched = String((trg as any)?.tier ?? "") === "TOUCHED";
@@ -1060,10 +1107,16 @@ function applyCloseConfirm(out: any, snap: any): any {
         entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
       };
     }
-    // TREND_PULLBACK / RANGE_MEAN_REVERT trigger logic (zone touch + reclaim on close-confirm)
+    // TREND_PULLBACK / RANGE_MEAN_REVERT / SCALP_MOMENTUM_PULLBACK / SCALP_1H_REACTION
+    // trigger logic (zone touch + reclaim/reject on close-confirm)
     if (
       s.status === "READY" &&
-      (s.type === "TREND_PULLBACK" || s.type === "RANGE_MEAN_REVERT") &&
+      (
+        s.type === "TREND_PULLBACK" ||
+        s.type === "RANGE_MEAN_REVERT" ||
+        s.type === "SCALP_MOMENTUM_PULLBACK" ||
+        s.type === "SCALP_1H_REACTION"
+      ) &&
       trg?.confirmed !== true &&
       last
     ) {
@@ -1083,8 +1136,12 @@ function applyCloseConfirm(out: any, snap: any): any {
       const bufRef = s.side === "LONG" ? z.hi : z.lo;
       const buffer = bufRef * 0.0008; // 8 bps buffer
 
-      const reclaimed =
-        s.side === "LONG" ? (last.c > z.hi + buffer) : (last.c < z.lo - buffer);
+      // For reaction-type setups we require a directional rejection away from the level.
+      // For zone-type pullbacks we require reclaim beyond the zone boundary.
+      const isReaction = s.type === "SCALP_1H_REACTION";
+      const reclaimed = isReaction
+        ? (s.side === "LONG" ? (last.c > z.hi + buffer) : (last.c < z.lo - buffer))
+        : (s.side === "LONG" ? (last.c > z.hi + buffer) : (last.c < z.lo - buffer));
 
       // Keep checklist aligned with runtime gate keys
       checklistNow = upsertChecklist(checklistNow, {
@@ -1103,9 +1160,60 @@ function applyCloseConfirm(out: any, snap: any): any {
       };
     }
 
-    // LIQUIDITY_SWEEP_REVERSAL trigger logic
+    // SCALP_RANGE_FADE trigger logic
+    // - Requires: zone touch + close-confirm re-entry back inside the swing range.
+    // - Uses checklist keys: range_hi / range_lo (engine writes "@ <price>")
+    if (s.status === "READY" && s.type === "SCALP_RANGE_FADE" && trg?.confirmed !== true && last) {
+      const z0 = s?.entry?.zone;
+      const z = getEffectiveTouchZone(s, trg) ?? z0;
+      if (!z || typeof z.lo !== "number" || typeof z.hi !== "number") {
+        return {
+          ...s,
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+        };
+      }
+
+      const hi = parseLevelFromChecklistKey(s, "range_hi");
+      const lo = parseLevelFromChecklistKey(s, "range_lo");
+      if (!Number.isFinite(hi) || !Number.isFinite(lo)) {
+        return {
+          ...s,
+          entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+        };
+      }
+
+      const strength = candleCloseStrengthPct(last, s.side);
+      const passStrength = strength >= 0.65;
+      const touched = candleTouchesZone(last, z);
+
+      // Re-entry definition: close back inside [lo..hi] with a small buffer.
+      const buf = (s.side === "LONG" ? Number(lo) : Number(hi)) * 0.0008; // 8 bps
+      const inside = last.c >= Number(lo) + buf && last.c <= Number(hi) - buf;
+
+      checklistNow = upsertChecklist(checklistNow, {
+        key: "pre_trigger",
+        ok: touched,
+        note: `candleTouch=${touched} | zone=[${z.lo.toFixed(2)}, ${z.hi.toFixed(2)}] | range=[${Number(lo).toFixed(2)}, ${Number(hi).toFixed(2)}]`,
+      });
+
+      if (touched && inside && passStrength) {
+        return markTriggered({ ...s, entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow } } });
+      }
+
+      return {
+        ...s,
+        entry: { ...s.entry, trigger: { ...trg, checklist: checklistNow, _cc_base_ts: lastTs } },
+      };
+    }
+
+    // LIQUIDITY_SWEEP_REVERSAL / SCALP_LIQUIDITY_SNAPBACK trigger logic
     // - Requires: retest zone touch + close-confirm reclaim of swept level
-    if (s.status === "READY" && s.type === "LIQUIDITY_SWEEP_REVERSAL" && trg?.confirmed !== true && last) {
+    if (
+      s.status === "READY" &&
+      (s.type === "LIQUIDITY_SWEEP_REVERSAL" || s.type === "SCALP_LIQUIDITY_SNAPBACK") &&
+      trg?.confirmed !== true &&
+      last
+    ) {
       const level = parseLevelFromChecklistKey(s, "sweep");
       const z0 = s?.entry?.zone;
       const z = getEffectiveTouchZone(s, trg) ?? z0;

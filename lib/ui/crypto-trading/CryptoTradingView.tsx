@@ -30,6 +30,18 @@ import {
   Sparkles,
 } from "lucide-react";
 
+function AnimatedEllipsis() {
+  const [dots, setDots] = useState(".");
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "." : prev + "."));
+    }, 450);
+    return () => clearInterval(id);
+  }, []);
+
+  return <span>{dots}</span>;
+}
 
 /** ---------- Minimal UI types (best-effort) ---------- */
 type SetupSide = "LONG" | "SHORT";
@@ -1188,7 +1200,7 @@ export function TradingView({
 
 }) {
 
-  const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused) as any;
+  const { snap, features, setups, executionGlobal: execGlobalRaw, feedStatus: feedStatusRaw } = useSetupsSnapshot(symbol, paused);
 
   const out = (setups as unknown as SetupsOutput | null) ?? null;
   const executionGlobal = useMemo(() => {
@@ -1385,6 +1397,21 @@ export function TradingView({
     const v = Number(features?.cross?.consensus_score);
     return Number.isFinite(v) ? clamp01(v) : undefined;
   }, [features?.cross?.consensus_score]);
+  const crossConsensusPending = useMemo(() => {
+    // Only show "pending" when Binance is OK (so user understands it's warming up, not broken)
+    const binOk = !!snap?.availability?.binance?.ok;
+    if (!binOk) return false;
+
+    const dev = Number(features?.cross?.dev_bps);
+    const cons = Number(features?.cross?.consensus_score);
+
+    // consensus_score depends on dev_bps; if either missing => still computing
+    if (!Number.isFinite(dev)) return true;
+    if (!Number.isFinite(cons)) return true;
+
+    return false;
+  }, [snap?.availability?.binance?.ok, features?.cross?.dev_bps, features?.cross?.consensus_score]);
+
 
   // key levels extracted from structure events and swings (HTF emphasis)
   const keyLevels = useMemo(() => {
@@ -1624,6 +1651,15 @@ export function TradingView({
             >
               Binance {binanceOk ? "OK" : "NOT OK"}
             </Pill>
+            {crossConsensusPending ? (
+              <Pill
+                tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                icon={<Clock className="h-4 w-4" />}
+                title="Computing cross-exchange consensus"
+              >
+                Computing consensus <AnimatedEllipsis />
+              </Pill>
+            ) : null}
             <RealtimeSignal
               staleSec={staleSec}
               label="Realtime"
@@ -1736,6 +1772,12 @@ export function TradingView({
                         intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : crossConsensus01 != null && crossConsensus01 <= 0.35 ? "warn" : "neutral"}
                       />
                     </div>
+                    {crossConsensusPending ? (
+                      <div className="mt-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/90">
+                        Computing consensus <AnimatedEllipsis />
+                      </div>
+                    ) : null}
+
                     <div className="mt-3 space-y-1.5">
                       <KV k="dev_bps" v={Number.isFinite(Number(features?.cross?.dev_bps)) ? `${fmtNum(Number(features?.cross?.dev_bps), 1)} bps` : "—"} />
                       <KV k="dev_z" v={Number.isFinite(Number(features?.cross?.dev_z)) ? fmtNum(Number(features?.cross?.dev_z), 2) : "—"} />
@@ -1950,7 +1992,15 @@ export function TradingView({
 
                                 </div>
                               </div>
-                              {/* Bottom bar: Entry / TP / SL (anchored at the bottom of the setup card) */}
+                              {/* Mid (anchored above the divider, left-aligned) */}
+                              <div className="mt-2 -mb-2">
+                                <div className="tabular-nums text-[11px] font-semibold text-zinc-300 ">
+                                  <span className="text-amber-200/90">Mid:</span>{" "}
+                                  <span className="text-zinc-100">
+                                    {Number.isFinite(mid) ? `$${fmtPxWithSep(mid)}` : "—"}
+                                  </span>
+                                </div>
+                              </div>
 
                               {/* Bottom bar: Entry / TP / SL + View (anchored at the bottom of the setup card) */}
                               <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-2 text-[11px] font-semibold">

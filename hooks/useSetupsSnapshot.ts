@@ -3,6 +3,31 @@ import { useFeaturesSnapshot } from "./useFeaturesSnapshot";
 import { buildSetups } from "../lib/feeds/setups/engine";
 import { gradeFromScore } from "../lib/feeds/setups/scoring";
 import type { ExecutionDecision, SetupTelemetry, DecisionNarrative, DecisionCode } from "../lib/feeds/setups/types";
+export type ExecutionGlobal = {
+  state: "ENABLED" | "BLOCKED";
+  reasons: string[];
+};
+
+export type FeedStatus = {
+  evaluated: boolean;
+  candidatesEvaluated: number | null;
+  published: number;
+  rejected: number | null;
+  rejectionByCode: Record<string, number> | null;
+  rejectNotesSample: string[] | null;
+  gate: string | null;
+  readiness: { state: string; items: Array<{ key: string; note: string }> } | null;
+  lastEvaluationTs: number;
+};
+
+export type UseSetupsSnapshotResult = {
+  snap: any;
+  features: any;
+  setups: any;
+  executionGlobal: ExecutionGlobal | null;
+  feedStatus: FeedStatus | null;
+};
+
 
 
 type Candle = {
@@ -790,6 +815,74 @@ function applyPreTrigger(out: any, snap: any): any {
 /**
  * 3.3a CLOSE-CONFIRM trigger evaluation
  */
+function hydrateCloseConfirmRuntime(out: any, cache: Map<string, any>): any {
+  if (!out || !Array.isArray(out.setups)) return out;
+
+  const setups = out.setups.map((s: any) => {
+    const key = String(s?.canon ?? s?.id ?? "");
+    if (!key) return s;
+
+    // Only hydrate when READY and not confirmed
+    if (s?.status !== "READY") return s;
+
+    const trg0 = s?.entry?.trigger;
+    if (!trg0 || typeof trg0 !== "object") return s;
+    if ((trg0 as any).confirmed === true) return s;
+
+    // If runtime already present, do not override
+    const hasBase = typeof (trg0 as any)._cc_base_ts === "number" && Number.isFinite((trg0 as any)._cc_base_ts);
+    if (hasBase) return s;
+
+    const cached = cache.get(key);
+    if (!cached) return s;
+
+    const trg = { ...(trg0 as any) };
+    if (typeof cached.baseTs === "number" && Number.isFinite(cached.baseTs)) trg._cc_base_ts = cached.baseTs;
+    if (typeof cached.nextCloseTs === "number" && Number.isFinite(cached.nextCloseTs)) trg._cc_next_close_ts = cached.nextCloseTs;
+    if (typeof cached.tf === "string" && cached.tf) trg._cc_tf = cached.tf;
+
+    return { ...s, entry: { ...s.entry, trigger: trg } };
+  });
+
+  return { ...out, setups };
+}
+
+function persistCloseConfirmRuntime(out: any, cache: Map<string, any>, nowTs: number): void {
+  if (!out || !Array.isArray(out.setups)) return;
+
+  // Update cache per setup
+  for (const s of out.setups) {
+    const key = String(s?.canon ?? s?.id ?? "");
+    if (!key) continue;
+
+    const trg = s?.entry?.trigger;
+    const confirmed = (trg as any)?.confirmed === true;
+
+    // Keep cache only while READY and not confirmed
+    if (s?.status === "READY" && !confirmed && trg && typeof trg === "object") {
+      const baseTs = (trg as any)._cc_base_ts;
+      const nextCloseTs = (trg as any)._cc_next_close_ts;
+      const tf = (trg as any)._cc_tf;
+
+      cache.set(key, {
+        baseTs: (typeof baseTs === "number" && Number.isFinite(baseTs)) ? baseTs : undefined,
+        nextCloseTs: (typeof nextCloseTs === "number" && Number.isFinite(nextCloseTs)) ? nextCloseTs : undefined,
+        tf: (typeof tf === "string" && tf) ? tf : undefined,
+        lastSeenTs: nowTs,
+      });
+    } else {
+      cache.delete(key);
+    }
+  }
+
+  // Prune old keys (avoid unbounded growth)
+  // Keep last 30 minutes of entries.
+  const cutoff = nowTs - 30 * 60 * 1000;
+  for (const [k, v] of cache.entries()) {
+    if (!v || typeof v.lastSeenTs !== "number" || v.lastSeenTs < cutoff) cache.delete(k);
+  }
+}
+
 function applyCloseConfirm(out: any, snap: any): any {
   if (!out || !Array.isArray(out.setups) || !snap) return out;
 
@@ -1295,6 +1388,35 @@ function applyCloseConfirm(out: any, snap: any): any {
 
   return { ...out, setups: updated };
 }
+// ---------- Shared time helpers (used by per-setup and global execution gating) ----------
+function tfToMinutes(tf: unknown): number | undefined {
+  const s = String(tf ?? "").trim().toLowerCase();
+  const m = s.match(/^(\d+)(m|h|d)$/);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  const unit = m[2];
+  if (unit === "m") return n;
+  if (unit === "h") return n * 60;
+  if (unit === "d") return n * 60 * 24;
+  return undefined;
+}
+
+function inferStaleLimitSecForEntryTf(entryTf: unknown): number {
+  const entryTfMin = tfToMinutes(entryTf);
+  // Default conservative (matches legacy behavior)
+  if (entryTfMin == null) return 5;
+
+  // Intraday entry TF => stricter stale gate
+  if (entryTfMin <= 5) return 2;   // 1m/3m/5m
+  if (entryTfMin <= 15) return 3;  // 10m/15m
+  if (entryTfMin <= 60) return 5;  // 30m/1h
+  return 8;                        // 4h+ (swing context)
+}
+
+function inferStaleLimitSecForSetup(setup: any): number {
+  return inferStaleLimitSecForEntryTf(setup?.entry_tf);
+}
 
 function deriveExecutionDecision(
   setup: any,
@@ -1311,32 +1433,7 @@ function deriveExecutionDecision(
   const status = setup?.status;
   const mode = setup?.entry?.mode;
 
-  // ---------- Helper: parse timeframe to minutes ----------
-  const tfToMinutes = (tf: unknown): number | undefined => {
-    const s = String(tf ?? "").trim().toLowerCase();
-    const m = s.match(/^(\d+)(m|h|d)$/);
-    if (!m) return undefined;
-    const n = Number(m[1]);
-    if (!Number.isFinite(n) || n <= 0) return undefined;
-    const unit = m[2];
-    if (unit === "m") return n;
-    if (unit === "h") return n * 60;
-    if (unit === "d") return n * 60 * 24;
-    return undefined;
-  };
 
-  // ---------- Helper: dynamic stale threshold (intraday stricter) ----------
-  const inferStaleLimitSec = (): number => {
-    const entryTfMin = tfToMinutes(setup?.entry_tf);
-    // Default conservative
-    if (entryTfMin == null) return 5;
-
-    // Intraday entry TF => stricter stale gate
-    if (entryTfMin <= 5) return 2;   // 1m/3m/5m
-    if (entryTfMin <= 15) return 3;  // 10m/15m
-    if (entryTfMin <= 60) return 5;  // 30m/1h
-    return 8;                        // 4h+ (swing context)
-  };
 
   // ---------- Quality gate: grade C/D are monitor-only ----------
   // Requirement from you: grade C must never allow canEnterMarket.
@@ -1366,7 +1463,9 @@ function deriveExecutionDecision(
   if (!ctx.bybitOk) gateBlockers.push("BYBIT_FEED_NOT_OK");
   if (ctx.paused) gateBlockers.push("PAUSED");
 
-  const staleLimitSec = inferStaleLimitSec();
+  // ---------- Dynamic stale threshold (intraday stricter) ----------
+  const staleLimitSec = inferStaleLimitSecForEntryTf(setup?.entry_tf);
+
   if (ctx.staleSec != null && ctx.staleSec > staleLimitSec) gateBlockers.push("STALE_PRICE_FEED");
 
   if (gateBlockers.length > 0) {
@@ -2002,12 +2101,25 @@ function snapshotRevision(snap: any): string {
   return parts.join("|");
 }
 
-export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
+export function useSetupsSnapshot(symbol: string, paused: boolean = false): UseSetupsSnapshotResult {
   const { snap, features } = useFeaturesSnapshot(symbol);
   const snapRev = snapshotRevision(snap);
 
   // Persisted per-hook instance cache to stabilize FORMING/READY status
   const statusCacheRef = useRef<Map<string, { status: SetupStatus; barTs: number }>>(new Map());
+  // Persist close-confirm runtime fields across engine recomputations (keyed by setup key)
+  const closeConfirmCacheRef = useRef<
+    Map<
+      string,
+      {
+        baseTs?: number;
+        nextCloseTs?: number;
+        tf?: string;
+        lastSeenTs: number;
+      }
+    >
+  >(new Map());
+
   const prevSymbolRef = useRef<string>(symbol);
   const persistRef = useRef<{
     key: string;
@@ -2037,6 +2149,7 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
       prevSymbolRef.current = symbol;
       statusCacheRef.current.clear();
       telemetryHistoryRef.current.clear();
+      closeConfirmCacheRef.current.clear();
     }
 
     const base = buildSetups({ snap, features });
@@ -2046,8 +2159,15 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
 
     const withPre = applyPreTrigger(withHardInvalid, snap);
 
+    // Close-confirm runtime fields (_cc_*) must persist across engine recomputations.
+    const hydrated = hydrateCloseConfirmRuntime(withPre, closeConfirmCacheRef.current);
+
     // Trigger confirmation still uses trigger_tf close-confirm (5m/15m)
-    const withConfirm = applyCloseConfirm(withPre, snap);
+    const withConfirm = applyCloseConfirm(hydrated, snap);
+
+    // Persist runtime close-confirm fields for next evaluation cycle
+    persistCloseConfirmRuntime(withConfirm, closeConfirmCacheRef.current, Date.now());
+
 
     // Stabilize FORMING/READY by status_tf confirmed bar (1h for intraday, 4h for swing)
     const stabilized = stabilizeStatusByConfirmedBar(withConfirm, snap, statusCacheRef.current);
@@ -2168,12 +2288,105 @@ export function useSetupsSnapshot(symbol: string, paused: boolean = false) {
       }
     }
 
+    // ---- Hook-level (global) execution + feed telemetry (UI contract) ----
+    // executionGlobal: summarizes operator gates that apply regardless of setup details.
+    const staleLimitSecGlobal = (() => {
+      const xs = Array.isArray(scored?.setups) ? scored.setups : [];
+      if (xs.length === 0) return inferStaleLimitSecForEntryTf(undefined);
+      let min = Infinity;
+      for (const s of xs) {
+        const lim = inferStaleLimitSecForSetup(s);
+        if (Number.isFinite(lim) && lim < min) min = lim;
+      }
+      return Number.isFinite(min) ? min : inferStaleLimitSecForEntryTf(undefined);
+    })();
+
+    const executionGlobal = (() => {
+      const reasons: string[] = [];
+      if (!dqOk) reasons.push("DQ_NOT_OK");
+      if (!bybitOk) reasons.push("BYBIT_FEED_NOT_OK");
+      if (paused) reasons.push("PAUSED");
+      if (staleSec != null && staleSec > staleLimitSecGlobal) reasons.push("STALE_PRICE_FEED");
+      return {
+        state: reasons.length > 0 ? "BLOCKED" : "ENABLED",
+        reasons,
+      };
+    })();
+
+    const feedStatus = (() => {
+      const t = (scored as any)?.telemetry;
+      if (!t || typeof t !== "object" || Array.isArray(t)) {
+        return {
+          evaluated: false,
+          candidatesEvaluated: null,
+          published: Array.isArray(finalArr) ? finalArr.length : 0,
+          rejected: null,
+          rejectionByCode: null,
+          rejectNotesSample: null,
+          gate: null,
+          readiness: null,
+          lastEvaluationTs: Number.isFinite(Number((scored as any)?.ts)) ? Number((scored as any).ts) : Date.now(),
+        };
+      }
+
+      const candidatesEvaluated = Number.isFinite(Number((t as any).candidates)) ? Number((t as any).candidates) : null;
+      const published = Number.isFinite(Number((t as any).accepted)) ? Number((t as any).accepted) : 0;
+      const rejected =
+        (t as any).rejected == null ? null : (Number.isFinite(Number((t as any).rejected)) ? Number((t as any).rejected) : null);
+
+      const rb = (t as any).rejectByCode;
+      const rejectionByCode =
+        rb && typeof rb === "object" && !Array.isArray(rb)
+          ? (Object.fromEntries(Object.entries(rb).map(([k, v]) => [String(k), Number(v)])) as Record<string, number>)
+          : null;
+
+      const rejectNotesSample = Array.isArray((t as any).rejectNotesSample)
+        ? (t as any).rejectNotesSample.map((s: any) => String(s))
+        : null;
+
+      const gate = (t as any).gate != null ? String((t as any).gate) : null;
+
+      const readinessRaw = (t as any).readiness;
+      const readiness =
+        readinessRaw && typeof readinessRaw === "object" && !Array.isArray(readinessRaw)
+          ? {
+            state: String((readinessRaw as any).state ?? ""),
+            items: Array.isArray((readinessRaw as any).items)
+              ? (readinessRaw as any).items
+                .map((it: any) => ({ key: String(it?.key ?? ""), note: String(it?.note ?? "") }))
+                .filter((it: any) => it.key && it.note)
+              : [],
+          }
+          : null;
+
+      const lastEvaluationTs = Number.isFinite(Number((scored as any)?.ts)) ? Number((scored as any).ts) : Date.now();
+
+      return {
+        evaluated: true,
+        candidatesEvaluated,
+        published,
+        rejected,
+        rejectionByCode,
+        rejectNotesSample,
+        gate,
+        readiness,
+        lastEvaluationTs,
+      };
+    })();
+
     return {
       ...scored,
       setups: finalArr,
+      executionGlobal,
+      feedStatus,
     };
+
 
   }, [snapRev, snap, features, paused, symbol]);
 
-  return { snap, features, setups };
+  const executionGlobal = (setups as any)?.executionGlobal ?? null;
+  const feedStatus = (setups as any)?.feedStatus ?? null;
+
+  return { snap, features, setups, executionGlobal, feedStatus };
+
 }
