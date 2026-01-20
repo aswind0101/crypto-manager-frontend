@@ -42,6 +42,35 @@ function AnimatedEllipsis() {
 
   return <span>{dots}</span>;
 }
+function EcgBeatIcon({ className }: { className?: string }) {
+  return (
+    <span className={["inline-flex items-center justify-center", className || ""].join(" ")}>
+      <svg viewBox="0 0 24 24" className="h-full w-full" fill="none" aria-hidden="true">
+        {/* Base ECG path */}
+        <path
+          d="M2 12 H6.8 L8.3 8.2 L11 17.6 L13 12 H22"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.95"
+        />
+
+        {/* Beat dot that runs along the path */}
+        <circle r="1.6" fill="currentColor" className="ct-ecg-dot">
+          <animateMotion
+            dur="1.25s"
+            repeatCount="indefinite"
+            keyTimes="0;0.78;1"
+            keySplines="0.2 0 0.2 1; 0.2 0 0.2 1"
+            calcMode="spline"
+            path="M2 12 H6.8 L8.3 8.2 L11 17.6 L13 12 H22"
+          />
+        </circle>
+      </svg>
+    </span>
+  );
+}
 
 /** ---------- Minimal UI types (best-effort) ---------- */
 type SetupSide = "LONG" | "SHORT";
@@ -1537,965 +1566,996 @@ export function TradingView({
   const appBlocked = executionGlobal?.state === "BLOCKED";
 
   return (
-    <div className="min-h-dvh bg-[#070A12] text-zinc-100 antialiased selection:bg-sky-500/20 selection:text-sky-50"
-    >
-      {/* subtle background */}
-      <div className="pointer-events-none fixed inset-0 opacity-50">
-        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-black/30" />
-        <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-sky-500/10 blur-3xl" />
-        <div className="absolute -bottom-44 left-1/3 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute -bottom-52 right-1/4 h-[520px] w-[520px] translate-x-1/2 rounded-full bg-rose-500/10 blur-3xl" />
-      </div>
+    <>
+      <style>{`
+      /* ECG "beat" styling (scoped by class names) */
+      .ct-ecg-dot {
+        filter: drop-shadow(0 0 6px rgba(16,185,129,0.25));
+      }
 
-      <div
-        className={[
-          // Mobile: full width + safe-area friendly padding
-          "relative w-full",
-          "px-[max(12px,env(safe-area-inset-left))] pr-[max(12px,env(safe-area-inset-right))]",
-          "pt-[max(12px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))]",
-          // Desktop: keep centered max width
-          "md:mx-auto md:max-w-7xl md:px-6 md:pt-5 md:pb-10",
-        ].join(" ")}
+      /* Optional: subtle breathing on the whole svg to feel alive */
+      @keyframes ct-ecg-breathe {
+        0%, 100% { opacity: 0.90; }
+        50% { opacity: 1; }
+      }
+      .ct-ecg-breathe {
+        animation: ct-ecg-breathe 1.25s ease-in-out infinite;
+      }
+    `}</style>
+      <div className="min-h-dvh bg-[#070A12] text-zinc-100 antialiased selection:bg-sky-500/20 selection:text-sky-50"
       >
-        {/* Top bar */}
-        <div className="flex flex-col gap-4 rounded-3xl bg-zinc-950/35 p-5 backdrop-blur ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.06),0_28px_90px_rgba(0,0,0,0.55)]">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="rounded-2xl bg-white/[0.04] p-2.5 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.05)]">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div className="text-lg font-black tracking-tight text-zinc-50">Crypto Setup Analyzer</div>
-              </div>
-              <div className="text-[12px] leading-snug text-zinc-300/70">
-                Frontend-only • Realtime snapshot → features → setups • Built for iPhone/iPad clarity
-              </div>
-            </div>
-
-            <div className="grid w-full grid-cols-1 gap-2 md:w-[520px] md:grid-cols-[1fr_auto_auto]">
-              <div
-                className={[
-                  "group flex items-center gap-2 rounded-2xl px-3 py-2.5 transition",
-                  symbolInputEnabled
-                    ? "bg-white/[0.045] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] focus-within:ring-sky-500/25 focus-within:bg-white/[0.06]"
-                    : "bg-white/[0.03] ring-1 ring-white/5 opacity-80",
-                ].join(" ")}
-                title={
-                  symbolInputEnabled
-                    ? "Enter a symbol to analyze"
-                    : "Disabled while scanning. Pause scan or turn Scan OFF to enter a symbol."
-                }
-              >
-                <Database className={["h-4 w-4", symbolInputEnabled ? "text-zinc-300" : "text-zinc-600"].join(" ")} />
-                <input
-                  value={inputSymbol}
-                  onChange={(e) => setInputSymbol(String(e.target.value || "").toUpperCase())}
-                  onKeyDown={onEnterInput}
-                  disabled={!symbolInputEnabled}
-                  placeholder="BTCUSDT"
-                  className={[
-                    "w-full bg-transparent text-sm font-semibold outline-none",
-                    symbolInputEnabled
-                      ? "text-zinc-50 placeholder:text-zinc-500"
-                      : "text-zinc-500 placeholder:text-zinc-700 cursor-not-allowed",
-                  ].join(" ")}
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                />
-              </div>
-
-              <button
-                onClick={onAnalyze}
-                disabled={!symbolInputEnabled}
-                className={[
-                  "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold tracking-tight transition",
-                  symbolInputEnabled
-                    ? "bg-gradient-to-b from-sky-500/30 to-sky-500/15 text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.14)] hover:from-sky-500/35 hover:to-sky-500/18 active:from-sky-500/40"
-                    : "bg-white/[0.04] text-zinc-500 cursor-not-allowed shadow-none",
-                ].join(" ")}
-                title={
-                  symbolInputEnabled
-                    ? "Analyze input symbol"
-                    : "Disabled while scanning. Pause scan or turn Scan OFF to analyze a symbol."
-                }
-              >
-                <RefreshCw className="h-4 w-4" />
-                Analyze
-              </button>
-
-              <button
-                onClick={() => setPaused((p) => !p)}
-                className={[
-                  "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold tracking-tight transition",
-                  paused
-                    ? "bg-gradient-to-b from-rose-500/28 to-rose-500/14 text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] hover:from-rose-500/32 hover:to-rose-500/16"
-                    : "bg-gradient-to-b from-emerald-500/26 to-emerald-500/12 text-emerald-50 shadow-[0_10px_30px_rgba(16,185,129,0.12)] hover:from-emerald-500/30 hover:to-emerald-500/14",
-                ].join(" ")}
-                title={paused ? "Resume updates" : "Pause updates"}
-              >
-                {paused ? <Lock className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
-                {paused ? "Paused" : "Live"}
-              </button>
-            </div>
-
-          </div>
-
-          {/* status row */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Pill tone={dqTone(dq)} icon={dqOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}>
-              DQ {String(dq || "—")}
-            </Pill>
-            <Pill
-              tone={bybitOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
-              icon={bybitOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-              title="Bybit feed health (execution venue)"
-            >
-              Bybit {bybitOk ? "OK" : "NOT OK"}
-            </Pill>
-            <Pill
-              tone={binanceOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
-              icon={binanceOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-              title="Binance feed health (cross exchange context)"
-            >
-              Binance {binanceOk ? "OK" : "NOT OK"}
-            </Pill>
-            {crossConsensusPending ? (
-              <Pill
-                tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                icon={<Clock className="h-4 w-4" />}
-                title="Computing cross-exchange consensus"
-              >
-                Computing consensus <AnimatedEllipsis />
-              </Pill>
-            ) : null}
-            <RealtimeSignal
-              staleSec={staleSec}
-              label="Realtime"
-              // Nếu bạn muốn vẫn thấy số giây nhỏ bên cạnh, bật true:
-              showSeconds={true}
-              title="Realtime price feed health (based on snap.price.ts)"
-            />
-            <div className="ml-auto text-xs text-zinc-400">Updated {lastUpdated}</div>
-          </div>
-
-          {/* banner */}
-          {banner.active ? (
-            <div className="mt-1 flex items-start justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-xl bg-emerald-500/15 p-2 ring-1 ring-emerald-500/25">
-                  <Flame className="h-4 w-4 text-emerald-200" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-emerald-100">Actionable setup detected</div>
-                  <div className="mt-0.5 text-xs text-emerald-100/90">{banner.text}</div>
-                </div>
-              </div>
-              <button
-                onClick={() => setBanner({ active: false, text: "" })}
-                className="rounded-2xl bg-white/[0.04] px-3 py-2 text-xs font-extrabold tracking-tight text-zinc-50 shadow-[0_1px_0_rgba(255,255,255,0.04)] hover:bg-white/[0.08]">
-                Dismiss
-              </button>
-            </div>
-          ) : null}
+        {/* subtle background */}
+        <div className="pointer-events-none fixed inset-0 opacity-50">
+          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-black/30" />
+          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-sky-500/10 blur-3xl" />
+          <div className="absolute -bottom-44 left-1/3 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-emerald-500/10 blur-3xl" />
+          <div className="absolute -bottom-52 right-1/4 h-[520px] w-[520px] translate-x-1/2 rounded-full bg-rose-500/10 blur-3xl" />
         </div>
-        {/* Main layout */}
-        <div className="mt-4 grid grid-cols-1 gap-4 min-[1440px]:grid-cols-[380px_1fr]">
-          {/* LEFT: queue */}
-          <div className="space-y-4">
-            <Card
-              title="Market Context"
-              icon={<LineChart className="h-5 w-5" />}
-              right={
+
+        <div
+          className={[
+            // Mobile: full width + safe-area friendly padding
+            "relative w-full",
+            "px-[max(12px,env(safe-area-inset-left))] pr-[max(12px,env(safe-area-inset-right))]",
+            "pt-[max(12px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))]",
+            // Desktop: keep centered max width
+            "md:mx-auto md:max-w-7xl md:px-6 md:pt-5 md:pb-10",
+          ].join(" ")}
+        >
+          {/* Top bar */}
+          <div className="flex flex-col gap-4 rounded-3xl bg-zinc-950/35 p-5 backdrop-blur ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.06),0_28px_90px_rgba(0,0,0,0.55)]">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <MidBadge mid={mid} />
-                  <Pill
-                    tone={
-                      biasDir === "BULL"
-                        ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                        : biasDir === "BEAR"
-                          ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                          : biasDir === "SIDEWAYS"
-                            ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                            : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
-                    }
-                    icon={
-                      biasDir === "BULL"
-                        ? <TrendingUp className="h-4 w-4" />
-                        : biasDir === "BEAR"
-                          ? <TrendingDown className="h-4 w-4" />
-                          : <Waves className="h-4 w-4" />
-                    }
-                  >
-                    {biasDir}
-                  </Pill>
+                  <div className="rounded-2xl bg-white/[0.04] p-2.5 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.05)]">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div className="text-lg font-black tracking-tight text-zinc-50">Crypto Setup Analyzer</div>
                 </div>
-              }
-            >
-              <div className="space-y-3">
-                <Meter
-                  label="Bias strength"
-                  value01={biasStrength01}
-                  intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"}
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
-                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                      <Waves className="h-4 w-4 text-zinc-300" />
-                      Volatility regime
+                <div className="text-[12px] leading-snug text-zinc-300/70">
+                  Frontend-only • Realtime snapshot → features → setups • Built for iPhone/iPad clarity
+                </div>
+              </div>
+
+              <div className="grid w-full grid-cols-1 gap-2 md:w-[520px] md:grid-cols-[1fr_auto_auto]">
+                <div
+                  className={[
+                    "group flex items-center gap-2 rounded-2xl px-3 py-2.5 transition",
+                    symbolInputEnabled
+                      ? "bg-white/[0.045] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] focus-within:ring-sky-500/25 focus-within:bg-white/[0.06]"
+                      : "bg-white/[0.03] ring-1 ring-white/5 opacity-80",
+                  ].join(" ")}
+                  title={
+                    symbolInputEnabled
+                      ? "Enter a symbol to analyze"
+                      : "Disabled while scanning. Pause scan or turn Scan OFF to enter a symbol."
+                  }
+                >
+                  <Database className={["h-4 w-4", symbolInputEnabled ? "text-zinc-300" : "text-zinc-600"].join(" ")} />
+                  <input
+                    value={inputSymbol}
+                    onChange={(e) => setInputSymbol(String(e.target.value || "").toUpperCase())}
+                    onKeyDown={onEnterInput}
+                    disabled={!symbolInputEnabled}
+                    placeholder="BTCUSDT"
+                    className={[
+                      "w-full bg-transparent text-sm font-semibold outline-none",
+                      symbolInputEnabled
+                        ? "text-zinc-50 placeholder:text-zinc-500"
+                        : "text-zinc-500 placeholder:text-zinc-700 cursor-not-allowed",
+                    ].join(" ")}
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                  />
+                </div>
+
+                <button
+                  onClick={onAnalyze}
+                  disabled={!symbolInputEnabled}
+                  className={[
+                    "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold tracking-tight transition",
+                    symbolInputEnabled
+                      ? "bg-gradient-to-b from-sky-500/30 to-sky-500/15 text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.14)] hover:from-sky-500/35 hover:to-sky-500/18 active:from-sky-500/40"
+                      : "bg-white/[0.04] text-zinc-500 cursor-not-allowed shadow-none",
+                  ].join(" ")}
+                  title={
+                    symbolInputEnabled
+                      ? "Analyze input symbol"
+                      : "Disabled while scanning. Pause scan or turn Scan OFF to analyze a symbol."
+                  }
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Analyze
+                </button>
+
+                <button
+                  onClick={() => setPaused((p) => !p)}
+                  className={[
+                    "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold tracking-tight transition",
+                    paused
+                      ? "bg-gradient-to-b from-rose-500/28 to-rose-500/14 text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] hover:from-rose-500/32 hover:to-rose-500/16"
+                      : "bg-gradient-to-b from-emerald-500/26 to-emerald-500/12 text-emerald-50 shadow-[0_10px_30px_rgba(16,185,129,0.12)] hover:from-emerald-500/30 hover:to-emerald-500/14",
+                  ].join(" ")}
+                  title={paused ? "Resume updates" : "Pause updates"}
+                >
+                  {paused ? (
+                    <Lock className="h-4 w-4" />
+                  ) : (
+                    <EcgBeatIcon className="h-5 w-5 text-emerald-100 ct-ecg-breathe" />
+                  )}
+
+                  <span className="inline-flex items-center gap-2">
+                    <span>{paused ? "Paused" : "Live"}</span>
+
+                    {!paused ? (
+                      <span className="relative inline-flex h-2.5 w-2.5" aria-label="Live indicator">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-200/40" />
+                        <span className="relative inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-200 shadow-[0_0_0_3px_rgba(16,185,129,0.10)]" />
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              </div>
+
+            </div>
+
+            {/* status row */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Pill tone={dqTone(dq)} icon={dqOk ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}>
+                DQ {String(dq || "—")}
+              </Pill>
+              <Pill
+                tone={bybitOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
+                icon={bybitOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                title="Bybit feed health (execution venue)"
+              >
+                Bybit {bybitOk ? "OK" : "NOT OK"}
+              </Pill>
+              <Pill
+                tone={binanceOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
+                icon={binanceOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                title="Binance feed health (cross exchange context)"
+              >
+                Binance {binanceOk ? "OK" : "NOT OK"}
+              </Pill>
+              {crossConsensusPending ? (
+                <Pill
+                  tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                  icon={<Clock className="h-4 w-4" />}
+                  title="Computing cross-exchange consensus"
+                >
+                  Computing consensus <AnimatedEllipsis />
+                </Pill>
+              ) : null}
+              <RealtimeSignal
+                staleSec={staleSec}
+                label="Realtime"
+                // Nếu bạn muốn vẫn thấy số giây nhỏ bên cạnh, bật true:
+                showSeconds={true}
+                title="Realtime price feed health (based on snap.price.ts)"
+              />
+              <div className="ml-auto text-xs text-zinc-400">Updated {lastUpdated}</div>
+            </div>
+
+            {/* banner */}
+            {banner.active ? (
+              <div className="mt-1 flex items-start justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-xl bg-emerald-500/15 p-2 ring-1 ring-emerald-500/25">
+                    <Flame className="h-4 w-4 text-emerald-200" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-emerald-100">Actionable setup detected</div>
+                    <div className="mt-0.5 text-xs text-emerald-100/90">{banner.text}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setBanner({ active: false, text: "" })}
+                  className="rounded-2xl bg-white/[0.04] px-3 py-2 text-xs font-extrabold tracking-tight text-zinc-50 shadow-[0_1px_0_rgba(255,255,255,0.04)] hover:bg-white/[0.08]">
+                  Dismiss
+                </button>
+              </div>
+            ) : null}
+          </div>
+          {/* Main layout */}
+          <div className="mt-4 grid grid-cols-1 gap-4 min-[1440px]:grid-cols-[380px_1fr]">
+            {/* LEFT: queue */}
+            <div className="space-y-4">
+              <Card
+                title="Market Context"
+                icon={<LineChart className="h-5 w-5" />}
+                right={
+                  <div className="flex items-center gap-2">
+                    <MidBadge mid={mid} />
+                    <Pill
+                      tone={
+                        biasDir === "BULL"
+                          ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                          : biasDir === "BEAR"
+                            ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                            : biasDir === "SIDEWAYS"
+                              ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                              : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
+                      }
+                      icon={
+                        biasDir === "BULL"
+                          ? <TrendingUp className="h-4 w-4" />
+                          : biasDir === "BEAR"
+                            ? <TrendingDown className="h-4 w-4" />
+                            : <Waves className="h-4 w-4" />
+                      }
+                    >
+                      {biasDir}
+                    </Pill>
+                  </div>
+                }
+              >
+                <div className="space-y-3">
+                  <Meter
+                    label="Bias strength"
+                    value01={biasStrength01}
+                    intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                        <Waves className="h-4 w-4 text-zinc-300" />
+                        Volatility regime
+                      </div>
+                      <div className="mt-2">
+                        <Pill
+                          tone={
+                            volRegime === "HIGH"
+                              ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                              : volRegime === "LOW"
+                                ? "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
+                                : "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
+                          }
+                        >
+                          {volRegime}
+                        </Pill>
+                      </div>
+                      <div className="mt-3 space-y-1.5">
+                        <KV k="ADX14" v={Number.isFinite(Number(features?.bias?.adx14)) ? fmtNum(Number(features?.bias?.adx14), 1) : "—"} />
+                        <KV k="EMA200" v={Number.isFinite(Number(features?.bias?.ema200)) ? fmtPx(Number(features?.bias?.ema200)) : "—"} />
+                        <KV
+                          k="EMA200 slope (bps/bar)"
+                          v={Number.isFinite(Number(features?.bias?.ema200_slope_bps)) ? fmtNum(Number(features?.bias?.ema200_slope_bps), 1) : "—"}
+                        />
+                      </div>
                     </div>
-                    <div className="mt-2">
-                      <Pill
-                        tone={
-                          volRegime === "HIGH"
-                            ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                            : volRegime === "LOW"
-                              ? "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
-                              : "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
-                        }
-                      >
-                        {volRegime}
-                      </Pill>
-                    </div>
-                    <div className="mt-3 space-y-1.5">
-                      <KV k="ADX14" v={Number.isFinite(Number(features?.bias?.adx14)) ? fmtNum(Number(features?.bias?.adx14), 1) : "—"} />
-                      <KV k="EMA200" v={Number.isFinite(Number(features?.bias?.ema200)) ? fmtPx(Number(features?.bias?.ema200)) : "—"} />
-                      <KV
-                        k="EMA200 slope (bps/bar)"
-                        v={Number.isFinite(Number(features?.bias?.ema200_slope_bps)) ? fmtNum(Number(features?.bias?.ema200_slope_bps), 1) : "—"}
-                      />
+
+                    <div className="rounded-xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                        <Layers className="h-4 w-4 text-zinc-300" />
+                        Cross / Consensus
+                      </div>
+                      <div className="mt-2">
+                        <Meter
+                          label={
+                            <span className="inline-flex items-center gap-1">
+                              <span>Consensus</span>
+                              {crossConsensusPending ? <AnimatedEllipsis /> : null}
+                            </span>
+                          }
+                          value01={crossConsensus01}
+                          right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
+                          intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : crossConsensus01 != null && crossConsensus01 <= 0.35 ? "warn" : "neutral"}
+                        />
+                      </div>
+                      {null}
+                      <div className="mt-3 space-y-1.5">
+                        <KV k="dev_bps" v={Number.isFinite(Number(features?.cross?.dev_bps)) ? `${fmtNum(Number(features?.cross?.dev_bps), 1)} bps` : "—"} />
+                        <KV k="dev_z" v={Number.isFinite(Number(features?.cross?.dev_z)) ? fmtNum(Number(features?.cross?.dev_z), 2) : "—"} />
+                        <KV
+                          k="lead/lag"
+                          v={
+                            features?.cross?.lead_lag
+                              ? `${String(features.cross.lead_lag.leader)} • ${fmtNum(Number(features.cross.lead_lag.lag_bars), 0)} bars • ${fmtPct01(Number(features.cross.lead_lag.score))}`
+                              : "—"
+                          }
+                        />
+                      </div>
                     </div>
                   </div>
+                </div>
+              </Card>
+              {/* Trend by timeframe (Structure) */}
+              <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                  <LineChart className="h-4 w-4 text-zinc-300" />
+                  Trend by timeframe (Structure)
+                </div>
 
-                  <div className="rounded-xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
-                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                      <Layers className="h-4 w-4 text-zinc-300" />
-                      Cross / Consensus
-                    </div>
-                    <div className="mt-2">
-                      <Meter
-                        label={
-                          <span className="inline-flex items-center gap-1">
-                            <span>Consensus</span>
-                            {crossConsensusPending ? <AnimatedEllipsis /> : null}
-                          </span>
-                        }
-                        value01={crossConsensus01}
-                        right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
-                        intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : crossConsensus01 != null && crossConsensus01 <= 0.35 ? "warn" : "neutral"}
-                      />
-                    </div>
-                    {null}
-                    <div className="mt-3 space-y-1.5">
-                      <KV k="dev_bps" v={Number.isFinite(Number(features?.cross?.dev_bps)) ? `${fmtNum(Number(features?.cross?.dev_bps), 1)} bps` : "—"} />
-                      <KV k="dev_z" v={Number.isFinite(Number(features?.cross?.dev_z)) ? fmtNum(Number(features?.cross?.dev_z), 2) : "—"} />
-                      <KV
-                        k="lead/lag"
-                        v={
-                          features?.cross?.lead_lag
-                            ? `${String(features.cross.lead_lag.leader)} • ${fmtNum(Number(features.cross.lead_lag.lag_bars), 0)} bars • ${fmtPct01(Number(features.cross.lead_lag.score))}`
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {["4h", "1h", "15m", "5m"].map((tf) => {
+                    const node = (features?.market_structure as any)?.[tf];
+                    const badge = structureTrendBadge(node?.trend);
+                    const e = pickLatestStructureEvent(node);
+
+                    return (
+                      <TrendStructureCard
+                        key={tf}   // 👈 FIX: thêm key
+                        tf={tf}
+                        badge={badge}
+                        kind={e.kind}
+                        dir={e.dir}
+                        level={e.level}
+                        ts={e.ts}
+                        confirmedCount={
+                          Number.isFinite(Number(node?.confirmed_count))
+                            ? fmtNum(Number(node?.confirmed_count), 0)
                             : "—"
                         }
                       />
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
-            </Card>
-            {/* Trend by timeframe (Structure) */}
-            <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                <LineChart className="h-4 w-4 text-zinc-300" />
-                Trend by timeframe (Structure)
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {["4h", "1h", "15m", "5m"].map((tf) => {
-                  const node = (features?.market_structure as any)?.[tf];
-                  const badge = structureTrendBadge(node?.trend);
-                  const e = pickLatestStructureEvent(node);
-
-                  return (
-                    <TrendStructureCard
-                      key={tf}   // 👈 FIX: thêm key
-                      tf={tf}
-                      badge={badge}
-                      kind={e.kind}
-                      dir={e.dir}
-                      level={e.level}
-                      ts={e.ts}
-                      confirmedCount={
-                        Number.isFinite(Number(node?.confirmed_count))
-                          ? fmtNum(Number(node?.confirmed_count), 0)
-                          : "—"
-                      }
-                    />
-                  );
-                })}
-              </div>
-            </div>
-            <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
-              {/* Queue filters */}
-              <div className="mb-3 space-y-2">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="relative mt-1">
-                    <div className="pointer-events-none absolute left-2 inset-y-0 flex items-center">
-                      <SideIcon side={qSide} />
-                    </div>
-
-                    <select
-                      className="w-full appearance-none bg-transparent pl-7 pr-8 text-sm font-semibold text-zinc-100 outline-none"
-                      value={qSide}
-                      onChange={(e) => setQSide(e.target.value as any)}
-                    >
-                      <option value="ALL">All Sides</option>
-                      <option value="LONG">Long only</option>
-                      <option value="SHORT">Short only</option>
-                    </select>
-
-                    <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-                      <SelectCaret />
-                    </div>
-                  </div>
-
-                  <div className="relative mt-1">
-                    <div className="pointer-events-none absolute left-2 inset-y-0 flex items-center">
-                      <StatusIcon status={qStatus} />
-                    </div>
-
-                    <select
-                      className="w-full appearance-none bg-transparent pl-7 pr-8 text-sm font-semibold text-zinc-100 outline-none"
-                      value={qStatus}
-                      onChange={(e) => setQStatus(e.target.value as any)}
-                    >
-                      <option value="ALL">All Statuses</option>
-                      <option value="FORMING">Forming</option>
-                      <option value="READY">Ready</option>
-                      <option value="TRIGGERED">Triggered</option>
-                      <option value="INVALIDATED">Invalidated</option>
-                      <option value="EXPIRED">Expired</option>
-                    </select>
-
-                    <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-                      <SelectCaret />
-                    </div>
-                  </div>
-
-
-                </div>
-              </div>
-
-              {executionGlobal?.state === "BLOCKED" ? (
-                <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-rose-500/15 p-2 ring-1 ring-rose-500/25">
-                      <ShieldAlert className="h-5 w-5 text-rose-200" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-extrabold text-rose-100">Execution blocked (system gate)</div>
-                      <div className="mt-1 text-xs text-rose-100/90">
-                        The system is running, but execution actions are blocked by policy/health gates. You may still review market context and monitor setups.
+              <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
+                {/* Queue filters */}
+                <div className="mb-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="relative mt-1">
+                      <div className="pointer-events-none absolute left-2 inset-y-0 flex items-center">
+                        <SideIcon side={qSide} />
                       </div>
 
-                      {Array.isArray(executionGlobal.reasons) && executionGlobal.reasons.length > 0 ? (
-                        <div className="mt-3 space-y-1.5 text-xs">
-                          {executionGlobal.reasons.slice(0, 6).map((r) => (
-                            <div key={r} className="flex items-start gap-2">
-                              <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-rose-200/70" />
-                              <span className="min-w-0">{formatExecutionGlobalReason(r)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                      <select
+                        className="w-full appearance-none bg-transparent pl-7 pr-8 text-sm font-semibold text-zinc-100 outline-none"
+                        value={qSide}
+                        onChange={(e) => setQSide(e.target.value as any)}
+                      >
+                        <option value="ALL">All Sides</option>
+                        <option value="LONG">Long only</option>
+                        <option value="SHORT">Short only</option>
+                      </select>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <Pill tone={dqTone(dq)} icon={<Database className="h-4 w-4" />}>
-                          DQ {String(dq || "—")}
-                        </Pill>
-                        <Pill
-                          tone={bybitOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
-                          icon={bybitOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-                        >
-                          Bybit {bybitOk ? "OK" : "NOT OK"}
-                        </Pill>
+                      <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                        <SelectCaret />
+                      </div>
+                    </div>
+
+                    <div className="relative mt-1">
+                      <div className="pointer-events-none absolute left-2 inset-y-0 flex items-center">
+                        <StatusIcon status={qStatus} />
+                      </div>
+
+                      <select
+                        className="w-full appearance-none bg-transparent pl-7 pr-8 text-sm font-semibold text-zinc-100 outline-none"
+                        value={qStatus}
+                        onChange={(e) => setQStatus(e.target.value as any)}
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="FORMING">Forming</option>
+                        <option value="READY">Ready</option>
+                        <option value="TRIGGERED">Triggered</option>
+                        <option value="INVALIDATED">Invalidated</option>
+                        <option value="EXPIRED">Expired</option>
+                      </select>
+
+                      <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                        <SelectCaret />
+                      </div>
+                    </div>
+
+
+                  </div>
+                </div>
+
+                {executionGlobal?.state === "BLOCKED" ? (
+                  <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-xl bg-rose-500/15 p-2 ring-1 ring-rose-500/25">
+                        <ShieldAlert className="h-5 w-5 text-rose-200" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-extrabold text-rose-100">Execution blocked (system gate)</div>
+                        <div className="mt-1 text-xs text-rose-100/90">
+                          The system is running, but execution actions are blocked by policy/health gates. You may still review market context and monitor setups.
+                        </div>
+
+                        {Array.isArray(executionGlobal.reasons) && executionGlobal.reasons.length > 0 ? (
+                          <div className="mt-3 space-y-1.5 text-xs">
+                            {executionGlobal.reasons.slice(0, 6).map((r) => (
+                              <div key={r} className="flex items-start gap-2">
+                                <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-rose-200/70" />
+                                <span className="min-w-0">{formatExecutionGlobalReason(r)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                          <Pill tone={dqTone(dq)} icon={<Database className="h-4 w-4" />}>
+                            DQ {String(dq || "—")}
+                          </Pill>
+                          <Pill
+                            tone={bybitOk ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"}
+                            icon={bybitOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                          >
+                            Bybit {bybitOk ? "OK" : "NOT OK"}
+                          </Pill>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {(() => {
-                    const publishedCount = ranked.length;
-                    const state = deriveFeedUiState(feedStatus, publishedCount);
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {(() => {
+                      const publishedCount = ranked.length;
+                      const state = deriveFeedUiState(feedStatus, publishedCount);
 
-                    if (state === "HAS_SETUPS") {
-                      const renderList = (items: Array<{ s: TradeSetup; idx: number }>) => {
-                        if (!items || items.length === 0) {
-                          return (
-                            <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 text-xs text-zinc-400">
-                              No setups in this category right now.
-                            </div>
-                          );
-                        }
-
-                        return items.map(({ s, idx }) => {
-                          const keyStr = stableSetupKey(s);
-                          const reactKey = `${keyStr}::${idx}`;
-                          const accordionKey = idx;
-                          const isOpen = expandedKey === accordionKey;
-
-                          const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
-                          const pri01 = clamp01(pri / 100);
-
-                          const chip = actionChip(s, executionGlobal);
-                          const entryText = fmtEntryZone(s.entry?.zone);
-                          const slText = fmtPx(s.stop?.price);
-                          const tpText = fmtTpSummary(s.tp);
-
-                          return (
-                            <div
-                              key={reactKey}
-                              className={[
-                                "rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] transition",
-                                isOpen ? "bg-white/[0.06] ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.12)]" : "hover:bg-white/[0.05]",
-                              ].join(" ")}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
-                                    <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
-                                    {isMonitorOnlySetup(s) ? (
-                                      <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
-                                        MONITOR-ONLY
-                                      </Pill>
-                                    ) : null}
-                                  </div>
-
-                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
-                                    <span>C: {fmtScore100(s.confidence?.score)}</span>
-                                    <span>•</span>
-                                    <span>RR: {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
-                                    <span>•</span>
-                                    <span>P: {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
-                                    <span>•</span>
-                                    <span>[{uiGrade(s)}]</span>
-                                  </div>
-
-                                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                                    <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
-                                  </div>
-
-                                </div>
-
-                                <div className="flex shrink-0 flex-col items-end justify-center gap-2">
-                                  <div className="grid justify-items-end gap-2">
-                                    <Pill tone={statusTone(s.status)}>{s.status}</Pill>
-                                    {chip ? (
-                                      <Pill tone={chip.tone} icon={chip.icon}>
-                                        {chip.label}
-                                      </Pill>
-                                    ) : null}
-                                  </div>
-
-                                </div>
+                      if (state === "HAS_SETUPS") {
+                        const renderList = (items: Array<{ s: TradeSetup; idx: number }>) => {
+                          if (!items || items.length === 0) {
+                            return (
+                              <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 text-xs text-zinc-400">
+                                No setups in this category right now.
                               </div>
-                              {/* Mid (anchored above the divider, left-aligned) */}
-                              <div className="mt-2 -mb-2">
-                                <div className="tabular-nums text-[11px] font-semibold text-zinc-300 ">
-                                  <span className="text-amber-200/90">Mid:</span>{" "}
-                                  <span className="text-zinc-100">
-                                    {Number.isFinite(mid) ? `$${fmtPxWithSep(mid)}` : "—"}
-                                  </span>
-                                </div>
-                              </div>
+                            );
+                          }
 
-                              {/* Bottom bar: Entry / TP / SL + View (anchored at the bottom of the setup card) */}
-                              <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-2 text-[11px] font-semibold">
-                                {/* Left: Entry / TP / SL */}
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <span className="tabular-nums text-sky-300">
-                                    <span className="font-bold text-sky-200">E:</span> {entryText}
-                                  </span>
+                          return items.map(({ s, idx }) => {
+                            const keyStr = stableSetupKey(s);
+                            const reactKey = `${keyStr}::${idx}`;
+                            const accordionKey = idx;
+                            const isOpen = expandedKey === accordionKey;
 
-                                  <span className="tabular-nums text-emerald-300">
-                                    <span className="font-bold text-emerald-200">TP:</span> {tpText}
-                                  </span>
+                            const pri = Number.isFinite(Number(s.priority_score)) ? Number(s.priority_score) : 0;
+                            const pri01 = clamp01(pri / 100);
 
-                                  <span className="tabular-nums text-rose-300">
-                                    <span className="font-bold text-rose-200">SL:</span> {slText}
-                                  </span>
-                                </div>
+                            const chip = actionChip(s, executionGlobal);
+                            const entryText = fmtEntryZone(s.entry?.zone);
+                            const slText = fmtPx(s.stop?.price);
+                            const tpText = fmtTpSummary(s.tp);
 
-                                {/* Right: View / Hide */}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleExpanded(accordionKey)}
-                                  className={[
-                                    "ml-2 inline-flex items-center gap-1",
-                                    "rounded-xl bg-white/[0.04] px-2 py-1 shadow-[0_1px_0_rgba(255,255,255,0.04)]",
-                                    "text-[10px] font-extrabold tracking-tight",
-                                    "text-zinc-200/80 hover:text-zinc-50",
-                                    "hover:bg-white/[0.07]",
-                                    "transition",
-                                  ].join(" ")}
-                                  aria-label={isOpen ? "Hide setup details" : "View setup details"}
-                                  title={isOpen ? "Hide details" : "View details"}
-                                >
-                                  {isOpen ? (
-                                    <>
-                                      <Minus className="h-3 w-3" />
-                                      <span className="hidden sm:inline">Hide</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Plus className="h-3 w-3" />
-                                      <span className="hidden sm:inline">View</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-
-                              {isOpen ? (
-                                <div className="mt-3">
-                                  <Divider />
-                                  <SetupDetail
-                                    setup={s}
-                                    symbol={symbol}
-                                    mid={mid}
-                                    dqOk={dqOk}
-                                    bybitOk={bybitOk}
-                                    staleSec={staleSec}
-                                    paused={paused}
-                                    features={features}
-                                    executionGlobal={executionGlobal}
-                                  />
-
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        });
-                      };
-
-                      return (
-                        <div className="space-y-4">
-                          {/* SCALP panel */}
-                          <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 ring-1 ring-white/10">
-                            <div className="mb-3 flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
-                                <Sparkles className="h-4 w-4 text-zinc-300" />
-                                SCALP
-                              </div>
-                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{scalpRanked.length} setups</Pill>
-                            </div>
-                            <div className="space-y-2">{renderList(scalpRanked)}</div>
-                          </div>
-
-                          {/* NON-SCALP panel */}
-                          <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 ring-1 ring-white/10">
-                            <div className="mb-3 flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
-                                <Layers className="h-4 w-4 text-zinc-300" />
-                                NON-SCALP
-                              </div>
-                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{nonScalpRanked.length} setups</Pill>
-                            </div>
-                            <div className="space-y-2">{renderList(nonScalpRanked)}</div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-
-                    // Empty states (policy-safe)
-                    if (state === "LOADING") {
-                      return (
-                        <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="rounded-xl bg-white/5 p-2">
-                              <RefreshCw className="h-5 w-5 text-zinc-200" />
-                            </div>
-                            <div>
-                              <div className="text-sm font-bold text-zinc-100">Loading snapshots and evaluating setups…</div>
-                              <div className="mt-1 text-xs text-zinc-400">This may be normal during warm-up or when switching symbols/timeframes.</div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-                    const readinessItems = Array.isArray(feedStatus?.readiness?.items) ? feedStatus!.readiness!.items : [];
-                    if (state === "NO_SIGNAL") {
-                      return (
-                        <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="rounded-xl bg-white/5 p-2">
-                              <Minus className="h-5 w-5 text-zinc-200" />
-                            </div>
-                            {readinessItems.length > 0 ? (
-                              <div className="mt-3">
-                                <div className="text-[11px] font-bold text-zinc-200">Readiness notes</div>
-                                <div className="mt-2 space-y-1.5 text-xs text-zinc-300/90">
-                                  {readinessItems.slice(0, 6).map((it, i) => (
-                                    <div key={`${it.key}-${i}`} className="flex items-start gap-2">
-                                      <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300/60" />
-                                      <span className="min-w-0">{it.note}</span>
+                            return (
+                              <div
+                                key={reactKey}
+                                className={[
+                                  "rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] transition",
+                                  isOpen ? "bg-white/[0.06] ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.12)]" : "hover:bg-white/[0.05]",
+                                ].join(" ")}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className="truncate text-sm font-extrabold text-zinc-50">{humanizeType(String(s.type))}</div>
+                                      <div className={["text-sm font-extrabold", sideTone(s.side)].join(" ")}>{s.side}</div>
+                                      {isMonitorOnlySetup(s) ? (
+                                        <Pill tone="bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30" title="Grade C policy">
+                                          MONITOR-ONLY
+                                        </Pill>
+                                      ) : null}
                                     </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    }
 
-                    if (state === "QUALITY_GATED") {
-                      const ce = feedStatus?.candidatesEvaluated;
-                      const rejected = feedStatus?.rejected;
-                      const top = topRejectionPairs(feedStatus?.rejectionByCode || null, 6);
-                      const hasNotes = Array.isArray(feedStatus?.rejectNotesSample) && (feedStatus?.rejectNotesSample?.length ?? 0) > 0;
-                      const hasBreakdown = top.length > 0;
-                      return (
-                        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="rounded-xl bg-amber-500/15 p-2 ring-1 ring-amber-500/25">
-                              <ShieldAlert className="h-5 w-5 text-amber-200" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-sm font-extrabold text-amber-100">No setups published (quality gated)</div>
-                              <div className="mt-1 text-xs text-amber-100/90">
-                                Candidates were generated but rejected by quality gates (conflict checks, invariants, RR/TP tradeability, or publish constraints).
-                              </div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                                      <span>C: {fmtScore100(s.confidence?.score)}</span>
+                                      <span>•</span>
+                                      <span>RR: {Number.isFinite(s.rr_min) ? s.rr_min.toFixed(2) : "—"}</span>
+                                      <span>•</span>
+                                      <span>P: {Number.isFinite(s.priority_score) ? s.priority_score : "—"}</span>
+                                      <span>•</span>
+                                      <span>[{uiGrade(s)}]</span>
+                                    </div>
 
-                              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Candidates {ce != null ? ce : "—"}</Pill>
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Rejected {rejected != null ? rejected : "—"}</Pill>
-                              </div>
+                                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
+                                      <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${pri01 * 100}%` }} />
+                                    </div>
 
-                              {hasBreakdown ? (
-                                <div className="mt-3">
-                                  <div className="text-[11px] font-bold text-amber-100">Top rejection reasons</div>
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    {top.map((p) => (
-                                      <Pill key={p.code} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
-                                        {p.code} • {p.count}
-                                      </Pill>
-                                    ))}
+                                  </div>
+
+                                  <div className="flex shrink-0 flex-col items-end justify-center gap-2">
+                                    <div className="grid justify-items-end gap-2">
+                                      <Pill tone={statusTone(s.status)}>{s.status}</Pill>
+                                      {chip ? (
+                                        <Pill tone={chip.tone} icon={chip.icon}>
+                                          {chip.label}
+                                        </Pill>
+                                      ) : null}
+                                    </div>
+
                                   </div>
                                 </div>
-                              ) : !hasNotes ? (
-                                <div className="mt-3 text-[11px] text-amber-100/80">
-                                  Rejection breakdown not available yet (telemetry not provided by the engine). The empty feed is still a valid outcome.
+                                {/* Mid (anchored above the divider, left-aligned) */}
+                                <div className="mt-2 -mb-2">
+                                  <div className="tabular-nums text-[11px] font-semibold text-zinc-300 ">
+                                    <span className="text-amber-200/90">Mid:</span>{" "}
+                                    <span className="text-zinc-100">
+                                      {Number.isFinite(mid) ? `$${fmtPxWithSep(mid)}` : "—"}
+                                    </span>
+                                  </div>
                                 </div>
-                              ) : null}
 
-                              {hasNotes ? (
+                                {/* Bottom bar: Entry / TP / SL + View (anchored at the bottom of the setup card) */}
+                                <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-2 text-[11px] font-semibold">
+                                  {/* Left: Entry / TP / SL */}
+                                  <div className="flex flex-wrap items-center gap-3">
+                                    <span className="tabular-nums text-sky-300">
+                                      <span className="font-bold text-sky-200">E:</span> {entryText}
+                                    </span>
+
+                                    <span className="tabular-nums text-emerald-300">
+                                      <span className="font-bold text-emerald-200">TP:</span> {tpText}
+                                    </span>
+
+                                    <span className="tabular-nums text-rose-300">
+                                      <span className="font-bold text-rose-200">SL:</span> {slText}
+                                    </span>
+                                  </div>
+
+                                  {/* Right: View / Hide */}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpanded(accordionKey)}
+                                    className={[
+                                      "ml-2 inline-flex items-center gap-1",
+                                      "rounded-xl bg-white/[0.04] px-2 py-1 shadow-[0_1px_0_rgba(255,255,255,0.04)]",
+                                      "text-[10px] font-extrabold tracking-tight",
+                                      "text-zinc-200/80 hover:text-zinc-50",
+                                      "hover:bg-white/[0.07]",
+                                      "transition",
+                                    ].join(" ")}
+                                    aria-label={isOpen ? "Hide setup details" : "View setup details"}
+                                    title={isOpen ? "Hide details" : "View details"}
+                                  >
+                                    {isOpen ? (
+                                      <>
+                                        <Minus className="h-3 w-3" />
+                                        <span className="hidden sm:inline">Hide</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="h-3 w-3" />
+                                        <span className="hidden sm:inline">View</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+
+                                {isOpen ? (
+                                  <div className="mt-3">
+                                    <Divider />
+                                    <SetupDetail
+                                      setup={s}
+                                      symbol={symbol}
+                                      mid={mid}
+                                      dqOk={dqOk}
+                                      bybitOk={bybitOk}
+                                      staleSec={staleSec}
+                                      paused={paused}
+                                      features={features}
+                                      executionGlobal={executionGlobal}
+                                    />
+
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          });
+                        };
+
+                        return (
+                          <div className="space-y-4">
+                            {/* SCALP panel */}
+                            <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 ring-1 ring-white/10">
+                              <div className="mb-3 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
+                                  <Sparkles className="h-4 w-4 text-zinc-300" />
+                                  SCALP
+                                </div>
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{scalpRanked.length} setups</Pill>
+                              </div>
+                              <div className="space-y-2">{renderList(scalpRanked)}</div>
+                            </div>
+
+                            {/* NON-SCALP panel */}
+                            <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 ring-1 ring-white/10">
+                              <div className="mb-3 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
+                                  <Layers className="h-4 w-4 text-zinc-300" />
+                                  NON-SCALP
+                                </div>
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{nonScalpRanked.length} setups</Pill>
+                              </div>
+                              <div className="space-y-2">{renderList(nonScalpRanked)}</div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+
+                      // Empty states (policy-safe)
+                      if (state === "LOADING") {
+                        return (
+                          <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="rounded-xl bg-white/5 p-2">
+                                <RefreshCw className="h-5 w-5 text-zinc-200" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold text-zinc-100">Loading snapshots and evaluating setups…</div>
+                                <div className="mt-1 text-xs text-zinc-400">This may be normal during warm-up or when switching symbols/timeframes.</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      const readinessItems = Array.isArray(feedStatus?.readiness?.items) ? feedStatus!.readiness!.items : [];
+                      if (state === "NO_SIGNAL") {
+                        return (
+                          <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="rounded-xl bg-white/5 p-2">
+                                <Minus className="h-5 w-5 text-zinc-200" />
+                              </div>
+                              {readinessItems.length > 0 ? (
                                 <div className="mt-3">
-                                  <div className="text-[11px] font-bold text-amber-100">Sample rejection notes</div>
-                                  <div className="mt-2 space-y-1.5 text-xs text-amber-100/90">
-                                    {feedStatus!.rejectNotesSample!.slice(0, 3).map((n, i) => (
-                                      <div key={i} className="flex items-start gap-2">
-                                        <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-200/70" />
-                                        <span className="min-w-0">{n}</span>
+                                  <div className="text-[11px] font-bold text-zinc-200">Readiness notes</div>
+                                  <div className="mt-2 space-y-1.5 text-xs text-zinc-300/90">
+                                    {readinessItems.slice(0, 6).map((it, i) => (
+                                      <div key={`${it.key}-${i}`} className="flex items-start gap-2">
+                                        <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300/60" />
+                                        <span className="min-w-0">{it.note}</span>
                                       </div>
                                     ))}
                                   </div>
                                 </div>
                               ) : null}
-
-                              {feedStatus?.gate ? (
-                                <div className="mt-2 text-[11px] text-amber-100/80">Engine gate: {feedStatus.gate}</div>
-                              ) : null}
                             </div>
+                          </div>
+                        );
+                      }
+
+                      if (state === "QUALITY_GATED") {
+                        const ce = feedStatus?.candidatesEvaluated;
+                        const rejected = feedStatus?.rejected;
+                        const top = topRejectionPairs(feedStatus?.rejectionByCode || null, 6);
+                        const hasNotes = Array.isArray(feedStatus?.rejectNotesSample) && (feedStatus?.rejectNotesSample?.length ?? 0) > 0;
+                        const hasBreakdown = top.length > 0;
+                        return (
+                          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="rounded-xl bg-amber-500/15 p-2 ring-1 ring-amber-500/25">
+                                <ShieldAlert className="h-5 w-5 text-amber-200" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-extrabold text-amber-100">No setups published (quality gated)</div>
+                                <div className="mt-1 text-xs text-amber-100/90">
+                                  Candidates were generated but rejected by quality gates (conflict checks, invariants, RR/TP tradeability, or publish constraints).
+                                </div>
+
+                                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                  <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Candidates {ce != null ? ce : "—"}</Pill>
+                                  <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">Rejected {rejected != null ? rejected : "—"}</Pill>
+                                </div>
+
+                                {hasBreakdown ? (
+                                  <div className="mt-3">
+                                    <div className="text-[11px] font-bold text-amber-100">Top rejection reasons</div>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {top.map((p) => (
+                                        <Pill key={p.code} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                                          {p.code} • {p.count}
+                                        </Pill>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : !hasNotes ? (
+                                  <div className="mt-3 text-[11px] text-amber-100/80">
+                                    Rejection breakdown not available yet (telemetry not provided by the engine). The empty feed is still a valid outcome.
+                                  </div>
+                                ) : null}
+
+                                {hasNotes ? (
+                                  <div className="mt-3">
+                                    <div className="text-[11px] font-bold text-amber-100">Sample rejection notes</div>
+                                    <div className="mt-2 space-y-1.5 text-xs text-amber-100/90">
+                                      {feedStatus!.rejectNotesSample!.slice(0, 3).map((n, i) => (
+                                        <div key={i} className="flex items-start gap-2">
+                                          <span className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-200/70" />
+                                          <span className="min-w-0">{n}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : null}
+
+                                {feedStatus?.gate ? (
+                                  <div className="mt-2 text-[11px] text-amber-100/80">Engine gate: {feedStatus.gate}</div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // EMPTY_UNKNOWN
+                      return (
+                        <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
+                          <div className="text-sm font-bold text-zinc-100">No setups</div>
+                          <div className="mt-1 text-xs text-zinc-400">
+                            The system did not publish setups. This can be normal when conditions are not met or telemetry is not available yet.
                           </div>
                         </div>
                       );
-                    }
+                    })()}
+                  </div>
+                )}
+              </Card>
+            </div>
 
-                    // EMPTY_UNKNOWN
-                    return (
-                      <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
-                        <div className="text-sm font-bold text-zinc-100">No setups</div>
-                        <div className="mt-1 text-xs text-zinc-400">
-                          The system did not publish setups. This can be normal when conditions are not met or telemetry is not available yet.
-                        </div>
+            {/* RIGHT: details */}
+            <div className="space-y-4">
+              <Card
+                title="Data Completeness"
+                icon={<Database className="h-5 w-5" />}
+                right={
+                  <div className="flex items-center gap-2">
+                    <Pill
+                      tone={
+                        snap?.availability?.bybit?.ok
+                          ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                          : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                      }
+                      icon={snap?.availability?.bybit?.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                    >
+                      Snapshot {snap ? "OK" : "—"}
+                    </Pill>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowDataCompleteness((v) => !v)}
+                      className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
+                      title={showDataCompleteness ? "Hide Data Completeness details" : "Show Data Completeness details"}
+                    >
+                      {showDataCompleteness ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                }
+
+              >
+                {showDataCompleteness ? (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                        <Clock className="h-4 w-4 text-zinc-300" />
+                        Realtime availability
                       </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </Card>
-          </div>
+                      <div className="mt-3 space-y-2 text-xs">
+                        <KV
+                          k="Bybit availability"
+                          v={
+                            snap?.availability?.bybit
+                              ? snap.availability.bybit.ok
+                                ? "OK"
+                                : `NOT OK${Array.isArray(snap.availability.bybit.notes) && snap.availability.bybit.notes.length ? ` • ${snap.availability.bybit.notes.join(", ")}` : ""}`
+                              : "—"
+                          }
+                        />
+                        <KV
+                          k="Binance availability"
+                          v={
+                            snap?.availability?.binance
+                              ? snap.availability.binance.ok
+                                ? "OK"
+                                : `NOT OK${Array.isArray(snap.availability.binance.notes) && snap.availability.binance.notes.length ? ` • ${snap.availability.binance.notes.join(", ")}` : ""}`
+                              : "—"
+                          }
+                        />
+                        <KV k="Quality grade (raw snapshot)" v={snap?.data_quality?.grade ? String(snap.data_quality.grade) : "—"} />
+                        <KV k="Quality score (raw snapshot)" v={Number.isFinite(Number(snap?.data_quality?.score)) ? fmtNum(Number(snap?.data_quality?.score), 0) : "—"} />
+                      </div>
+                      {Array.isArray(snap?.data_quality?.reasons) && snap!.data_quality!.reasons.length > 0 ? (
+                        <div className="mt-3">
+                          <div className="text-[11px] font-bold text-zinc-200">Quality notes</div>
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {snap!.data_quality!.reasons.slice(0, 8).map((r, i) => (
+                              <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
+                                {r}
+                              </Pill>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
 
-          {/* RIGHT: details */}
-          <div className="space-y-4">
-            <Card
-              title="Data Completeness"
-              icon={<Database className="h-5 w-5" />}
-              right={
-                <div className="flex items-center gap-2">
-                  <Pill
-                    tone={
-                      snap?.availability?.bybit?.ok
-                        ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                        : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                    }
-                    icon={snap?.availability?.bybit?.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-                  >
-                    Snapshot {snap ? "OK" : "—"}
-                  </Pill>
+                    <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
+                        <Layers className="h-4 w-4 text-zinc-300" />
+                        Timeframe health (stale/partial)
+                      </div>
 
+                      <div className="mt-3 space-y-2">
+                        {tfHealthView.length === 0 ? (
+                          <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
+                        ) : (
+                          tfHealthView.map((t) => {
+                            const bars = Number.isFinite(t.staleBars) ? t.staleBars : NaN;
+
+                            // Tone by bars behind (more meaningful than 1.5s/5s for candles)
+                            const staleTone =
+                              Number.isFinite(bars) && bars <= 0
+                                ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                                : Number.isFinite(bars) && bars <= 1
+                                  ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                                  : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
+
+                            const staleLabel =
+                              Number.isFinite(bars)
+                                ? (bars === 0 ? "0 bars" : `${bars} bars`)
+                                : "—";
+
+                            const countLabel = `B:${t.haveCandlesBybit} / N:${t.haveCandlesBinance}`;
+
+                            return (
+                              <div
+                                key={t.tf}
+                                className="flex items-center justify-between rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] px-3 py-2"
+                              >
+                                <div className="min-w-0">
+                                  <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
+                                  <div className="mt-1 text-[11px] text-zinc-400">
+                                    {countLabel}
+                                    {Number.isFinite(t.lastTs) ? ` • last ${relTime(t.lastTs)}` : ""}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />} title="Bars behind current time">
+                                    {staleLabel}
+                                  </Pill>
+
+                                  <Pill
+                                    tone={
+                                      t.partial
+                                        ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
+                                        : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
+                                    }
+                                    title={t.partial ? "Data incomplete for this TF" : "Data complete"}
+                                  >
+                                    {t.partial ? "PARTIAL" : "OK"}
+                                  </Pill>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+
+                        {tfHealth.length > tfHealthPrimary.length ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowTfHealthMore((v) => !v)}
+                            className="mt-2 inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/70 hover:text-zinc-50 hover:bg-white/[0.05]"
+                          >
+                            {showTfHealthMore ? "Show less" : `Show more (${tfHealth.length - tfHealthPrimary.length})`}
+                          </button>
+                        ) : null}
+                      </div>
+
+                    </div>
+                  </div>
+                ) : null}
+
+
+              </Card>
+
+              <Card
+                title="Key Levels"
+                icon={<Target className="h-5 w-5" />}
+                right={
                   <button
                     type="button"
-                    onClick={() => setShowDataCompleteness((v) => !v)}
+                    onClick={() => setShowKeyLevels((v) => !v)}
                     className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
-                    title={showDataCompleteness ? "Hide Data Completeness details" : "Show Data Completeness details"}
+                    title={showKeyLevels ? "Hide Key Levels" : "Show Key Levels"}
                   >
-                    {showDataCompleteness ? "Hide" : "Show"}
+                    {showKeyLevels ? "Hide" : "Show"}
                   </button>
-                </div>
-              }
-
-            >
-              {showDataCompleteness ? (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                }
+              >
+                {showKeyLevels ? (
                   <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                     <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                      <Clock className="h-4 w-4 text-zinc-300" />
-                      Realtime availability
+                      <Target className="h-4 w-4 text-zinc-300" />
+                      Key levels (events & swings)
                     </div>
-                    <div className="mt-3 space-y-2 text-xs">
-                      <KV
-                        k="Bybit availability"
-                        v={
-                          snap?.availability?.bybit
-                            ? snap.availability.bybit.ok
-                              ? "OK"
-                              : `NOT OK${Array.isArray(snap.availability.bybit.notes) && snap.availability.bybit.notes.length ? ` • ${snap.availability.bybit.notes.join(", ")}` : ""}`
-                            : "—"
-                        }
-                      />
-                      <KV
-                        k="Binance availability"
-                        v={
-                          snap?.availability?.binance
-                            ? snap.availability.binance.ok
-                              ? "OK"
-                              : `NOT OK${Array.isArray(snap.availability.binance.notes) && snap.availability.binance.notes.length ? ` • ${snap.availability.binance.notes.join(", ")}` : ""}`
-                            : "—"
-                        }
-                      />
-                      <KV k="Quality grade (raw snapshot)" v={snap?.data_quality?.grade ? String(snap.data_quality.grade) : "—"} />
-                      <KV k="Quality score (raw snapshot)" v={Number.isFinite(Number(snap?.data_quality?.score)) ? fmtNum(Number(snap?.data_quality?.score), 0) : "—"} />
+                    <div className="mt-1 text-[11px] text-zinc-400">
+                      Showing {keyLevelsView.length} of {keyLevels.length} levels • Sorted by TF priority (4h → 5m)
                     </div>
-                    {Array.isArray(snap?.data_quality?.reasons) && snap!.data_quality!.reasons.length > 0 ? (
-                      <div className="mt-3">
-                        <div className="text-[11px] font-bold text-zinc-200">Quality notes</div>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          {snap!.data_quality!.reasons.slice(0, 8).map((r, i) => (
-                            <Pill key={i} tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">
-                              {r}
-                            </Pill>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
-                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                      <Layers className="h-4 w-4 text-zinc-300" />
-                      Timeframe health (stale/partial)
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                      {tfHealthView.length === 0 ? (
-                        <div className="text-xs text-zinc-400">No timeframe diagnostics yet.</div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {keyLevelsView.length === 0 ? (
+                        <div className="text-xs text-zinc-400">No market structure levels yet.</div>
                       ) : (
-                        tfHealthView.map((t) => {
-                          const bars = Number.isFinite(t.staleBars) ? t.staleBars : NaN;
+                        keyLevelsView.map((l, i) => {
+                          const lvl = Number.isFinite(l.level) ? (l.level as number) : NaN;
+                          const haveMid = Number.isFinite(mid);
+                          const haveLvl = Number.isFinite(lvl);
+                          const deltaAbs = haveMid && haveLvl ? Math.abs(mid - lvl) : NaN;
 
-                          // Tone by bars behind (more meaningful than 1.5s/5s for candles)
-                          const staleTone =
-                            Number.isFinite(bars) && bars <= 0
-                              ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                              : Number.isFinite(bars) && bars <= 1
+                          const dirLabel =
+                            haveMid && haveLvl
+                              ? lvl > mid
+                                ? "ABOVE"
+                                : lvl < mid
+                                  ? "BELOW"
+                                  : "AT"
+                              : "";
+
+                          const kindTone =
+                            l.kind === "BOS"
+                              ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
+                              : l.kind === "CHOCH"
                                 ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                                : "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
-
-                          const staleLabel =
-                            Number.isFinite(bars)
-                              ? (bars === 0 ? "0 bars" : `${bars} bars`)
-                              : "—";
-
-                          const countLabel = `B:${t.haveCandlesBybit} / N:${t.haveCandlesBinance}`;
+                                : l.kind === "SWING_HIGH"
+                                  ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
+                                  : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
 
                           return (
                             <div
-                              key={t.tf}
-                              className="flex items-center justify-between rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] px-3 py-2"
+                              key={`${l.tf}-${l.kind}-${i}`}
+                              className="rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3"
                             >
-                              <div className="min-w-0">
-                                <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
-                                <div className="mt-1 text-[11px] text-zinc-400">
-                                  {countLabel}
-                                  {Number.isFinite(t.lastTs) ? ` • last ${relTime(t.lastTs)}` : ""}
+                              {/* Top row: TF + Kind + optional dir */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.tf}</Pill>
+                                <Pill tone={kindTone}>{l.kind}</Pill>
+                                {l.dir && l.dir !== "—" ? (
+                                  <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill>
+                                ) : null}
+
+                                {/* Right-side mini meta */}
+                                <div className="ml-auto flex items-center gap-2">
+                                  {haveMid && haveLvl ? (
+                                    <Pill
+                                      tone="bg-white/5 text-zinc-100 ring-1 ring-white/10"
+                                      title="Relative to realtime mid"
+                                    >
+                                      {dirLabel} · Δ {fmtPx(deltaAbs)}
+                                    </Pill>
+                                  ) : null}
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2">
-                                <Pill tone={staleTone} icon={<Clock className="h-4 w-4" />} title="Bars behind current time">
-                                  {staleLabel}
-                                </Pill>
-
-                                <Pill
-                                  tone={
-                                    t.partial
-                                      ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                                      : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                                  }
-                                  title={t.partial ? "Data incomplete for this TF" : "Data complete"}
-                                >
-                                  {t.partial ? "PARTIAL" : "OK"}
-                                </Pill>
+                              {/* Price row: big number + timestamp */}
+                              <div className="mt-2 flex items-end justify-between gap-3">
+                                <div className="text-base font-extrabold text-zinc-50 tabular-nums">
+                                  {haveLvl ? fmtPx(lvl) : "—"}
+                                </div>
+                                <div className="text-[11px] text-zinc-400">
+                                  {Number.isFinite(l.ts) ? relTime(l.ts) : ""}
+                                </div>
                               </div>
                             </div>
                           );
                         })
                       )}
-
-                      {tfHealth.length > tfHealthPrimary.length ? (
-                        <button
-                          type="button"
-                          onClick={() => setShowTfHealthMore((v) => !v)}
-                          className="mt-2 inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/70 hover:text-zinc-50 hover:bg-white/[0.05]"
-                        >
-                          {showTfHealthMore ? "Show less" : `Show more (${tfHealth.length - tfHealthPrimary.length})`}
-                        </button>
-                      ) : null}
                     </div>
 
+                    {keyLevels.length > 6 ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowLevelsMore((v) => !v)}
+                        className="mt-2 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
+                      >
+                        {showLevelsMore ? "Show less" : `Show more (${keyLevels.length - 6})`}
+                      </button>
+                    ) : null}
                   </div>
-                </div>
-              ) : null}
+                ) : null}
 
 
-            </Card>
+              </Card>
+            </div>
+          </div>
 
-            <Card
-              title="Key Levels"
-              icon={<Target className="h-5 w-5" />}
-              right={
-                <button
-                  type="button"
-                  onClick={() => setShowKeyLevels((v) => !v)}
-                  className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
-                  title={showKeyLevels ? "Hide Key Levels" : "Show Key Levels"}
-                >
-                  {showKeyLevels ? "Hide" : "Show"}
-                </button>
-              }
-            >
-              {showKeyLevels ? (
-                <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
-                    <Target className="h-4 w-4 text-zinc-300" />
-                    Key levels (events & swings)
-                  </div>
-                  <div className="mt-1 text-[11px] text-zinc-400">
-                    Showing {keyLevelsView.length} of {keyLevels.length} levels • Sorted by TF priority (4h → 5m)
-                  </div>
-                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {keyLevelsView.length === 0 ? (
-                      <div className="text-xs text-zinc-400">No market structure levels yet.</div>
-                    ) : (
-                      keyLevelsView.map((l, i) => {
-                        const lvl = Number.isFinite(l.level) ? (l.level as number) : NaN;
-                        const haveMid = Number.isFinite(mid);
-                        const haveLvl = Number.isFinite(lvl);
-                        const deltaAbs = haveMid && haveLvl ? Math.abs(mid - lvl) : NaN;
-
-                        const dirLabel =
-                          haveMid && haveLvl
-                            ? lvl > mid
-                              ? "ABOVE"
-                              : lvl < mid
-                                ? "BELOW"
-                                : "AT"
-                            : "";
-
-                        const kindTone =
-                          l.kind === "BOS"
-                            ? "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30"
-                            : l.kind === "CHOCH"
-                              ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                              : l.kind === "SWING_HIGH"
-                                ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                                : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
-
-                        return (
-                          <div
-                            key={`${l.tf}-${l.kind}-${i}`}
-                            className="rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3"
-                          >
-                            {/* Top row: TF + Kind + optional dir */}
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.tf}</Pill>
-                              <Pill tone={kindTone}>{l.kind}</Pill>
-                              {l.dir && l.dir !== "—" ? (
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{l.dir}</Pill>
-                              ) : null}
-
-                              {/* Right-side mini meta */}
-                              <div className="ml-auto flex items-center gap-2">
-                                {haveMid && haveLvl ? (
-                                  <Pill
-                                    tone="bg-white/5 text-zinc-100 ring-1 ring-white/10"
-                                    title="Relative to realtime mid"
-                                  >
-                                    {dirLabel} · Δ {fmtPx(deltaAbs)}
-                                  </Pill>
-                                ) : null}
-                              </div>
-                            </div>
-
-                            {/* Price row: big number + timestamp */}
-                            <div className="mt-2 flex items-end justify-between gap-3">
-                              <div className="text-base font-extrabold text-zinc-50 tabular-nums">
-                                {haveLvl ? fmtPx(lvl) : "—"}
-                              </div>
-                              <div className="text-[11px] text-zinc-400">
-                                {Number.isFinite(l.ts) ? relTime(l.ts) : ""}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {keyLevels.length > 6 ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowLevelsMore((v) => !v)}
-                      className="mt-2 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
-                    >
-                      {showLevelsMore ? "Show less" : `Show more (${keyLevels.length - 6})`}
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-
-
-            </Card>
+          <div className="mt-6 text-center text-[11px] text-zinc-500">
+            This UI does not place trades. It explains signals, risk, and conditions so the user can execute confidently.
           </div>
         </div>
-
-        <div className="mt-6 text-center text-[11px] text-zinc-500">
-          This UI does not place trades. It explains signals, risk, and conditions so the user can execute confidently.
-        </div>
       </div>
-    </div>
+    </>
   );
 }
 /** ---------- Detail component ---------- */
