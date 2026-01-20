@@ -565,11 +565,11 @@ function sideTone(side: SetupSide) {
 
 function dqTone(dq?: string) {
   const g = String(dq || "").toUpperCase();
-  if (g === "A") return "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
-  if (g === "B") return "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30";
-  if (g === "C") return "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30";
-  if (g === "D") return "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
-  return "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
+  if (g === "A") return "bg-emerald-500/10 text-emerald-200";
+  if (g === "B") return "bg-sky-500/10 text-sky-200";
+  if (g === "C") return "bg-amber-500/10 text-amber-200";
+  if (g === "D") return "bg-rose-500/10 text-rose-200";
+  return "bg-zinc-500/10 text-zinc-200";
 }
 function uiGrade(setup: TradeSetup): string {
   const gp = String((setup as any)?.confidence?.grade_plus ?? "").toUpperCase();
@@ -583,22 +583,20 @@ function isMonitorOnlySetup(setup: TradeSetup) {
 
 function gradeTone(grade?: string) {
   const g = String(grade || "").toUpperCase();
-  if (g === "A") return "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
-  if (g === "B") return "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30";
-  if (g === "C") return "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30";
-  return "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
+  if (g === "A") return "bg-emerald-500/10 text-emerald-200";
+  if (g === "B") return "bg-sky-500/10 text-sky-200";
+  if (g === "C") return "bg-amber-500/10 text-amber-200";
+  return "bg-rose-500/10 text-rose-200";
 }
 
 function statusTone(status?: string) {
   const s = String(status || "").toUpperCase();
-  if (s === "READY") return "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30";
-  if (s === "FORMING") return "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30";
-  if (s === "TRIGGERED") return "bg-sky-500/10 text-sky-200 ring-1 ring-sky-500/30";
-  if (s === "INVALIDATED" || s === "EXPIRED")
-    return "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30";
-  return "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30";
+  if (s === "READY") return "bg-emerald-500/10 text-emerald-200";
+  if (s === "FORMING") return "bg-amber-500/10 text-amber-200";
+  if (s === "TRIGGERED") return "bg-sky-500/10 text-sky-200";
+  if (s === "INVALIDATED" || s === "EXPIRED") return "bg-rose-500/10 text-rose-200";
+  return "bg-zinc-500/10 text-zinc-200";
 }
-
 function actionChip(
   s: TradeSetup,
   executionGlobal: ExecutionGlobal | null
@@ -780,7 +778,7 @@ function TrendStructureCard({
   const ago = Number.isFinite(ts as number) ? relTime(Number(ts)) : "—";
 
   return (
-    <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+    <div className="rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
       <div className="flex items-center justify-between">
         <div className="text-xs font-extrabold text-zinc-100">{String(tf).toUpperCase()}</div>
         <span className={["inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold", badge.cls].join(" ")}>
@@ -1044,7 +1042,7 @@ function Pill({
       title={title}
       className={[
         "flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
-        "ring-1 ring-white/10 bg-white/5 text-zinc-100",
+        "bg-white/[0.04] text-zinc-100 shadow-[0_1px_0_rgba(255,255,255,0.05)] backdrop-blur",
         fullWidth ? "w-full justify-center" : "inline-flex",
         tone || "",
         className || "",
@@ -1055,8 +1053,6 @@ function Pill({
     </span>
   );
 }
-
-
 function Card({
   title,
   icon,
@@ -1073,16 +1069,17 @@ function Card({
   return (
     <section
       className={[
-        "rounded-2xl border border-white/10 bg-zinc-950/40 backdrop-blur",
-        "shadow-[0_20px_60px_rgba(0,0,0,0.35)]",
+        "rounded-2xl bg-zinc-950/40 backdrop-blur",
+        "ring-1 ring-white/5",
+        "shadow-[0_1px_0_rgba(255,255,255,0.06),0_24px_70px_rgba(0,0,0,0.45)]",
         className || "",
       ].join(" ")}
     >
       <header className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="flex items-center gap-2">
-          <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">{icon}</div>
+          <div className="rounded-2xl bg-white/[0.04] p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/5">{icon}</div>
           <div>
-            <div className="text-sm font-bold tracking-tight text-zinc-50">{title}</div>
+            <div className="text-[13px] font-extrabold tracking-tight text-zinc-50">{title}</div>
           </div>
         </div>
         {right ? <div className="pt-1">{right}</div> : null}
@@ -1142,7 +1139,7 @@ function KV({
 }
 
 function Divider() {
-  return <div className="my-3 h-px w-full bg-white/10" />;
+  return <div className="my-4 h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />;
 }
 function relTime(ts?: number) {
   if (!Number.isFinite(ts as number)) return "—";
@@ -1540,26 +1537,27 @@ export function TradingView({
   const appBlocked = executionGlobal?.state === "BLOCKED";
 
   return (
-    <div className="min-h-screen bg-[#070A12] text-zinc-100">
+    <div className="min-h-screen bg-[#070A12] text-zinc-100 antialiased selection:bg-sky-500/20 selection:text-sky-50">
       {/* subtle background */}
-      <div className="pointer-events-none fixed inset-0 opacity-60">
+      <div className="pointer-events-none fixed inset-0 opacity-50">
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-black/30" />
         <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-sky-500/10 blur-3xl" />
         <div className="absolute -bottom-44 left-1/3 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-emerald-500/10 blur-3xl" />
         <div className="absolute -bottom-52 right-1/4 h-[520px] w-[520px] translate-x-1/2 rounded-full bg-rose-500/10 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-5">
+      <div className="relative mx-auto w-full max-w-7xl px-4 pb-10 pt-5">
         {/* Top bar */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-zinc-950/40 p-4 backdrop-blur shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        <div className="flex flex-col gap-4 rounded-3xl bg-zinc-950/35 p-5 backdrop-blur ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.06),0_28px_90px_rgba(0,0,0,0.55)]">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                <div className="rounded-2xl bg-white/[0.04] p-2.5 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.05)]">
                   <Sparkles className="h-5 w-5" />
                 </div>
-                <div className="text-base font-extrabold tracking-tight">Crypto Setup Analyzer</div>
+                <div className="text-lg font-black tracking-tight text-zinc-50">Crypto Setup Analyzer</div>
               </div>
-              <div className="text-xs text-zinc-400">
+              <div className="text-[12px] leading-snug text-zinc-300/70">
                 Frontend-only • Realtime snapshot → features → setups • Built for iPhone/iPad clarity
               </div>
             </div>
@@ -1567,10 +1565,10 @@ export function TradingView({
             <div className="grid w-full grid-cols-1 gap-2 md:w-[520px] md:grid-cols-[1fr_auto_auto]">
               <div
                 className={[
-                  "flex items-center gap-2 rounded-xl border px-3 py-2",
+                  "group flex items-center gap-2 rounded-2xl px-3 py-2.5 transition",
                   symbolInputEnabled
-                    ? "border-white/10 bg-white/5"
-                    : "border-white/5 bg-white/[0.03] opacity-80",
+                    ? "bg-white/[0.045] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] focus-within:ring-sky-500/25 focus-within:bg-white/[0.06]"
+                    : "bg-white/[0.03] ring-1 ring-white/5 opacity-80",
                 ].join(" ")}
                 title={
                   symbolInputEnabled
@@ -1600,10 +1598,10 @@ export function TradingView({
                 onClick={onAnalyze}
                 disabled={!symbolInputEnabled}
                 className={[
-                  "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ring-1",
+                  "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold tracking-tight transition",
                   symbolInputEnabled
-                    ? "bg-sky-500/20 text-sky-100 ring-sky-500/30 hover:bg-sky-500/25 active:bg-sky-500/30"
-                    : "bg-zinc-800 text-zinc-500 ring-zinc-700 cursor-not-allowed",
+                    ? "bg-gradient-to-b from-sky-500/30 to-sky-500/15 text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.14)] hover:from-sky-500/35 hover:to-sky-500/18 active:from-sky-500/40"
+                    : "bg-white/[0.04] text-zinc-500 cursor-not-allowed shadow-none",
                 ].join(" ")}
                 title={
                   symbolInputEnabled
@@ -1618,10 +1616,10 @@ export function TradingView({
               <button
                 onClick={() => setPaused((p) => !p)}
                 className={[
-                  "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ring-1",
+                  "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold tracking-tight transition",
                   paused
-                    ? "bg-rose-500/20 text-rose-100 ring-rose-500/30 hover:bg-rose-500/25"
-                    : "bg-emerald-500/20 text-emerald-100 ring-emerald-500/30 hover:bg-emerald-500/25",
+                    ? "bg-gradient-to-b from-rose-500/28 to-rose-500/14 text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] hover:from-rose-500/32 hover:to-rose-500/16"
+                    : "bg-gradient-to-b from-emerald-500/26 to-emerald-500/12 text-emerald-50 shadow-[0_10px_30px_rgba(16,185,129,0.12)] hover:from-emerald-500/30 hover:to-emerald-500/14",
                 ].join(" ")}
                 title={paused ? "Resume updates" : "Pause updates"}
               >
@@ -1684,8 +1682,7 @@ export function TradingView({
               </div>
               <button
                 onClick={() => setBanner({ active: false, text: "" })}
-                className="rounded-xl bg-white/5 px-3 py-2 text-xs font-bold text-zinc-100 ring-1 ring-white/10 hover:bg-white/10"
-              >
+                className="rounded-2xl bg-white/[0.04] px-3 py-2 text-xs font-extrabold tracking-tight text-zinc-50 shadow-[0_1px_0_rgba(255,255,255,0.04)] hover:bg-white/[0.08]">
                 Dismiss
               </button>
             </div>
@@ -1731,7 +1728,7 @@ export function TradingView({
                   intent={biasStrength01 != null && biasStrength01 >= 0.62 ? "good" : "warn"}
                 />
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="rounded-xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                     <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
                       <Waves className="h-4 w-4 text-zinc-300" />
                       Volatility regime
@@ -1759,7 +1756,7 @@ export function TradingView({
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="rounded-xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                     <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
                       <Layers className="h-4 w-4 text-zinc-300" />
                       Cross / Consensus
@@ -1795,7 +1792,7 @@ export function TradingView({
               </div>
             </Card>
             {/* Trend by timeframe (Structure) */}
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+            <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
               <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
                 <LineChart className="h-4 w-4 text-zinc-300" />
                 Trend by timeframe (Structure)
@@ -1924,7 +1921,7 @@ export function TradingView({
                       const renderList = (items: Array<{ s: TradeSetup; idx: number }>) => {
                         if (!items || items.length === 0) {
                           return (
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-zinc-400">
+                            <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 text-xs text-zinc-400">
                               No setups in this category right now.
                             </div>
                           );
@@ -1948,8 +1945,8 @@ export function TradingView({
                             <div
                               key={reactKey}
                               className={[
-                                "rounded-2xl border bg-white/5 p-3 ring-1 ring-white/10",
-                                isOpen ? "border-sky-500/40 ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.15)]" : "border-white/10",
+                                "rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] transition",
+                                isOpen ? "bg-white/[0.06] ring-sky-500/25 shadow-[0_0_0_3px_rgba(56,189,248,0.12)]" : "hover:bg-white/[0.05]",
                               ].join(" ")}
                             >
                               <div className="flex items-start gap-3">
@@ -2003,7 +2000,7 @@ export function TradingView({
                               </div>
 
                               {/* Bottom bar: Entry / TP / SL + View (anchored at the bottom of the setup card) */}
-                              <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-2 text-[11px] font-semibold">
+                              <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-2 text-[11px] font-semibold">
                                 {/* Left: Entry / TP / SL */}
                                 <div className="flex flex-wrap items-center gap-3">
                                   <span className="tabular-nums text-sky-300">
@@ -2025,10 +2022,10 @@ export function TradingView({
                                   onClick={() => toggleExpanded(accordionKey)}
                                   className={[
                                     "ml-2 inline-flex items-center gap-1",
-                                    "rounded-md px-1.5 py-0.5",
-                                    "text-[10px] font-bold",
-                                    "text-zinc-300 hover:text-zinc-100",
-                                    "ring-1 ring-white/10 hover:ring-white/20",
+                                    "rounded-xl bg-white/[0.04] px-2 py-1 shadow-[0_1px_0_rgba(255,255,255,0.04)]",
+                                    "text-[10px] font-extrabold tracking-tight",
+                                    "text-zinc-200/80 hover:text-zinc-50",
+                                    "hover:bg-white/[0.07]",
                                     "transition",
                                   ].join(" ")}
                                   aria-label={isOpen ? "Hide setup details" : "View setup details"}
@@ -2073,7 +2070,7 @@ export function TradingView({
                       return (
                         <div className="space-y-4">
                           {/* SCALP panel */}
-                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 ring-1 ring-white/10">
+                          <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 ring-1 ring-white/10">
                             <div className="mb-3 flex items-center justify-between">
                               <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
                                 <Sparkles className="h-4 w-4 text-zinc-300" />
@@ -2085,7 +2082,7 @@ export function TradingView({
                           </div>
 
                           {/* NON-SCALP panel */}
-                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 ring-1 ring-white/10">
+                          <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 ring-1 ring-white/10">
                             <div className="mb-3 flex items-center justify-between">
                               <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
                                 <Layers className="h-4 w-4 text-zinc-300" />
@@ -2103,9 +2100,9 @@ export function TradingView({
                     // Empty states (policy-safe)
                     if (state === "LOADING") {
                       return (
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
                           <div className="flex items-start gap-3">
-                            <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                            <div className="rounded-xl bg-white/5 p-2">
                               <RefreshCw className="h-5 w-5 text-zinc-200" />
                             </div>
                             <div>
@@ -2119,9 +2116,9 @@ export function TradingView({
                     const readinessItems = Array.isArray(feedStatus?.readiness?.items) ? feedStatus!.readiness!.items : [];
                     if (state === "NO_SIGNAL") {
                       return (
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
                           <div className="flex items-start gap-3">
-                            <div className="rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                            <div className="rounded-xl bg-white/5 p-2">
                               <Minus className="h-5 w-5 text-zinc-200" />
                             </div>
                             {readinessItems.length > 0 ? (
@@ -2207,7 +2204,7 @@ export function TradingView({
 
                     // EMPTY_UNKNOWN
                     return (
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
                         <div className="text-sm font-bold text-zinc-100">No setups</div>
                         <div className="mt-1 text-xs text-zinc-400">
                           The system did not publish setups. This can be normal when conditions are not met or telemetry is not available yet.
@@ -2241,7 +2238,7 @@ export function TradingView({
                   <button
                     type="button"
                     onClick={() => setShowDataCompleteness((v) => !v)}
-                    className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+                   className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
                     title={showDataCompleteness ? "Hide Data Completeness details" : "Show Data Completeness details"}
                   >
                     {showDataCompleteness ? "Hide" : "Show"}
@@ -2252,7 +2249,7 @@ export function TradingView({
             >
               {showDataCompleteness ? (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                     <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
                       <Clock className="h-4 w-4 text-zinc-300" />
                       Realtime availability
@@ -2295,7 +2292,7 @@ export function TradingView({
                     ) : null}
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                     <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
                       <Layers className="h-4 w-4 text-zinc-300" />
                       Timeframe health (stale/partial)
@@ -2326,7 +2323,7 @@ export function TradingView({
                           return (
                             <div
                               key={t.tf}
-                              className="flex items-center justify-between rounded-xl border border-white/10 bg-zinc-950/30 px-3 py-2"
+                              className="flex items-center justify-between rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] px-3 py-2"
                             >
                               <div className="min-w-0">
                                 <div className="text-xs font-extrabold text-zinc-100">{t.tf}</div>
@@ -2361,7 +2358,7 @@ export function TradingView({
                         <button
                           type="button"
                           onClick={() => setShowTfHealthMore((v) => !v)}
-                          className="pt-1 text-[11px] font-semibold text-zinc-400 hover:text-zinc-200"
+                          className="mt-2 inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/70 hover:text-zinc-50 hover:bg-white/[0.05]"
                         >
                           {showTfHealthMore ? "Show less" : `Show more (${tfHealth.length - tfHealthPrimary.length})`}
                         </button>
@@ -2382,7 +2379,7 @@ export function TradingView({
                 <button
                   type="button"
                   onClick={() => setShowKeyLevels((v) => !v)}
-                  className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+                 className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
                   title={showKeyLevels ? "Hide Key Levels" : "Show Key Levels"}
                 >
                   {showKeyLevels ? "Hide" : "Show"}
@@ -2390,7 +2387,7 @@ export function TradingView({
               }
             >
               {showKeyLevels ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
                     <Target className="h-4 w-4 text-zinc-300" />
                     Key levels (events & swings)
@@ -2429,7 +2426,7 @@ export function TradingView({
                         return (
                           <div
                             key={`${l.tf}-${l.kind}-${i}`}
-                            className="rounded-xl border border-white/10 bg-zinc-950/30 p-3"
+                            className="rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3"
                           >
                             {/* Top row: TF + Kind + optional dir */}
                             <div className="flex flex-wrap items-center gap-2">
@@ -2698,7 +2695,7 @@ function SetupDetail({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-2">
@@ -2745,7 +2742,7 @@ function SetupDetail({
         {/* Guidance */}
         <div className={["rounded-2xl p-4", guidance.tone].join(" ")}>
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+            <div className="mt-0.5 rounded-xl bg-white/5 p-2">
               {guidance.headline.includes("Enter") || guidance.headline.includes("Place") ? (
                 <CheckCircle2 className="h-5 w-5" />
               ) : guidance.headline.includes("Do not") || guidance.headline.includes("Blocked") ? (
@@ -2801,7 +2798,7 @@ function SetupDetail({
 
       {/* Plan */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
           <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
             <Target className="h-4 w-4 text-zinc-300" />
             Entry Plan
@@ -2843,7 +2840,7 @@ function SetupDetail({
 
           <div className="space-y-2">
             <div className="text-xs font-bold text-zinc-100">Trigger checklist</div>
-            <div className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+            <div className="rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-xs font-semibold text-zinc-100">Summary</div>
                 <div className="text-[11px] text-zinc-400 tabular-nums">
@@ -2897,7 +2894,7 @@ function SetupDetail({
                   const pending = c.ok !== true && c.ok !== false;
 
                   return (
-                    <div key={c.key} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                    <div key={c.key} className="rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -2946,7 +2943,7 @@ function SetupDetail({
                     <button
                       type="button"
                       onClick={() => setShowChecklistPassed((v) => !v)}
-                      className="text-[11px] font-semibold text-zinc-300 hover:text-zinc-100"
+                      className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
                     >
                       {showChecklistPassed ? "Hide passed" : `Show passed (${checklistOk.length})`}
                     </button>
@@ -2957,7 +2954,7 @@ function SetupDetail({
                 {showChecklistPassed ? (
                   <div className="space-y-2">
                     {checklistOk.map((c) => (
-                      <div key={c.key} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                      <div key={c.key} className="rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -2999,7 +2996,7 @@ function SetupDetail({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
           <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
             <ShieldCheck className="h-4 w-4 text-zinc-300" />
             Risk & Targets
@@ -3023,7 +3020,7 @@ function SetupDetail({
             ) : (
               <div className="space-y-2">
                 {tps.map((tp, i) => (
-                  <div key={i} className="rounded-xl border border-white/10 bg-zinc-950/30 p-3">
+                  <div key={i} className="rounded-xl bg-zinc-950/30 ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-xs font-extrabold text-zinc-100">TP{i + 1}</div>
@@ -3104,7 +3101,7 @@ function SetupDetail({
       </div>
 
       {/* Reasons & context */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="flex items-center gap-2 text-xs font-bold text-zinc-100">
             <Gauge className="h-4 w-4 text-zinc-300" />
