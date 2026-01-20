@@ -1095,7 +1095,7 @@ function Meter({
   right,
   intent,
 }: {
-  label: string;
+  label: React.ReactNode;
   value01?: number;
   right?: React.ReactNode;
   intent?: "good" | "warn" | "bad" | "neutral";
@@ -1537,7 +1537,8 @@ export function TradingView({
   const appBlocked = executionGlobal?.state === "BLOCKED";
 
   return (
-    <div className="min-h-screen bg-[#070A12] text-zinc-100 antialiased selection:bg-sky-500/20 selection:text-sky-50">
+    <div className="min-h-dvh bg-[#070A12] text-zinc-100 antialiased selection:bg-sky-500/20 selection:text-sky-50"
+    >
       {/* subtle background */}
       <div className="pointer-events-none fixed inset-0 opacity-50">
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-black/30" />
@@ -1546,7 +1547,16 @@ export function TradingView({
         <div className="absolute -bottom-52 right-1/4 h-[520px] w-[520px] translate-x-1/2 rounded-full bg-rose-500/10 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto w-full max-w-7xl px-4 pb-10 pt-5">
+      <div
+        className={[
+          // Mobile: full width + safe-area friendly padding
+          "relative w-full",
+          "px-[max(12px,env(safe-area-inset-left))] pr-[max(12px,env(safe-area-inset-right))]",
+          "pt-[max(12px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))]",
+          // Desktop: keep centered max width
+          "md:mx-auto md:max-w-7xl md:px-6 md:pt-5 md:pb-10",
+        ].join(" ")}
+      >
         {/* Top bar */}
         <div className="flex flex-col gap-4 rounded-3xl bg-zinc-950/35 p-5 backdrop-blur ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.06),0_28px_90px_rgba(0,0,0,0.55)]">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -1763,18 +1773,18 @@ export function TradingView({
                     </div>
                     <div className="mt-2">
                       <Meter
-                        label="Consensus"
+                        label={
+                          <span className="inline-flex items-center gap-1">
+                            <span>Consensus</span>
+                            {crossConsensusPending ? <AnimatedEllipsis /> : null}
+                          </span>
+                        }
                         value01={crossConsensus01}
                         right={crossConsensus01 != null ? fmtPct01(crossConsensus01) : "—"}
                         intent={crossConsensus01 != null && crossConsensus01 >= 0.65 ? "good" : crossConsensus01 != null && crossConsensus01 <= 0.35 ? "warn" : "neutral"}
                       />
                     </div>
-                    {crossConsensusPending ? (
-                      <div className="mt-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/90">
-                        Computing consensus <AnimatedEllipsis />
-                      </div>
-                    ) : null}
-
+                    {null}
                     <div className="mt-3 space-y-1.5">
                       <KV k="dev_bps" v={Number.isFinite(Number(features?.cross?.dev_bps)) ? `${fmtNum(Number(features?.cross?.dev_bps), 1)} bps` : "—"} />
                       <KV k="dev_z" v={Number.isFinite(Number(features?.cross?.dev_z)) ? fmtNum(Number(features?.cross?.dev_z), 2) : "—"} />
@@ -2238,7 +2248,7 @@ export function TradingView({
                   <button
                     type="button"
                     onClick={() => setShowDataCompleteness((v) => !v)}
-                   className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
+                    className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
                     title={showDataCompleteness ? "Hide Data Completeness details" : "Show Data Completeness details"}
                   >
                     {showDataCompleteness ? "Hide" : "Show"}
@@ -2379,7 +2389,7 @@ export function TradingView({
                 <button
                   type="button"
                   onClick={() => setShowKeyLevels((v) => !v)}
-                 className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
+                  className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-200/80 hover:text-zinc-50 hover:bg-white/[0.05]"
                   title={showKeyLevels ? "Hide Key Levels" : "Show Key Levels"}
                 >
                   {showKeyLevels ? "Hide" : "Show"}
