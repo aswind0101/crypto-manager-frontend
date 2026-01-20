@@ -102,11 +102,15 @@ export function computeMarketStructureTF(args: {
   candles?: Candle[];
   pivotWindow?: number; // default 2
   swingsCap?: number;   // default 20
+  sweepLookback?: number; // default 12 (most recent confirmed sweep within window)
   prevTrend?: MarketTrend;
 }): MarketStructureTF {
+
   const tf = args.tf;
   const pivotWindow = args.pivotWindow ?? 2;
   const swingsCap = args.swingsCap ?? 20;
+  const sweepLookback = args.sweepLookback ?? 12;
+
 
   const raw = Array.isArray(args.candles) ? args.candles : [];
   const conf = confirmedOnly(raw);
@@ -130,18 +134,21 @@ export function computeMarketStructureTF(args: {
     chochDown = false,
     sweepUp = false,
     sweepDown = false;
-
-  // Detect BOS/CHOCH as "most recent confirmed event" (not only on last candle).
-  // We scan confirmed candles left-to-right, using swing points as structural levels.
-  if (conf.length && swingsAll.length) {
-    // Build swing lookup by timestamp (ts should match candle.ts)
-    const swingsByTs = new Map<number, SwingPoint[]>();
+  // Build swing lookup by timestamp (ts should match candle.ts)
+  const swingsByTs = new Map<number, SwingPoint[]>();
+  if (swingsAll.length) {
     for (const sp of swingsAll) {
       const arr = swingsByTs.get(sp.ts);
       if (arr) arr.push(sp);
       else swingsByTs.set(sp.ts, [sp]);
     }
+  }
 
+
+  // Detect BOS/CHOCH as "most recent confirmed event" (not only on last candle).
+  // We scan confirmed candles left-to-right, using swing points as structural levels.
+  if (conf.length && swingsAll.length) {
+    // Build swing lookup by timestamp (ts should match candle.ts)
     let curHigh: SwingPoint | undefined = undefined;
     let curLow: SwingPoint | undefined = undefined;
 
@@ -200,11 +207,39 @@ export function computeMarketStructureTF(args: {
     }
   }
 
-  // Sweeps are still evaluated on the last confirmed candle against the last swings (as before).
-  if (last && (lastSwingHigh || lastSwingLow)) {
-    lastSweep = detectSweep(tf, last, lastSwingHigh, lastSwingLow);
-    if (lastSweep?.dir === "UP") sweepUp = true;
-    if (lastSweep?.dir === "DOWN") sweepDown = true;
+   // Detect sweeps as the most recent confirmed sweep within a short lookback window.
+  // This is important for SCALP_LIQUIDITY_SNAPBACK where the sweep may happen a few candles
+  // before the snapback entry condition is evaluated.
+  if (conf.length && swingsAll.length && (lastSwingHigh || lastSwingLow)) {
+    const startIdx = Math.max(0, conf.length - Math.max(1, sweepLookback));
+
+    // Track the latest swing levels seen so far (by time), without clearing them.
+    // These are used as reference levels for sweep detection.
+    let sweepHigh: SwingPoint | undefined = undefined;
+    let sweepLow: SwingPoint | undefined = undefined;
+
+    for (let i = 0; i < conf.length; i++) {
+      const c = conf[i];
+      const sps = swingsByTs.get(c.ts);
+      if (sps?.length) {
+        for (const sp of sps) {
+          if (sp.type === "HIGH") sweepHigh = sp;
+          else if (sp.type === "LOW") sweepLow = sp;
+        }
+      }
+
+      if (i >= startIdx) {
+        const ev = detectSweep(tf, c, sweepHigh, sweepLow);
+        if (ev) lastSweep = ev;
+      }
+    }
+
+    // Preserve per-last-candle sweep flags for UI signals (same semantics as before).
+    if (last) {
+      const lastEv = detectSweep(tf, last, sweepHigh, sweepLow);
+      if (lastEv?.dir === "UP") sweepUp = true;
+      if (lastEv?.dir === "DOWN") sweepDown = true;
+    }
   }
 
   return {

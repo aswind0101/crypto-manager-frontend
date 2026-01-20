@@ -236,8 +236,14 @@ function validateSetupInvariant(args: {
       minRiskAtrK: 0.15,
       minRewardPxK: 0.00035,
       minRewardAtrK: 0.22,
+
+      // allow tiny tolerance for float/rounding drift around zone edges
       stopEdgeTolPxK: 0.00002,
       stopEdgeTolAtrK: 0.02,
+
+      // NEW: minimum distance from stop to the nearest zone edge (prevents "SL glued to entry zone")
+      minStopEdgePxK: 0.00012,
+      minStopEdgeAtrK: 0.06,
     }
     : {
       rrMin: 1.2,
@@ -246,9 +252,15 @@ function validateSetupInvariant(args: {
       minRiskAtrK: 0.25,
       minRewardPxK: 0.0008,
       minRewardAtrK: 0.35,
+
       stopEdgeTolPxK: 0.0,
       stopEdgeTolAtrK: 0.0,
+
+      // NEW: minimum distance from stop to the nearest zone edge
+      minStopEdgePxK: 0.0002,
+      minStopEdgeAtrK: 0.10,
     };
+
 
   const codes: string[] = [];
   const notes: string[] = [];
@@ -308,6 +320,25 @@ function validateSetupInvariant(args: {
     if (!(st > (hi - stopEdgeTol))) {
       codes.push("INV_STOP_NOT_ABOVE_ZONE");
       notes.push(`SHORT stop must be above zone.hi (tol=${stopEdgeTol.toFixed(6)})`);
+    }
+  }
+  // NEW: Stop must not be "glued" to the entry zone edge (operational buffer).
+  // This is separate from "risk from mid-zone" because a wide zone can make mid-based risk look OK
+  // while the stop is still too close to the zone boundary.
+  const minStopEdge = Math.max(px * (INV as any).minStopEdgePxK, atrAbs * (INV as any).minStopEdgeAtrK);
+
+  if (setup.side === "LONG") {
+    const edgeDist = lo - st; // distance below zone.lo
+    // allow tolerance to avoid rejecting due to tiny rounding drift
+    if (edgeDist < (minStopEdge - stopEdgeTol)) {
+      codes.push("INV_STOP_TOO_CLOSE_TO_ZONE_EDGE");
+      notes.push(`Stop too close to zone edge: (zone.lo - stop)=${edgeDist.toFixed(6)} < min ${minStopEdge.toFixed(6)} (tol=${stopEdgeTol.toFixed(6)})`);
+    }
+  } else {
+    const edgeDist = st - hi; // distance above zone.hi
+    if (edgeDist < (minStopEdge - stopEdgeTol)) {
+      codes.push("INV_STOP_TOO_CLOSE_TO_ZONE_EDGE");
+      notes.push(`Stop too close to zone edge: (stop - zone.hi)=${edgeDist.toFixed(6)} < min ${minStopEdge.toFixed(6)} (tol=${stopEdgeTol.toFixed(6)})`);
     }
   }
 
@@ -635,53 +666,53 @@ export function buildSetups(args: {
   }
 
   const tryAccept = (s: TradeSetup) => {
-  telemetry.candidates += 1;
+    telemetry.candidates += 1;
 
-  // IMPORTANT: use scalp sizing for quality gates when setup is scalp
-  const scalp = isScalpSetup(s);
-  const atrpForGate = scalp ? atrpScalp : atrp;
+    // IMPORTANT: use scalp sizing for quality gates when setup is scalp
+    const scalp = isScalpSetup(s);
+    const atrpForGate = scalp ? atrpScalp : atrp;
 
-  const g = applyQualityGates({ setup: s, f, px, atrp: atrpForGate });
+    const g = applyQualityGates({ setup: s, f, px, atrp: atrpForGate });
 
-  if (g.ok === false) {
-    telemetry.rejected += 1;
+    if (g.ok === false) {
+      telemetry.rejected += 1;
 
-    const codes = ("rejectCodes" in g && Array.isArray(g.rejectCodes)) ? g.rejectCodes : [];
-    const notes = ("rejectNotes" in g && Array.isArray(g.rejectNotes)) ? g.rejectNotes : [];
+      const codes = ("rejectCodes" in g && Array.isArray(g.rejectCodes)) ? g.rejectCodes : [];
+      const notes = ("rejectNotes" in g && Array.isArray(g.rejectNotes)) ? g.rejectNotes : [];
 
-    bumpReject(codes, notes);
-    return false;
-  }
+      bumpReject(codes, notes);
+      return false;
+    }
 
-  telemetry.accepted += 1;
+    telemetry.accepted += 1;
 
-  const tagsAdd = ("tagsAdd" in g && Array.isArray(g.tagsAdd)) ? g.tagsAdd : [];
-  const reasonsAdd = ("reasonsAdd" in g && Array.isArray(g.reasonsAdd)) ? g.reasonsAdd : [];
+    const tagsAdd = ("tagsAdd" in g && Array.isArray(g.tagsAdd)) ? g.tagsAdd : [];
+    const reasonsAdd = ("reasonsAdd" in g && Array.isArray(g.reasonsAdd)) ? g.reasonsAdd : [];
 
-  s.tags = Array.from(new Set([...(s.tags || []), ...tagsAdd]));
-  s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...reasonsAdd]));
+    s.tags = Array.from(new Set([...(s.tags || []), ...tagsAdd]));
+    s.confidence.reasons = Array.from(new Set([...(s.confidence.reasons || []), ...reasonsAdd]));
 
-  // NEW: derive grade_plus (A+/A/B/C) centrally at accept-time (no need to touch each setup builder)
-  // We compute conflicts here to avoid relying on fields that are not stored on the setup.
-  const conflictsNow = detectConflicts(f, s.side);
-  const conflictsMajor = conflictsNow.filter((c) => c.severity === "MAJOR").length;
+    // NEW: derive grade_plus (A+/A/B/C) centrally at accept-time (no need to touch each setup builder)
+    // We compute conflicts here to avoid relying on fields that are not stored on the setup.
+    const conflictsNow = detectConflicts(f, s.side);
+    const conflictsMajor = conflictsNow.filter((c) => c.severity === "MAJOR").length;
 
-  const gp = gradePlusFromScore({
-    scoreCommon: isFiniteNum(s.confidence?.score) ? Number(s.confidence.score) : 0,
-    rrMin: isFiniteNum((s as any)?.rr_min) ? Number((s as any).rr_min) : undefined,
-    conflictsMajor,
-    dqGrade: String((f as any)?.quality?.dq_grade ?? ""),
-    biasComplete: !bias_incomplete,
-    triggerTf: String((s as any)?.trigger_tf ?? ""),
-  });
+    const gp = gradePlusFromScore({
+      scoreCommon: isFiniteNum(s.confidence?.score) ? Number(s.confidence.score) : 0,
+      rrMin: isFiniteNum((s as any)?.rr_min) ? Number((s as any).rr_min) : undefined,
+      conflictsMajor,
+      dqGrade: String((f as any)?.quality?.dq_grade ?? ""),
+      biasComplete: !bias_incomplete,
+      triggerTf: String((s as any)?.trigger_tf ?? ""),
+    });
 
-  // Attach to confidence (non-breaking; optional fields)
-  (s.confidence as any).grade_plus = gp.grade_plus;
-  (s.confidence as any).grade_plus_reasons = gp.reasons;
+    // Attach to confidence (non-breaking; optional fields)
+    (s.confidence as any).grade_plus = gp.grade_plus;
+    (s.confidence as any).grade_plus_reasons = gp.reasons;
 
-  setups.push(s);
-  return true;
-};
+    setups.push(s);
+    return true;
+  };
 
 
 
