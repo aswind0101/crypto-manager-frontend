@@ -4,10 +4,8 @@ import { useSetupsSnapshot } from "../../../hooks/useSetupsSnapshot";
 import { useLocalStorageState } from "../../../hooks/useLocalStorageState";
 
 import {
-  Activity,
   AlertTriangle,
   CheckCircle2,
-  SearchIcon,
   CircleDashed,
   Clock,
   Crosshair,
@@ -990,28 +988,6 @@ function MidBadge({ mid }: { mid: number }) {
     </span>
   );
 }
-function MidAssistButton({ mid }: { mid: number }) {
-  const text = Number.isFinite(mid) ? `$${fmtPxWithSep(mid)}` : "—";
-
-  return (
-    <span
-      className={[
-        // iOS AssistiveTouch-ish: blurred, subtle ring, soft shadow
-        "inline-flex items-center justify-center",
-        "h-8 rounded-full px-3",
-        "bg-white/10 backdrop-blur-md",
-        "ring-1 ring-white/20",
-        "shadow-[0_10px_24px_rgba(0,0,0,0.35)]",
-        "text-[11px] font-semibold tabular-nums",
-        "text-zinc-100/90",
-        "select-none",
-      ].join(" ")}
-      title="Realtime mid price"
-    >
-      {text}
-    </span>
-  );
-}
 /** ---------- Small UI atoms ---------- */
 function SideIcon({ side }: { side: string }) {
   if (side === "LONG") {
@@ -1768,30 +1744,20 @@ export function TradingView({
             <div className="space-y-4">
               <Card
                 title="Market Context"
-                icon={<LineChart className="h-5 w-5" />}
+                icon={
+                  biasDir === "BULL" ? (
+                    <TrendingUp className="h-5 w-5 text-emerald-300" />
+                  ) : biasDir === "BEAR" ? (
+                    <TrendingDown className="h-5 w-5 text-rose-300" />
+                  ) : biasDir === "SIDEWAYS" ? (
+                    <Waves className="h-5 w-5 text-amber-300" />
+                  ) : (
+                    <Minus className="h-5 w-5 text-zinc-300" />
+                  )
+                }
                 right={
                   <div className="flex items-center gap-2">
                     <MidBadge mid={mid} />
-                    <Pill
-                      tone={
-                        biasDir === "BULL"
-                          ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                          : biasDir === "BEAR"
-                            ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                            : biasDir === "SIDEWAYS"
-                              ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                              : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
-                      }
-                      icon={
-                        biasDir === "BULL"
-                          ? <TrendingUp className="h-4 w-4" />
-                          : biasDir === "BEAR"
-                            ? <TrendingDown className="h-4 w-4" />
-                            : <Waves className="h-4 w-4" />
-                      }
-                    >
-                      {biasDir}
-                    </Pill>
                   </div>
                 }
               >
