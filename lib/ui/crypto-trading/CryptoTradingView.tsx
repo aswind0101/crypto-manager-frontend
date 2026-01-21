@@ -1070,16 +1070,23 @@ function Pill({
 function Card({
   title,
   icon,
+  iconWrapClassName,
   right,
   children,
   className,
 }: {
   title: string;
   icon?: React.ReactNode;
+  iconWrapClassName?: string;
   right?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
+  const iconWrapCls =
+    typeof iconWrapClassName === "string" && iconWrapClassName.trim().length > 0
+      ? iconWrapClassName
+      : "rounded-2xl bg-white/[0.04] p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/5";
+
   return (
     <section
       className={[
@@ -1091,7 +1098,7 @@ function Card({
     >
       <header className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="flex items-center gap-2">
-          <div className="rounded-2xl bg-white/[0.04] p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/5">{icon}</div>
+          {icon ? <div className={iconWrapCls}>{icon}</div> : null}
           <div>
             <div className="text-[13px] font-extrabold tracking-tight text-zinc-50">{title}</div>
           </div>
@@ -1102,6 +1109,7 @@ function Card({
     </section>
   );
 }
+
 
 function Meter({
   label,
@@ -1744,6 +1752,7 @@ export function TradingView({
             <div className="space-y-4">
               <Card
                 title="Market Context"
+                iconWrapClassName="flex items-center justify-center bg-transparent p-0 shadow-none ring-0"
                 icon={
                   biasDir === "BULL" ? (
                     <TrendingUp className="h-5 w-5 text-emerald-300" />
