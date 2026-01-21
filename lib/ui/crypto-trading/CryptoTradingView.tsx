@@ -874,11 +874,13 @@ function RealtimeSignal({
   label = "Realtime",
   title,
   showSeconds = false,
+  liveDotActive = false,
 }: {
   staleSec?: number;
   label?: string;
   title?: string;
   showSeconds?: boolean;
+  liveDotActive?: boolean;
 }) {
   const level = signalLevelFromStale(staleSec);
   const tone = signalToneFromLevel(level);
@@ -935,13 +937,20 @@ function RealtimeSignal({
       {showSeconds ? (
         <span
           className={[
-            "ml-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-zinc-100 ring-1 ring-white/10",
-            "tabular-nums text-center",
+            "px-2 py-0.5 text-[10px] text-zinc-100",
+            "tabular-nums text-left",
             // Reserve space so the pill never changes width (prevents page jitter)
             "min-w-[46px]",
           ].join(" ")}
         >
           {secText}
+        </span>
+      ) : null}
+      {/* Live dot placed after seconds (i.e., after "ts" pill) */}
+      {liveDotActive ? (
+        <span className="relative inline-flex h-2.5 w-2.5" aria-label="Live indicator">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-200/40" />
+          <span className="relative inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-200 shadow-[0_0_0_3px_rgba(16,185,129,0.10)]" />
         </span>
       ) : null}
 
@@ -1653,10 +1662,10 @@ export function TradingView({
                   onClick={onAnalyze}
                   disabled={!symbolInputEnabled}
                   className={[
-                    "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold tracking-tight transition",
-                    symbolInputEnabled
-                      ? "bg-gradient-to-b from-sky-500/30 to-sky-500/15 text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.14)] hover:from-sky-500/35 hover:to-sky-500/18 active:from-sky-500/40"
-                      : "bg-white/[0.04] text-zinc-500 cursor-not-allowed shadow-none",
+                    "relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-2xl px-5 text-sm font-extrabold tracking-tight transition",
+                    "w-full sm:w-auto",
+                    "bg-gradient-to-b from-sky-500/30 to-sky-500/15 text-sky-50 shadow-[0_10px_30px_rgba(56,189,248,0.14)]",
+                    "hover:from-sky-500/35 hover:to-sky-500/18 active:from-sky-500/40",
                   ].join(" ")}
                   title={
                     symbolInputEnabled
@@ -1671,28 +1680,23 @@ export function TradingView({
                 <button
                   onClick={() => setPaused((p) => !p)}
                   className={[
-                    "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold tracking-tight transition",
+                    "relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-2xl px-5 text-sm font-extrabold tracking-tight transition",
+                    "w-full sm:w-auto",
                     paused
-                      ? "bg-gradient-to-b from-rose-500/28 to-rose-500/14 text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] hover:from-rose-500/32 hover:to-rose-500/16"
-                      : "bg-gradient-to-b from-emerald-500/26 to-emerald-500/12 text-emerald-50 shadow-[0_10px_30px_rgba(16,185,129,0.12)] hover:from-emerald-500/30 hover:to-emerald-500/14",
+                      ? "bg-gradient-to-b from-rose-500/28 to-rose-500/14 text-rose-50 shadow-[0_10px_30px_rgba(244,63,94,0.12)] ring-1 ring-rose-500/15 hover:from-rose-500/32 hover:to-rose-500/16"
+                      : "bg-gradient-to-b from-emerald-500/26 to-emerald-500/12 text-emerald-50 shadow-[0_10px_30px_rgba(16,185,129,0.12)] ring-1 ring-emerald-500/15 hover:from-emerald-500/30 hover:to-emerald-500/14",
                   ].join(" ")}
+
                   title={paused ? "Resume updates" : "Pause updates"}
                 >
                   {paused ? (
                     <Lock className="h-4 w-4" />
                   ) : (
-                    <EcgBeatIcon className="h-5 w-5 text-emerald-100 ct-ecg-breathe" />
+                    <EcgBeatIcon className="h-6 w-6 text-emerald-100 ct-ecg-breathe" />
                   )}
 
                   <span className="inline-flex items-center gap-2">
                     <span>{paused ? "Paused" : "Live"}</span>
-
-                    {!paused ? (
-                      <span className="relative inline-flex h-2.5 w-2.5" aria-label="Live indicator">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-200/40" />
-                        <span className="relative inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-200 shadow-[0_0_0_3px_rgba(16,185,129,0.10)]" />
-                      </span>
-                    ) : null}
                   </span>
                 </button>
               </div>
@@ -1732,6 +1736,7 @@ export function TradingView({
                 label="Realtime"
                 // Nếu bạn muốn vẫn thấy số giây nhỏ bên cạnh, bật true:
                 showSeconds={true}
+                liveDotActive={!paused}
                 title="Realtime price feed health (based on snap.price.ts)"
               />
               <div className="ml-auto text-xs text-zinc-400">Updated {lastUpdated}</div>
