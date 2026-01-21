@@ -2123,9 +2123,9 @@ export function TradingView({
                               <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
                                   <Sparkles className="h-4 w-4 text-zinc-300" />
-                                  SCALP
+                                  <span>SCALP :</span>
+                                  <span className="text-sm font-black">{scalpRanked.length}</span>
                                 </div>
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{scalpRanked.length} setups</Pill>
                               </div>
                               <div className="space-y-2">{renderList(scalpRanked)}</div>
                             </div>
@@ -2135,9 +2135,9 @@ export function TradingView({
                               <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
                                   <Layers className="h-4 w-4 text-zinc-300" />
-                                  NON-SCALP
+                                  <span>NON-SCALP :</span>
+                                  <span className="text-sm font-black">{nonScalpRanked.length}</span>
                                 </div>
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{nonScalpRanked.length} setups</Pill>
                               </div>
                               <div className="space-y-2">{renderList(nonScalpRanked)}</div>
                             </div>
