@@ -978,7 +978,7 @@ function MidBadge({ mid }: { mid: number }) {
   return (
     <span
       className={[
-        "flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
+        "flex items-center gap-2 rounded-xl px-3 h-7 text-[11px] font-semibold",
         "bg-sky-500/15 text-sky-200 ring-1 ring-sky-500/30",
         "tabular-nums min-w-[110px] justify-center",
       ].join(" ")}
@@ -1755,13 +1755,13 @@ export function TradingView({
                 iconWrapClassName="flex items-center justify-center bg-transparent p-0 shadow-none ring-0"
                 icon={
                   biasDir === "BULL" ? (
-                    <TrendingUp className="h-5 w-5 text-emerald-300" />
+                    <TrendingUp className="h-6 w-6 text-emerald-300" />
                   ) : biasDir === "BEAR" ? (
-                    <TrendingDown className="h-5 w-5 text-rose-300" />
+                    <TrendingDown className="h-6 w-6 text-rose-300" />
                   ) : biasDir === "SIDEWAYS" ? (
-                    <Waves className="h-5 w-5 text-amber-300" />
+                    <Waves className="h-6 w-6 text-amber-300" />
                   ) : (
-                    <Minus className="h-5 w-5 text-zinc-300" />
+                    <Minus className="h-6 w-6 text-zinc-300" />
                   )
                 }
                 right={
@@ -1770,6 +1770,8 @@ export function TradingView({
                   </div>
                 }
               >
+                <div className="mb-3 h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
                 <div className="space-y-3">
                   <Meter
                     label="Bias strength"
@@ -1846,6 +1848,7 @@ export function TradingView({
                   <LineChart className="h-4 w-4 text-zinc-300" />
                   Trend by timeframe (Structure)
                 </div>
+                <Divider/>
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {["4h", "1h", "15m", "5m"].map((tf) => {
@@ -1872,7 +1875,12 @@ export function TradingView({
                   })}
                 </div>
               </div>
-              <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
+              <Card
+                title="Setup Queue"
+                icon={<Target className="h-5 w-5" />}
+                right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}
+              >
+                <div className="mb-3 h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 {/* Queue filters */}
                 <div className="mb-3 space-y-2">
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
