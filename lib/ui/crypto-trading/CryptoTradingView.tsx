@@ -215,12 +215,12 @@ function fmtEntryZone(zone?: { lo: number; hi: number }) {
 
   // If nearly equal, show single price
   const eps = 1e-12;
-  if (Math.abs(a - b) <= eps) return fmtPx(a);
+  if (Math.abs(a - b) <= eps) return fmtPxWithSep(a);
 
   // Keep natural order (lo-hi), but still handle reversed data safely
   const lo2 = Math.min(a, b);
   const hi2 = Math.max(a, b);
-  return `${fmtPx(lo2)}–${fmtPx(hi2)}`;
+  return `${fmtPxWithSep(lo2)}–${fmtPxWithSep(hi2)}`;
 }
 
 function fmtTpSummary(tp?: Array<{ price: number; size_pct: number }>) {
@@ -228,7 +228,7 @@ function fmtTpSummary(tp?: Array<{ price: number; size_pct: number }>) {
   const prices = arr
     .map((x) => x?.price)
     .filter((p) => Number.isFinite(p as number))
-    .map((p) => fmtPx(p as number));
+    .map((p) => fmtPxWithSep(p as number));
 
   if (prices.length === 0) return "—";
   if (prices.length <= 2) return prices.join(" / ");
@@ -2012,7 +2012,7 @@ export function TradingView({
 
                             const chip = actionChip(s, executionGlobal);
                             const entryText = fmtEntryZone(s.entry?.zone);
-                            const slText = fmtPx(s.stop?.price);
+                            const slText = fmtPxWithSep(s.stop?.price);
                             const tpText = fmtTpSummary(s.tp);
 
                             return (
