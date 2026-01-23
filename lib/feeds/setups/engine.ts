@@ -1495,12 +1495,9 @@ export function buildSetups(args: {
   const last5 = tf5c[tf5c.length - 1];
   const px5 = lastConfirmedClose(tf5c) ?? px;
 
-  // ATR% proxy for scalp sizing (prefer 5m ATR% if present; fallback to 15m then global proxy)
-  const atrp5mPct = isFiniteNum((f as any)?.entry?.volatility?.atrp_5m) ? Number((f as any).entry.volatility.atrp_5m) / 100 : undefined;
+  // ATR% proxy for scalp sizing (prefer 15m ATR% if present; fallback to global proxy)
   const atrp15mPct = isFiniteNum((f as any)?.entry?.volatility?.atrp_15m) ? Number((f as any).entry.volatility.atrp_15m) / 100 : undefined;
-  const atrpScalp = (atrp5mPct && atrp5mPct > 0)
-    ? atrp5mPct
-    : ((atrp15mPct && atrp15mPct > 0) ? atrp15mPct : atrp);
+  const atrpScalp = atrp15mPct && atrp15mPct > 0 ? atrp15mPct : atrp;
 
   // Small helper: bps proximity
   const distBps = (a: number, b: number) => ((a - b) / b) * 10000;
@@ -1518,19 +1515,9 @@ export function buildSetups(args: {
       const widthFrac = (hi - lo) / px5;
       const vr = String((f as any)?.bias?.vol_regime ?? "");
       const trendDir = String((f as any)?.bias?.trend_dir ?? "");
-      const trendStrength = (f as any)?.bias?.trend_strength;
-      const ms15 = (f as any).market_structure?.["15m"];
-      const ms15Trend = String(ms15?.trend ?? "");
-
-      // Range context: require either sideways bias OR 15m structure in RANGE OR weak trend-strength.
-      // This is a HARD gate (not just a score tweak) to avoid fading in strong trends.
-      const rangeCtxOk =
-        trendDir === "sideways" ||
-        ms15Trend === "RANGE" ||
-        (typeof trendStrength === "number" && trendStrength < 0.55);
 
       // Range conditions: not in high-vol, and width is meaningful relative to ATR.
-      const rangeOk = rangeCtxOk && vr !== "high" && widthFrac >= (atrpScalp * 0.8);
+      const rangeOk = vr !== "high" && widthFrac >= (atrpScalp * 0.8);
       if (rangeOk) {
         // Proximity to an edge: within ~25% of range width OR within ~0.25*ATR.
         const dHi = abs(px5 - hi);
@@ -1601,7 +1588,6 @@ export function buildSetups(args: {
               confirmed: false,
               checklist: [
                 { key: "range", ok: true, note: "5m swing range fade" },
-                { key: "range_ctx", ok: rangeCtxOk, note: `bias=${trendDir || "n/a"} strength=${fmtNum(trendStrength, 2)} ms15=${ms15Trend || "n/a"}` },
                 { key: "range_hi", ok: true, note: `RangeHi @ ${hi.toFixed(2)} (5m)` },
                 { key: "range_lo", ok: true, note: `RangeLo @ ${lo.toFixed(2)} (5m)` },
                 { key: "vol", ok: vr !== "high", note: `vol_regime=${vr || "n/a"}` },
@@ -1648,7 +1634,7 @@ export function buildSetups(args: {
     const swTs = Number(sw?.ts);
     const recentOk = isFiniteNum(swTs) && isFiniteNum(last5.ts)
       ? (last5.ts - swTs) <= 3 * 5 * 60 * 1000
-      : false;
+      : true;
 
     if (isFiniteNum(swLevel) && swLevel > 0 && recentOk) {
       const side: SetupSide = String(sw.dir) === "UP" ? "SHORT" : "LONG";
@@ -1706,8 +1692,7 @@ export function buildSetups(args: {
           trigger: {
             confirmed: false,
             checklist: [
-              { key: "sweep", ok: true, note: `5m sweep ${String(sw.dir)} @ ${swLevel.toFixed(2)}` },
-              { key: "recency", ok: recentOk, note: `dt_ms=${isFiniteNum(swTs) && isFiniteNum(last5.ts) ? (last5.ts - swTs) : NaN}` },
+              { key: "sweep", ok: true, note: `Sweep @ ${swLevel.toFixed(2)} (5m)` },
               { key: "retest", ok: true, note: "Retest sweep level zone" },
               { key: "proximity", ok: nearLvl, note: `dist=${distBps(px5, swLevel).toFixed(1)}bps` },
             ],
