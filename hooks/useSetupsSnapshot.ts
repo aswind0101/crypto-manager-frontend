@@ -1011,50 +1011,74 @@ function applyCloseConfirm(out: any, snap: any): any {
 
     // When setup first becomes READY, set baseline and require the NEXT confirmed candle.
     // This prevents triggering off a candle that closed before the setup was READY..
+    //
+    // Exception (explicit, deterministic): SCALP_LIQUIDITY_SNAPBACK may trigger on the CURRENT close-confirm candle
+    // (still confirmed) to avoid systematic 1-candle delay. We do this by setting the baseline to the previous candle.
     if (s.status === "READY" && trg?.confirmed !== true && baseTs == null) {
       const tfMs = tfToMs(tf);
+      const allowSameClose = s.type === "SCALP_LIQUIDITY_SNAPBACK";
 
-      let nextCloseTs: number | undefined =
-        typeof lastTs === "number" && typeof tfMs === "number"
-          ? lastTs + tfMs
-          : undefined;
+      // If we can compute tfMs, and this setup is allowed to use the current confirmed close,
+      // we set baseline to the previous candle and continue evaluating trigger logic in this same pass.
+      if (allowSameClose && typeof lastTs === "number" && typeof tfMs === "number" && tfMs > 0) {
+        const basePrev = lastTs - tfMs;
 
-      // IMPORTANT FIX: ensure nextCloseTs is strictly in the future
-      if (typeof nextCloseTs === "number") {
-        while (nextCloseTs <= tnow) {
-          nextCloseTs += tfMs!;
+        checklistNow = upsertChecklist(checklistNow, {
+          key: "close_confirm",
+          ok: true,
+          note: `Using current confirmed close (tf=${tf}) with baseline=${basePrev}`,
+        });
+
+        trg = {
+          ...(trg as any),
+          checklist: checklistNow,
+          _cc_base_ts: basePrev,
+          _cc_next_close_ts: undefined,
+          _cc_tf: (tf === "5m" || tf === "15m") ? tf : undefined,
+          tier: String((trg as any)?.tier ?? "") || "APPROACHING",
+        };
+      } else {
+        let nextCloseTs: number | undefined =
+          typeof lastTs === "number" && typeof tfMs === "number"
+            ? lastTs + tfMs
+            : undefined;
+
+        // IMPORTANT FIX: ensure nextCloseTs is strictly in the future
+        if (typeof nextCloseTs === "number") {
+          while (nextCloseTs <= tnow) {
+            nextCloseTs += tfMs!;
+          }
         }
-      }
 
-      const remainingSec =
-        typeof nextCloseTs === "number"
-          ? Math.max(0, Math.ceil((nextCloseTs - tnow) / 1000))
-          : undefined;
-      const remainingMMSS = formatRemainingMMSS(remainingSec);
+        const remainingSec =
+          typeof nextCloseTs === "number"
+            ? Math.max(0, Math.ceil((nextCloseTs - tnow) / 1000))
+            : undefined;
+        const remainingMMSS = formatRemainingMMSS(remainingSec);
 
-      checklistNow = upsertChecklist(checklistNow, {
-        key: "close_confirm",
-        ok: false,
-        note: `Waiting next ${tf} close at ${nextCloseTs ? new Date(nextCloseTs).toLocaleTimeString() : "?"
-          } (${remainingMMSS ?? "countdown unavailable"} remaining)`,
-      });
+        checklistNow = upsertChecklist(checklistNow, {
+          key: "close_confirm",
+          ok: false,
+          note: `Waiting next ${tf} close at ${nextCloseTs ? new Date(nextCloseTs).toLocaleTimeString() : "?"
+            } (${remainingMMSS ?? "countdown unavailable"} remaining)`,
+        });
 
-      return {
-        ...s,
-        entry: {
-          ...s.entry,
-          trigger: {
-            ...trg,
-            checklist: checklistNow,
-            _cc_base_ts: lastTs,
-            _cc_next_close_ts: typeof nextCloseTs === "number" ? nextCloseTs : undefined,
-            _cc_tf: (tf === "5m" || tf === "15m") ? tf : undefined,
-            tier: String((trg as any)?.tier ?? "") || "APPROACHING",
+        return {
+          ...s,
+          entry: {
+            ...s.entry,
+            trigger: {
+              ...trg,
+              checklist: checklistNow,
+              _cc_base_ts: lastTs,
+              _cc_next_close_ts: typeof nextCloseTs === "number" ? nextCloseTs : undefined,
+              _cc_tf: (tf === "5m" || tf === "15m") ? tf : undefined,
+              tier: String((trg as any)?.tier ?? "") || "APPROACHING",
+            },
           },
-        },
-      };
+        };
+      }
     }
-
 
     // If baseline exists, require a NEW candle close (ts advanced).
     let closeOk = true;

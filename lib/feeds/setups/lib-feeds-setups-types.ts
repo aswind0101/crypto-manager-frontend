@@ -5,7 +5,12 @@ export type SetupType =
   | "BREAKOUT"
   | "RANGE_MEAN_REVERT"
   | "LIQUIDITY_SWEEP_REVERSAL"
-  | "FAILED_SWEEP_CONTINUATION";
+  | "FAILED_SWEEP_CONTINUATION"
+  // Scalp setups (short-horizon; 5m/15m/1h)
+  | "SCALP_RANGE_FADE"
+  | "SCALP_LIQUIDITY_SNAPBACK"
+  | "SCALP_MOMENTUM_PULLBACK"
+  | "SCALP_1H_REACTION";
 
 export type EntryPlan = {
   mode: "LIMIT" | "MARKET";

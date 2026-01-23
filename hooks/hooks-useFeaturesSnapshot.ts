@@ -3,22 +3,32 @@ import type { UnifiedSnapshot } from "../lib/feeds/snapshot/unifiedTypes";
 import type { FeaturesSnapshot, FeatureEngineInput } from "../lib/feeds/features/types";
 import { computeFeatures } from "../lib/feeds/features/engine";
 import { useBybitUnifiedSnapshot } from "./useBybitUnifiedSnapshot";
+import type { Candle } from "../lib/feeds/core/types";
+
 
 // Helper: lấy candles theo tf từ snapshot.timeframes
 function extractCandles(snap: UnifiedSnapshot, tf: any, src: "bybit" | "binance") {
   const tfNode: any = snap.timeframes.find((x: any) => x.tf === tf);
   if (!tfNode) return undefined;
 
-  if (src === "bybit") {
-    return tfNode?.candles?.ohlcv;
+  const raw: Candle[] | undefined =
+    src === "bybit"
+      ? tfNode?.candles?.ohlcv
+      : src === "binance"
+        ? tfNode?.candles_binance?.ohlcv
+        : undefined;
+
+  if (!Array.isArray(raw) || raw.length === 0) return raw;
+
+  // ✅ Only use closed candles for feature computation
+  const last = raw[raw.length - 1];
+  if (last && last.confirm === false) {
+    return raw.slice(0, -1);
   }
 
-  if (src === "binance") {
-    return tfNode?.candles_binance?.ohlcv;
-  }
-
-  return undefined;
+  return raw;
 }
+
 
 export function useFeaturesSnapshot(symbol: string) {
   const snap = useBybitUnifiedSnapshot(symbol);
@@ -38,6 +48,7 @@ export function useFeaturesSnapshot(symbol: string) {
     const c15 = extractCandles(snap, "15m", "bybit");
     const c1h = extractCandles(snap, "1h", "bybit");
     const c4h = extractCandles(snap, "4h", "bybit");
+    const c1D = extractCandles(snap, "1D", "bybit");
 
     // ✅ Binance candles (5m/15m) từ timeframes (Task 3.1.1)
     const b5 = extractCandles(snap, "5m", "binance");
@@ -64,6 +75,7 @@ export function useFeaturesSnapshot(symbol: string) {
         "15m": { bybit: c15, binance: b15 },
         "1h": { bybit: c1h },
         "4h": { bybit: c4h },
+        "1D": { bybit: c1D },
       },
 
       orderbook: orderbook ? { bids: orderbook.bids, asks: orderbook.asks } : undefined,
@@ -79,7 +91,7 @@ export function useFeaturesSnapshot(symbol: string) {
   useEffect(() => {
     if (!input) return;
 
-    // key dựa trên ts của các TF quan trọng + orderbook ts để cache
+    //. key dựa trên ts của các TF quan trọng + orderbook ts để cache
     const k5 = input.candles["5m"]?.bybit?.slice(-1)?.[0]?.ts ?? 0;
     const k15 = input.candles["15m"]?.bybit?.slice(-1)?.[0]?.ts ?? 0;
     const k1h = input.candles["1h"]?.bybit?.slice(-1)?.[0]?.ts ?? 0;

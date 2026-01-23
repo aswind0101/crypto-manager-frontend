@@ -37,7 +37,7 @@ export type FeaturesSnapshot = {
     ema200?: number;
     ema200_slope_bps?: number; // EMA200 slope in bps per bar
   };
-  bias_by_tf?: Record<"15m" | "1h" | "4h" | "1d", BiasTfSnapshot>;
+  bias_by_tf?: Record<"15m" | "1h" | "4h" | "1D", BiasTfSnapshot>;
   entry: {
     tfs: Array<"5m" | "15m">;
     momentum: {
@@ -168,4 +168,3 @@ export type MarketStructureTF = {
 };
 
 export type MarketStructureSnapshot = Record<string, MarketStructureTF>;
-

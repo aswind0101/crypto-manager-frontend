@@ -47,7 +47,9 @@ export type FeaturesSnapshot = {
       macdHist_15m?: number;
     };
     volatility: {
+      atrp_5m?: number;   // ATR/price (%) 5m (scalp sizing)
       atrp_15m?: number;  // ATR/price (%) 15m
+
       atrp_1h?: number;   // NEW: ATR/price (%) 1h
       atrp_4h?: number;   // NEW: ATR/price (%) 4h
 

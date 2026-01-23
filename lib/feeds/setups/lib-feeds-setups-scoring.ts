@@ -14,6 +14,67 @@ export function gradeFromScore(score: number): "A" | "B" | "C" | "D" {
   if (score >= 50) return "C";
   return "D";
 }
+export function gradePlusFromScore(input: {
+  scoreCommon: number;             // 0..100
+  rrMin?: number;                  // e.g., 1.2..3.5
+  conflictsMajor?: number;         // count
+  dqGrade?: string;                // "A"|"B"|...
+  biasComplete?: boolean;
+  triggerTf?: string;
+}): { grade_plus: "A+" | "A" | "B" | "C"; reasons: string[] } {
+  const reasons: string[] = [];
+  const rr = Number.isFinite(Number(input.rrMin)) ? Number(input.rrMin) : 0;
+  const cm = Number.isFinite(Number(input.conflictsMajor)) ? Number(input.conflictsMajor) : 0;
+  const dq = String(input.dqGrade ?? "");
+  const biasComplete = input.biasComplete !== false;
+
+  // Base from common score
+  let g: "A+" | "A" | "B" | "C";
+  if (input.scoreCommon >= 88) g = "A+";
+  else if (input.scoreCommon >= 80) g = "A";
+  else if (input.scoreCommon >= 68) g = "B";
+  else g = "C";
+
+  // DQ / bias completeness caps
+  if (dq && dq !== "A" && dq !== "B") {
+    g = "C";
+    reasons.push(`dq=${dq} cap->C`);
+  }
+  if (!biasComplete && g === "A+") {
+    g = "A";
+    reasons.push("bias_incomplete cap A+->A");
+  }
+
+  // Conflicts cap
+  if (cm >= 1 && g === "A+") {
+    g = "A";
+    reasons.push("major_conflict cap A+->A");
+  } else if (cm >= 2 && (g === "A+" || g === "A")) {
+    g = "B";
+    reasons.push("major_conflicts cap->B");
+  }
+
+  // RR nudges
+  if (rr > 0) {
+    if (rr >= 2.2 && (g === "A" || g === "B")) {
+      // good RR can bump one step, but never above A
+      g = g === "B" ? "A" : "A";
+      reasons.push(`rr=${rr.toFixed(2)} bump->A`);
+    }
+    if (rr < 1.35 && (g === "A+" || g === "A")) {
+      g = "B";
+      reasons.push(`rr=${rr.toFixed(2)} cap->B`);
+    }
+  }
+
+  // Final sanity
+  if (g === "A+") reasons.push("meets A+ threshold");
+  if (g === "A") reasons.push("meets A threshold");
+  if (g === "B") reasons.push("meets B threshold");
+  if (g === "C") reasons.push("monitor-only");
+
+  return { grade_plus: g, reasons };
+}
 
 function isFiniteNum(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x);

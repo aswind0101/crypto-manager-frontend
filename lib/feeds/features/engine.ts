@@ -230,10 +230,15 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
 
   // Vol regime (15m)
   let vol_regime: VolRegime = "normal";
+  let atrp_5m: number | undefined = undefined;
   let atrp_15m: number | undefined = undefined;
+
   let atrp_1h: number | undefined = undefined;
   let atrp_4h: number | undefined = undefined;
-
+  if (c5 && c5.length >= 50) {
+    const vr = volRegimeFromAtr(c5);
+    atrp_5m = vr.atrp * 100; // %
+  }
   if (c15 && c15.length >= 50) {
     const vr = volRegimeFromAtr(c15);
     vol_regime = vr.reg;
@@ -442,6 +447,7 @@ export function computeFeatures(input: FeatureEngineInput): FeaturesSnapshot {
         macdHist_15m,
       },
       volatility: {
+        atrp_5m,
         atrp_15m,
         atrp_1h,
         atrp_4h,
