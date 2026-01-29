@@ -27,6 +27,7 @@
     "emoji-picker-react": "^4.12.2",
     "firebase": "^11.5.0",
     "framer-motion": "^12.23.26",
+    "jspdf": "^4.0.0",
     "keen-slider": "^6.8.6",
     "libphonenumber-js": "^1.12.7",
     "lucide-react": "^0.510.0",
@@ -46,7 +47,8 @@
     "socket.io-client": "^4.8.1",
     "swr": "^2.3.8",
     "tailwind-merge": "^3.3.1",
-    "use-places-autocomplete": "^4.0.1"
+    "use-places-autocomplete": "^4.0.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

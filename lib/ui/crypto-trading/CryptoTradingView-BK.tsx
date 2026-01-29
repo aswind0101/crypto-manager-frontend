@@ -4,10 +4,8 @@ import { useSetupsSnapshot } from "../../../hooks/useSetupsSnapshot";
 import { useLocalStorageState } from "../../../hooks/useLocalStorageState";
 
 import {
-  Activity,
   AlertTriangle,
   CheckCircle2,
-  SearchIcon,
   CircleDashed,
   Clock,
   Crosshair,
@@ -980,31 +978,9 @@ function MidBadge({ mid }: { mid: number }) {
   return (
     <span
       className={[
-        "flex items-center gap-2 rounded-full px-3 h-7 text-[11px] font-semibold",
+        "flex items-center gap-2 rounded-xl px-3 h-7 text-[11px] font-semibold",
         "bg-sky-500/15 text-sky-200 ring-1 ring-sky-500/30",
         "tabular-nums min-w-[110px] justify-center",
-      ].join(" ")}
-      title="Realtime mid price"
-    >
-      {text}
-    </span>
-  );
-}
-function MidAssistButton({ mid }: { mid: number }) {
-  const text = Number.isFinite(mid) ? `$${fmtPxWithSep(mid)}` : "—";
-
-  return (
-    <span
-      className={[
-        // iOS AssistiveTouch-ish: blurred, subtle ring, soft shadow
-        "inline-flex items-center justify-center",
-        "h-8 rounded-full px-3",
-        "bg-white/10 backdrop-blur-md",
-        "ring-1 ring-white/20",
-        "shadow-[0_10px_24px_rgba(0,0,0,0.35)]",
-        "text-[11px] font-semibold tabular-nums",
-        "text-zinc-100/90",
-        "select-none",
       ].join(" ")}
       title="Realtime mid price"
     >
@@ -1094,16 +1070,23 @@ function Pill({
 function Card({
   title,
   icon,
+  iconWrapClassName,
   right,
   children,
   className,
 }: {
   title: string;
   icon?: React.ReactNode;
+  iconWrapClassName?: string;
   right?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
+  const iconWrapCls =
+    typeof iconWrapClassName === "string" && iconWrapClassName.trim().length > 0
+      ? iconWrapClassName
+      : "rounded-2xl bg-white/[0.04] p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/5";
+
   return (
     <section
       className={[
@@ -1115,7 +1098,7 @@ function Card({
     >
       <header className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="flex items-center gap-2">
-          <div className="rounded-2xl bg-white/[0.04] p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/5">{icon}</div>
+          {icon ? <div className={iconWrapCls}>{icon}</div> : null}
           <div>
             <div className="text-[13px] font-extrabold tracking-tight text-zinc-50">{title}</div>
           </div>
@@ -1126,6 +1109,7 @@ function Card({
     </section>
   );
 }
+
 
 function Meter({
   label,
@@ -1768,33 +1752,26 @@ export function TradingView({
             <div className="space-y-4">
               <Card
                 title="Market Context"
-                icon={<LineChart className="h-5 w-5" />}
+                iconWrapClassName="flex items-center justify-center bg-transparent p-0 shadow-none ring-0"
+                icon={
+                  biasDir === "BULL" ? (
+                    <TrendingUp className="h-6 w-6 text-emerald-300" />
+                  ) : biasDir === "BEAR" ? (
+                    <TrendingDown className="h-6 w-6 text-rose-300" />
+                  ) : biasDir === "SIDEWAYS" ? (
+                    <Waves className="h-6 w-6 text-amber-300" />
+                  ) : (
+                    <Minus className="h-6 w-6 text-zinc-300" />
+                  )
+                }
                 right={
                   <div className="flex items-center gap-2">
                     <MidBadge mid={mid} />
-                    <Pill
-                      tone={
-                        biasDir === "BULL"
-                          ? "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30"
-                          : biasDir === "BEAR"
-                            ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30"
-                            : biasDir === "SIDEWAYS"
-                              ? "bg-amber-500/10 text-amber-200 ring-1 ring-amber-500/30"
-                              : "bg-zinc-500/10 text-zinc-200 ring-1 ring-zinc-500/30"
-                      }
-                      icon={
-                        biasDir === "BULL"
-                          ? <TrendingUp className="h-4 w-4" />
-                          : biasDir === "BEAR"
-                            ? <TrendingDown className="h-4 w-4" />
-                            : <Waves className="h-4 w-4" />
-                      }
-                    >
-                      {biasDir}
-                    </Pill>
                   </div>
                 }
               >
+                <div className="mb-3 h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
                 <div className="space-y-3">
                   <Meter
                     label="Bias strength"
@@ -1871,6 +1848,7 @@ export function TradingView({
                   <LineChart className="h-4 w-4 text-zinc-300" />
                   Trend by timeframe (Structure)
                 </div>
+                <Divider/>
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {["4h", "1h", "15m", "5m"].map((tf) => {
@@ -1897,7 +1875,12 @@ export function TradingView({
                   })}
                 </div>
               </div>
-              <Card title="Setup Queue" icon={<Target className="h-5 w-5" />} right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}>
+              <Card
+                title="Setup Queue"
+                icon={<Target className="h-5 w-5" />}
+                right={<div className="text-xs text-zinc-400">{ranked.length} setups</div>}
+              >
+                <div className="mb-3 h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 {/* Queue filters */}
                 <div className="mb-3 space-y-2">
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -2148,9 +2131,9 @@ export function TradingView({
                               <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
                                   <Sparkles className="h-4 w-4 text-zinc-300" />
-                                  SCALP
+                                  <span>SCALP :</span>
+                                  <span className="text-sm font-black">{scalpRanked.length}</span>
                                 </div>
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{scalpRanked.length} setups</Pill>
                               </div>
                               <div className="space-y-2">{renderList(scalpRanked)}</div>
                             </div>
@@ -2160,9 +2143,9 @@ export function TradingView({
                               <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-100">
                                   <Layers className="h-4 w-4 text-zinc-300" />
-                                  NON-SCALP
+                                  <span>NON-SCALP :</span>
+                                  <span className="text-sm font-black">{nonScalpRanked.length}</span>
                                 </div>
-                                <Pill tone="bg-white/5 text-zinc-100 ring-1 ring-white/10">{nonScalpRanked.length} setups</Pill>
                               </div>
                               <div className="space-y-2">{renderList(nonScalpRanked)}</div>
                             </div>
