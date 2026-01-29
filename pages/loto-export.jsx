@@ -1,198 +1,129 @@
 // /pages/loto-export.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import TemplateCalibrator from "../components/TemplateCalibrator";
+import React, { useMemo, useState } from "react";
 import { parseExcelToTickets } from "../lib/excel";
 import { exportTicketsToPdf } from "../lib/pdf";
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onerror = () => reject(new Error("Không đọc được file ảnh."));
-    r.onload = () => resolve(r.result);
-    r.readAsDataURL(file);
-  });
-}
+import { TEMPLATE_SPEC } from "../lib/templateSpec";
 
 export default function LotoExportPage() {
-  const [templateFile, setTemplateFile] = useState(null);
-  const [templateDataUrl, setTemplateDataUrl] = useState("");
-  const [templateSize, setTemplateSize] = useState(null);
+    const [tickets, setTickets] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [serialStart, setSerialStart] = useState(1);
+    const totalPages = useMemo(() => Math.ceil(tickets.length / 4), [tickets.length]);
 
-  const [calib, setCalib] = useState(null);
+    const onPickExcel = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-  const [excelFile, setExcelFile] = useState(null);
-  const [tickets, setTickets] = useState([]);
-  const [totalRows, setTotalRows] = useState(0);
-
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-
-  const totalTickets = tickets.length;
-  const totalPages = useMemo(() => Math.ceil(totalTickets / 4), [totalTickets]);
-
-  // load template image to dataUrl
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!templateFile) return;
-        const url = await fileToDataUrl(templateFile);
-        setTemplateDataUrl(url);
-        setErr("");
-
-        // reset calib khi đổi template
-        setCalib(null);
-        setTemplateSize(null);
-      } catch (e) {
-        setErr(e?.message || "Lỗi template.");
-      }
-    })();
-  }, [templateFile]);
-
-  // load excel
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!excelFile) return;
         setLoading(true);
-        setErr("");
+        try {
+            const t = await parseExcelToTickets(file);
+            setTickets(t);
+        } catch (err) {
+            console.error(err);
+            alert(err?.message || "Parse Excel lỗi");
+        } finally {
+            setLoading(false);
+            e.target.value = "";
+        }
+    };
 
-        const { totalRows, tickets } = await parseExcelToTickets(excelFile);
-        setTotalRows(totalRows);
-        setTickets(tickets);
-      } catch (e) {
-        setErr(e?.message || "Lỗi Excel.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [excelFile]);
+    const onExport = async () => {
+        if (!tickets.length) return alert("Chưa có dữ liệu vé. Hãy import Excel trước.");
+        setLoading(true);
+        try {
+            await exportTicketsToPdf({
+                tickets,
+                serialStart: Number(serialStart) || 1,
+            });
+        } catch (err) {
+            console.error(err);
+            alert(err?.message || "Export PDF lỗi");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  // persist calib
-  useEffect(() => {
-    try {
-      if (calib && templateSize) {
-        localStorage.setItem("loto_calib_v1", JSON.stringify({ calib, templateSize }));
-      }
-    } catch {}
-  }, [calib, templateSize]);
+    return (
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: 16, fontFamily: "system-ui" }}>
+            <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Lô tô – Import Excel → Export PDF</h1>
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("loto_calib_v1");
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed?.calib && parsed?.templateSize) {
-        setCalib(parsed.calib);
-        setTemplateSize(parsed.templateSize);
-      }
-    } catch {}
-  }, []);
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                <label style={{ border: "1px solid #ddd", padding: 12, borderRadius: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Import Excel</div>
+                    <input type="file" accept=".xlsx,.xls" onChange={onPickExcel} disabled={loading} />
+                </label>
 
-  const canExport = templateDataUrl && templateSize && calib && totalTickets > 0 && !loading;
+                <label style={{ border: "1px solid #ddd", padding: 12, borderRadius: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Serial bắt đầu</div>
+                    <input
+                        type="number"
+                        value={serialStart}
+                        onChange={(e) => setSerialStart(e.target.value)}
+                        disabled={loading}
+                        style={{ width: 120 }}
+                    />
+                </label>
 
-  const onExport = async () => {
-    try {
-      setErr("");
-      setLoading(true);
-      await exportTicketsToPdf({
-        templateImgDataUrl: templateDataUrl,
-        templateNaturalSize: templateSize,
-        tickets,
-        serialStart: 1, // LT-001
-        calib,
-        fileName: "loto_export.pdf",
-      });
-    } catch (e) {
-      setErr(e?.message || "Export lỗi.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto max-w-4xl px-4 py-6">
-        <div className="text-lg font-semibold">Lô Tô Export (4 vé / trang)</div>
-        <div className="mt-1 text-xs text-slate-400">
-          Excel: 5 dòng = 1 vé · PDF: 4 vé/trang · SERIAL: LT-001 tăng dần
-        </div>
-
-        {/* Uploads */}
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-            <div className="text-sm font-semibold">1) Template image</div>
-            <input
-              type="file"
-              accept="image/*"
-              className="mt-3 block w-full text-sm"
-              onChange={(e) => setTemplateFile(e.target.files?.[0] || null)}
-            />
-            <div className="mt-2 text-xs text-slate-500">Khuyên dùng JPG/PNG đúng mẫu.</div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-            <div className="text-sm font-semibold">2) Excel data</div>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              className="mt-3 block w-full text-sm"
-              onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
-            />
-            <div className="mt-2 text-xs text-slate-500">
-              {excelFile ? `Đã tải: ${excelFile.name}` : "Chưa có file."}
+                <button
+                    onClick={onExport}
+                    disabled={loading || tickets.length === 0}
+                    style={{
+                        padding: "12px 16px",
+                        borderRadius: 10,
+                        border: "1px solid #111",
+                        background: loading ? "#eee" : "#111",
+                        color: loading ? "#111" : "#fff",
+                        cursor: loading ? "not-allowed" : "pointer",
+                        fontWeight: 700,
+                    }}
+                >
+                    Export PDF
+                </button>
             </div>
-          </div>
+
+            <div style={{ marginTop: 16, border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 13 }}>
+                    <b>Template:</b> {TEMPLATE_SPEC.url} (cố định)
+                </div>
+                <div style={{ fontSize: 13, marginTop: 6 }}>
+                    <b>Số vé:</b> {tickets.length} &nbsp;|&nbsp; <b>Số trang A4:</b> {totalPages}
+                </div>
+                <div style={{ fontSize: 12, marginTop: 8, color: "#555" }}>
+                    Ghi chú: 1 vé = 5 dòng, mỗi dòng 5 cột. 4 vé / 1 trang A4 dọc.
+                </div>
+            </div>
+
+            {tickets.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Preview vé đầu tiên (5×5)</div>
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(5, 48px)",
+                            gap: 6,
+                            alignItems: "center",
+                        }}
+                    >
+                        {tickets[0].grid.flat().map((v, idx) => (
+                            <div
+                                key={idx}
+                                style={{
+                                    width: 48,
+                                    height: 40,
+                                    border: "1px solid #ddd",
+                                    borderRadius: 6,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: 700,
+                                }}
+                            >
+                                {String(v)}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
-
-        {/* Stats */}
-        <div className="mt-4 rounded-2xl border border-slate-800 bg-black/20 p-4 text-sm">
-          <div className="flex flex-wrap gap-4">
-            <div>Rows: <span className="text-slate-200">{totalRows}</span></div>
-            <div>Tickets: <span className="text-slate-200">{totalTickets}</span></div>
-            <div>PDF pages: <span className="text-slate-200">{totalPages}</span></div>
-          </div>
-        </div>
-
-        {/* Calibrate */}
-        {templateDataUrl ? (
-          <div className="mt-4">
-            <TemplateCalibrator
-              imgSrc={templateDataUrl}
-              onDone={(calib, size) => {
-                setCalib(calib);
-                setTemplateSize(size);
-              }}
-            />
-          </div>
-        ) : null}
-
-        {/* Export */}
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="button"
-            disabled={!canExport}
-            onClick={onExport}
-            className={[
-              "rounded-2xl px-4 py-3 text-sm font-semibold transition",
-              canExport
-                ? "bg-slate-200 text-slate-950 hover:bg-white"
-                : "cursor-not-allowed bg-slate-800 text-slate-400",
-            ].join(" ")}
-          >
-            {loading ? "Đang xử lý..." : "EXPORT PDF"}
-          </button>
-
-          <div className="text-xs text-slate-500">
-            {(!calib || !templateSize) ? "Cần calibrate xong (3 clicks) trước khi export." : "Calibration OK."}
-          </div>
-        </div>
-
-        {err ? (
-          <div className="mt-4 rounded-2xl border border-red-900/60 bg-red-950/30 p-3 text-sm text-red-200">
-            {err}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
+    );
 }
