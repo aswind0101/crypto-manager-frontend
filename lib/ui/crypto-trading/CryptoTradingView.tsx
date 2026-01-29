@@ -29,17 +29,55 @@ import {
 } from "lucide-react";
 
 function AnimatedEllipsis() {
-  const [dots, setDots] = useState(".");
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "inline-flex",
+        width: "1.8em", // fixed width prevents layout shift
+        justifyContent: "space-between",
+      }}
+    >
+      <svg width="6" height="6" viewBox="0 0 6 6">
+        <circle cx="3" cy="3" r="2" fill="currentColor">
+          <animate
+            attributeName="opacity"
+            values="0.2;1;0.2"
+            dur="1.2s"
+            begin="0s"
+            repeatCount="indefinite"
+          />
+        </circle>
+      </svg>
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? "." : prev + "."));
-    }, 450);
-    return () => clearInterval(id);
-  }, []);
+      <svg width="6" height="6" viewBox="0 0 6 6">
+        <circle cx="3" cy="3" r="2" fill="currentColor">
+          <animate
+            attributeName="opacity"
+            values="0.2;1;0.2"
+            dur="1.2s"
+            begin="0.2s"
+            repeatCount="indefinite"
+          />
+        </circle>
+      </svg>
 
-  return <span>{dots}</span>;
+      <svg width="6" height="6" viewBox="0 0 6 6">
+        <circle cx="3" cy="3" r="2" fill="currentColor">
+          <animate
+            attributeName="opacity"
+            values="0.2;1;0.2"
+            dur="1.2s"
+            begin="0.4s"
+            repeatCount="indefinite"
+          />
+        </circle>
+      </svg>
+    </span>
+  );
 }
+
+
 function EcgBeatIcon({ className }: { className?: string }) {
   return (
     <span className={["inline-flex items-center justify-center", className || ""].join(" ")}>
@@ -67,6 +105,32 @@ function EcgBeatIcon({ className }: { className?: string }) {
         </circle>
       </svg>
     </span>
+  );
+}
+function SetupSearchingRunnerFull() {
+  return (
+    <div className="relative w-full py-1">
+      <svg
+        viewBox="0 0 100 10"
+        preserveAspectRatio="none"
+        className="block w-full h-[10px]"
+        fill="none"
+        aria-hidden="true"
+      >
+        {/* moving dot */}
+        <circle cy="5" r="2" fill="currentColor" className="text-zinc-200">
+          <animate
+            attributeName="cx"
+            values="2;98;2"
+            dur="2.5s"
+            repeatCount="indefinite"
+            keyTimes="0;0.5;1"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+            calcMode="spline"
+          />
+        </circle>
+      </svg>
+    </div>
   );
 }
 
@@ -1848,7 +1912,7 @@ export function TradingView({
                   <LineChart className="h-4 w-4 text-zinc-300" />
                   Trend by timeframe (Structure)
                 </div>
-                <Divider/>
+                <Divider />
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {["4h", "1h", "15m", "5m"].map((tf) => {
@@ -1978,10 +2042,14 @@ export function TradingView({
                         const renderList = (items: Array<{ s: TradeSetup; idx: number }>) => {
                           if (!items || items.length === 0) {
                             return (
-                              <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3 text-xs text-zinc-400">
-                                No setups in this category right now.
+                              <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/5 shadow-[0_1px_0_rgba(255,255,255,0.04)] p-3">
+                                <div className="text-[13px] text-zinc-400 text-center">
+                                  Searching <AnimatedEllipsis />
+                                </div>
+                                <SetupSearchingRunnerFull />
                               </div>
                             );
+
                           }
 
                           return items.map(({ s, idx }) => {
